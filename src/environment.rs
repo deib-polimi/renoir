@@ -6,6 +6,7 @@ use async_std::channel::Sender;
 use async_std::task::JoinHandle;
 
 use crate::block::{ExecutionMetadataRef, InnerBlock};
+use crate::config::EnvironmentConfig;
 use crate::operator::source::Source;
 use crate::scheduler;
 use crate::scheduler::ExecutionMetadata;
@@ -18,6 +19,7 @@ pub struct StartHandle {
 }
 
 pub struct StreamEnvironmentInner {
+    pub config: EnvironmentConfig,
     pub block_count: BlockId,
     pub next_blocks: HashMap<BlockId, Vec<BlockId>>,
     pub start_handles: HashMap<BlockId, StartHandle>,
@@ -28,10 +30,11 @@ pub struct StreamEnvironment {
 }
 
 impl StreamEnvironment {
-    pub fn new() -> Self {
+    pub fn new(config: EnvironmentConfig) -> Self {
         info!("Constructing environment");
         StreamEnvironment {
             inner: Rc::new(RefCell::new(StreamEnvironmentInner {
+                config,
                 block_count: 0,
                 next_blocks: Default::default(),
                 start_handles: Default::default(),

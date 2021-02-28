@@ -5,9 +5,11 @@ use async_std::stream::from_iter;
 
 use operator::source;
 
+use crate::config::EnvironmentConfig;
 use crate::environment::StreamEnvironment;
 
 mod block;
+mod config;
 mod environment;
 mod operator;
 mod scheduler;
@@ -18,7 +20,8 @@ mod worker;
 async fn main() {
     pretty_env_logger::init();
 
-    let mut env = StreamEnvironment::new();
+    let config = EnvironmentConfig::local(4);
+    let mut env = StreamEnvironment::new(config);
     let source = source::StreamSource::new(from_iter(0..10));
     let stream = env
         .stream(source)
