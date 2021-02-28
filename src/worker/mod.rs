@@ -1,9 +1,8 @@
 use async_std::channel::Receiver;
 
 use crate::block::InnerBlock;
-use crate::environment::StartHandle;
 use crate::operator::Operator;
-use crate::scheduler::ExecutionMetadata;
+use crate::scheduler::{ExecutionMetadata, StartHandle};
 
 pub fn spawn_worker<In, Out, OperatorChain>(
     block: InnerBlock<In, Out, OperatorChain>,

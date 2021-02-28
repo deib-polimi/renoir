@@ -1,28 +1,17 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
-
-use async_std::channel::Sender;
-use async_std::task::JoinHandle;
 
 use crate::block::{ExecutionMetadataRef, InnerBlock};
 use crate::config::EnvironmentConfig;
 use crate::operator::source::Source;
-use crate::scheduler;
-use crate::scheduler::ExecutionMetadata;
+use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
-use std::ops::DerefMut;
 
-pub struct StartHandle {
-    pub starter: Sender<ExecutionMetadata>,
-    pub join_handle: JoinHandle<()>,
-}
 
 pub struct StreamEnvironmentInner {
     pub config: EnvironmentConfig,
     pub block_count: BlockId,
-    pub next_blocks: HashMap<BlockId, Vec<BlockId>>,
-    pub start_handles: HashMap<BlockId, StartHandle>,
+    pub scheduler: Scheduler,
 }
 
 pub struct StreamEnvironment {
@@ -36,8 +25,7 @@ impl StreamEnvironment {
             inner: Rc::new(RefCell::new(StreamEnvironmentInner {
                 config,
                 block_count: 0,
-                next_blocks: Default::default(),
-                start_handles: Default::default(),
+                scheduler: Scheduler::new(config),
             })),
         }
     }
@@ -59,18 +47,10 @@ impl StreamEnvironment {
     pub async fn execute(self) {
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);
-        StreamEnvironment::log_topology(&env);
-        let join = scheduler::start(env.deref_mut()).await;
+        let join = env.scheduler.start().await;
         // wait till the computation ends
         for join_handle in join {
             join_handle.await;
-        }
-    }
-
-    fn log_topology(env: &StreamEnvironmentInner) {
-        debug!("Job graph:");
-        for (id, next) in env.next_blocks.iter() {
-            debug!("  {}: {:?}", id, next);
         }
     }
 }

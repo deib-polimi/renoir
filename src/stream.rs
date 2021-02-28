@@ -48,16 +48,9 @@ where
             let mut env = self.env.borrow_mut();
             let new_id = env.block_count;
             env.block_count += 1;
-            info!("Adding new block, id={}", new_id);
-            // connect the last block to the new one
-            env.next_blocks
-                .entry(self.block_id)
-                .or_default()
-                .push(new_id);
-            info!("Connecting blocks: {} -> {}", self.block_id, new_id);
-            // spawn the worker of the block
-            let start_handle = spawn_worker(self.block);
-            env.start_handles.insert(self.block_id, start_handle);
+            env.scheduler.add_block(self.block);
+            env.scheduler.connect_blocks(self.block_id, new_id);
+            info!("Creating a new block, id={}", new_id);
             new_id
         };
         let metadata = ExecutionMetadataRef::default();
@@ -71,8 +64,6 @@ where
     pub fn finalize_block(self) {
         let mut env = self.env.borrow_mut();
         info!("Finalizing block id={}", self.block_id);
-        // spawn the worker of the block
-        let start_handle = spawn_worker(self.block);
-        env.start_handles.insert(self.block_id, start_handle);
+        env.scheduler.add_block(self.block);
     }
 }
