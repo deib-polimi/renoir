@@ -64,4 +64,11 @@ where
             env: self.env,
         }
     }
+
+    pub fn finalize_block(self) {
+        let mut env = self.env.borrow_mut();
+        // spawn the worker of the block
+        let start_handle = spawn_worker(self.block);
+        env.start_handles.insert(self.block_id, start_handle);
+    }
 }

@@ -20,6 +20,7 @@ async fn main() {
         .map(|x| x.to_string())
         .shuffle()
         .map(|s| s.len());
-    // let result = stream.collect_vec();
+    let result = stream.collect_vec();
     env.execute().await;
+    println!("Output: {:?}", result.get());
 }

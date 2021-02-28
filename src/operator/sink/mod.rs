@@ -1,28 +1,24 @@
-use crate::operator::{Operator, StreamElement};
-use async_trait::async_trait;
+use async_std::sync::{Arc, Mutex};
 
-pub struct CollectVecSink<In, PreviousOperators>
-where
-    PreviousOperators: Operator<In>,
-{
-    prev: PreviousOperators,
-    result: Vec<In>,
+pub use collect_vec::*;
+
+use crate::operator::Operator;
+
+mod collect_vec;
+
+pub trait Sink: Operator<()> {}
+
+pub type StreamOutputRef<Out> = Arc<Mutex<Option<Out>>>;
+
+pub struct StreamOutput<Out> {
+    result: Arc<Mutex<Option<Out>>>,
 }
 
-#[async_trait]
-impl<In, PreviousOperators> Operator<()> for CollectVecSink<In, PreviousOperators>
-where
-    In: Send,
-    PreviousOperators: Operator<In> + Send,
-{
-    async fn next(&mut self) -> StreamElement<()> {
-        match self.prev.next().await {
-            StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
-                self.result.push(t);
-                StreamElement::Item(())
-            }
-            StreamElement::Watermark(w) => StreamElement::Watermark(w),
-            StreamElement::End => StreamElement::End,
-        }
+impl<Out> StreamOutput<Out> {
+    pub fn get(self) -> Option<Out> {
+        self.result
+            .try_lock()
+            .expect("Cannot lock output result")
+            .take()
     }
 }
