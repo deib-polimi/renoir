@@ -5,7 +5,7 @@ use async_std::sync::Arc;
 use once_cell::sync::OnceCell;
 
 use crate::operator::Operator;
-use crate::worker::ExecutionMetadata;
+use crate::scheduler::ExecutionMetadata;
 
 pub enum NextStrategy {
     OnlyOne,

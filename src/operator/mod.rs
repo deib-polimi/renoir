@@ -3,9 +3,11 @@ use std::time::Duration;
 use async_trait::async_trait;
 
 pub use map::*;
+pub use shuffle::*;
 
 mod map;
-mod sink;
+mod shuffle;
+pub mod sink;
 pub mod source;
 
 pub enum StreamElement<Out> {

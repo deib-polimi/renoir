@@ -8,8 +8,8 @@ use async_std::task::JoinHandle;
 use crate::block::{ExecutionMetadataRef, InnerBlock};
 use crate::operator::source::Source;
 use crate::scheduler;
+use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
-use crate::worker::ExecutionMetadata;
 use std::ops::DerefMut;
 
 pub struct StartHandle {

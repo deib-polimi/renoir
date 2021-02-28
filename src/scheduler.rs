@@ -1,7 +1,11 @@
 use async_std::task::JoinHandle;
 
 use crate::environment::StreamEnvironmentInner;
-use crate::worker::ExecutionMetadata;
+
+#[derive(Debug)]
+pub struct ExecutionMetadata {
+    // TODO: previous nodes, next nodes
+}
 
 pub async fn start(env: &mut StreamEnvironmentInner) -> Vec<JoinHandle<()>> {
     let mut join = Vec::new();

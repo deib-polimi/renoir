@@ -15,7 +15,11 @@ mod worker;
 async fn main() {
     let mut env = StreamEnvironment::new();
     let source = source::StreamSource::new(from_iter(0..10));
-    let stream = env.stream(source).map(|x| x.to_string());
+    let stream = env
+        .stream(source)
+        .map(|x| x.to_string())
+        .shuffle()
+        .map(|s| s.len());
     // let result = stream.collect_vec();
     env.execute().await;
 }

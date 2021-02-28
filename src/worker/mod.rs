@@ -1,12 +1,9 @@
+use async_std::channel::Receiver;
+
 use crate::block::InnerBlock;
 use crate::environment::StartHandle;
 use crate::operator::Operator;
-use async_std::channel::Receiver;
-
-#[derive(Debug)]
-pub struct ExecutionMetadata {
-    // TODO: previous nodes, next nodes
-}
+use crate::scheduler::ExecutionMetadata;
 
 pub fn spawn_worker<In, Out, OperatorChain>(
     block: InnerBlock<In, Out, OperatorChain>,
