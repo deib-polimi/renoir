@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::operator::Operator;
+use async_trait::async_trait;
+
+use crate::operator::{Operator, StreamElement};
 
 pub enum NextStrategy {
     OnlyOne,
@@ -41,5 +43,15 @@ impl<Out> Default for StartBlock<Out> {
         StartBlock {
             _out_type: Default::default(),
         }
+    }
+}
+
+#[async_trait]
+impl<Out> Operator<Out> for StartBlock<Out>
+where
+    Out: Send,
+{
+    async fn next(&mut self) -> StreamElement<Out> {
+        unimplemented!()
     }
 }

@@ -1,6 +1,10 @@
+mod map;
+
 use std::time::Duration;
 
 use async_trait::async_trait;
+
+pub use map::*;
 
 pub enum StreamElement<Out> {
     Item(Out),

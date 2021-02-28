@@ -1,21 +1,22 @@
 use std::cell::RefCell;
-use std::marker::PhantomData;
 use std::rc::Rc;
 
-use crate::block::{InnerBlock, NextStrategy, StartBlock};
+use crate::block::InnerBlock;
 use crate::source::Source;
 use crate::stream::{BlockId, Stream};
 use async_std::channel::Sender;
 use async_std::task::JoinHandle;
+use std::collections::HashMap;
 
-struct StartHandle {
-    starter: Sender<()>,
-    join_handle: JoinHandle<()>,
+pub struct StartHandle {
+    pub starter: Sender<()>,
+    pub join_handle: JoinHandle<()>,
 }
 
 pub struct StreamEnvironmentInner {
-    block_count: BlockId,
-    start_handles: Vec<StartHandle>,
+    pub block_count: BlockId,
+    pub next_blocks: HashMap<BlockId, Vec<BlockId>>,
+    pub start_handles: Vec<StartHandle>,
 }
 
 pub struct StreamEnvironment {
@@ -27,6 +28,7 @@ impl StreamEnvironment {
         StreamEnvironment {
             inner: Rc::new(RefCell::new(StreamEnvironmentInner {
                 block_count: 0,
+                next_blocks: Default::default(),
                 start_handles: Vec::new(),
             })),
         }
