@@ -7,6 +7,7 @@ use crate::environment::StreamEnvironment;
 mod block;
 mod environment;
 mod operator;
+mod scheduler;
 mod stream;
 mod worker;
 

@@ -1,8 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::block::{InnerBlock, StartBlock};
+use crate::block::InnerBlock;
 use crate::environment::StreamEnvironmentInner;
+use crate::operator::source::StartBlock;
 use crate::operator::Operator;
 use crate::worker::spawn_worker;
 
@@ -52,7 +53,7 @@ where
                 .push(new_id);
             // spawn the worker of the block
             let start_handle = spawn_worker(self.block);
-            env.start_handles.push(start_handle);
+            env.start_handles.insert(self.block_id, start_handle);
             new_id
         };
         Stream {

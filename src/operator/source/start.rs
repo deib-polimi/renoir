@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 use crate::operator::{Operator, StreamElement};
 use std::marker::PhantomData;
 

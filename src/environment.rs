@@ -1,22 +1,26 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
+
+use async_std::channel::Sender;
+use async_std::task::JoinHandle;
 
 use crate::block::InnerBlock;
 use crate::operator::source::Source;
+use crate::scheduler;
 use crate::stream::{BlockId, Stream};
-use async_std::channel::Sender;
-use async_std::task::JoinHandle;
-use std::collections::HashMap;
+use crate::worker::ExecutionMetadata;
+use std::ops::DerefMut;
 
 pub struct StartHandle {
-    pub starter: Sender<()>,
+    pub starter: Sender<ExecutionMetadata>,
     pub join_handle: JoinHandle<()>,
 }
 
 pub struct StreamEnvironmentInner {
     pub block_count: BlockId,
     pub next_blocks: HashMap<BlockId, Vec<BlockId>>,
-    pub start_handles: Vec<StartHandle>,
+    pub start_handles: HashMap<BlockId, StartHandle>,
 }
 
 pub struct StreamEnvironment {
@@ -29,7 +33,7 @@ impl StreamEnvironment {
             inner: Rc::new(RefCell::new(StreamEnvironmentInner {
                 block_count: 0,
                 next_blocks: Default::default(),
-                start_handles: Vec::new(),
+                start_handles: Default::default(),
             })),
         }
     }
@@ -48,12 +52,8 @@ impl StreamEnvironment {
     }
 
     pub async fn execute(self) {
-        let mut inner = self.inner.borrow_mut();
-        let mut join = Vec::new();
-        for handle in inner.start_handles.drain(..) {
-            handle.starter.send(()).await.unwrap();
-            join.push(handle.join_handle);
-        }
+        let join = scheduler::start(self.inner.borrow_mut().deref_mut()).await;
+        // wait till the computation ends
         for join_handle in join {
             join_handle.await;
         }

@@ -25,9 +25,7 @@ impl<Out> Source<Out> for StreamSource<Out> {}
 #[async_trait]
 impl<Out> Operator<Out> for StreamSource<Out> {
     async fn next(&mut self) -> StreamElement<Out> {
-        let next = self.inner.next();
-        let next = next.await;
-        match next {
+        match self.inner.next().await {
             Some(t) => StreamElement::Item(t),
             None => StreamElement::End,
         }
