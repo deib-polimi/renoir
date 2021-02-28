@@ -1,15 +1,19 @@
-use async_trait::async_trait;
-
-use crate::operator::{Operator, StreamElement};
 use std::marker::PhantomData;
 
+use async_trait::async_trait;
+
+use crate::block::ExecutionMetadataRef;
+use crate::operator::{Operator, StreamElement};
+
 pub struct StartBlock<Out> {
+    metadata: ExecutionMetadataRef,
     _out_type: PhantomData<Out>,
 }
 
-impl<Out> Default for StartBlock<Out> {
-    fn default() -> Self {
+impl<Out> StartBlock<Out> {
+    pub fn new(metadata: ExecutionMetadataRef) -> Self {
         StartBlock {
+            metadata,
             _out_type: Default::default(),
         }
     }

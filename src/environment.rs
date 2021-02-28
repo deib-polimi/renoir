@@ -5,7 +5,7 @@ use std::rc::Rc;
 use async_std::channel::Sender;
 use async_std::task::JoinHandle;
 
-use crate::block::InnerBlock;
+use crate::block::{ExecutionMetadataRef, InnerBlock};
 use crate::operator::source::Source;
 use crate::scheduler;
 use crate::stream::{BlockId, Stream};
@@ -46,7 +46,7 @@ impl StreamEnvironment {
         self.inner.borrow_mut().block_count += 1;
         Stream {
             block_id,
-            block: InnerBlock::new(source),
+            block: InnerBlock::new(source, ExecutionMetadataRef::default()),
             env: self.inner.clone(),
         }
     }

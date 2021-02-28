@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::block::InnerBlock;
+use crate::block::{ExecutionMetadataRef, InnerBlock};
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::source::StartBlock;
 use crate::operator::Operator;
@@ -34,6 +34,7 @@ where
             block: InnerBlock {
                 operators: get_operator(self.block.operators),
                 next_strategy: self.block.next_strategy,
+                execution_metadata: self.block.execution_metadata,
                 _in_type: Default::default(),
                 _out_type: Default::default(),
             },
@@ -56,9 +57,10 @@ where
             env.start_handles.insert(self.block_id, start_handle);
             new_id
         };
+        let metadata = ExecutionMetadataRef::default();
         Stream {
             block_id: new_id,
-            block: InnerBlock::new(Default::default()),
+            block: InnerBlock::new(StartBlock::new(metadata.clone()), metadata),
             env: self.env,
         }
     }
