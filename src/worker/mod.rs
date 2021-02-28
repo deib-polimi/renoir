@@ -15,6 +15,7 @@ where
         let _ = receiver.recv().await.unwrap();
         drop(receiver);
         // TODO: inform the block about the network topology
+        // TODO: call .next() and send to the next nodes
         block.operators.next().await;
     });
     StartHandle {

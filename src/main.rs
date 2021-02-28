@@ -1,12 +1,12 @@
 use async_std::stream::from_iter;
 
+use operator::source;
+
 use crate::environment::StreamEnvironment;
 
 mod block;
 mod environment;
 mod operator;
-mod sink;
-mod source;
 mod stream;
 mod worker;
 

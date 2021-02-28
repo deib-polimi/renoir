@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::block::InnerBlock;
-use crate::source::Source;
+use crate::operator::source::Source;
 use crate::stream::{BlockId, Stream};
 use async_std::channel::Sender;
 use async_std::task::JoinHandle;

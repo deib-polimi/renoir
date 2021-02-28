@@ -2,8 +2,8 @@ use async_std::stream::Stream;
 use async_std::stream::StreamExt;
 use async_trait::async_trait;
 
+use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
-use crate::source::Source;
 
 pub struct StreamSource<Out> {
     inner: Box<dyn Stream<Item = Out> + Unpin + Send>,
