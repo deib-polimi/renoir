@@ -32,6 +32,7 @@ where
         Stream {
             block_id: self.block_id,
             block: InnerBlock {
+                id: self.block_id,
                 operators: get_operator(self.block.operators),
                 next_strategy: self.block.next_strategy,
                 execution_metadata: self.block.execution_metadata,
@@ -47,11 +48,13 @@ where
             let mut env = self.env.borrow_mut();
             let new_id = env.block_count;
             env.block_count += 1;
+            info!("Adding new block, id={}", new_id);
             // connect the last block to the new one
             env.next_blocks
                 .entry(self.block_id)
                 .or_default()
                 .push(new_id);
+            info!("Connecting blocks: {} -> {}", self.block_id, new_id);
             // spawn the worker of the block
             let start_handle = spawn_worker(self.block);
             env.start_handles.insert(self.block_id, start_handle);
@@ -60,13 +63,14 @@ where
         let metadata = ExecutionMetadataRef::default();
         Stream {
             block_id: new_id,
-            block: InnerBlock::new(StartBlock::new(metadata.clone()), metadata),
+            block: InnerBlock::new(new_id, StartBlock::new(metadata.clone()), metadata),
             env: self.env,
         }
     }
 
     pub fn finalize_block(self) {
         let mut env = self.env.borrow_mut();
+        info!("Finalizing block id={}", self.block_id);
         // spawn the worker of the block
         let start_handle = spawn_worker(self.block);
         env.start_handles.insert(self.block_id, start_handle);

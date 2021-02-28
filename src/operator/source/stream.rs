@@ -30,4 +30,8 @@ impl<Out> Operator<Out> for StreamSource<Out> {
             None => StreamElement::End,
         }
     }
+
+    fn to_string(&self) -> String {
+        format!("StreamSource<{}>", std::any::type_name::<Out>())
+    }
 }

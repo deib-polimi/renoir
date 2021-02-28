@@ -29,10 +29,14 @@ async fn worker<In, Out, OperatorChain>(
     Out: Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
+    info!(
+        "Starting worker for block {}: {}",
+        block.id,
+        block.to_string()
+    );
     let metadata = receiver.recv().await.unwrap();
     block.execution_metadata.set(metadata).unwrap();
     drop(receiver);
-    // TODO: inform the block about the network topology
     // TODO: call .next() and send to the next nodes
     block.operators.next().await;
 }

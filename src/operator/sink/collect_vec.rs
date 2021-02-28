@@ -32,6 +32,10 @@ where
             }
         }
     }
+
+    fn to_string(&self) -> String {
+        format!("CollectVecSink<{}>", self.prev.to_string())
+    }
 }
 
 impl<Out, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators>

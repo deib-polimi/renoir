@@ -20,4 +20,6 @@ pub enum StreamElement<Out> {
 #[async_trait]
 pub trait Operator<Out> {
     async fn next(&mut self) -> StreamElement<Out>;
+
+    fn to_string(&self) -> String;
 }

@@ -27,4 +27,8 @@ where
     async fn next(&mut self) -> StreamElement<Out> {
         unimplemented!()
     }
+
+    fn to_string(&self) -> String {
+        format!("[{}]", std::any::type_name::<Out>())
+    }
 }

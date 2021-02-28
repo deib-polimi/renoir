@@ -32,6 +32,14 @@ where
             StreamElement::End => StreamElement::End,
         }
     }
+
+    fn to_string(&self) -> String {
+        format!(
+            "Map<{} -> {}>",
+            self.prev.to_string(),
+            std::any::type_name::<NewOut>()
+        )
+    }
 }
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>

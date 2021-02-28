@@ -29,6 +29,7 @@ pub struct StreamEnvironment {
 
 impl StreamEnvironment {
     pub fn new() -> Self {
+        info!("Constructing environment");
         StreamEnvironment {
             inner: Rc::new(RefCell::new(StreamEnvironmentInner {
                 block_count: 0,
@@ -44,18 +45,29 @@ impl StreamEnvironment {
     {
         let block_id = self.inner.borrow().block_count;
         self.inner.borrow_mut().block_count += 1;
+        info!("Creating a new stream, block_id={}", block_id);
         Stream {
             block_id,
-            block: InnerBlock::new(source, ExecutionMetadataRef::default()),
+            block: InnerBlock::new(block_id, source, ExecutionMetadataRef::default()),
             env: self.inner.clone(),
         }
     }
 
     pub async fn execute(self) {
-        let join = scheduler::start(self.inner.borrow_mut().deref_mut()).await;
+        let mut env = self.inner.borrow_mut();
+        info!("Starting execution of {} blocks", env.block_count);
+        StreamEnvironment::log_topology(&env);
+        let join = scheduler::start(env.deref_mut()).await;
         // wait till the computation ends
         for join_handle in join {
             join_handle.await;
+        }
+    }
+
+    fn log_topology(env: &StreamEnvironmentInner) {
+        debug!("Job graph:");
+        for (id, next) in env.next_blocks.iter() {
+            debug!("  {}: {:?}", id, next);
         }
     }
 }
