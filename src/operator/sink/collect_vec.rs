@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+use crate::block::ExecutionMetadataRef;
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
 use crate::operator::{Operator, StreamElement};
 use crate::stream::Stream;
@@ -19,7 +20,15 @@ where
     Out: Send + Sync,
     PreviousOperators: Operator<Out> + Send,
 {
+    fn init(&mut self, metadata: ExecutionMetadataRef) {
+        self.prev.init(metadata);
+    }
+
     async fn next(&mut self) -> StreamElement<()> {
+        // cloned CollectVecSink or already ended stream
+        if self.result.is_none() {
+            return StreamElement::End;
+        }
         match self.prev.next().await {
             StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
                 self.result.as_mut().unwrap().push(t);
@@ -27,7 +36,7 @@ where
             }
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::End => {
-                *self.output.lock().await = Some(self.result.take().expect("Double End"));
+                *self.output.lock().await = Some(self.result.take().unwrap());
                 StreamElement::End
             }
         }
@@ -43,6 +52,19 @@ where
     Out: Send + Sync,
     PreviousOperators: Operator<Out> + Send,
 {
+}
+impl<Out, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
+where
+    Out: Send + Sync,
+    PreviousOperators: Operator<Out> + Send,
+{
+    fn clone(&self) -> Self {
+        Self {
+            prev: self.prev.clone(),
+            result: None, // disable the new sink
+            output: self.output.clone(),
+        }
+    }
 }
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>

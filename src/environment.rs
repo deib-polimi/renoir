@@ -1,12 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::block::{ExecutionMetadataRef, InnerBlock};
+use crate::block::InnerBlock;
 use crate::config::EnvironmentConfig;
 use crate::operator::source::Source;
 use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
-
 
 pub struct StreamEnvironmentInner {
     pub config: EnvironmentConfig,
@@ -39,7 +38,7 @@ impl StreamEnvironment {
         info!("Creating a new stream, block_id={}", block_id);
         Stream {
             block_id,
-            block: InnerBlock::new(block_id, source, ExecutionMetadataRef::default()),
+            block: InnerBlock::new(block_id, source),
             env: self.inner.clone(),
         }
     }

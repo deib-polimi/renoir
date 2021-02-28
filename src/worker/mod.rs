@@ -33,10 +33,10 @@ async fn worker<In, Out, OperatorChain>(
     drop(receiver);
     let metadata = block.execution_metadata.get().unwrap();
     info!(
-        "Starting worker for block {}: {}: {:?}",
+        "Starting worker for block {}, replica {}: {}",
         block.id,
+        metadata.replica_id,
         block.to_string(),
-        metadata
     );
     // TODO: call .next() and send to the next nodes
     block.operators.next().await;

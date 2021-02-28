@@ -7,12 +7,14 @@ use crate::operator::Operator;
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 
+#[derive(Debug, Clone, Copy)]
 pub enum NextStrategy {
     OnlyOne,
     Random,
     GroupBy,
 }
 
+// FIXME: drop OnceCell?
 pub type ExecutionMetadataRef = Arc<OnceCell<ExecutionMetadata>>;
 
 pub struct InnerBlock<In, Out, OperatorChain>
@@ -31,12 +33,12 @@ impl<In, Out, OperatorChain> InnerBlock<In, Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
-    pub fn new(id: BlockId, operators: OperatorChain, metadata: ExecutionMetadataRef) -> Self {
+    pub fn new(id: BlockId, operators: OperatorChain) -> Self {
         Self {
             id,
             operators,
             next_strategy: NextStrategy::OnlyOne,
-            execution_metadata: metadata,
+            execution_metadata: ExecutionMetadataRef::default(),
             _in_type: Default::default(),
             _out_type: Default::default(),
         }
@@ -46,6 +48,22 @@ where
         match self.next_strategy {
             NextStrategy::Random => format!("Shuffle<{}>", self.operators.to_string()),
             _ => self.operators.to_string().to_string(),
+        }
+    }
+}
+
+impl<In, Out, OperatorChain> Clone for InnerBlock<In, Out, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            operators: self.operators.clone(),
+            next_strategy: self.next_strategy.clone(),
+            execution_metadata: ExecutionMetadataRef::default(), // new block = new metadata
+            _in_type: Default::default(),
+            _out_type: Default::default(),
         }
     }
 }

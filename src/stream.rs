@@ -1,11 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::block::{ExecutionMetadataRef, InnerBlock};
+use crate::block::InnerBlock;
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::source::StartBlock;
 use crate::operator::Operator;
-use crate::worker::spawn_worker;
 
 pub type BlockId = usize;
 
@@ -53,10 +52,9 @@ where
             info!("Creating a new block, id={}", new_id);
             new_id
         };
-        let metadata = ExecutionMetadataRef::default();
         Stream {
             block_id: new_id,
-            block: InnerBlock::new(new_id, StartBlock::new(metadata.clone()), metadata),
+            block: InnerBlock::new(new_id, StartBlock::new()),
             env: self.env,
         }
     }

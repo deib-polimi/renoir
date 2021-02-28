@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
+use crate::block::ExecutionMetadataRef;
 pub use map::*;
 pub use shuffle::*;
 
@@ -18,7 +19,9 @@ pub enum StreamElement<Out> {
 }
 
 #[async_trait]
-pub trait Operator<Out> {
+pub trait Operator<Out>: Clone {
+    fn init(&mut self, metadata: ExecutionMetadataRef);
+
     async fn next(&mut self) -> StreamElement<Out>;
 
     fn to_string(&self) -> String;
