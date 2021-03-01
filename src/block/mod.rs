@@ -19,6 +19,7 @@ pub type ExecutionMetadataRef = Arc<OnceCell<ExecutionMetadata>>;
 
 pub struct InnerBlock<In, Out, OperatorChain>
 where
+    Out: Clone + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub id: BlockId,
@@ -31,6 +32,7 @@ where
 
 impl<In, Out, OperatorChain> InnerBlock<In, Out, OperatorChain>
 where
+    Out: Clone + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub fn new(id: BlockId, operators: OperatorChain) -> Self {
@@ -54,6 +56,7 @@ where
 
 impl<In, Out, OperatorChain> Clone for InnerBlock<In, Out, OperatorChain>
 where
+    Out: Clone + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     fn clone(&self) -> Self {

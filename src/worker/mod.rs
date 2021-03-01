@@ -1,15 +1,15 @@
 use async_std::channel::Receiver;
 
 use crate::block::InnerBlock;
-use crate::operator::Operator;
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::{ExecutionMetadata, StartHandle};
 
 pub fn spawn_worker<In, Out, OperatorChain>(
     block: InnerBlock<In, Out, OperatorChain>,
 ) -> StartHandle
 where
-    In: Send + 'static,
-    Out: Send + 'static,
+    In: Clone + Send + 'static,
+    Out: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     let (sender, receiver) = async_std::channel::bounded(1);
@@ -24,8 +24,8 @@ async fn worker<In, Out, OperatorChain>(
     mut block: InnerBlock<In, Out, OperatorChain>,
     metadata_receiver: Receiver<ExecutionMetadata>,
 ) where
-    In: Send + 'static,
-    Out: Send + 'static,
+    In: Clone + Send + 'static,
+    Out: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     let metadata = metadata_receiver.recv().await.unwrap();
@@ -37,10 +37,26 @@ async fn worker<In, Out, OperatorChain>(
     drop(metadata_receiver);
     let metadata = block.execution_metadata.get().unwrap();
     info!(
-        "Starting worker for {:?}: {}",
+        "Starting worker for {}: {}",
         metadata.coord,
         block.to_string(),
     );
-    // TODO: call .next() and send to the next nodes
-    block.operators.next().await;
+    // notify the operators that we are about to start
+    block.operators.start().await;
+    let senders = metadata.network.lock().await.get_senders(metadata.coord);
+    loop {
+        let message = block.operators.next().await;
+        let is_end = matches!(message, StreamElement::End);
+        for (next, sender) in senders.iter() {
+            debug!("Sending message {} -> {}", metadata.coord, next);
+            let out_buf = vec![message.clone()];
+            if let Err(e) = sender.send(out_buf).await {
+                error!("Failed to send message to {}: {:?}", next, e);
+            }
+        }
+        if is_end {
+            break;
+        }
+    }
+    info!("Worker {} completed, exiting", metadata.coord);
 }

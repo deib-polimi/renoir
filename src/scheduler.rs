@@ -49,8 +49,8 @@ impl Scheduler {
 
     pub fn add_block<In, Out, OperatorChain>(&mut self, block: InnerBlock<In, Out, OperatorChain>)
     where
-        In: Send + 'static,
-        Out: Send + 'static,
+        In: Clone + Send + 'static,
+        Out: Clone + Send + 'static,
         OperatorChain: Operator<Out> + Send + 'static,
     {
         let block_id = block.id;
@@ -68,7 +68,7 @@ impl Scheduler {
             // register this block in the network
             self.network.register_local::<In>(coord);
             // initialize the block with its metadata ref (it will be set at start)
-            block.operators.init(block.execution_metadata.clone());
+            block.operators.block_init(block.execution_metadata.clone());
             // spawn the actual worker
             let start_handle = spawn_worker(block);
             self.start_handles
@@ -142,6 +142,8 @@ impl Scheduler {
         _block: &InnerBlock<In, Out, OperatorChain>,
     ) -> SchedulerBlockInfo
     where
+        In: Clone + Send + 'static,
+        Out: Clone + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         match self.config.runtime {

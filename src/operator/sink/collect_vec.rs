@@ -7,6 +7,7 @@ use crate::stream::Stream;
 
 pub struct CollectVecSink<Out, PreviousOperators>
 where
+    Out: Clone + Send + 'static,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -17,11 +18,15 @@ where
 #[async_trait]
 impl<Out, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
 where
-    Out: Send + Sync,
+    Out: Clone + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    fn init(&mut self, metadata: ExecutionMetadataRef) {
-        self.prev.init(metadata);
+    fn block_init(&mut self, metadata: ExecutionMetadataRef) {
+        self.prev.block_init(metadata);
+    }
+
+    async fn start(&mut self) {
+        self.prev.start().await;
     }
 
     async fn next(&mut self) -> StreamElement<()> {
@@ -49,13 +54,13 @@ where
 
 impl<Out, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators>
 where
-    Out: Send + Sync,
+    Out: Clone + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
 }
 impl<Out, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
 where
-    Out: Send + Sync,
+    Out: Clone + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     fn clone(&self) -> Self {
@@ -69,8 +74,8 @@ where
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Send + 'static,
-    Out: Send + Sync + 'static,
+    In: Clone + Send + 'static,
+    Out: Clone + Send + Sync + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {

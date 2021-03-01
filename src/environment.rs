@@ -27,6 +27,7 @@ impl StreamEnvironment {
 
     pub fn stream<Out, S>(&mut self, source: S) -> Stream<Out, Out, S>
     where
+        Out: Clone + Send + 'static,
         S: Source<Out> + 'static,
     {
         let block_id = self.inner.borrow().block_count;

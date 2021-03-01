@@ -9,6 +9,7 @@ use crate::stream::Stream;
 
 pub struct Map<Out, NewOut, PreviousOperators>
 where
+    Out: Clone + Send + 'static,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -20,12 +21,16 @@ where
 #[async_trait]
 impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Map<Out, NewOut, PreviousOperators>
 where
-    Out: Send,
-    NewOut: Send,
+    Out: Clone + Send + 'static,
+    NewOut: Clone + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    fn init(&mut self, metadata: ExecutionMetadataRef) {
-        self.prev.init(metadata);
+    fn block_init(&mut self, metadata: ExecutionMetadataRef) {
+        self.prev.block_init(metadata);
+    }
+
+    async fn start(&mut self) {
+        self.prev.start().await;
     }
 
     async fn next(&mut self) -> StreamElement<NewOut> {
@@ -48,8 +53,8 @@ where
 
 impl<Out, NewOut, PreviousOperators> Clone for Map<Out, NewOut, PreviousOperators>
 where
-    Out: Send,
-    NewOut: Send,
+    Out: Clone + Send + 'static,
+    NewOut: Clone + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     fn clone(&self) -> Self {
@@ -64,13 +69,13 @@ where
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
 where
+    In: Clone + Send + 'static,
+    Out: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn map<NewOut, F>(self, f: F) -> Stream<In, NewOut, Map<Out, NewOut, OperatorChain>>
     where
-        In: Send + 'static,
-        Out: Send + 'static,
-        NewOut: Send + 'static,
+        NewOut: Clone + Send + 'static,
         F: Fn(Out) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| Map {

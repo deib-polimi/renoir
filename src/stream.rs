@@ -10,6 +10,8 @@ pub type BlockId = usize;
 
 pub struct Stream<In, Out, OperatorChain>
 where
+    In: Clone + Send + 'static,
+    Out: Clone + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub block_id: BlockId,
@@ -19,12 +21,13 @@ where
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Send + 'static,
-    Out: Send + 'static,
+    In: Clone + Send + 'static,
+    Out: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn add_operator<NewOut, Op, GetOp>(self, get_operator: GetOp) -> Stream<In, NewOut, Op>
     where
+        NewOut: Clone + Send + 'static,
         Op: Operator<NewOut> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
     {

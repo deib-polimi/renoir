@@ -21,14 +21,15 @@ impl<Out> StreamSource<Out> {
     }
 }
 
-impl<Out> Source<Out> for StreamSource<Out> where Out: Send + Unpin + 'static {}
+impl<Out> Source<Out> for StreamSource<Out> where Out: Clone + Send + Unpin + 'static {}
 
 #[async_trait]
 impl<Out> Operator<Out> for StreamSource<Out>
 where
-    Out: Send + Unpin + 'static,
+    Out: Clone + Send + Unpin + 'static,
 {
-    fn init(&mut self, _metadata: ExecutionMetadataRef) {}
+    fn block_init(&mut self, _metadata: ExecutionMetadataRef) {}
+    async fn start(&mut self) {}
 
     async fn next(&mut self) -> StreamElement<Out> {
         match self.inner.next().await {

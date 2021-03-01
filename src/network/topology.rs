@@ -4,23 +4,23 @@ use std::marker::PhantomData;
 use async_std::channel::bounded;
 use typemap::{Key, ShareMap};
 
-use crate::network::{Coord, NetworkReceiver, NetworkSender};
+use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender};
 
 struct ReceiverKey<In>(PhantomData<In>);
 
 impl<In> Key for ReceiverKey<In>
 where
-    In: 'static,
+    In: Clone + Send + 'static,
 {
-    type Value = HashMap<Coord, NetworkReceiver<In>>;
+    type Value = HashMap<Coord, NetworkReceiver<NetworkMessage<In>>>;
 }
 
 struct SenderKey<Out>(PhantomData<Out>);
 impl<Out> Key for SenderKey<Out>
 where
-    Out: 'static,
+    Out: Clone + Send + 'static,
 {
-    type Value = HashMap<Coord, NetworkSender<Out>>;
+    type Value = HashMap<Coord, NetworkSender<NetworkMessage<Out>>>;
 }
 
 pub struct NetworkTopology {
@@ -40,7 +40,7 @@ impl NetworkTopology {
 
     pub fn register_local<T>(&mut self, coord: Coord)
     where
-        T: Send + 'static,
+        T: Clone + Send + 'static,
     {
         let (sender, receiver) = bounded(1);
         let sender = NetworkSender::Local(sender);
@@ -55,9 +55,9 @@ impl NetworkTopology {
             .insert(coord, receiver);
     }
 
-    pub fn get_sender<T>(&self, coord: Coord) -> NetworkSender<T>
+    pub fn get_sender<T>(&self, coord: Coord) -> NetworkSender<NetworkMessage<T>>
     where
-        T: Send + 'static,
+        T: Clone + Send + 'static,
     {
         let map = self.senders.get::<SenderKey<T>>().unwrap_or_else(|| {
             panic!(
@@ -76,9 +76,19 @@ impl NetworkTopology {
             .clone()
     }
 
-    pub fn get_receiver<T>(&mut self, coord: Coord) -> NetworkReceiver<T>
+    pub fn get_senders<T>(&self, coord: Coord) -> HashMap<Coord, NetworkSender<NetworkMessage<T>>>
     where
-        T: Send + 'static,
+        T: Clone + Send + 'static,
+    {
+        match self.next.get(&coord) {
+            None => Default::default(),
+            Some(next) => next.iter().map(|&c| (c, self.get_sender(c))).collect(),
+        }
+    }
+
+    pub fn get_receiver<T>(&mut self, coord: Coord) -> NetworkReceiver<NetworkMessage<T>>
+    where
+        T: Clone + Send + 'static,
     {
         let map = self
             .receivers
