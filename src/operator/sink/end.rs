@@ -8,7 +8,7 @@ use crate::network::{NetworkMessage, NetworkSender};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
-type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
+pub type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
 
 pub struct EndBlock<Out, OperatorChain>
 where
@@ -36,7 +36,7 @@ where
     }
 }
 
-async fn broadcast<Out>(senders: &SenderList<Out>, message: NetworkMessage<Out>)
+pub async fn broadcast<Out>(senders: &SenderList<Out>, message: NetworkMessage<Out>)
 where
     Out: Clone + Send + 'static,
 {
@@ -116,7 +116,7 @@ where
             }
         }
         info!(
-            "End of {} has these senders: {:?}",
+            "EndBlock of {} has these senders: {:?}",
             metadata.coord, self.senders
         );
         self.metadata = Some(metadata);
@@ -126,11 +126,10 @@ where
         let message = self.prev.next().await;
         let message2 = message.clone();
         match message2 {
-            message2 @ StreamElement::Watermark(_) => {
+            StreamElement::Watermark(_) | StreamElement::End => {
                 broadcast(&self.senders, vec![message2]).await
             }
-            message2 @ StreamElement::End => broadcast(&self.senders, vec![message2]).await,
-            message2 @ _ => send(&self.senders, message2).await,
+            _ => send(&self.senders, message2).await,
         };
         if matches!(message, StreamElement::End) {
             let metadata = self.metadata.as_ref().unwrap();

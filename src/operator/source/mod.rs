@@ -1,6 +1,7 @@
-use crate::operator::Operator;
 pub use start::*;
 pub use stream::*;
+
+use crate::operator::Operator;
 
 mod start;
 mod stream;

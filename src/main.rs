@@ -28,7 +28,9 @@ async fn main() {
         .stream(source)
         .map(|x| x.to_string())
         .shuffle()
-        .map(|s| s.len());
+        .group_by(|s| s.len())
+        .map(|(_k, s)| s.len())
+        .unkey();
     let result = stream.collect_vec();
     env.execute().await;
     println!("Output: {:?}", result.get());

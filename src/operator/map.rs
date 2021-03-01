@@ -3,7 +3,8 @@ use async_trait::async_trait;
 
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::Stream;
+use crate::stream::{KeyValue, KeyedStream, Stream};
+use std::hash::Hash;
 
 pub struct Map<Out, NewOut, PreviousOperators>
 where
@@ -72,6 +73,28 @@ where
         self.add_operator(|prev| Map {
             prev,
             f: Arc::new(f),
+        })
+    }
+}
+
+impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+where
+    Key: Clone + Send + Hash + Eq + 'static,
+    In: Clone + Send + 'static,
+    Out: Clone + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+{
+    pub fn map<NewOut, F>(
+        self,
+        f: F,
+    ) -> KeyedStream<In, Key, NewOut, Map<KeyValue<Key, Out>, KeyValue<Key, NewOut>, OperatorChain>>
+    where
+        NewOut: Clone + Send + 'static,
+        F: Fn(KeyValue<Key, Out>) -> NewOut + Send + Sync + 'static,
+    {
+        self.add_operator(|prev| Map {
+            prev,
+            f: Arc::new(move |(k, v)| (k.clone(), f((k, v)))),
         })
     }
 }

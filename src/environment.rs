@@ -62,6 +62,13 @@ impl StreamEnvironmentInner {
         }
     }
 
+    pub fn new_block(&mut self) -> BlockId {
+        let new_id = self.block_count;
+        self.block_count += 1;
+        info!("Creating a new block, id={}", new_id);
+        new_id
+    }
+
     pub fn scheduler_mut(&mut self) -> &mut Scheduler {
         self.scheduler
             .as_mut()
