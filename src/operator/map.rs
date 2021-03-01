@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use async_std::sync::Arc;
 use async_trait::async_trait;
 
@@ -14,8 +12,6 @@ where
 {
     prev: PreviousOperators,
     f: Arc<dyn Fn(Out) -> NewOut + Send + Sync>,
-    _out_type: PhantomData<Out>,
-    _new_out_type: PhantomData<NewOut>,
 }
 
 #[async_trait]
@@ -61,8 +57,6 @@ where
         Self {
             prev: self.prev.clone(),
             f: self.f.clone(),
-            _out_type: Default::default(),
-            _new_out_type: Default::default(),
         }
     }
 }
@@ -81,8 +75,6 @@ where
         self.add_operator(|prev| Map {
             prev,
             f: Arc::new(f),
-            _out_type: Default::default(),
-            _new_out_type: Default::default(),
         })
     }
 }
