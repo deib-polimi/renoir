@@ -46,7 +46,7 @@ where
     }
 
     fn to_string(&self) -> String {
-        format!("CollectVecSink<{}>", self.prev.to_string())
+        format!("{} -> CollectVecSink", self.prev.to_string())
     }
 }
 

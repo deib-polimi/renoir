@@ -36,8 +36,9 @@ where
 
     fn to_string(&self) -> String {
         format!(
-            "Map<{} -> {}>",
+            "{} -> Map<{} -> {}>",
             self.prev.to_string(),
+            std::any::type_name::<Out>(),
             std::any::type_name::<NewOut>()
         )
     }
