@@ -49,6 +49,8 @@ async fn worker<In, Out, OperatorChain>(
         let is_end = matches!(message, StreamElement::End);
         for (next, sender) in senders.iter() {
             debug!("Sending message {} -> {}", metadata.coord, next);
+            // TODO: batching
+            // TODO: next_strategy
             let out_buf = vec![message.clone()];
             if let Err(e) = sender.send(out_buf).await {
                 error!("Failed to send message to {}: {:?}", next, e);

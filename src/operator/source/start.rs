@@ -13,6 +13,7 @@ where
     metadata: Option<ExecutionMetadataRef>,
     receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
     buffer: VecDeque<StreamElement<Out>>,
+    missing_ends: usize,
 }
 
 impl<Out> StartBlock<Out>
@@ -24,6 +25,7 @@ where
             metadata: None,
             receiver: None,
             buffer: Default::default(),
+            missing_ends: 0,
         }
     }
 }
@@ -41,16 +43,40 @@ where
         let metadata = self.metadata.as_ref().unwrap().get().unwrap();
         let mut network = metadata.network.lock().await;
         self.receiver = Some(network.get_receiver(metadata.coord));
-        info!("StartBlock {} initialized", metadata.coord);
+        self.missing_ends = metadata.num_prev;
+        info!(
+            "StartBlock {} initialized, {} previous blocks, receiver is: {:?}",
+            metadata.coord, metadata.num_prev, self.receiver
+        );
     }
 
     async fn next(&mut self) -> StreamElement<Out> {
+        // all the previous blocks sent and end: we're done
+        if self.missing_ends == 0 {
+            let metadata = self.metadata.as_ref().unwrap().get().unwrap();
+            info!("StartBlock for {} has ended", metadata.coord);
+            return StreamElement::End;
+        }
+        let receiver = self.receiver.as_ref().unwrap();
         if self.buffer.is_empty() {
-            let receiver = self.receiver.as_ref().unwrap();
+            // receive from any previous block
             let buf = receiver.recv().await.unwrap();
             self.buffer.append(&mut buf.into());
         }
-        self.buffer.pop_front().unwrap_or(StreamElement::End)
+        let message = self
+            .buffer
+            .pop_front()
+            .expect("Previous block sent an empty message");
+        if matches!(message, StreamElement::End) {
+            let metadata = self.metadata.as_ref().unwrap().get().unwrap();
+            self.missing_ends -= 1;
+            debug!(
+                "{} received an end, {} more to come",
+                metadata.coord, self.missing_ends
+            );
+            return self.next().await;
+        }
+        message
     }
 
     fn to_string(&self) -> String {
@@ -70,6 +96,7 @@ where
             metadata: None,
             receiver: None,
             buffer: Default::default(),
+            missing_ends: 0,
         }
     }
 }

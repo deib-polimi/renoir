@@ -15,6 +15,7 @@ pub type ReplicaId = usize;
 
 pub struct ExecutionMetadata {
     pub coord: Coord,
+    pub num_prev: usize,
     pub network: Arc<Mutex<NetworkTopology>>,
 }
 
@@ -31,6 +32,7 @@ pub struct SchedulerBlockInfo {
 pub struct Scheduler {
     pub config: EnvironmentConfig,
     pub next_blocks: HashMap<BlockId, Vec<BlockId>>,
+    pub prev_blocks: HashMap<BlockId, Vec<BlockId>>,
     pub block_info: HashMap<BlockId, SchedulerBlockInfo>,
     pub start_handles: HashMap<BlockId, Vec<StartHandle>>,
     pub network: NetworkTopology,
@@ -41,6 +43,7 @@ impl Scheduler {
         Self {
             config,
             next_blocks: Default::default(),
+            prev_blocks: Default::default(),
             block_info: Default::default(),
             start_handles: Default::default(),
             network: NetworkTopology::new(),
@@ -84,6 +87,7 @@ impl Scheduler {
             panic!("Connecting from an unknown block: {}", from);
         }
         self.next_blocks.entry(from).or_default().push(to);
+        self.prev_blocks.entry(to).or_default().push(from);
     }
 
     pub async fn start(self) -> Vec<JoinHandle<()>> {
@@ -99,12 +103,15 @@ impl Scheduler {
         self.network.log_topology();
 
         let mut join = Vec::new();
+        let num_prev = self.num_prev();
         let network = Arc::new(Mutex::new(self.network));
+        let start_handles: Vec<_> = self.start_handles.drain().collect();
         // start the execution
-        for (block_id, handles) in self.start_handles.drain() {
+        for (block_id, handles) in start_handles {
             for (replica_id, handle) in handles.into_iter().enumerate() {
                 let metadata = ExecutionMetadata {
                     coord: Coord::new(block_id, replica_id),
+                    num_prev: num_prev[&block_id],
                     network: network.clone(),
                 };
                 handle.starter.send(metadata).await.unwrap();
@@ -112,6 +119,25 @@ impl Scheduler {
             }
         }
         join
+    }
+
+    fn num_prev(&self) -> HashMap<BlockId, usize> {
+        self.block_info
+            .keys()
+            .map(|&block_id| {
+                (
+                    block_id,
+                    if let Some(prev_blocks) = self.prev_blocks.get(&block_id) {
+                        prev_blocks
+                            .iter()
+                            .map(|b| self.block_info[b].num_replicas)
+                            .sum()
+                    } else {
+                        0
+                    },
+                )
+            })
+            .collect()
     }
 
     fn setup_topology(&mut self) {

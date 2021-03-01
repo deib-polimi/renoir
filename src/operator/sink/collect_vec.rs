@@ -30,18 +30,20 @@ where
     }
 
     async fn next(&mut self) -> StreamElement<()> {
-        // cloned CollectVecSink or already ended stream
-        if self.result.is_none() {
-            return StreamElement::End;
-        }
         match self.prev.next().await {
             StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
-                self.result.as_mut().unwrap().push(t);
+                // cloned CollectVecSink or already ended stream
+                if let Some(result) = self.result.as_mut() {
+                    result.push(t);
+                }
+                info!("Received element at collect_vec");
                 StreamElement::Item(())
             }
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::End => {
-                *self.output.lock().await = Some(self.result.take().unwrap());
+                if let Some(result) = self.result.take() {
+                    *self.output.lock().await = Some(result);
+                }
                 StreamElement::End
             }
         }

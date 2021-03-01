@@ -1,4 +1,5 @@
-use std::fmt::{Display, Formatter};
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 
 use async_std::channel::{Receiver, Sender};
 
@@ -7,7 +8,6 @@ pub use topology::*;
 use crate::operator::StreamElement;
 use crate::scheduler::ReplicaId;
 use crate::stream::BlockId;
-use std::error::Error;
 
 mod topology;
 
@@ -35,34 +35,85 @@ impl Display for Coord {
     }
 }
 
-pub enum NetworkReceiver<In> {
+pub struct NetworkReceiver<In> {
+    pub coord: Coord,
+    inner: NetworkReceiverInner<In>,
+}
+
+pub enum NetworkReceiverInner<In> {
     Local(Receiver<In>),
 }
 
-pub enum NetworkSender<Out> {
+pub struct NetworkSender<Out> {
+    pub coord: Coord,
+    inner: NetworkSenderInner<Out>,
+}
+
+pub enum NetworkSenderInner<Out> {
     Local(Sender<Out>),
 }
 
 impl<Out> Clone for NetworkSender<Out> {
     fn clone(&self) -> Self {
-        match &self {
-            NetworkSender::Local(local) => NetworkSender::Local(local.clone()),
+        match &self.inner {
+            NetworkSenderInner::Local(local) => NetworkSender {
+                coord: self.coord,
+                inner: NetworkSenderInner::Local(local.clone()),
+            },
         }
     }
 }
 
 impl<In> NetworkReceiver<In> {
+    pub fn local(coord: Coord, receiver: Receiver<In>) -> Self {
+        Self {
+            coord,
+            inner: NetworkReceiverInner::Local(receiver),
+        }
+    }
+
     pub async fn recv(&self) -> Result<In, impl Error> {
-        match self {
-            NetworkReceiver::Local(local) => local.recv().await,
+        match &self.inner {
+            NetworkReceiverInner::Local(local) => local.recv().await,
         }
     }
 }
 
+impl<In> Debug for NetworkReceiver<In> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let typ = match &self.inner {
+            NetworkReceiverInner::Local(_) => "local",
+        };
+        f.debug_struct("NetworkReceiver")
+            .field("coord", &self.coord)
+            .field("type", &typ)
+            .finish()
+    }
+}
+
 impl<Out> NetworkSender<Out> {
-    pub async fn send(&self, item: Out) -> Result<(), impl Error> {
-        match self {
-            NetworkSender::Local(local) => local.send(item).await,
+    pub fn local(coord: Coord, sender: Sender<Out>) -> Self {
+        Self {
+            coord,
+            inner: NetworkSenderInner::Local(sender),
         }
+    }
+
+    pub async fn send(&self, item: Out) -> Result<(), impl Error> {
+        match &self.inner {
+            NetworkSenderInner::Local(local) => local.send(item).await,
+        }
+    }
+}
+
+impl<Out> Debug for NetworkSender<Out> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let typ = match &self.inner {
+            NetworkSenderInner::Local(_) => "local",
+        };
+        f.debug_struct("NetworkSender")
+            .field("coord", &self.coord)
+            .field("type", &typ)
+            .finish()
     }
 }

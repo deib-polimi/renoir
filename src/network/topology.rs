@@ -43,8 +43,8 @@ impl NetworkTopology {
         T: Clone + Send + 'static,
     {
         let (sender, receiver) = bounded(1);
-        let sender = NetworkSender::Local(sender);
-        let receiver = NetworkReceiver::Local(receiver);
+        let sender = NetworkSender::local(coord, sender);
+        let receiver = NetworkReceiver::local(coord, receiver);
         self.senders
             .entry::<SenderKey<T>>()
             .or_insert_with(|| Default::default())

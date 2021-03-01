@@ -23,7 +23,7 @@ async fn main() {
 
     let config = EnvironmentConfig::local(4);
     let mut env = StreamEnvironment::new(config);
-    let source = source::StreamSource::new(from_iter(0..10));
+    let source = source::StreamSource::new(from_iter(90..110));
     let stream = env
         .stream(source)
         .map(|x| x.to_string())
