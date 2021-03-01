@@ -36,7 +36,7 @@ where
                 if let Some(result) = self.result.as_mut() {
                     result.push(t);
                 }
-                info!("Received element at collect_vec");
+                debug!("Received element at collect_vec");
                 StreamElement::Item(())
             }
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
@@ -66,11 +66,7 @@ where
     PreviousOperators: Operator<Out> + Send,
 {
     fn clone(&self) -> Self {
-        Self {
-            prev: self.prev.clone(),
-            result: None, // disable the new sink
-            output: self.output.clone(),
-        }
+        panic!("CollectVecSink cannot be cloned");
     }
 }
 
@@ -81,13 +77,16 @@ where
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {
+        let mut new_stream = self.add_block();
+        new_stream.block.max_parallelism = Some(1);
         let output = StreamOutputRef::default();
-        self.add_operator(|prev| CollectVecSink {
-            prev,
-            result: Some(Vec::new()),
-            output: output.clone(),
-        })
-        .finalize_block();
+        new_stream
+            .add_operator(|prev| CollectVecSink {
+                prev,
+                result: Some(Vec::new()),
+                output: output.clone(),
+            })
+            .finalize_block();
         StreamOutput { result: output }
     }
 }

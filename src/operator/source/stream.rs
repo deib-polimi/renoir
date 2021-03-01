@@ -49,8 +49,6 @@ where
 {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
-        Self {
-            inner: Box::new(stream::empty()),
-        }
+        panic!("StreamSource cannot be cloned");
     }
 }

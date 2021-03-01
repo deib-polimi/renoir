@@ -25,6 +25,7 @@ where
     pub id: BlockId,
     pub operators: OperatorChain,
     pub next_strategy: NextStrategy,
+    pub max_parallelism: Option<usize>,
     pub execution_metadata: ExecutionMetadataRef,
     pub _in_type: PhantomData<In>,
     pub _out_type: PhantomData<Out>,
@@ -40,6 +41,7 @@ where
             id,
             operators,
             next_strategy: NextStrategy::OnlyOne,
+            max_parallelism: None,
             execution_metadata: ExecutionMetadataRef::default(),
             _in_type: Default::default(),
             _out_type: Default::default(),
@@ -47,10 +49,7 @@ where
     }
 
     pub fn to_string(&self) -> String {
-        match self.next_strategy {
-            NextStrategy::Random => format!("Shuffle<{}>", self.operators.to_string()),
-            _ => self.operators.to_string().to_string(),
-        }
+        self.operators.to_string()
     }
 }
 
@@ -64,6 +63,7 @@ where
             id: self.id,
             operators: self.operators.clone(),
             next_strategy: self.next_strategy.clone(),
+            max_parallelism: self.max_parallelism,
             execution_metadata: ExecutionMetadataRef::default(), // new block = new metadata
             _in_type: Default::default(),
             _out_type: Default::default(),

@@ -51,9 +51,9 @@ where
     }
 
     async fn next(&mut self) -> StreamElement<Out> {
+        let metadata = self.metadata.as_ref().unwrap().get().unwrap();
         // all the previous blocks sent and end: we're done
         if self.missing_ends == 0 {
-            let metadata = self.metadata.as_ref().unwrap().get().unwrap();
             info!("StartBlock for {} has ended", metadata.coord);
             return StreamElement::End;
         }
@@ -68,7 +68,6 @@ where
             .pop_front()
             .expect("Previous block sent an empty message");
         if matches!(message, StreamElement::End) {
-            let metadata = self.metadata.as_ref().unwrap().get().unwrap();
             self.missing_ends -= 1;
             debug!(
                 "{} received an end, {} more to come",
@@ -76,6 +75,7 @@ where
             );
             return self.next().await;
         }
+        debug!("Block {} received a message", metadata.coord);
         message
     }
 

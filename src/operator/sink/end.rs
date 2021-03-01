@@ -1,0 +1,170 @@
+use std::collections::HashMap;
+
+use async_trait::async_trait;
+
+use crate::block::{ExecutionMetadataRef, NextStrategy};
+use crate::network::{NetworkMessage, NetworkSender};
+use crate::operator::{Operator, StreamElement};
+use rand::{thread_rng, Rng};
+
+type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
+
+pub struct EndBlock<Out, OperatorChain>
+where
+    Out: Clone + Send + 'static,
+    OperatorChain: Operator<Out>,
+{
+    prev: OperatorChain,
+    metadata: Option<ExecutionMetadataRef>,
+    next_strategy: NextStrategy,
+    senders: SenderList<Out>,
+}
+
+impl<Out, OperatorChain> EndBlock<Out, OperatorChain>
+where
+    Out: Clone + Send + 'static,
+    OperatorChain: Operator<Out>,
+{
+    pub fn new(prev: OperatorChain, next_strategy: NextStrategy) -> Self {
+        Self {
+            prev,
+            metadata: None,
+            next_strategy,
+            senders: Default::default(),
+        }
+    }
+}
+
+async fn broadcast<Out>(senders: &SenderList<Out>, message: NetworkMessage<Out>)
+where
+    Out: Clone + Send + 'static,
+{
+    for senders in senders.iter() {
+        for sender in senders.iter() {
+            let message = message.clone();
+            if let Err(e) = sender.send(message).await {
+                error!("Failed to send message to {:?}: {:?}", sender, e);
+            }
+        }
+    }
+}
+
+async fn send<Out>(senders: &SenderList<Out>, message: StreamElement<Out>)
+where
+    Out: Clone + Send + 'static,
+{
+    for senders in senders.iter() {
+        let out_buf = vec![message.clone()];
+        let index = thread_rng().gen_range(0..senders.len());
+        // TODO: batching
+        let sender = &senders[index];
+        if let Err(e) = sender.send(out_buf).await {
+            error!("Failed to send message to {:?}: {:?}", sender, e);
+        }
+    }
+}
+
+#[async_trait]
+impl<Out, OperatorChain> Operator<Out> for EndBlock<Out, OperatorChain>
+where
+    Out: Clone + Send + 'static,
+    OperatorChain: Operator<Out> + Send,
+{
+    fn block_init(&mut self, metadata: ExecutionMetadataRef) {
+        self.metadata = Some(metadata.clone());
+        self.prev.block_init(metadata);
+    }
+
+    async fn start(&mut self) {
+        self.prev.start().await;
+
+        let metadata = self.metadata.as_ref().unwrap().get().unwrap();
+        let network = metadata.network.lock().await;
+        let senders = network.get_senders(metadata.coord);
+        let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();
+        for (coord, sender) in senders {
+            by_block_id.entry(coord.block_id).or_default().push(sender);
+        }
+        for (block_id, senders) in by_block_id {
+            match self.next_strategy {
+                NextStrategy::OnlyOne => {
+                    assert!(
+                        senders.len() == 1 || senders.len() == metadata.num_replicas,
+                        "OnlyOne cannot mix the number of replicas: block={} current={}, next={}",
+                        block_id,
+                        senders.len(),
+                        metadata.num_replicas
+                    );
+                    if senders.len() == 1 {
+                        self.senders.push(senders);
+                    } else {
+                        let mut found = false;
+                        for sender in senders {
+                            if sender.coord.replica_id == metadata.coord.replica_id {
+                                found = true;
+                                self.senders.push(vec![sender]);
+                                break;
+                            }
+                        }
+                        assert!(
+                            found,
+                            "Cannot found next sender for the block with the same replica_id: {}",
+                            metadata.coord
+                        );
+                    }
+                }
+                NextStrategy::Random => {
+                    self.senders.push(senders);
+                }
+                NextStrategy::GroupBy => todo!("GroupBy is not supported yet"),
+            }
+        }
+        info!(
+            "End of {} has these senders: {:?}",
+            metadata.coord, self.senders
+        );
+    }
+
+    async fn next(&mut self) -> StreamElement<Out> {
+        let message = self.prev.next().await;
+        let message2 = message.clone();
+        match message2 {
+            message2 @ StreamElement::Watermark(_) => {
+                broadcast(&self.senders, vec![message2]).await
+            }
+            message2 @ StreamElement::End => broadcast(&self.senders, vec![message2]).await,
+            message2 @ _ => send(&self.senders, message2).await,
+        };
+        if matches!(message, StreamElement::End) {
+            let metadata = self.metadata.as_ref().unwrap().get().unwrap();
+            info!("EndBlock at {} received End", metadata.coord);
+        }
+        message
+    }
+
+    fn to_string(&self) -> String {
+        match self.next_strategy {
+            NextStrategy::Random => format!("Shuffle<{}>", self.prev.to_string()),
+            NextStrategy::OnlyOne => format!("OnlyOne<{}>", self.prev.to_string()),
+            _ => self.prev.to_string().to_string(),
+        }
+    }
+}
+
+impl<Out, OperatorChain> Clone for EndBlock<Out, OperatorChain>
+where
+    Out: Clone + Send + 'static,
+    OperatorChain: Operator<Out>,
+{
+    fn clone(&self) -> Self {
+        if self.metadata.is_some() {
+            panic!("Cannot clone once initialized");
+        }
+        Self {
+            prev: self.prev.clone(),
+            metadata: None,
+            next_strategy: self.next_strategy,
+            senders: Default::default(),
+        }
+    }
+}

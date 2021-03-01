@@ -4,7 +4,7 @@ use async_std::channel::Sender;
 use async_std::sync::{Arc, Mutex};
 use async_std::task::JoinHandle;
 
-use crate::block::InnerBlock;
+use crate::block::{InnerBlock, NextStrategy};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::Operator;
@@ -15,6 +15,7 @@ pub type ReplicaId = usize;
 
 pub struct ExecutionMetadata {
     pub coord: Coord,
+    pub num_replicas: usize,
     pub num_prev: usize,
     pub network: Arc<Mutex<NetworkTopology>>,
 }
@@ -27,6 +28,7 @@ pub struct StartHandle {
 #[derive(Debug, Clone, Copy)]
 pub struct SchedulerBlockInfo {
     num_replicas: usize,
+    next_strategy: NextStrategy,
 }
 
 pub struct Scheduler {
@@ -108,9 +110,11 @@ impl Scheduler {
         let start_handles: Vec<_> = self.start_handles.drain().collect();
         // start the execution
         for (block_id, handles) in start_handles {
+            let num_replicas = handles.len();
             for (replica_id, handle) in handles.into_iter().enumerate() {
                 let metadata = ExecutionMetadata {
                     coord: Coord::new(block_id, replica_id),
+                    num_replicas,
                     num_prev: num_prev[&block_id],
                     network: network.clone(),
                 };
@@ -165,7 +169,7 @@ impl Scheduler {
 
     fn local_block_info<In, Out, OperatorChain>(
         &self,
-        _block: &InnerBlock<In, Out, OperatorChain>,
+        block: &InnerBlock<In, Out, OperatorChain>,
     ) -> SchedulerBlockInfo
     where
         In: Clone + Send + 'static,
@@ -174,7 +178,8 @@ impl Scheduler {
     {
         match self.config.runtime {
             ExecutionRuntime::Local(local) => SchedulerBlockInfo {
-                num_replicas: local.num_cores,
+                num_replicas: block.max_parallelism.unwrap_or(local.num_cores),
+                next_strategy: block.next_strategy,
             },
         }
     }

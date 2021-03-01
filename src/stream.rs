@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use crate::block::InnerBlock;
 use crate::environment::StreamEnvironmentInner;
+use crate::operator::sink::EndBlock;
 use crate::operator::source::StartBlock;
 use crate::operator::Operator;
 
@@ -37,6 +38,7 @@ where
                 id: self.block_id,
                 operators: get_operator(self.block.operators),
                 next_strategy: self.block.next_strategy,
+                max_parallelism: self.block.max_parallelism,
                 execution_metadata: self.block.execution_metadata,
                 _in_type: Default::default(),
                 _out_type: Default::default(),
@@ -46,20 +48,20 @@ where
     }
 
     pub fn add_block(self) -> Stream<Out, Out, StartBlock<Out>> {
-        let new_id = {
-            let mut env = self.env.borrow_mut();
-            let new_id = env.block_count;
-            env.block_count += 1;
-            let scheduler = env.scheduler_mut();
-            scheduler.add_block(self.block);
-            scheduler.connect_blocks(self.block_id, new_id);
-            info!("Creating a new block, id={}", new_id);
-            new_id
-        };
+        let next_strategy = self.block.next_strategy;
+        let old_stream = self.add_operator(|prev| EndBlock::new(prev, next_strategy));
+        let mut env = old_stream.env.borrow_mut();
+        let new_id = env.block_count;
+        env.block_count += 1;
+        let scheduler = env.scheduler_mut();
+        scheduler.add_block(old_stream.block);
+        scheduler.connect_blocks(old_stream.block_id, new_id);
+        drop(env);
+        info!("Creating a new block, id={}", new_id);
         Stream {
             block_id: new_id,
             block: InnerBlock::new(new_id, StartBlock::new()),
-            env: self.env,
+            env: old_stream.env,
         }
     }
 

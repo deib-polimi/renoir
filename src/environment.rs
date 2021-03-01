@@ -33,9 +33,11 @@ impl StreamEnvironment {
         let block_id = self.inner.borrow().block_count;
         self.inner.borrow_mut().block_count += 1;
         info!("Creating a new stream, block_id={}", block_id);
+        let mut block = InnerBlock::new(block_id, source);
+        block.max_parallelism = Some(1);
         Stream {
             block_id,
-            block: InnerBlock::new(block_id, source),
+            block,
             env: self.inner.clone(),
         }
     }

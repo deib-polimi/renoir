@@ -43,22 +43,8 @@ async fn worker<In, Out, OperatorChain>(
     );
     // notify the operators that we are about to start
     block.operators.start().await;
-    let senders = metadata.network.lock().await.get_senders(metadata.coord);
-    loop {
-        let message = block.operators.next().await;
-        let is_end = matches!(message, StreamElement::End);
-        for (next, sender) in senders.iter() {
-            debug!("Sending message {} -> {}", metadata.coord, next);
-            // TODO: batching
-            // TODO: next_strategy
-            let out_buf = vec![message.clone()];
-            if let Err(e) = sender.send(out_buf).await {
-                error!("Failed to send message to {}: {:?}", next, e);
-            }
-        }
-        if is_end {
-            break;
-        }
+    while !matches!(block.operators.next().await, StreamElement::End) {
+        // nothing to do
     }
     info!("Worker {} completed, exiting", metadata.coord);
 }

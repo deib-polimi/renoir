@@ -1,10 +1,12 @@
 use async_std::sync::{Arc, Mutex};
 
 pub use collect_vec::*;
+pub use end::*;
 
 use crate::operator::Operator;
 
 mod collect_vec;
+mod end;
 
 pub trait Sink: Operator<()> {}
 
