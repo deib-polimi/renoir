@@ -10,7 +10,7 @@ use crate::stream::{BlockId, Stream};
 pub struct StreamEnvironmentInner {
     pub config: EnvironmentConfig,
     pub block_count: BlockId,
-    pub scheduler: Scheduler,
+    scheduler: Option<Scheduler>,
 }
 
 pub struct StreamEnvironment {
@@ -21,11 +21,7 @@ impl StreamEnvironment {
     pub fn new(config: EnvironmentConfig) -> Self {
         info!("Constructing environment");
         StreamEnvironment {
-            inner: Rc::new(RefCell::new(StreamEnvironmentInner {
-                config,
-                block_count: 0,
-                scheduler: Scheduler::new(config),
-            })),
+            inner: Rc::new(RefCell::new(StreamEnvironmentInner::new(config))),
         }
     }
 
@@ -46,10 +42,26 @@ impl StreamEnvironment {
     pub async fn execute(self) {
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);
-        let join = env.scheduler.start().await;
+        let join = env.scheduler.take().unwrap().start().await;
         // wait till the computation ends
         for join_handle in join {
             join_handle.await;
         }
+    }
+}
+
+impl StreamEnvironmentInner {
+    pub fn new(config: EnvironmentConfig) -> Self {
+        Self {
+            config,
+            block_count: 0,
+            scheduler: Some(Scheduler::new(config)),
+        }
+    }
+
+    pub fn scheduler_mut(&mut self) -> &mut Scheduler {
+        self.scheduler
+            .as_mut()
+            .expect("The environment has already been started, cannot access the scheduler")
     }
 }

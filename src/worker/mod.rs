@@ -22,20 +22,23 @@ where
 
 async fn worker<In, Out, OperatorChain>(
     mut block: InnerBlock<In, Out, OperatorChain>,
-    receiver: Receiver<ExecutionMetadata>,
+    metadata_receiver: Receiver<ExecutionMetadata>,
 ) where
     In: Send + 'static,
     Out: Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    let metadata = receiver.recv().await.unwrap();
-    block.execution_metadata.set(metadata).unwrap();
-    drop(receiver);
+    let metadata = metadata_receiver.recv().await.unwrap();
+    block
+        .execution_metadata
+        .set(metadata)
+        .map_err(|_| "Metadata already sent")
+        .unwrap();
+    drop(metadata_receiver);
     let metadata = block.execution_metadata.get().unwrap();
     info!(
-        "Starting worker for block {}, replica {}: {}",
-        block.id,
-        metadata.replica_id,
+        "Starting worker for {:?}: {}",
+        metadata.coord,
         block.to_string(),
     );
     // TODO: call .next() and send to the next nodes

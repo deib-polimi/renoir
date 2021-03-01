@@ -11,6 +11,7 @@ use crate::environment::StreamEnvironment;
 mod block;
 mod config;
 mod environment;
+mod network;
 mod operator;
 mod scheduler;
 mod stream;

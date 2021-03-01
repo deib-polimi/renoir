@@ -1,19 +1,21 @@
 use std::collections::HashMap;
 
 use async_std::channel::Sender;
+use async_std::sync::{Arc, Mutex};
 use async_std::task::JoinHandle;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig};
+use crate::network::{Coord, NetworkTopology};
 use crate::operator::Operator;
 use crate::stream::BlockId;
 use crate::worker::spawn_worker;
 
 pub type ReplicaId = usize;
 
-#[derive(Debug)]
 pub struct ExecutionMetadata {
-    pub replica_id: ReplicaId,
+    pub coord: Coord,
+    pub network: Arc<Mutex<NetworkTopology>>,
 }
 
 pub struct StartHandle {
@@ -21,10 +23,17 @@ pub struct StartHandle {
     pub join_handle: JoinHandle<()>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct SchedulerBlockInfo {
+    num_replicas: usize,
+}
+
 pub struct Scheduler {
     pub config: EnvironmentConfig,
     pub next_blocks: HashMap<BlockId, Vec<BlockId>>,
+    pub block_info: HashMap<BlockId, SchedulerBlockInfo>,
     pub start_handles: HashMap<BlockId, Vec<StartHandle>>,
+    pub network: NetworkTopology,
 }
 
 impl Scheduler {
@@ -32,7 +41,9 @@ impl Scheduler {
         Self {
             config,
             next_blocks: Default::default(),
+            block_info: Default::default(),
             start_handles: Default::default(),
+            network: NetworkTopology::new(),
         }
     }
 
@@ -43,19 +54,22 @@ impl Scheduler {
         OperatorChain: Operator<Out> + Send + 'static,
     {
         let block_id = block.id;
-        let parallelism = self.local_block_parallelism(&block);
-        info!(
-            "Adding new block id={} with {} copies",
-            block_id, parallelism
-        );
+        let info = self.local_block_info(&block);
+        info!("Adding new block id={}: {:?}", block_id, info);
+        self.block_info.insert(block_id, info);
         let mut blocks = vec![block];
-        blocks.reserve(parallelism);
-        for _ in 0..parallelism - 1 {
-            // avoid an extra clone
+        blocks.reserve(info.num_replicas);
+        for _ in 0..info.num_replicas - 1 {
+            // avoid an extra clone, this will make the metadata unique
             blocks.push(blocks[0].clone());
         }
-        for mut block in blocks {
+        for (replica_id, mut block) in blocks.into_iter().enumerate() {
+            let coord = Coord::new(block_id, replica_id);
+            // register this block in the network
+            self.network.register_local::<In>(coord);
+            // initialize the block with its metadata ref (it will be set at start)
             block.operators.init(block.execution_metadata.clone());
+            // spawn the actual worker
             let start_handle = spawn_worker(block);
             self.start_handles
                 .entry(block_id)
@@ -72,26 +86,48 @@ impl Scheduler {
         self.next_blocks.entry(from).or_default().push(to);
     }
 
-    pub async fn start(&mut self) -> Vec<JoinHandle<()>> {
-        self.log_topology();
+    pub async fn start(self) -> Vec<JoinHandle<()>> {
         match self.config.runtime {
             ExecutionRuntime::Local(local) => self.start_local(local).await,
         }
     }
 
-    async fn start_local(&mut self, config: LocalRuntimeConfig) -> Vec<JoinHandle<()>> {
+    async fn start_local(mut self, config: LocalRuntimeConfig) -> Vec<JoinHandle<()>> {
         info!("Starting local environment: {:?}", config);
+        self.setup_topology();
+        self.log_topology();
+        self.network.log_topology();
+
         let mut join = Vec::new();
+        let network = Arc::new(Mutex::new(self.network));
         // start the execution
-        for (_id, handles) in self.start_handles.drain() {
+        for (block_id, handles) in self.start_handles.drain() {
             for (replica_id, handle) in handles.into_iter().enumerate() {
-                // TODO: build metadata
-                let metadata = ExecutionMetadata { replica_id };
+                let metadata = ExecutionMetadata {
+                    coord: Coord::new(block_id, replica_id),
+                    network: network.clone(),
+                };
                 handle.starter.send(metadata).await.unwrap();
                 join.push(handle.join_handle);
             }
         }
         join
+    }
+
+    fn setup_topology(&mut self) {
+        for (from_block_id, next) in self.next_blocks.iter() {
+            let from_info = self.block_info[from_block_id];
+            for to_block_id in next.iter() {
+                let to_info = self.block_info[to_block_id];
+                for from_replica_id in 0..from_info.num_replicas {
+                    let from_coord = Coord::new(*from_block_id, from_replica_id);
+                    for to_replica_id in 0..to_info.num_replicas {
+                        let to_coord = Coord::new(*to_block_id, to_replica_id);
+                        self.network.connect(from_coord, to_coord);
+                    }
+                }
+            }
+        }
     }
 
     fn log_topology(&self) {
@@ -101,15 +137,17 @@ impl Scheduler {
         }
     }
 
-    fn local_block_parallelism<In, Out, OperatorChain>(
+    fn local_block_info<In, Out, OperatorChain>(
         &self,
         _block: &InnerBlock<In, Out, OperatorChain>,
-    ) -> usize
+    ) -> SchedulerBlockInfo
     where
         OperatorChain: Operator<Out>,
     {
         match self.config.runtime {
-            ExecutionRuntime::Local(local) => local.num_cores,
+            ExecutionRuntime::Local(local) => SchedulerBlockInfo {
+                num_replicas: local.num_cores,
+            },
         }
     }
 }
