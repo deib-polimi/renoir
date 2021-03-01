@@ -2,9 +2,9 @@ use async_std::stream;
 use async_std::stream::StreamExt;
 use async_trait::async_trait;
 
-use crate::block::ExecutionMetadataRef;
 use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
+use crate::scheduler::ExecutionMetadata;
 
 pub struct StreamSource<Out> {
     inner: Box<dyn stream::Stream<Item = Out> + Unpin + Send>,
@@ -28,8 +28,7 @@ impl<Out> Operator<Out> for StreamSource<Out>
 where
     Out: Clone + Send + Unpin + 'static,
 {
-    fn block_init(&mut self, _metadata: ExecutionMetadataRef) {}
-    async fn start(&mut self) {}
+    async fn setup(&mut self, _metadata: ExecutionMetadata) {}
 
     async fn next(&mut self) -> StreamElement<Out> {
         match self.inner.next().await {

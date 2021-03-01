@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use crate::block::ExecutionMetadataRef;
 pub use map::*;
 pub use shuffle::*;
+
+use crate::scheduler::ExecutionMetadata;
 
 mod map;
 mod shuffle;
@@ -29,9 +30,7 @@ pub trait Operator<Out>: Clone
 where
     Out: Clone + Send + 'static,
 {
-    fn block_init(&mut self, metadata: ExecutionMetadataRef);
-
-    async fn start(&mut self);
+    async fn setup(&mut self, metadata: ExecutionMetadata);
 
     async fn next(&mut self) -> StreamElement<Out>;
 

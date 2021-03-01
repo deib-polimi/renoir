@@ -13,6 +13,7 @@ use crate::worker::spawn_worker;
 
 pub type ReplicaId = usize;
 
+#[derive(Clone)]
 pub struct ExecutionMetadata {
     pub coord: Coord,
     pub num_replicas: usize,
@@ -68,12 +69,10 @@ impl Scheduler {
             // avoid an extra clone, this will make the metadata unique
             blocks.push(blocks[0].clone());
         }
-        for (replica_id, mut block) in blocks.into_iter().enumerate() {
+        for (replica_id, block) in blocks.into_iter().enumerate() {
             let coord = Coord::new(block_id, replica_id);
             // register this block in the network
             self.network.register_local::<In>(coord);
-            // initialize the block with its metadata ref (it will be set at start)
-            block.operators.block_init(block.execution_metadata.clone());
             // spawn the actual worker
             let start_handle = spawn_worker(block);
             self.start_handles

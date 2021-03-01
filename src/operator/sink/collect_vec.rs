@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-use crate::block::ExecutionMetadataRef;
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
 use crate::operator::{Operator, StreamElement};
+use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
 pub struct CollectVecSink<Out, PreviousOperators>
@@ -21,12 +21,8 @@ where
     Out: Clone + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    fn block_init(&mut self, metadata: ExecutionMetadataRef) {
-        self.prev.block_init(metadata);
-    }
-
-    async fn start(&mut self) {
-        self.prev.start().await;
+    async fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata).await;
     }
 
     async fn next(&mut self) -> StreamElement<()> {

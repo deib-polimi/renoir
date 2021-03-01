@@ -29,20 +29,14 @@ async fn worker<In, Out, OperatorChain>(
     OperatorChain: Operator<Out> + Send + 'static,
 {
     let metadata = metadata_receiver.recv().await.unwrap();
-    block
-        .execution_metadata
-        .set(metadata)
-        .map_err(|_| "Metadata already sent")
-        .unwrap();
     drop(metadata_receiver);
-    let metadata = block.execution_metadata.get().unwrap();
     info!(
         "Starting worker for {}: {}",
         metadata.coord,
         block.to_string(),
     );
     // notify the operators that we are about to start
-    block.operators.start().await;
+    block.operators.setup(metadata.clone()).await;
     while !matches!(block.operators.next().await, StreamElement::End) {
         // nothing to do
     }

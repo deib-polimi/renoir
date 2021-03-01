@@ -39,7 +39,6 @@ where
                 operators: get_operator(self.block.operators),
                 next_strategy: self.block.next_strategy,
                 max_parallelism: self.block.max_parallelism,
-                execution_metadata: self.block.execution_metadata,
                 _in_type: Default::default(),
                 _out_type: Default::default(),
             },

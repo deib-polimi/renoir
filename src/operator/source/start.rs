@@ -2,15 +2,15 @@ use std::collections::VecDeque;
 
 use async_trait::async_trait;
 
-use crate::block::ExecutionMetadataRef;
 use crate::network::{NetworkMessage, NetworkReceiver};
 use crate::operator::{Operator, StreamElement};
+use crate::scheduler::ExecutionMetadata;
 
 pub struct StartBlock<Out>
 where
     Out: Clone + Send + 'static,
 {
-    metadata: Option<ExecutionMetadataRef>,
+    metadata: Option<ExecutionMetadata>,
     receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
     buffer: VecDeque<StreamElement<Out>>,
     missing_ends: usize,
@@ -35,23 +35,20 @@ impl<Out> Operator<Out> for StartBlock<Out>
 where
     Out: Clone + Send + 'static,
 {
-    fn block_init(&mut self, metadata: ExecutionMetadataRef) {
-        self.metadata = Some(metadata.clone());
-    }
-
-    async fn start(&mut self) {
-        let metadata = self.metadata.as_ref().unwrap().get().unwrap();
+    async fn setup(&mut self, metadata: ExecutionMetadata) {
         let mut network = metadata.network.lock().await;
         self.receiver = Some(network.get_receiver(metadata.coord));
+        drop(network);
         self.missing_ends = metadata.num_prev;
         info!(
             "StartBlock {} initialized, {} previous blocks, receiver is: {:?}",
             metadata.coord, metadata.num_prev, self.receiver
         );
+        self.metadata = Some(metadata);
     }
 
     async fn next(&mut self) -> StreamElement<Out> {
-        let metadata = self.metadata.as_ref().unwrap().get().unwrap();
+        let metadata = self.metadata.as_ref().unwrap();
         // all the previous blocks sent and end: we're done
         if self.missing_ends == 0 {
             info!("StartBlock for {} has ended", metadata.coord);

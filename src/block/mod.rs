@@ -1,10 +1,6 @@
 use std::marker::PhantomData;
 
-use async_std::sync::Arc;
-use once_cell::sync::OnceCell;
-
 use crate::operator::Operator;
-use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 
 #[derive(Debug, Clone, Copy)]
@@ -13,9 +9,6 @@ pub enum NextStrategy {
     Random,
     GroupBy,
 }
-
-// FIXME: drop OnceCell?
-pub type ExecutionMetadataRef = Arc<OnceCell<ExecutionMetadata>>;
 
 pub struct InnerBlock<In, Out, OperatorChain>
 where
@@ -26,7 +19,6 @@ where
     pub operators: OperatorChain,
     pub next_strategy: NextStrategy,
     pub max_parallelism: Option<usize>,
-    pub execution_metadata: ExecutionMetadataRef,
     pub _in_type: PhantomData<In>,
     pub _out_type: PhantomData<Out>,
 }
@@ -42,7 +34,6 @@ where
             operators,
             next_strategy: NextStrategy::OnlyOne,
             max_parallelism: None,
-            execution_metadata: ExecutionMetadataRef::default(),
             _in_type: Default::default(),
             _out_type: Default::default(),
         }
@@ -64,7 +55,6 @@ where
             operators: self.operators.clone(),
             next_strategy: self.next_strategy.clone(),
             max_parallelism: self.max_parallelism,
-            execution_metadata: ExecutionMetadataRef::default(), // new block = new metadata
             _in_type: Default::default(),
             _out_type: Default::default(),
         }

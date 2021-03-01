@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use rand::{thread_rng, Rng};
 
-use crate::block::{ExecutionMetadataRef, NextStrategy};
+use crate::block::NextStrategy;
 use crate::network::{NetworkMessage, NetworkSender};
 use crate::operator::{Operator, StreamElement};
-use rand::{thread_rng, Rng};
+use crate::scheduler::ExecutionMetadata;
 
 type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
 
@@ -15,7 +16,7 @@ where
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
-    metadata: Option<ExecutionMetadataRef>,
+    metadata: Option<ExecutionMetadata>,
     next_strategy: NextStrategy,
     senders: SenderList<Out>,
 }
@@ -70,17 +71,12 @@ where
     Out: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send,
 {
-    fn block_init(&mut self, metadata: ExecutionMetadataRef) {
-        self.metadata = Some(metadata.clone());
-        self.prev.block_init(metadata);
-    }
+    async fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata.clone()).await;
 
-    async fn start(&mut self) {
-        self.prev.start().await;
-
-        let metadata = self.metadata.as_ref().unwrap().get().unwrap();
         let network = metadata.network.lock().await;
         let senders = network.get_senders(metadata.coord);
+        drop(network);
         let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();
         for (coord, sender) in senders {
             by_block_id.entry(coord.block_id).or_default().push(sender);
@@ -123,6 +119,7 @@ where
             "End of {} has these senders: {:?}",
             metadata.coord, self.senders
         );
+        self.metadata = Some(metadata);
     }
 
     async fn next(&mut self) -> StreamElement<Out> {
@@ -136,7 +133,7 @@ where
             message2 @ _ => send(&self.senders, message2).await,
         };
         if matches!(message, StreamElement::End) {
-            let metadata = self.metadata.as_ref().unwrap().get().unwrap();
+            let metadata = self.metadata.as_ref().unwrap();
             info!("EndBlock at {} received End", metadata.coord);
         }
         message
