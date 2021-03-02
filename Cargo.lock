@@ -563,7 +563,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "log",
- "once_cell",
  "pretty_env_logger",
  "rand",
  "typemap",

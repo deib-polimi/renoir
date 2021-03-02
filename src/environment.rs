@@ -28,18 +28,17 @@ impl StreamEnvironment {
     pub fn stream<Out, S>(&mut self, source: S) -> Stream<Out, Out, S>
     where
         Out: Clone + Send + 'static,
-        S: Source<Out> + 'static,
+        S: Source<Out> + Send + 'static,
     {
         let block_id = self.inner.borrow().block_count;
         self.inner.borrow_mut().block_count += 1;
         info!("Creating a new stream, block_id={}", block_id);
-        let mut block = InnerBlock::new(block_id, source);
-        block.max_parallelism = Some(1);
         Stream {
             block_id,
-            block,
+            block: InnerBlock::new(block_id, source),
             env: self.inner.clone(),
         }
+        .max_parallelism(1)
     }
 
     pub async fn execute(self) {

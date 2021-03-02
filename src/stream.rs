@@ -38,6 +38,11 @@ where
     Out: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
+    pub fn max_parallelism(mut self, max_parallelism: usize) -> Self {
+        self.block.max_parallelism = Some(max_parallelism);
+        self
+    }
+
     pub fn add_operator<NewOut, Op, GetOp>(self, get_operator: GetOp) -> Stream<In, NewOut, Op>
     where
         NewOut: Clone + Send + 'static,

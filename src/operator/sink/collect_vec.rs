@@ -74,10 +74,9 @@ where
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {
-        let mut new_stream = self.add_block();
-        new_stream.block.max_parallelism = Some(1);
         let output = StreamOutputRef::default();
-        new_stream
+        self.add_block()
+            .max_parallelism(1)
             .add_operator(|prev| CollectVecSink {
                 prev,
                 result: Some(Vec::new()),
