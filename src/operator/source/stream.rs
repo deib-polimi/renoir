@@ -1,5 +1,3 @@
-use std::fmt::{Debug, Formatter};
-
 use async_std::stream;
 use async_std::stream::StreamExt;
 use async_trait::async_trait;
@@ -8,7 +6,10 @@ use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct StreamSource<Out> {
+    #[derivative(Debug = "ignore")]
     inner: Box<dyn stream::Stream<Item = Out> + Unpin + Send>,
 }
 
@@ -50,20 +51,6 @@ where
 {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
-        panic!("StreamSource cannot be cloned");
-    }
-}
-
-impl<Out> Debug for StreamSource<Out>
-where
-    Out: Send + Unpin + 'static,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("StreamSource")
-            .field(
-                "inner",
-                &format!("Stream of {}", std::any::type_name::<Out>()),
-            )
-            .finish()
+        panic!("StreamSource cannot be cloned, max_parallelism should be 1");
     }
 }

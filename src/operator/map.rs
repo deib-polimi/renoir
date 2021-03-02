@@ -1,4 +1,3 @@
-use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
 use async_std::sync::Arc;
@@ -8,12 +7,15 @@ use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct Map<Out, NewOut, PreviousOperators>
 where
     Out: Clone + Send + 'static,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
+    #[derivative(Debug = "ignore")]
     f: Arc<dyn Fn(Out) -> NewOut + Send + Sync>,
 }
 
@@ -44,41 +46,6 @@ where
             std::any::type_name::<Out>(),
             std::any::type_name::<NewOut>()
         )
-    }
-}
-
-impl<Out, NewOut, PreviousOperators> Clone for Map<Out, NewOut, PreviousOperators>
-where
-    Out: Clone + Send + 'static,
-    NewOut: Clone + Send + 'static,
-    PreviousOperators: Operator<Out> + Send,
-{
-    fn clone(&self) -> Self {
-        Self {
-            prev: self.prev.clone(),
-            f: self.f.clone(),
-        }
-    }
-}
-
-impl<Out, NewOut, PreviousOperators> Debug for Map<Out, NewOut, PreviousOperators>
-where
-    Out: Clone + Send + 'static,
-    NewOut: Clone + Send + 'static,
-    PreviousOperators: Operator<Out> + Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Map")
-            .field("prev", &self.prev)
-            .field(
-                "f",
-                &format!(
-                    "Fn({}) -> {}",
-                    std::any::type_name::<Out>(),
-                    std::any::type_name::<NewOut>()
-                ),
-            )
-            .finish()
     }
 }
 

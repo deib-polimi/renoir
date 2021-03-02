@@ -7,7 +7,7 @@ use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Unkey<Key, Out, OperatorChain>
 where
     Key: Clone + Send + Hash + Eq + 'static,
@@ -51,21 +51,6 @@ where
 
     fn to_string(&self) -> String {
         format!("{} -> Unkey", self.prev.to_string())
-    }
-}
-
-impl<Key, Out, OperatorChain> Clone for Unkey<Key, Out, OperatorChain>
-where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
-    OperatorChain: Operator<KeyValue<Key, Out>>,
-{
-    fn clone(&self) -> Self {
-        Self {
-            prev: self.prev.clone(),
-            _key_type: Default::default(),
-            _out_type: Default::default(),
-        }
     }
 }
 

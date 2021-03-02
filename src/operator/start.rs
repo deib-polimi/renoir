@@ -6,12 +6,14 @@ use crate::network::{NetworkMessage, NetworkReceiver};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
-#[derive(Debug)]
+#[derive(Debug, Derivative)]
+#[derivative(Clone)]
 pub struct StartBlock<Out>
 where
     Out: Clone + Send + 'static,
 {
     metadata: Option<ExecutionMetadata>,
+    #[derivative(Clone(clone_with = "clone_none"))]
     receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
     buffer: VecDeque<StreamElement<Out>>,
     missing_ends: usize,
@@ -82,19 +84,6 @@ where
     }
 }
 
-impl<Out> Clone for StartBlock<Out>
-where
-    Out: Clone + Send + 'static,
-{
-    fn clone(&self) -> Self {
-        if self.metadata.is_some() {
-            panic!("Cannot clone once initialized");
-        }
-        Self {
-            metadata: None,
-            receiver: None,
-            buffer: Default::default(),
-            missing_ends: 0,
-        }
-    }
+fn clone_none<T>(_: &Option<T>) -> Option<T> {
+    None
 }

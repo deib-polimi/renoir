@@ -10,7 +10,7 @@ use crate::scheduler::ExecutionMetadata;
 
 pub type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EndBlock<Out, OperatorChain>
 where
     Out: Clone + Send + 'static,
@@ -144,24 +144,6 @@ where
             NextStrategy::Random => format!("{} -> Shuffle", self.prev.to_string()),
             NextStrategy::OnlyOne => format!("{} -> OnlyOne", self.prev.to_string()),
             _ => self.prev.to_string().to_string(),
-        }
-    }
-}
-
-impl<Out, OperatorChain> Clone for EndBlock<Out, OperatorChain>
-where
-    Out: Clone + Send + 'static,
-    OperatorChain: Operator<Out>,
-{
-    fn clone(&self) -> Self {
-        if self.metadata.is_some() {
-            panic!("Cannot clone once initialized");
-        }
-        Self {
-            prev: self.prev.clone(),
-            metadata: None,
-            next_strategy: self.next_strategy,
-            senders: Default::default(),
         }
     }
 }

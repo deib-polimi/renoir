@@ -57,13 +57,14 @@ where
     PreviousOperators: Operator<Out> + Send,
 {
 }
+
 impl<Out, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
 where
     Out: Clone + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     fn clone(&self) -> Self {
-        panic!("CollectVecSink cannot be cloned");
+        panic!("CollectVecSink cannot be cloned, max_parallelism should be 1");
     }
 }
 

@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate derivative;
 
 use async_std::stream::from_iter;
 

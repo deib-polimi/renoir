@@ -1,4 +1,3 @@
-use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
 use async_trait::async_trait;
@@ -8,6 +7,8 @@ use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyValue;
 
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct KeyBy<Key, Out, OperatorChain>
 where
     Key: Clone + Send + Hash + Eq + 'static,
@@ -15,6 +16,7 @@ where
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
+    #[derivative(Debug = "ignore")]
     keyer: Keyer<Key, Out>,
 }
 
@@ -57,33 +59,5 @@ where
             self.prev.to_string(),
             std::any::type_name::<Key>(),
         )
-    }
-}
-
-impl<Key, Out, OperatorChain> Clone for KeyBy<Key, Out, OperatorChain>
-where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
-    OperatorChain: Operator<Out> + Send,
-{
-    fn clone(&self) -> Self {
-        Self {
-            prev: self.prev.clone(),
-            keyer: self.keyer.clone(),
-        }
-    }
-}
-
-impl<Key, Out, OperatorChain> Debug for KeyBy<Key, Out, OperatorChain>
-where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
-    OperatorChain: Operator<Out> + Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("KeyBy")
-            .field("prev", &self.prev)
-            .field("keyer", &std::any::type_name::<Keyer<Key, Out>>())
-            .finish()
     }
 }

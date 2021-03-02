@@ -1,6 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 
 use async_std::sync::Arc;
@@ -15,6 +14,8 @@ use crate::stream::{KeyedStream, Stream};
 
 pub type Keyer<Key, Out> = Arc<dyn Fn(&Out) -> Key + Send + Sync>;
 
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct GroupByEndBlock<Key, Out, OperatorChain>
 where
     Key: Clone + Send + Hash + Eq + 'static,
@@ -23,6 +24,7 @@ where
 {
     prev: OperatorChain,
     metadata: Option<ExecutionMetadata>,
+    #[derivative(Debug = "ignore")]
     keyer: Keyer<Key, Out>,
     senders: SenderList<Out>,
 }
@@ -120,25 +122,6 @@ where
     }
 }
 
-impl<Key, Out, OperatorChain> Clone for GroupByEndBlock<Key, Out, OperatorChain>
-where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
-    OperatorChain: Operator<Out>,
-{
-    fn clone(&self) -> Self {
-        if self.metadata.is_some() {
-            panic!("Cannot clone once initialized");
-        }
-        Self {
-            prev: self.prev.clone(),
-            metadata: None,
-            keyer: self.keyer.clone(),
-            senders: Default::default(),
-        }
-    }
-}
-
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
 where
     In: Clone + Send + 'static,
@@ -167,21 +150,5 @@ where
             block: InnerBlock::new(new_id, KeyBy::new(StartBlock::new(), keyer)),
             env: old_stream.env,
         })
-    }
-}
-
-impl<Key, Out, OperatorChain> Debug for GroupByEndBlock<Key, Out, OperatorChain>
-where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
-    OperatorChain: Operator<Out> + Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GroupByEndBlock")
-            .field("prev", &self.prev)
-            .field("metadata", &self.metadata)
-            .field("keyer", &std::any::type_name::<Keyer<Key, Out>>())
-            .field("senders", &self.senders)
-            .finish()
     }
 }
