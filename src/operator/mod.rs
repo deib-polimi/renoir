@@ -45,6 +45,15 @@ impl<Out> StreamElement<Out>
 where
     Out: Clone + Send + 'static,
 {
+    pub fn take(&self) -> StreamElement<()> {
+        match self {
+            StreamElement::Item(_) => StreamElement::Item(()),
+            StreamElement::Timestamped(_, _) => StreamElement::Item(()),
+            StreamElement::Watermark(w) => StreamElement::Watermark(*w),
+            StreamElement::End => StreamElement::End,
+        }
+    }
+
     pub fn map<NewOut>(self, f: impl FnOnce(Out) -> NewOut) -> StreamElement<NewOut>
     where
         NewOut: Clone + Send + 'static,

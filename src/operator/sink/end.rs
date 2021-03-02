@@ -66,7 +66,7 @@ where
 }
 
 #[async_trait]
-impl<Out, OperatorChain> Operator<Out> for EndBlock<Out, OperatorChain>
+impl<Out, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
 where
     Out: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send,
@@ -122,20 +122,20 @@ where
         self.metadata = Some(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<Out> {
+    async fn next(&mut self) -> StreamElement<()> {
         let message = self.prev.next().await;
-        let message2 = message.clone();
-        match message2 {
+        let to_return = message.take();
+        match message {
             StreamElement::Watermark(_) | StreamElement::End => {
-                broadcast(&self.senders, vec![message2]).await
+                broadcast(&self.senders, vec![message]).await
             }
-            _ => send(&self.senders, message2).await,
+            _ => send(&self.senders, message).await,
         };
-        if matches!(message, StreamElement::End) {
+        if matches!(to_return, StreamElement::End) {
             let metadata = self.metadata.as_ref().unwrap();
             info!("EndBlock at {} received End", metadata.coord);
         }
-        message
+        to_return
     }
 
     fn to_string(&self) -> String {

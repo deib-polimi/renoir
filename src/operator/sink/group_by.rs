@@ -9,7 +9,7 @@ use crate::operator::sink::{broadcast, SenderList};
 use crate::operator::source::StartBlock;
 use crate::operator::{KeyBy, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 use std::collections::hash_map::DefaultHasher;
 
 pub type Keyer<Key, Out> = Arc<dyn Fn(&Out) -> Key + Send + Sync>;
@@ -66,8 +66,7 @@ async fn send<Key, Out>(
 }
 
 #[async_trait]
-impl<Key, Out, OperatorChain> Operator<KeyValue<Key, Out>>
-    for GroupByEndBlock<Key, Out, OperatorChain>
+impl<Key, Out, OperatorChain> Operator<()> for GroupByEndBlock<Key, Out, OperatorChain>
 where
     Key: Clone + Send + Hash + Eq + 'static,
     Out: Clone + Send + 'static,
@@ -94,21 +93,21 @@ where
         self.metadata = Some(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
+    async fn next(&mut self) -> StreamElement<()> {
         let message = self.prev.next().await;
-        let message2 = message.clone();
-        match message2 {
+        let to_return = message.take();
+        match message {
             StreamElement::Watermark(_) | StreamElement::End => {
-                let out_buf = vec![message2];
+                let out_buf = vec![message];
                 broadcast(&self.senders, out_buf).await
             }
-            _ => send(&self.senders, message2, &self.keyer).await,
+            _ => send(&self.senders, message, &self.keyer).await,
         };
-        if matches!(message, StreamElement::End) {
+        if matches!(to_return, StreamElement::End) {
             let metadata = self.metadata.as_ref().unwrap();
             info!("GroupByEndBlock at {} received End", metadata.coord);
         }
-        message.map(|val| ((self.keyer)(&val), val))
+        to_return
     }
 
     fn to_string(&self) -> String {
