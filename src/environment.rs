@@ -7,17 +7,27 @@ use crate::operator::source::Source;
 use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
 
-pub struct StreamEnvironmentInner {
-    pub config: EnvironmentConfig,
-    pub block_count: BlockId,
+/// Actual content of the StreamEnvironment. This is stored inside a `Rc` and it's shared among all
+/// the blocks.
+pub(crate) struct StreamEnvironmentInner {
+    /// The configuration of the environment.
+    pub(crate) config: EnvironmentConfig,
+    /// The number of blocks in the job graph, it's used to assign new ids to the blocks.
+    block_count: BlockId,
+    /// The scheduler that will start the computation. It's an option because it will be moved out
+    /// of this struct when the computation starts.
     scheduler: Option<Scheduler>,
 }
 
+/// Streaming environment from which it's possible to register new streams and start the
+/// computation.
 pub struct StreamEnvironment {
+    /// Reference to the actual content of the environment.
     inner: Rc<RefCell<StreamEnvironmentInner>>,
 }
 
 impl StreamEnvironment {
+    /// Construct a new environment from the config.
     pub fn new(config: EnvironmentConfig) -> Self {
         info!("Constructing environment");
         StreamEnvironment {
@@ -25,22 +35,23 @@ impl StreamEnvironment {
         }
     }
 
+    /// Construct a new stream bound to this environment starting with the specified source.
     pub fn stream<Out, S>(&mut self, source: S) -> Stream<Out, Out, S>
     where
         Out: Clone + Send + 'static,
         S: Source<Out> + Send + 'static,
     {
-        let block_id = self.inner.borrow().block_count;
-        self.inner.borrow_mut().block_count += 1;
+        let block_id = self.inner.borrow_mut().new_block();
         info!("Creating a new stream, block_id={}", block_id);
+        let mut block = InnerBlock::new(block_id, source);
+        block.max_parallelism(1);
         Stream {
-            block_id,
-            block: InnerBlock::new(block_id, source),
+            block,
             env: self.inner.clone(),
         }
-        .max_parallelism(1)
     }
 
+    /// Start the computation. Await on the returned future to actually start the computation.
     pub async fn execute(self) {
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);
@@ -53,7 +64,7 @@ impl StreamEnvironment {
 }
 
 impl StreamEnvironmentInner {
-    pub fn new(config: EnvironmentConfig) -> Self {
+    fn new(config: EnvironmentConfig) -> Self {
         Self {
             config,
             block_count: 0,
@@ -61,14 +72,17 @@ impl StreamEnvironmentInner {
         }
     }
 
-    pub fn new_block(&mut self) -> BlockId {
+    /// Allocate a new BlockId inside the environment.
+    pub(crate) fn new_block(&mut self) -> BlockId {
         let new_id = self.block_count;
         self.block_count += 1;
         info!("Creating a new block, id={}", new_id);
         new_id
     }
 
-    pub fn scheduler_mut(&mut self) -> &mut Scheduler {
+    /// Return a mutable reference to the scheduler. This method will panic if the computation has
+    /// already been started.
+    pub(crate) fn scheduler_mut(&mut self) -> &mut Scheduler {
         self.scheduler
             .as_mut()
             .expect("The environment has already been started, cannot access the scheduler")

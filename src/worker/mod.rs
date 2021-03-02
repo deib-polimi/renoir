@@ -4,7 +4,7 @@ use crate::block::InnerBlock;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::{ExecutionMetadata, StartHandle};
 
-pub fn spawn_worker<In, Out, OperatorChain>(
+pub(crate) fn spawn_worker<In, Out, OperatorChain>(
     block: InnerBlock<In, Out, OperatorChain>,
 ) -> StartHandle
 where
@@ -14,10 +14,7 @@ where
 {
     let (sender, receiver) = async_std::channel::bounded(1);
     let join_handle = async_std::task::spawn(async move { worker(block, receiver).await });
-    StartHandle {
-        starter: sender,
-        join_handle,
-    }
+    StartHandle::new(sender, join_handle)
 }
 
 async fn worker<In, Out, OperatorChain>(

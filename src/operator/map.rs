@@ -31,12 +31,7 @@ where
     }
 
     async fn next(&mut self) -> StreamElement<NewOut> {
-        match self.prev.next().await {
-            StreamElement::Item(t) => StreamElement::Item((self.f)(t)),
-            StreamElement::Timestamped(t, ts) => StreamElement::Timestamped((self.f)(t), ts),
-            StreamElement::Watermark(w) => StreamElement::Watermark(w),
-            StreamElement::End => StreamElement::End,
-        }
+        self.prev.next().await.map(&*self.f)
     }
 
     fn to_string(&self) -> String {

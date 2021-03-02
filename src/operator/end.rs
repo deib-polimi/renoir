@@ -27,7 +27,7 @@ where
     Out: Clone + Send + 'static,
     OperatorChain: Operator<Out>,
 {
-    pub fn new(prev: OperatorChain, next_strategy: NextStrategy) -> Self {
+    pub(crate) fn new(prev: OperatorChain, next_strategy: NextStrategy) -> Self {
         Self {
             prev,
             metadata: None,

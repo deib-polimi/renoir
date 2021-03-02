@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
-use crate::operator::{Operator, StreamElement};
+use crate::operator::{EndBlock, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
@@ -76,8 +76,10 @@ where
 {
     pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {
         let output = StreamOutputRef::default();
-        self.add_block()
-            .max_parallelism(1)
+        let mut new_stream = self.add_block(EndBlock::new);
+        // FIXME: when implementing Stream::max_parallelism use that here
+        new_stream.block.max_parallelism(1);
+        new_stream
             .add_operator(|prev| CollectVecSink {
                 prev,
                 result: Some(Vec::new()),

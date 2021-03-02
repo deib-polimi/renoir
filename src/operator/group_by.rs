@@ -5,7 +5,7 @@ use std::hash::{Hash, Hasher};
 use async_std::sync::Arc;
 use async_trait::async_trait;
 
-use crate::block::{InnerBlock, NextStrategy};
+use crate::block::NextStrategy;
 use crate::operator::StartBlock;
 use crate::operator::{broadcast, SenderList};
 use crate::operator::{KeyBy, Operator, StreamElement};
@@ -138,17 +138,9 @@ where
     {
         let keyer = Arc::new(keyer);
         self.block.next_strategy = NextStrategy::GroupBy;
-        let old_stream = self.add_operator(|prev| GroupByEndBlock::new(prev, keyer.clone()));
-        let mut env = old_stream.env.borrow_mut();
-        let new_id = env.new_block();
-        let scheduler = env.scheduler_mut();
-        scheduler.add_block(old_stream.block);
-        scheduler.connect_blocks(old_stream.block_id, new_id);
-        drop(env);
-        KeyedStream(Stream {
-            block_id: new_id,
-            block: InnerBlock::new(new_id, KeyBy::new(StartBlock::new(), keyer)),
-            env: old_stream.env,
-        })
+        let new_stream = self
+            .add_block(|prev, _| GroupByEndBlock::new(prev, keyer.clone()))
+            .add_operator(|prev| KeyBy::new(prev, keyer));
+        KeyedStream(new_stream)
     }
 }

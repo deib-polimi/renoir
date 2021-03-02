@@ -1,6 +1,6 @@
 use crate::block::NextStrategy;
-use crate::operator::Operator;
 use crate::operator::StartBlock;
+use crate::operator::{EndBlock, Operator};
 use crate::stream::Stream;
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
@@ -11,6 +11,6 @@ where
 {
     pub fn shuffle(mut self) -> Stream<Out, Out, StartBlock<Out>> {
         self.block.next_strategy = NextStrategy::Random;
-        self.add_block()
+        self.add_block(EndBlock::new)
     }
 }

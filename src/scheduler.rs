@@ -4,41 +4,59 @@ use async_std::channel::Sender;
 use async_std::sync::{Arc, Mutex};
 use async_std::task::JoinHandle;
 
-use crate::block::{InnerBlock, NextStrategy};
+use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::Operator;
 use crate::stream::BlockId;
 use crate::worker::spawn_worker;
 
+/// The identifier of a replica of a block in the execution graph.
 pub type ReplicaId = usize;
 
+/// Metadata associated to a block in the execution graph.
 #[derive(Clone, Debug)]
 pub struct ExecutionMetadata {
-    pub coord: Coord,
-    pub num_replicas: usize,
-    pub num_prev: usize,
-    pub network: Arc<Mutex<NetworkTopology>>,
+    /// The coordinate of the block (it's id, replica id, ...).
+    pub(crate) coord: Coord,
+    /// The total number of replicas of the block.
+    pub(crate) num_replicas: usize,
+    /// The total number of previous blocks inside the execution graph.
+    pub(crate) num_prev: usize,
+    /// A reference to the `NetworkTopology` that keeps the state of the network.
+    pub(crate) network: Arc<Mutex<NetworkTopology>>,
 }
 
-pub struct StartHandle {
-    pub starter: Sender<ExecutionMetadata>,
-    pub join_handle: JoinHandle<()>,
+/// Handle that the scheduler uses to start the computation of a block.
+pub(crate) struct StartHandle {
+    /// Sender for the `ExecutionMetadata` sent to the worker.
+    starter: Sender<ExecutionMetadata>,
+    /// `JoinHandle` used to wait until a block has finished working.
+    join_handle: JoinHandle<()>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct SchedulerBlockInfo {
+/// Information about a block in the job graph.
+#[derive(Debug, Clone)]
+struct SchedulerBlockInfo {
+    /// The number of replicas of the block.
     num_replicas: usize,
-    next_strategy: NextStrategy,
 }
 
-pub struct Scheduler {
-    pub config: EnvironmentConfig,
-    pub next_blocks: HashMap<BlockId, Vec<BlockId>>,
-    pub prev_blocks: HashMap<BlockId, Vec<BlockId>>,
-    pub block_info: HashMap<BlockId, SchedulerBlockInfo>,
-    pub start_handles: HashMap<BlockId, Vec<StartHandle>>,
-    pub network: NetworkTopology,
+/// The `Scheduler` is the entity that keeps track of all the blocks of the job graph and when the
+/// execution starts it builds the execution graph and actually start the workers.
+pub(crate) struct Scheduler {
+    /// The configuration of the environment.
+    config: EnvironmentConfig,
+    /// Adjacency list of the job graph.
+    next_blocks: HashMap<BlockId, Vec<BlockId>>,
+    /// Reverse adjacency list of the job graph.
+    prev_blocks: HashMap<BlockId, Vec<BlockId>>,
+    /// Information about the blocks known to the scheduler.
+    block_info: HashMap<BlockId, SchedulerBlockInfo>,
+    /// The list of handles of each block in the execution graph.
+    start_handles: Vec<(Coord, StartHandle)>,
+    /// The network topology that keeps track of all the connections inside the execution graph.
+    network: NetworkTopology,
 }
 
 impl Scheduler {
@@ -53,8 +71,15 @@ impl Scheduler {
         }
     }
 
-    pub fn add_block<In, Out, OperatorChain>(&mut self, block: InnerBlock<In, Out, OperatorChain>)
-    where
+    /// Register a new block inside the scheduler.
+    ///
+    /// This spawns a worker for each replica of the block in the execution graph and saves its
+    /// start handle. The handle will be later used to actually start the worker when the
+    /// computation is asked to begin.
+    pub(crate) fn add_block<In, Out, OperatorChain>(
+        &mut self,
+        block: InnerBlock<In, Out, OperatorChain>,
+    ) where
         In: Clone + Send + 'static,
         Out: Clone + Send + 'static,
         OperatorChain: Operator<Out> + Send + 'static,
@@ -62,41 +87,46 @@ impl Scheduler {
         let block_id = block.id;
         let info = self.local_block_info(&block);
         info!("Adding new block id={}: {:?}", block_id, info);
-        self.block_info.insert(block_id, info);
-        let mut blocks = vec![block];
+
+        // duplicate the block in the execution graph
+        let mut blocks = vec![];
         blocks.reserve(info.num_replicas);
-        for _ in 0..info.num_replicas - 1 {
-            // avoid an extra clone, this will make the metadata unique
-            blocks.push(blocks[0].clone());
-        }
-        for (replica_id, block) in blocks.into_iter().enumerate() {
+        if info.num_replicas >= 1 {
+            let replica_id = 0;
             let coord = Coord::new(block_id, replica_id);
+            blocks.push((coord, block));
+        }
+        // not all blocks can be cloned: clone only when necessary
+        for replica_id in 1..info.num_replicas {
+            let coord = Coord::new(block_id, replica_id);
+            blocks.push((coord, blocks[0].1.clone()));
+        }
+        self.block_info.insert(block_id, info);
+
+        for (coord, block) in blocks {
             // register this block in the network
             self.network.register_local::<In>(coord);
             // spawn the actual worker
             let start_handle = spawn_worker(block);
-            self.start_handles
-                .entry(block_id)
-                .or_default()
-                .push(start_handle);
+            self.start_handles.push((coord, start_handle));
         }
     }
 
-    pub fn connect_blocks(&mut self, from: BlockId, to: BlockId) {
+    /// Connect a pair of blocks inside the job graph.
+    pub(crate) fn connect_blocks(&mut self, from: BlockId, to: BlockId) {
         info!("Connecting blocks: {} -> {}", from, to);
-        if !self.start_handles.contains_key(&from) {
-            panic!("Connecting from an unknown block: {}", from);
-        }
         self.next_blocks.entry(from).or_default().push(to);
         self.prev_blocks.entry(to).or_default().push(from);
     }
 
-    pub async fn start(self) -> Vec<JoinHandle<()>> {
+    /// Start the computation returning the list of handles used to join the workers.
+    pub(crate) async fn start(self) -> Vec<JoinHandle<()>> {
         match self.config.runtime {
             ExecutionRuntime::Local(local) => self.start_local(local).await,
         }
     }
 
+    /// Start the computation locally without spawning any other process.
     async fn start_local(mut self, config: LocalRuntimeConfig) -> Vec<JoinHandle<()>> {
         info!("Starting local environment: {:?}", config);
         self.setup_topology();
@@ -106,24 +136,23 @@ impl Scheduler {
         let mut join = Vec::new();
         let num_prev = self.num_prev();
         let network = Arc::new(Mutex::new(self.network));
-        let start_handles: Vec<_> = self.start_handles.drain().collect();
+        // let start_handles: Vec<_> = self.start_handles.drain().collect();
         // start the execution
-        for (block_id, handles) in start_handles {
-            let num_replicas = handles.len();
-            for (replica_id, handle) in handles.into_iter().enumerate() {
-                let metadata = ExecutionMetadata {
-                    coord: Coord::new(block_id, replica_id),
-                    num_replicas,
-                    num_prev: num_prev[&block_id],
-                    network: network.clone(),
-                };
-                handle.starter.send(metadata).await.unwrap();
-                join.push(handle.join_handle);
-            }
+        for (coord, handle) in self.start_handles {
+            let num_replicas = self.block_info[&coord.block_id].num_replicas;
+            let metadata = ExecutionMetadata {
+                coord,
+                num_replicas,
+                num_prev: num_prev[&coord.block_id],
+                network: network.clone(),
+            };
+            handle.starter.send(metadata).await.unwrap();
+            join.push(handle.join_handle);
         }
         join
     }
 
+    /// Compute the number of predecessors of each block inside the execution graph.
     fn num_prev(&self) -> HashMap<BlockId, usize> {
         self.block_info
             .keys()
@@ -143,11 +172,12 @@ impl Scheduler {
             .collect()
     }
 
+    /// Build the execution graph for the network topology.
     fn setup_topology(&mut self) {
         for (from_block_id, next) in self.next_blocks.iter() {
-            let from_info = self.block_info[from_block_id];
+            let from_info = &self.block_info[from_block_id];
             for to_block_id in next.iter() {
-                let to_info = self.block_info[to_block_id];
+                let to_info = &self.block_info[to_block_id];
                 for from_replica_id in 0..from_info.num_replicas {
                     let from_coord = Coord::new(*from_block_id, from_replica_id);
                     for to_replica_id in 0..to_info.num_replicas {
@@ -166,6 +196,7 @@ impl Scheduler {
         }
     }
 
+    /// Extract the `SchedulerBlockInfo` of a block that will be run locally.
     fn local_block_info<In, Out, OperatorChain>(
         &self,
         block: &InnerBlock<In, Out, OperatorChain>,
@@ -178,8 +209,16 @@ impl Scheduler {
         match self.config.runtime {
             ExecutionRuntime::Local(local) => SchedulerBlockInfo {
                 num_replicas: block.max_parallelism.unwrap_or(local.num_cores),
-                next_strategy: block.next_strategy,
             },
+        }
+    }
+}
+
+impl StartHandle {
+    pub(crate) fn new(starter: Sender<ExecutionMetadata>, join_handle: JoinHandle<()>) -> Self {
+        Self {
+            starter,
+            join_handle,
         }
     }
 }
