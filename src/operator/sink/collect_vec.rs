@@ -5,6 +5,7 @@ use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
+#[derive(Debug)]
 pub struct CollectVecSink<Out, PreviousOperators>
 where
     Out: Clone + Send + 'static,

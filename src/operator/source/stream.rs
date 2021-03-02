@@ -1,3 +1,5 @@
+use std::fmt::{Debug, Formatter};
+
 use async_std::stream;
 use async_std::stream::StreamExt;
 use async_trait::async_trait;
@@ -49,5 +51,19 @@ where
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
         panic!("StreamSource cannot be cloned");
+    }
+}
+
+impl<Out> Debug for StreamSource<Out>
+where
+    Out: Send + Unpin + 'static,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StreamSource")
+            .field(
+                "inner",
+                &format!("Stream of {}", std::any::type_name::<Out>()),
+            )
+            .finish()
     }
 }

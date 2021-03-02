@@ -1,10 +1,12 @@
+use std::fmt::{Debug, Formatter};
+use std::hash::Hash;
+
 use async_std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use std::hash::Hash;
 
 pub struct Map<Out, NewOut, PreviousOperators>
 where
@@ -56,6 +58,27 @@ where
             prev: self.prev.clone(),
             f: self.f.clone(),
         }
+    }
+}
+
+impl<Out, NewOut, PreviousOperators> Debug for Map<Out, NewOut, PreviousOperators>
+where
+    Out: Clone + Send + 'static,
+    NewOut: Clone + Send + 'static,
+    PreviousOperators: Operator<Out> + Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Map")
+            .field("prev", &self.prev)
+            .field(
+                "f",
+                &format!(
+                    "Fn({}) -> {}",
+                    std::any::type_name::<Out>(),
+                    std::any::type_name::<NewOut>()
+                ),
+            )
+            .finish()
     }
 }
 

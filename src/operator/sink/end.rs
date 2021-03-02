@@ -10,6 +10,7 @@ use crate::scheduler::ExecutionMetadata;
 
 pub type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
 
+#[derive(Debug)]
 pub struct EndBlock<Out, OperatorChain>
 where
     Out: Clone + Send + 'static,

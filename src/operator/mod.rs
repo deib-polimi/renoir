@@ -18,7 +18,7 @@ mod unkey;
 
 pub type Timestamp = Duration;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum StreamElement<Out>
 where
     Out: Clone + Send + 'static,

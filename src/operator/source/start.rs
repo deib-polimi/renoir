@@ -6,6 +6,7 @@ use crate::network::{NetworkMessage, NetworkReceiver};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
+#[derive(Debug)]
 pub struct StartBlock<Out>
 where
     Out: Clone + Send + 'static,

@@ -1,11 +1,13 @@
+use std::hash::Hash;
+use std::marker::PhantomData;
+
 use async_trait::async_trait;
 
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use std::hash::Hash;
-use std::marker::PhantomData;
 
+#[derive(Debug)]
 pub struct Unkey<Key, Out, OperatorChain>
 where
     Key: Clone + Send + Hash + Eq + 'static,

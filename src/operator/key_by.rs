@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
 use async_trait::async_trait;
@@ -70,5 +71,19 @@ where
             prev: self.prev.clone(),
             keyer: self.keyer.clone(),
         }
+    }
+}
+
+impl<Key, Out, OperatorChain> Debug for KeyBy<Key, Out, OperatorChain>
+where
+    Key: Clone + Send + Hash + Eq + 'static,
+    Out: Clone + Send + 'static,
+    OperatorChain: Operator<Out> + Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeyBy")
+            .field("prev", &self.prev)
+            .field("keyer", &std::any::type_name::<Keyer<Key, Out>>())
+            .finish()
     }
 }

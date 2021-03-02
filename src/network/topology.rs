@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 
 use async_std::channel::bounded;
@@ -121,5 +122,15 @@ impl NetworkTopology {
             }
         }
         debug!("{}", topology);
+    }
+}
+
+impl Debug for NetworkTopology {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NetworkTopology")
+            .field("num_receivers", &self.receivers.len())
+            .field("num_senders", &self.senders.len())
+            .field("next", &self.next)
+            .finish()
     }
 }

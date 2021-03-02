@@ -1,4 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 
 use async_std::sync::Arc;
@@ -10,7 +12,6 @@ use crate::operator::source::StartBlock;
 use crate::operator::{KeyBy, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyedStream, Stream};
-use std::collections::hash_map::DefaultHasher;
 
 pub type Keyer<Key, Out> = Arc<dyn Fn(&Out) -> Key + Send + Sync>;
 
@@ -166,5 +167,21 @@ where
             block: InnerBlock::new(new_id, KeyBy::new(StartBlock::new(), keyer)),
             env: old_stream.env,
         })
+    }
+}
+
+impl<Key, Out, OperatorChain> Debug for GroupByEndBlock<Key, Out, OperatorChain>
+where
+    Key: Clone + Send + Hash + Eq + 'static,
+    Out: Clone + Send + 'static,
+    OperatorChain: Operator<Out> + Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GroupByEndBlock")
+            .field("prev", &self.prev)
+            .field("metadata", &self.metadata)
+            .field("keyer", &std::any::type_name::<Keyer<Key, Out>>())
+            .field("senders", &self.senders)
+            .finish()
     }
 }

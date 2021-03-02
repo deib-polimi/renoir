@@ -13,7 +13,7 @@ use crate::worker::spawn_worker;
 
 pub type ReplicaId = usize;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExecutionMetadata {
     pub coord: Coord,
     pub num_replicas: usize,
