@@ -3,9 +3,9 @@ use std::rc::Rc;
 
 use crate::block::InnerBlock;
 use crate::environment::StreamEnvironmentInner;
-use crate::operator::sink::EndBlock;
-use crate::operator::source::StartBlock;
+use crate::operator::EndBlock;
 use crate::operator::Operator;
+use crate::operator::StartBlock;
 use std::hash::Hash;
 
 pub type BlockId = usize;

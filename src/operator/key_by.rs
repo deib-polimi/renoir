@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use async_trait::async_trait;
 
-use crate::operator::sink::Keyer;
+use crate::operator::Keyer;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyValue;

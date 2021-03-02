@@ -7,8 +7,8 @@ use async_std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::block::{InnerBlock, NextStrategy};
-use crate::operator::sink::{broadcast, SenderList};
-use crate::operator::source::StartBlock;
+use crate::operator::StartBlock;
+use crate::operator::{broadcast, SenderList};
 use crate::operator::{KeyBy, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyedStream, Stream};

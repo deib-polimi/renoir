@@ -1,6 +1,6 @@
 use crate::block::NextStrategy;
-use crate::operator::source::StartBlock;
 use crate::operator::Operator;
+use crate::operator::StartBlock;
 use crate::stream::Stream;
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
