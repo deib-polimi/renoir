@@ -11,7 +11,7 @@ pub trait Sink: Operator<()> {}
 pub type StreamOutputRef<Out> = Arc<Mutex<Option<Out>>>;
 
 pub struct StreamOutput<Out> {
-    result: Arc<Mutex<Option<Out>>>,
+    result: StreamOutputRef<Out>,
 }
 
 impl<Out> StreamOutput<Out> {
