@@ -4,6 +4,7 @@ use std::iter::FromIterator;
 use async_std::channel::Sender;
 use async_std::sync::{Arc, Mutex};
 use async_std::task::JoinHandle;
+use itertools::Itertools;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
@@ -194,11 +195,27 @@ impl Scheduler {
 
     fn log_topology(&self) {
         let mut topology = "Job graph:".to_string();
-        for (id, next) in self.next_blocks.iter() {
-            topology += &format!("\n  {}: {}", id, self.block_info[&id].repr);
-            topology += &format!("\n    -> {:?}", next);
+        for block_id in 0..self.block_info.len() {
+            topology += &format!("\n  {}: {}", block_id, self.block_info[&block_id].repr);
+            if let Some(next) = &self.next_blocks.get(&block_id) {
+                let sorted = next.iter().sorted().collect_vec();
+                topology += &format!("\n    -> {:?}", sorted);
+            }
         }
         debug!("{}", topology);
+        let mut assignments = "Replicas:".to_string();
+        for block_id in 0..self.block_info.len() {
+            assignments += &format!("\n  {}:", block_id);
+            let replicas = self.block_info[&block_id]
+                .replicas
+                .values()
+                .flatten()
+                .sorted();
+            for &coord in replicas {
+                assignments += &format!(" {}", coord);
+            }
+        }
+        debug!("{}", assignments);
     }
 
     /// Extract the `SchedulerBlockInfo` of a block.

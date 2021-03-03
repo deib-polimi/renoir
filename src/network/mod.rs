@@ -14,7 +14,7 @@ mod topology;
 pub type Batch<T> = Vec<StreamElement<T>>;
 pub type NetworkMessage<T> = Batch<T>;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Coord {
     pub block_id: BlockId,
     pub host_id: HostId,

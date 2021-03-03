@@ -3,6 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 
 use async_std::channel::bounded;
+use itertools::Itertools;
 use typemap::{Key, ShareMap};
 
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender};
@@ -115,9 +116,9 @@ impl NetworkTopology {
 
     pub fn log_topology(&self) {
         let mut topology = "Execution graph:".to_owned();
-        for (coord, next) in self.next.iter() {
+        for (coord, next) in self.next.iter().sorted() {
             topology += &format!("\n  {}:", coord);
-            for next in next.iter() {
+            for next in next.iter().sorted() {
                 topology += &format!(" {}", next);
             }
         }
