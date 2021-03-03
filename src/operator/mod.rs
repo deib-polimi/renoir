@@ -13,6 +13,7 @@ pub use unkey::*;
 use crate::scheduler::ExecutionMetadata;
 
 mod end;
+mod flatten;
 mod group_by;
 mod key_by;
 mod map;
