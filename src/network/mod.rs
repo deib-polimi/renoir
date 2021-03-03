@@ -6,7 +6,7 @@ use async_std::channel::{Receiver, Sender};
 pub use topology::*;
 
 use crate::operator::StreamElement;
-use crate::scheduler::ReplicaId;
+use crate::scheduler::{HostId, ReplicaId};
 use crate::stream::BlockId;
 
 mod topology;
@@ -17,13 +17,15 @@ pub type NetworkMessage<T> = Batch<T>;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Coord {
     pub block_id: BlockId,
+    pub host_id: HostId,
     pub replica_id: ReplicaId,
 }
 
 impl Coord {
-    pub fn new(block_id: BlockId, replica_id: ReplicaId) -> Self {
+    pub fn new(block_id: BlockId, host_id: HostId, replica_id: ReplicaId) -> Self {
         Self {
             block_id,
+            host_id,
             replica_id,
         }
     }
@@ -31,7 +33,11 @@ impl Coord {
 
 impl Display for Coord {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Coord[b{}, r{}]", self.block_id, self.replica_id)
+        write!(
+            f,
+            "Coord[b{}, h{}, r{}]",
+            self.block_id, self.host_id, self.replica_id
+        )
     }
 }
 

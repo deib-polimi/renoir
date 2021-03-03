@@ -1,16 +1,19 @@
 use std::collections::HashMap;
+use std::iter::FromIterator;
 
 use async_std::channel::Sender;
 use async_std::sync::{Arc, Mutex};
 use async_std::task::JoinHandle;
 
 use crate::block::InnerBlock;
-use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig};
+use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::Operator;
 use crate::stream::BlockId;
 use crate::worker::spawn_worker;
 
+/// The identifier of an host.
+pub type HostId = usize;
 /// The identifier of a replica of a block in the execution graph.
 pub type ReplicaId = usize;
 
@@ -38,8 +41,14 @@ pub(crate) struct StartHandle {
 /// Information about a block in the job graph.
 #[derive(Debug, Clone)]
 struct SchedulerBlockInfo {
-    /// The number of replicas of the block.
+    /// The identifier of the current block.
+    block_id: BlockId,
+    /// String representation of the block.
+    repr: String,
+    /// The total number of replicas of the block.
     num_replicas: usize,
+    /// All the replicas, grouped by host.
+    replicas: HashMap<HostId, Vec<Coord>>,
 }
 
 /// The `Scheduler` is the entity that keeps track of all the blocks of the job graph and when the
@@ -85,21 +94,25 @@ impl Scheduler {
         OperatorChain: Operator<Out> + Send + 'static,
     {
         let block_id = block.id;
-        let info = self.local_block_info(&block);
-        info!("Adding new block id={}: {:?}", block_id, info);
+        let info = self.block_info(&block);
+        info!(
+            "Adding new block id={}: {} {:?}",
+            block_id,
+            block.to_string(),
+            info
+        );
 
         // duplicate the block in the execution graph
         let mut blocks = vec![];
-        blocks.reserve(info.num_replicas);
-        if info.num_replicas >= 1 {
-            let replica_id = 0;
-            let coord = Coord::new(block_id, replica_id);
+        let local_replicas = info.replicas(self.config.host_id);
+        blocks.reserve(local_replicas.len());
+        if !local_replicas.is_empty() {
+            let coord = local_replicas[0];
             blocks.push((coord, block));
         }
         // not all blocks can be cloned: clone only when necessary
-        for replica_id in 1..info.num_replicas {
-            let coord = Coord::new(block_id, replica_id);
-            blocks.push((coord, blocks[0].1.clone()));
+        for coord in &local_replicas[1..] {
+            blocks.push((*coord, blocks[0].1.clone()));
         }
         self.block_info.insert(block_id, info);
 
@@ -120,23 +133,15 @@ impl Scheduler {
     }
 
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) async fn start(self) -> Vec<JoinHandle<()>> {
-        match self.config.runtime {
-            ExecutionRuntime::Local(local) => self.start_local(local).await,
-        }
-    }
-
-    /// Start the computation locally without spawning any other process.
-    async fn start_local(mut self, config: LocalRuntimeConfig) -> Vec<JoinHandle<()>> {
-        info!("Starting local environment: {:?}", config);
-        self.setup_topology();
+    pub(crate) async fn start(mut self) -> Vec<JoinHandle<()>> {
+        info!("Starting scheduler: {:?}", self.config);
+        self.build_execution_graph();
         self.log_topology();
         self.network.log_topology();
 
         let mut join = Vec::new();
         let num_prev = self.num_prev();
         let network = Arc::new(Mutex::new(self.network));
-        // let start_handles: Vec<_> = self.start_handles.drain().collect();
         // start the execution
         for (coord, handle) in self.start_handles {
             let num_replicas = self.block_info[&coord.block_id].num_replicas;
@@ -173,15 +178,13 @@ impl Scheduler {
     }
 
     /// Build the execution graph for the network topology.
-    fn setup_topology(&mut self) {
+    fn build_execution_graph(&mut self) {
         for (from_block_id, next) in self.next_blocks.iter() {
-            let from_info = &self.block_info[from_block_id];
+            let from = &self.block_info[from_block_id];
             for to_block_id in next.iter() {
-                let to_info = &self.block_info[to_block_id];
-                for from_replica_id in 0..from_info.num_replicas {
-                    let from_coord = Coord::new(*from_block_id, from_replica_id);
-                    for to_replica_id in 0..to_info.num_replicas {
-                        let to_coord = Coord::new(*to_block_id, to_replica_id);
+                let to = &self.block_info[to_block_id];
+                for from_coord in from.replicas(self.config.host_id) {
+                    for to_coord in to.replicas(self.config.host_id) {
                         self.network.connect(from_coord, to_coord);
                     }
                 }
@@ -190,14 +193,16 @@ impl Scheduler {
     }
 
     fn log_topology(&self) {
-        debug!("Job graph:");
+        let mut topology = "Job graph:".to_string();
         for (id, next) in self.next_blocks.iter() {
-            debug!("  {}: {:?}", id, next);
+            topology += &format!("\n  {}: {}", id, self.block_info[&id].repr);
+            topology += &format!("\n    -> {:?}", next);
         }
+        debug!("{}", topology);
     }
 
-    /// Extract the `SchedulerBlockInfo` of a block that will be run locally.
-    fn local_block_info<In, Out, OperatorChain>(
+    /// Extract the `SchedulerBlockInfo` of a block.
+    fn block_info<In, Out, OperatorChain>(
         &self,
         block: &InnerBlock<In, Out, OperatorChain>,
     ) -> SchedulerBlockInfo
@@ -206,10 +211,93 @@ impl Scheduler {
         Out: Clone + Send + 'static,
         OperatorChain: Operator<Out>,
     {
-        match self.config.runtime {
-            ExecutionRuntime::Local(local) => SchedulerBlockInfo {
-                num_replicas: block.max_parallelism.unwrap_or(local.num_cores),
-            },
+        match &self.config.runtime {
+            ExecutionRuntime::Local(local) => self.local_block_info(block, local),
+            ExecutionRuntime::Remote(remote) => self.remote_block_info(block, remote),
+        }
+    }
+
+    /// Extract the `SchedulerBlockInfo` of a block that runs only locally.
+    ///
+    /// The number of replicas will be the minimum between:
+    ///
+    ///  - the number of logical cores.
+    ///  - the `max_parallelism` of the block.
+    ///  - the `max_local_parallelism` of the block.
+    fn local_block_info<In, Out, OperatorChain>(
+        &self,
+        block: &InnerBlock<In, Out, OperatorChain>,
+        local: &LocalRuntimeConfig,
+    ) -> SchedulerBlockInfo
+    where
+        In: Clone + Send + 'static,
+        Out: Clone + Send + 'static,
+        OperatorChain: Operator<Out>,
+    {
+        let max_parallelism = block.scheduler_requirements.max_parallelism;
+        let max_local_parallelism = block.scheduler_requirements.max_local_parallelism;
+        let num_replicas = local
+            .num_cores
+            .min(max_parallelism.unwrap_or(usize::max_value()))
+            .min(max_local_parallelism.unwrap_or(usize::max_value()));
+        debug!(
+            "Block {} will have {} local replicas (max_parallelism={:?}, max_local_parallelism={:?})",
+            block.id, num_replicas, max_parallelism, max_local_parallelism
+        );
+        let host_id = self.config.host_id;
+        let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
+        let replicas = Vec::from_iter(replicas);
+        SchedulerBlockInfo {
+            block_id: block.id,
+            repr: block.to_string(),
+            num_replicas,
+            replicas: HashMap::from_iter(vec![(host_id, replicas)].into_iter()),
+        }
+    }
+
+    /// Extract the `SchedulerBlockInfo` of a block that runs remotely.
+    ///
+    /// The block can be replicated at most `max_parallelism` times (if specified). Assign the
+    /// replicas starting from the first host giving as much replicas as possible without assigning
+    /// more replicas than cores and without exceeding `max_local_parallelism`.
+    fn remote_block_info<In, Out, OperatorChain>(
+        &self,
+        block: &InnerBlock<In, Out, OperatorChain>,
+        remote: &RemoteRuntimeConfig,
+    ) -> SchedulerBlockInfo
+    where
+        In: Clone + Send + 'static,
+        Out: Clone + Send + 'static,
+        OperatorChain: Operator<Out>,
+    {
+        let max_parallelism = block.scheduler_requirements.max_parallelism;
+        let max_local_parallelism = block.scheduler_requirements.max_local_parallelism;
+        debug!("Allocating block {} on remote runtime", block.id);
+        // number of replicas we can assign at most
+        let mut remaining_replicas = max_parallelism.unwrap_or(usize::max_value());
+        let mut num_replicas = 0;
+        let mut replicas: HashMap<_, Vec<_>> = HashMap::default();
+        for (host_id, host_info) in remote.hosts.iter().enumerate() {
+            let num_host_replicas = host_info
+                .num_cores
+                .min(remaining_replicas)
+                .min(max_local_parallelism.unwrap_or(usize::max_value()));
+            debug!(
+                "Block {} will have {} replicas on {} (max_parallelism={:?}, max_local_parallelism={:?}, num_cores={})",
+                block.id, num_host_replicas, host_info.to_string(), max_parallelism, max_local_parallelism, host_info.num_cores
+            );
+            remaining_replicas -= num_host_replicas;
+            num_replicas += num_host_replicas;
+            let host_replicas = replicas.entry(host_id).or_default();
+            for replica_id in 0..num_host_replicas {
+                host_replicas.push(Coord::new(block.id, host_id, replica_id));
+            }
+        }
+        SchedulerBlockInfo {
+            block_id: block.id,
+            repr: block.to_string(),
+            num_replicas,
+            replicas,
         }
     }
 }
@@ -220,5 +308,12 @@ impl StartHandle {
             starter,
             join_handle,
         }
+    }
+}
+
+impl SchedulerBlockInfo {
+    /// The list of replicas of the block inside a given host.
+    fn replicas(&self, host_id: HostId) -> Vec<Coord> {
+        self.replicas.get(&host_id).cloned().unwrap_or_default()
     }
 }

@@ -78,7 +78,7 @@ where
         let output = StreamOutputRef::default();
         let mut new_stream = self.add_block(EndBlock::new);
         // FIXME: when implementing Stream::max_parallelism use that here
-        new_stream.block.max_parallelism(1);
+        new_stream.block.scheduler_requirements.max_parallelism(1);
         new_stream
             .add_operator(|prev| CollectVecSink {
                 prev,

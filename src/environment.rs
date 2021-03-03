@@ -44,7 +44,7 @@ impl StreamEnvironment {
         let block_id = self.inner.borrow_mut().new_block();
         info!("Creating a new stream, block_id={}", block_id);
         let mut block = InnerBlock::new(block_id, source);
-        block.max_parallelism(1);
+        block.scheduler_requirements.max_parallelism(1);
         Stream {
             block,
             env: self.inner.clone(),
@@ -66,7 +66,7 @@ impl StreamEnvironment {
 impl StreamEnvironmentInner {
     fn new(config: EnvironmentConfig) -> Self {
         Self {
-            config,
+            config: config.clone(),
             block_count: 0,
             scheduler: Some(Scheduler::new(config)),
         }

@@ -29,7 +29,7 @@ pub(crate) enum NextStrategy {
 ///
 /// `OperatorChain` is the type of the chain of operators inside the block. It must be an operator
 /// that yields values of type `Out`.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct InnerBlock<In, Out, OperatorChain>
 where
     Out: Clone + Send + 'static,
@@ -41,15 +41,23 @@ where
     pub(crate) operators: OperatorChain,
     /// The strategy to use for sending to the next blocks in the stream.
     pub(crate) next_strategy: NextStrategy,
+    /// The set of requirements that the block imposes on the scheduler.
+    pub(crate) scheduler_requirements: SchedulerRequirements,
+
+    pub _in_type: PhantomData<In>,
+    pub _out_type: PhantomData<Out>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SchedulerRequirements {
     /// If some of the operators inside the chain require a limit on the parallelism of this node,
     /// it is stored here. `None` means that the scheduler is allowed to spawn as many copies of
     /// this block as it likes.
     ///
     /// The value specified is only an upper bound, the scheduler is allowed to spawn less blocks,
     pub(crate) max_parallelism: Option<usize>,
-
-    pub _in_type: PhantomData<In>,
-    pub _out_type: PhantomData<Out>,
+    /// Like `max_parallelism`, but counting only the replicas inside each host,
+    pub(crate) max_local_parallelism: Option<usize>,
 }
 
 impl<In, Out, OperatorChain> InnerBlock<In, Out, OperatorChain>
@@ -62,14 +70,20 @@ where
             id,
             operators,
             next_strategy: NextStrategy::OnlyOne,
-            max_parallelism: None,
+            scheduler_requirements: Default::default(),
             _in_type: Default::default(),
             _out_type: Default::default(),
         }
     }
 
+    pub fn to_string(&self) -> String {
+        self.operators.to_string()
+    }
+}
+
+impl SchedulerRequirements {
     /// Limit the maximum parallelism of this block.
-    pub fn max_parallelism(&mut self, max_parallelism: usize) {
+    pub(crate) fn max_parallelism(&mut self, max_parallelism: usize) {
         if let Some(old) = self.max_parallelism {
             self.max_parallelism = Some(old.min(max_parallelism));
         } else {
@@ -77,7 +91,12 @@ where
         }
     }
 
-    pub fn to_string(&self) -> String {
-        self.operators.to_string()
+    /// Limit the maximum parallelism of this block inside each host.
+    pub(crate) fn max_local_parallelism(&mut self, max_local_parallelism: usize) {
+        if let Some(old) = self.max_parallelism {
+            self.max_local_parallelism = Some(old.max(max_local_parallelism));
+        } else {
+            self.max_local_parallelism = Some(max_local_parallelism);
+        }
     }
 }

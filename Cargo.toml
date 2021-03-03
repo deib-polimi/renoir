@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Edoardo Morassutto <edoardo.morassutto@gmail.com>"]
 edition = "2018"
 
-
 [dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
 async-trait = "0.1"
@@ -17,3 +16,8 @@ typemap = "0.3"
 rand = "0.8"
 
 derivative = "2.2"
+
+serde = { version="1.0", features = ["derive"] }
+serde_yaml = "0.8"
+
+anyhow = "1.0"

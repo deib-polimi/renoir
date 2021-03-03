@@ -23,7 +23,8 @@ mod worker;
 async fn main() {
     pretty_env_logger::init();
 
-    let config = EnvironmentConfig::local(4);
+    // let config = EnvironmentConfig::local(4);
+    let config = EnvironmentConfig::remote("config.yml").await.unwrap();
     let mut env = StreamEnvironment::new(config);
     let source = source::StreamSource::new(from_iter(90..110));
     let stream = env

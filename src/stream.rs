@@ -75,7 +75,7 @@ where
                 id: self.block.id,
                 operators: get_operator(self.block.operators),
                 next_strategy: self.block.next_strategy,
-                max_parallelism: self.block.max_parallelism,
+                scheduler_requirements: self.block.scheduler_requirements,
                 _in_type: Default::default(),
                 _out_type: Default::default(),
             },
