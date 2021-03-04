@@ -1,6 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+
 use crate::block::InnerBlock;
 use crate::config::EnvironmentConfig;
 use crate::operator::source::Source;
@@ -38,7 +41,7 @@ impl StreamEnvironment {
     /// Construct a new stream bound to this environment starting with the specified source.
     pub fn stream<Out, S>(&mut self, source: S) -> Stream<Out, Out, S>
     where
-        Out: Clone + Send + 'static,
+        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         S: Source<Out> + Send + 'static,
     {
         let block_id = self.inner.borrow_mut().new_block();

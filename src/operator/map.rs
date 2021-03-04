@@ -2,6 +2,8 @@ use std::hash::Hash;
 
 use async_std::sync::Arc;
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -11,7 +13,7 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 #[derivative(Debug)]
 pub struct Map<Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -22,8 +24,8 @@ where
 #[async_trait]
 impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Map<Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Send + 'static,
-    NewOut: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     async fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -46,13 +48,13 @@ where
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Send + 'static,
-    Out: Clone + Send + 'static,
+    In: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn map<NewOut, F>(self, f: F) -> Stream<In, NewOut, Map<Out, NewOut, OperatorChain>>
     where
-        NewOut: Clone + Send + 'static,
+        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(Out) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| Map {
@@ -64,9 +66,9 @@ where
 
 impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    In: Clone + Send + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    In: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn map<NewOut, F>(
@@ -74,7 +76,7 @@ where
         f: F,
     ) -> KeyedStream<In, Key, NewOut, Map<KeyValue<Key, Out>, KeyValue<Key, NewOut>, OperatorChain>>
     where
-        NewOut: Clone + Send + 'static,
+        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(KeyValue<Key, Out>) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| Map {

@@ -1,4 +1,6 @@
 use async_std::channel::Receiver;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::block::InnerBlock;
 use crate::operator::{Operator, StreamElement};
@@ -8,8 +10,8 @@ pub(crate) fn spawn_worker<In, Out, OperatorChain>(
     block: InnerBlock<In, Out, OperatorChain>,
 ) -> StartHandle
 where
-    In: Clone + Send + 'static,
-    Out: Clone + Send + 'static,
+    In: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     let (sender, receiver) = async_std::channel::bounded(1);
@@ -21,8 +23,8 @@ async fn worker<In, Out, OperatorChain>(
     mut block: InnerBlock<In, Out, OperatorChain>,
     metadata_receiver: Receiver<ExecutionMetadata>,
 ) where
-    In: Clone + Send + 'static,
-    Out: Clone + Send + 'static,
+    In: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     let metadata = metadata_receiver.recv().await.unwrap();

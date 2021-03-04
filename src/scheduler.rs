@@ -5,6 +5,8 @@ use async_std::channel::Sender;
 use async_std::sync::{Arc, Mutex};
 use async_std::task::JoinHandle;
 use itertools::Itertools;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
@@ -90,8 +92,8 @@ impl Scheduler {
         &mut self,
         block: InnerBlock<In, Out, OperatorChain>,
     ) where
-        In: Clone + Send + 'static,
-        Out: Clone + Send + 'static,
+        In: Clone + Serialize + DeserializeOwned + Send + 'static,
+        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out> + Send + 'static,
     {
         let block_id = block.id;
@@ -240,8 +242,8 @@ impl Scheduler {
         block: &InnerBlock<In, Out, OperatorChain>,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Send + 'static,
-        Out: Clone + Send + 'static,
+        In: Clone + Serialize + DeserializeOwned + Send + 'static,
+        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         match &self.config.runtime {
@@ -263,8 +265,8 @@ impl Scheduler {
         local: &LocalRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Send + 'static,
-        Out: Clone + Send + 'static,
+        In: Clone + Serialize + DeserializeOwned + Send + 'static,
+        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
@@ -299,8 +301,8 @@ impl Scheduler {
         remote: &RemoteRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Send + 'static,
-        Out: Clone + Send + 'static,
+        In: Clone + Serialize + DeserializeOwned + Send + 'static,
+        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;

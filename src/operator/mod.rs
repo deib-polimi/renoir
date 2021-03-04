@@ -1,6 +1,8 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 pub use end::*;
 pub use group_by::*;
@@ -34,7 +36,7 @@ pub type Timestamp = Duration;
 /// An operator may need to change the content of a `StreamElement` (e.g. a `Map` may change the
 /// value of the `Item`). Usually `Watermark` and `End` are simply forwarded to the next operator in
 /// the chain.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StreamElement<Out>
 where
     Out: Clone + Send + 'static,
@@ -63,7 +65,7 @@ where
 #[async_trait]
 pub trait Operator<Out>: Clone
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     /// Setup the operator chain. This is called before any call to `next` and it's used to
     /// initialize the operator. When it's called the operator has already been cloned and it will
@@ -82,7 +84,7 @@ where
 
 impl<Out> StreamElement<Out>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     /// Create a new `StreamElement` with an `Item(())` if `self` contains an item, otherwise it
     /// returns the same variant of `self`.
@@ -98,7 +100,7 @@ where
     /// Change the type of the element inside the `StreamElement`.
     pub(crate) fn map<NewOut>(self, f: impl FnOnce(Out) -> NewOut) -> StreamElement<NewOut>
     where
-        NewOut: Clone + Send + 'static,
+        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     {
         match self {
             StreamElement::Item(item) => StreamElement::Item(f(item)),

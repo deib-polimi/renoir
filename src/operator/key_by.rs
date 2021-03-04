@@ -1,6 +1,8 @@
 use std::hash::Hash;
 
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::operator::Keyer;
 use crate::operator::{Operator, StreamElement};
@@ -11,8 +13,8 @@ use crate::stream::KeyValue;
 #[derivative(Debug)]
 pub struct KeyBy<Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
@@ -22,8 +24,8 @@ where
 
 impl<Key, Out, OperatorChain> KeyBy<Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub fn new(prev: OperatorChain, keyer: Keyer<Key, Out>) -> Self {
@@ -34,8 +36,8 @@ where
 #[async_trait]
 impl<Key, Out, OperatorChain> Operator<KeyValue<Key, Out>> for KeyBy<Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send,
 {
     async fn setup(&mut self, metadata: ExecutionMetadata) {

@@ -4,6 +4,8 @@ use async_std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use async_std::stream::StreamExt;
 use async_std::task::spawn;
 use async_std::task::JoinHandle;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::network::{wait_start, Coord, NetworkSender, NetworkStarter, NetworkStarterRecv};
 
@@ -19,7 +21,7 @@ pub struct NetworkReceiver<In> {
 
 impl<In> NetworkReceiver<In>
 where
-    In: Send + 'static,
+    In: Send + Serialize + DeserializeOwned + 'static,
 {
     pub fn new<A>(coord: Coord, address: A) -> (Self, NetworkStarter, JoinHandle<()>)
     where

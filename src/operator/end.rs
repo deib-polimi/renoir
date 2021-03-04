@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use rand::{thread_rng, Rng};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::block::NextStrategy;
 use crate::network::{NetworkMessage, NetworkSender};
@@ -13,7 +15,7 @@ pub type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
 #[derive(Debug, Clone)]
 pub struct EndBlock<Out, OperatorChain>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
@@ -24,7 +26,7 @@ where
 
 impl<Out, OperatorChain> EndBlock<Out, OperatorChain>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub(crate) fn new(prev: OperatorChain, next_strategy: NextStrategy) -> Self {
@@ -39,7 +41,7 @@ where
 
 pub async fn broadcast<Out>(senders: &SenderList<Out>, message: NetworkMessage<Out>)
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     for senders in senders.iter() {
         for sender in senders.iter() {
@@ -53,7 +55,7 @@ where
 
 async fn send<Out>(senders: &SenderList<Out>, message: StreamElement<Out>)
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     for senders in senders.iter() {
         let out_buf = vec![message.clone()];
@@ -69,7 +71,7 @@ where
 #[async_trait]
 impl<Out, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send,
 {
     async fn setup(&mut self, metadata: ExecutionMetadata) {

@@ -1,5 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
+use async_std::channel::{Receiver, Sender};
+
 pub use receiver::*;
 pub use sender::*;
 pub(crate) use topology::*;
@@ -7,7 +9,6 @@ pub(crate) use topology::*;
 use crate::operator::StreamElement;
 use crate::scheduler::{HostId, ReplicaId};
 use crate::stream::BlockId;
-use async_std::channel::{Receiver, Sender};
 
 mod receiver;
 mod sender;

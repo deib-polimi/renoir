@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::network::{NetworkMessage, NetworkReceiver};
 use crate::operator::{Operator, StreamElement};
@@ -10,7 +12,7 @@ use crate::scheduler::ExecutionMetadata;
 #[derivative(Clone)]
 pub struct StartBlock<Out>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     metadata: Option<ExecutionMetadata>,
     #[derivative(Clone(clone_with = "clone_none"))]
@@ -21,7 +23,7 @@ where
 
 impl<Out> StartBlock<Out>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     pub fn new() -> Self {
         StartBlock {
@@ -36,7 +38,7 @@ where
 #[async_trait]
 impl<Out> Operator<Out> for StartBlock<Out>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     async fn setup(&mut self, metadata: ExecutionMetadata) {
         let mut network = metadata.network.lock().await;

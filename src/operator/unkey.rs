@@ -2,6 +2,8 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -10,8 +12,8 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 #[derive(Debug, Clone)]
 pub struct Unkey<Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
     prev: OperatorChain,
@@ -21,8 +23,8 @@ where
 
 impl<Key, Out, OperatorChain> Unkey<Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
     pub fn new(prev: OperatorChain) -> Self {
@@ -37,8 +39,8 @@ where
 #[async_trait]
 impl<Key, Out, OperatorChain> Operator<Out> for Unkey<Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send,
 {
     async fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -56,9 +58,9 @@ where
 
 impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    In: Clone + Send + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    In: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn unkey(self) -> Stream<In, Out, Unkey<Key, Out, OperatorChain>> {

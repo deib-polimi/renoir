@@ -1,5 +1,8 @@
 use std::marker::PhantomData;
 
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+
 use crate::operator::Operator;
 use crate::stream::BlockId;
 
@@ -32,7 +35,7 @@ pub(crate) enum NextStrategy {
 #[derive(Debug, Clone)]
 pub(crate) struct InnerBlock<In, Out, OperatorChain>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     /// The identifier of the block inside the environment.
@@ -62,7 +65,7 @@ pub(crate) struct SchedulerRequirements {
 
 impl<In, Out, OperatorChain> InnerBlock<In, Out, OperatorChain>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub fn new(id: BlockId, operators: OperatorChain) -> Self {

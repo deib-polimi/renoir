@@ -1,6 +1,8 @@
 use async_std::stream;
 use async_std::stream::StreamExt;
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
@@ -24,12 +26,15 @@ impl<Out> StreamSource<Out> {
     }
 }
 
-impl<Out> Source<Out> for StreamSource<Out> where Out: Clone + Send + Unpin + 'static {}
+impl<Out> Source<Out> for StreamSource<Out> where
+    Out: Clone + Serialize + DeserializeOwned + Send + Unpin + 'static
+{
+}
 
 #[async_trait]
 impl<Out> Operator<Out> for StreamSource<Out>
 where
-    Out: Clone + Send + Unpin + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + Unpin + 'static,
 {
     async fn setup(&mut self, _metadata: ExecutionMetadata) {}
 

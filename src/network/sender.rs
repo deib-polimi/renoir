@@ -1,13 +1,16 @@
+use std::io::ErrorKind;
+use std::time::Duration;
+
 use anyhow::{anyhow, Result};
 use async_std::channel::{bounded, Receiver, Sender};
-
-use crate::network::{wait_start, Coord, NetworkStarter, NetworkStarterRecv};
 use async_std::io::timeout;
 use async_std::net::{TcpStream, ToSocketAddrs};
 use async_std::task::spawn;
 use async_std::task::{sleep, JoinHandle};
-use std::io::ErrorKind;
-use std::time::Duration;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
+use crate::network::{wait_start, Coord, NetworkStarter, NetworkStarterRecv};
 
 const CONNECT_ATTEMPTS: usize = 10;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
@@ -24,7 +27,7 @@ pub struct NetworkSender<Out> {
 
 impl<Out> NetworkSender<Out>
 where
-    Out: Send + 'static,
+    Out: Serialize + DeserializeOwned + Send + 'static,
 {
     /// Store the sender of a local channel. No connection is required since the channel born
     /// connected.
