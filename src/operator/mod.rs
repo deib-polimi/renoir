@@ -16,6 +16,7 @@ mod end;
 mod flatten;
 mod group_by;
 mod key_by;
+mod keyed_fold;
 mod map;
 mod shuffle;
 pub mod sink;
