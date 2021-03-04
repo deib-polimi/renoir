@@ -48,9 +48,7 @@ where
         while self.buffer.is_empty() {
             match self.prev.next().await {
                 StreamElement::Item(item) => {
-                    self.buffer = (self.make_iter)(item)
-                        .map(|value| StreamElement::Item(value))
-                        .collect()
+                    self.buffer = (self.make_iter)(item).map(StreamElement::Item).collect()
                 }
                 StreamElement::Timestamped(item, ts) => {
                     self.buffer = (self.make_iter)(item)

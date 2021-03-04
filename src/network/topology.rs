@@ -142,8 +142,7 @@ impl NetworkTopology {
         };
         let (receiver, bind_socket, receiver_join_handle) =
             NetworkReceiver::new(coord, address.clone());
-        let (sender, connect_socket, sender_join_handle) =
-            NetworkSender::remote(coord, address.clone());
+        let (sender, connect_socket, sender_join_handle) = NetworkSender::remote(coord, address);
         self.receivers_metadata
             .entry(coord)
             .or_insert_with(|| ReceiverMetadata {
@@ -160,15 +159,15 @@ impl NetworkTopology {
             });
         self.local_senders
             .entry::<SenderKey<T>>()
-            .or_insert_with(|| Default::default())
+            .or_insert_with(Default::default)
             .insert(coord, receiver.sender());
         self.remote_senders
             .entry::<SenderKey<T>>()
-            .or_insert_with(|| Default::default())
+            .or_insert_with(Default::default)
             .insert(coord, sender);
         self.receivers
             .entry::<ReceiverKey<T>>()
-            .or_insert_with(|| Default::default())
+            .or_insert_with(Default::default)
             .insert(coord, receiver);
     }
 

@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 
 use serde::de::DeserializeOwned;
@@ -78,9 +79,15 @@ where
             _out_type: Default::default(),
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        self.operators.to_string()
+impl<In, Out, OperatorChain> Display for InnerBlock<In, Out, OperatorChain>
+where
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    OperatorChain: Operator<Out>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.operators.to_string())
     }
 }
 

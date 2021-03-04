@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::iter::FromIterator;
 
 use async_std::channel::Sender;
 use async_std::sync::{Arc, Mutex};
@@ -281,12 +280,11 @@ impl Scheduler {
         );
         let host_id = self.config.host_id;
         let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
-        let replicas = Vec::from_iter(replicas);
         SchedulerBlockInfo {
             block_id: block.id,
             repr: block.to_string(),
             num_replicas,
-            replicas: HashMap::from_iter(vec![(host_id, replicas)].into_iter()),
+            replicas: vec![(host_id, replicas.collect())].into_iter().collect(),
         }
     }
 

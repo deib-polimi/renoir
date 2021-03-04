@@ -148,7 +148,7 @@ where
         match self.next_strategy {
             NextStrategy::Random => format!("{} -> Shuffle", self.prev.to_string()),
             NextStrategy::OnlyOne => format!("{} -> OnlyOne", self.prev.to_string()),
-            _ => self.prev.to_string().to_string(),
+            _ => self.prev.to_string(),
         }
     }
 }

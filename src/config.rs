@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use anyhow::Result;
@@ -83,8 +84,8 @@ impl EnvironmentConfig {
     }
 }
 
-impl RemoteHostConfig {
-    pub fn to_string(&self) -> String {
-        format!("[{}:{}-]", self.address, self.base_port)
+impl Display for RemoteHostConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}:{}-]", self.address, self.base_port)
     }
 }
