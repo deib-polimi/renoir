@@ -52,7 +52,7 @@ where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn map<NewOut, F>(self, f: F) -> Stream<In, NewOut, Map<Out, NewOut, OperatorChain>>
+    pub fn map<NewOut, F>(self, f: F) -> Stream<In, NewOut, impl Operator<NewOut>>
     where
         NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(Out) -> NewOut + Send + Sync + 'static,
@@ -74,7 +74,7 @@ where
     pub fn map<NewOut, F>(
         self,
         f: F,
-    ) -> KeyedStream<In, Key, NewOut, Map<KeyValue<Key, Out>, KeyValue<Key, NewOut>, OperatorChain>>
+    ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
         NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(KeyValue<Key, Out>) -> NewOut + Send + Sync + 'static,

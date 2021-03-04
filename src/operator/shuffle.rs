@@ -12,7 +12,7 @@ where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn shuffle(mut self) -> Stream<Out, Out, StartBlock<Out>> {
+    pub fn shuffle(mut self) -> Stream<Out, Out, impl Operator<Out>> {
         self.block.next_strategy = NextStrategy::Random;
         self.add_block(EndBlock::new)
     }

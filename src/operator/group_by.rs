@@ -12,7 +12,7 @@ use crate::operator::StartBlock;
 use crate::operator::{broadcast, SenderList};
 use crate::operator::{KeyBy, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyedStream, Stream};
+use crate::stream::{KeyValue, KeyedStream, Stream};
 
 pub type Keyer<Key, Out> = Arc<dyn Fn(&Out) -> Key + Send + Sync>;
 
@@ -133,7 +133,7 @@ where
     pub fn group_by<Key, Keyer>(
         mut self,
         keyer: Keyer,
-    ) -> KeyedStream<Out, Key, Out, KeyBy<Key, Out, StartBlock<Out>>>
+    ) -> KeyedStream<Out, Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
         Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
