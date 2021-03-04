@@ -5,7 +5,7 @@ use std::hash::{Hash, Hasher};
 use async_std::sync::Arc;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::block::NextStrategy;
 use crate::operator::StartBlock;

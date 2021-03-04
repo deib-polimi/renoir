@@ -1,15 +1,17 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 
-use async_std::net::IpAddr;
 use async_std::task::JoinHandle;
 use itertools::Itertools;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use typemap::{Key, ShareMap};
 
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, NetworkStarter};
+use crate::scheduler::HostId;
+use crate::stream::BlockId;
+use async_std::channel::Sender;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In>(PhantomData<In>);
@@ -33,12 +35,13 @@ where
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct ReceiverMetadata {
-    /// This receiver should also accept network connections and not just local ones.
-    is_remote: bool,
+    /// The set of blocks that connect to this receiver. All the replicas of a block inside a single
+    /// host will share the same socket, so they should be counted once.
+    connections: HashSet<(BlockId, HostId)>,
     /// The starter that makes the receiver start binding the socket. `Option` because it will be
     /// moved out this structure.
     #[derivative(Debug = "ignore")]
-    bind_socket: Option<NetworkStarter>,
+    bind_socket: Option<Sender<usize>>,
     /// `JoinHandle` of the task that binds the remote socket. `Option` because it will be moved out
     /// this structure.
     #[derivative(Debug = "ignore")]
@@ -128,22 +131,24 @@ impl NetworkTopology {
         debug!("Registering {}", coord);
         let address = match &self.config.runtime {
             // this doesn't really matter, no socket will be bound
-            ExecutionRuntime::Local(_) => (IpAddr::from([127, 0, 0, 1]), 0),
+            ExecutionRuntime::Local(_) => ("127.0.0.1".to_string(), 0),
             ExecutionRuntime::Remote(remote) => {
                 let host = &remote.hosts[coord.host_id];
-                let address = host.address;
+                let address = host.address.clone();
                 // TODO: this will be wrong with the multiplexer
                 let port = coord.block_id * host.num_cores + coord.replica_id;
                 (address, port as u16 + host.base_port)
             }
         };
-        let (receiver, bind_socket, receiver_join_handle) = NetworkReceiver::new(coord, address);
-        let (sender, connect_socket, sender_join_handle) = NetworkSender::remote(coord, address);
+        let (receiver, bind_socket, receiver_join_handle) =
+            NetworkReceiver::new(coord, address.clone());
+        let (sender, connect_socket, sender_join_handle) =
+            NetworkSender::remote(coord, address.clone());
         self.receivers_metadata
             .entry(coord)
             .or_insert_with(|| ReceiverMetadata {
                 bind_socket: Some(bind_socket),
-                is_remote: false,
+                connections: Default::default(),
                 join_handle: Some(receiver_join_handle),
             });
         self.senders_metadata
@@ -243,13 +248,11 @@ impl NetworkTopology {
         for (_coord, remote) in self.receivers_metadata.iter_mut() {
             let bind_socket = remote.bind_socket.take().unwrap();
             let join_handle = remote.join_handle.take().unwrap();
-            if remote.is_remote {
-                // tell the receiver to bind the socket
-                bind_socket.send(true).await.unwrap();
+            let num_connections = remote.connections.len();
+            bind_socket.send(num_connections).await.unwrap();
+            if num_connections > 0 {
                 join_handles.push(join_handle);
             } else {
-                // tell the receiver not to bind the socket and exit immediately
-                bind_socket.send(false).await.unwrap();
                 join_handle.await;
             }
         }
@@ -257,11 +260,10 @@ impl NetworkTopology {
         for (_coord, remote) in self.senders_metadata.iter_mut() {
             let connect_socket = remote.connect_socket.take().unwrap();
             let join_handle = remote.join_handle.take().unwrap();
+            connect_socket.send(remote.is_remote).await.unwrap();
             if remote.is_remote {
-                connect_socket.send(true).await.unwrap();
                 join_handles.push(join_handle);
             } else {
-                connect_socket.send(false).await.unwrap();
                 join_handle.await;
             }
         }
@@ -291,7 +293,8 @@ impl NetworkTopology {
 
         // a remote client wants to connect: this receiver should be remote
         if from_remote {
-            self.receivers_metadata.get_mut(&from).unwrap().is_remote = true;
+            let metadata = self.receivers_metadata.get_mut(&to).unwrap();
+            metadata.connections.insert((from.block_id, from.host_id));
         }
         // we want to connect to a remote: this sender should be remote
         if to_remote {

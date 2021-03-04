@@ -10,7 +10,7 @@ use crate::network::{NetworkMessage, NetworkSender};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
-pub type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
+pub(crate) type SenderList<Out> = Vec<Vec<NetworkSender<NetworkMessage<Out>>>>;
 
 #[derive(Debug, Clone)]
 pub struct EndBlock<Out, OperatorChain>
@@ -39,7 +39,7 @@ where
     }
 }
 
-pub async fn broadcast<Out>(senders: &SenderList<Out>, message: NetworkMessage<Out>)
+pub(crate) async fn broadcast<Out>(senders: &SenderList<Out>, message: NetworkMessage<Out>)
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
@@ -62,9 +62,10 @@ where
         let index = thread_rng().gen_range(0..senders.len());
         // TODO: batching
         let sender = &senders[index];
-        if let Err(e) = sender.send(out_buf).await {
-            error!("Failed to send message to {:?}: {:?}", sender, e);
-        }
+        sender
+            .send(out_buf)
+            .await
+            .unwrap_or_else(|e| panic!("Failed to send message to {:?}: {:?}", sender, e));
     }
 }
 

@@ -2,6 +2,8 @@
 extern crate derivative;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate lazy_static;
 
 use async_std::stream::from_iter;
 

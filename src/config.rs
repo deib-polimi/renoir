@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use anyhow::Result;
-use async_std::net::IpAddr;
 use async_std::path::Path;
 use serde::Deserialize;
 
@@ -35,7 +34,7 @@ pub struct RemoteRuntimeConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RemoteHostConfig {
-    pub address: IpAddr,
+    pub address: String,
     pub base_port: u16,
     pub num_cores: usize,
     // TODO: extra ssh information for spawning

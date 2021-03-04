@@ -6,7 +6,7 @@ use async_std::sync::{Arc, Mutex};
 use async_std::task::JoinHandle;
 use itertools::Itertools;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};

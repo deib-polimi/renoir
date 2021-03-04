@@ -3,7 +3,7 @@ use std::hash::Hash;
 use std::rc::Rc;
 
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::block::{InnerBlock, NextStrategy};
 use crate::environment::StreamEnvironmentInner;
