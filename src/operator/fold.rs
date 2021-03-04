@@ -131,3 +131,26 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use async_std::stream::from_iter;
+
+    use crate::config::EnvironmentConfig;
+    use crate::environment::StreamEnvironment;
+    use crate::operator::source;
+
+    #[async_std::test]
+    async fn fold_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(0..10u8));
+        let res = env
+            .stream(source)
+            .fold("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
+            .collect_vec();
+        env.execute().await;
+        let res = res.get().unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0], "0123456789");
+    }
+}

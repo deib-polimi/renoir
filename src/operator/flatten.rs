@@ -79,7 +79,7 @@ impl<In, Out, OperatorChain, NewOut> Stream<In, Out, OperatorChain>
 where
     In: Clone + Serialize + DeserializeOwned + Send + 'static,
     Out: IntoIterator<Item = NewOut> + Clone + Serialize + DeserializeOwned + Send + 'static,
-    <Out as IntoIterator>::IntoIter: Clone + Serialize + DeserializeOwned + Send + 'static,
+    <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
     NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
@@ -102,7 +102,7 @@ where
     pub fn flat_map<MapOut, NewOut, F>(self, f: F) -> Stream<In, NewOut, impl Operator<NewOut>>
     where
         MapOut: IntoIterator<Item = NewOut> + Clone + Serialize + DeserializeOwned + Send + 'static,
-        <MapOut as IntoIterator>::IntoIter: Clone + Serialize + DeserializeOwned + Send + 'static,
+        <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
         NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(Out) -> MapOut + Send + Sync + 'static,
     {
@@ -115,7 +115,7 @@ where
     Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
     In: Clone + Serialize + DeserializeOwned + Send + 'static,
     Out: IntoIterator<Item = NewOut> + Clone + Serialize + DeserializeOwned + Send + 'static,
-    <Out as IntoIterator>::IntoIter: Clone + Serialize + DeserializeOwned + Send + 'static,
+    <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
     NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
@@ -143,10 +143,90 @@ where
     ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
         MapOut: IntoIterator<Item = NewOut> + Clone + Serialize + DeserializeOwned + Send + 'static,
-        <MapOut as IntoIterator>::IntoIter: Clone + Serialize + DeserializeOwned + Send + 'static,
+        <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
         NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(KeyValue<Key, Out>) -> MapOut + Send + Sync + 'static,
     {
         self.map(f).flatten()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use async_std::stream::from_iter;
+    use itertools::Itertools;
+
+    use crate::config::EnvironmentConfig;
+    use crate::environment::StreamEnvironment;
+    use crate::operator::source;
+
+    #[async_std::test]
+    async fn flatten_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(vec![
+            vec![],
+            vec![1u8, 2, 3],
+            vec![4, 5],
+            vec![],
+            vec![6, 7, 8],
+            vec![],
+        ]));
+        let res = env.stream(source).flatten().collect_vec();
+        env.execute().await;
+        assert_eq!(res.get().unwrap(), (1..=8).collect_vec());
+    }
+
+    #[async_std::test]
+    async fn flatten_keyed_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(0..10u8));
+        let res = env
+            .stream(source)
+            .group_by(|v| v % 2)
+            .map(|(_k, v)| vec![v, v, v])
+            .flatten()
+            .unkey()
+            .collect_vec();
+        env.execute().await;
+        let expected = (0..10u8)
+            .flat_map(|x| vec![(x % 2, x), (x % 2, x), (x % 2, x)])
+            .sorted()
+            .collect_vec();
+        let res = res.get().unwrap().into_iter().sorted().collect_vec();
+        assert_eq!(expected, res);
+    }
+
+    #[async_std::test]
+    async fn flat_map_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(0..10u8));
+        let res = env
+            .stream(source)
+            .flat_map(|x| vec![x, 10 * x, 20 * x])
+            .collect_vec();
+        env.execute().await;
+        let expected = (0..10u8)
+            .flat_map(|x| vec![x, 10 * x, 20 * x])
+            .collect_vec();
+        assert_eq!(res.get().unwrap(), expected);
+    }
+
+    #[async_std::test]
+    async fn flat_map_keyed_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(0..10u8));
+        let res = env
+            .stream(source)
+            .group_by(|v| v % 2)
+            .flat_map(|(_k, v)| vec![v, v, v])
+            .unkey()
+            .collect_vec();
+        env.execute().await;
+        let expected = (0..10u8)
+            .flat_map(|x| vec![(x % 2, x), (x % 2, x), (x % 2, x)])
+            .sorted()
+            .collect_vec();
+        let res = res.get().unwrap().into_iter().sorted().collect_vec();
+        assert_eq!(expected, res);
     }
 }

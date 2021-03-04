@@ -74,11 +74,11 @@ where
         if let Some(k) = self.accumulators.keys().next() {
             let key = k.clone();
             let entry = self.accumulators.remove_entry(&key).unwrap();
-            if let Some(ts) = self.timestamps.remove(&key) {
-                return StreamElement::Timestamped(entry, ts);
+            return if let Some(ts) = self.timestamps.remove(&key) {
+                StreamElement::Timestamped(entry, ts)
             } else {
-                return StreamElement::Item(entry);
-            }
+                StreamElement::Item(entry)
+            };
         }
 
         if let Some(ts) = self.max_watermark.take() {
@@ -123,5 +123,32 @@ where
             max_watermark: None,
             received_end: false,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use async_std::stream::from_iter;
+
+    use crate::config::EnvironmentConfig;
+    use crate::environment::StreamEnvironment;
+    use crate::operator::source;
+    use itertools::Itertools;
+
+    #[async_std::test]
+    async fn fold_keyed_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(0..10u8));
+        let res = env
+            .stream(source)
+            .group_by(|n| n % 2)
+            .fold("".to_string(), |s, n| s + &n.to_string())
+            .unkey()
+            .collect_vec();
+        env.execute().await;
+        let res = res.get().unwrap().into_iter().sorted().collect_vec();
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0].1, "02468");
+        assert_eq!(res[1].1, "13579");
     }
 }

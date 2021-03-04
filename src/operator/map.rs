@@ -85,3 +85,47 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use async_std::stream::from_iter;
+
+    use crate::config::EnvironmentConfig;
+    use crate::environment::StreamEnvironment;
+    use crate::operator::source;
+    use itertools::Itertools;
+    use std::str::FromStr;
+
+    #[async_std::test]
+    async fn map_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(0..10u8));
+        let res = env
+            .stream(source)
+            .map(|n| n.to_string())
+            .map(|n| n + "000")
+            .map(|n| u32::from_str(&n).unwrap())
+            .collect_vec();
+        env.execute().await;
+        let res = res.get().unwrap();
+        let expected = (0..10u32).map(|n| 1000 * n).collect_vec();
+        assert_eq!(res, expected);
+    }
+
+    #[async_std::test]
+    async fn map_keyed_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(0..10u8));
+        let res = env
+            .stream(source)
+            .group_by(|n| n % 2)
+            .map(|(k, v)| 100 * k + v)
+            .unkey()
+            .map(|(_k, v)| v)
+            .collect_vec();
+        env.execute().await;
+        let res = res.get().unwrap().into_iter().sorted().collect_vec();
+        let expected = (0..10u8).map(|n| (n % 2) * 100 + n).sorted().collect_vec();
+        assert_eq!(res, expected);
+    }
+}

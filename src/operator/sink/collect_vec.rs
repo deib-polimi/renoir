@@ -91,3 +91,22 @@ where
         StreamOutput { result: output }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use async_std::stream::from_iter;
+    use itertools::Itertools;
+
+    use crate::config::EnvironmentConfig;
+    use crate::environment::StreamEnvironment;
+    use crate::operator::source;
+
+    #[async_std::test]
+    async fn collect_vec() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(from_iter(0..10u8));
+        let res = env.stream(source).collect_vec();
+        env.execute().await;
+        assert_eq!(res.get().unwrap(), (0..10).collect_vec());
+    }
+}
