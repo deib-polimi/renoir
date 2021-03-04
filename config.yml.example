@@ -1,0 +1,7 @@
+hosts:
+  - address: localhost
+    base_port: 9500
+    num_cores: 4
+  - address: localhost
+    base_port: 9600
+    num_cores: 4
