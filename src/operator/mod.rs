@@ -14,6 +14,7 @@ use crate::scheduler::ExecutionMetadata;
 
 mod end;
 mod flatten;
+mod fold;
 mod group_by;
 mod key_by;
 mod keyed_fold;

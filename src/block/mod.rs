@@ -71,7 +71,7 @@ where
     /// Limit the maximum parallelism of this block.
     pub fn max_parallelism(&mut self, max_parallelism: usize) {
         if let Some(old) = self.max_parallelism {
-            self.max_parallelism = Some(old.max(max_parallelism));
+            self.max_parallelism = Some(old.min(max_parallelism));
         } else {
             self.max_parallelism = Some(max_parallelism);
         }

@@ -79,7 +79,7 @@ where
             }
         }
 
-        if let Some(ts) = self.max_watermark {
+        if let Some(ts) = self.max_watermark.take() {
             return StreamElement::Watermark(ts);
         }
 
