@@ -4,6 +4,8 @@ use std::hash::Hash;
 
 use async_std::sync::Arc;
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
@@ -13,10 +15,10 @@ use crate::stream::{KeyValue, KeyedStream};
 #[derivative(Debug)]
 pub struct KeyedFold<Key, Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Send + 'static,
-    Key: Clone + Send + Hash + Eq + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
     PreviousOperators: Operator<KeyValue<Key, Out>>,
-    NewOut: Clone + Send + 'static,
+    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -32,10 +34,10 @@ where
 impl<Key, Out, NewOut, PreviousOperators> Operator<KeyValue<Key, NewOut>>
     for KeyedFold<Key, Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Send + 'static,
-    Key: Clone + Send + Hash + Eq + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
     PreviousOperators: Operator<KeyValue<Key, Out>> + Send,
-    NewOut: Clone + Send + 'static,
+    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     async fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata).await;
@@ -98,9 +100,9 @@ where
 
 impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Clone + Send + Hash + Eq + 'static,
-    In: Clone + Send + 'static,
-    Out: Clone + Send + 'static,
+    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    In: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn fold<NewOut, F>(
@@ -109,7 +111,7 @@ where
         f: F,
     ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        NewOut: Clone + Send + 'static,
+        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| KeyedFold {

@@ -1,5 +1,7 @@
 use async_std::sync::Arc;
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::block::NextStrategy;
 use crate::operator::{EndBlock, Operator, StreamElement, Timestamp};
@@ -10,9 +12,9 @@ use crate::stream::Stream;
 #[derivative(Debug)]
 pub struct Fold<Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out>,
-    NewOut: Clone + Send + 'static,
+    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -27,8 +29,8 @@ where
 #[async_trait]
 impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Fold<Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Send + 'static,
-    NewOut: Clone + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     async fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -87,8 +89,8 @@ where
 
 impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Send + 'static,
-    Out: Clone + Send + 'static,
+    In: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn fold<NewOut, Local, Global>(
@@ -98,7 +100,7 @@ where
         global: Global,
     ) -> Stream<NewOut, NewOut, impl Operator<NewOut>>
     where
-        NewOut: Clone + Send + 'static,
+        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         Local: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
         Global: Fn(NewOut, NewOut) -> NewOut + Send + Sync + 'static,
     {
@@ -117,7 +119,7 @@ where
             .add_block(EndBlock::new);
 
         // Global fold (which is done on only one node)
-        second_part.block.max_parallelism(1);
+        second_part.block.scheduler_requirements.max_parallelism(1);
         second_part.add_operator(|prev| Fold {
             prev,
             fold: Arc::new(global),
