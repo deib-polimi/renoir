@@ -38,6 +38,7 @@ pub struct RemoteHostConfig {
     pub address: IpAddr,
     pub base_port: u16,
     pub num_cores: usize,
+    // TODO: extra ssh information for spawning
 }
 
 impl EnvironmentConfig {

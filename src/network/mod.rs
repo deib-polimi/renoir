@@ -1,23 +1,38 @@
-use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
-use async_std::channel::{Receiver, Sender};
-
-pub use topology::*;
+pub use receiver::*;
+pub use sender::*;
+pub(crate) use topology::*;
 
 use crate::operator::StreamElement;
 use crate::scheduler::{HostId, ReplicaId};
 use crate::stream::BlockId;
+use async_std::channel::{Receiver, Sender};
 
+mod receiver;
+mod sender;
 mod topology;
 
+/// Sender that communicate to a network component to start working. Sending `true` will make the
+/// network component start working, sending `false` or dropping all the senders will make the
+/// component exit.
+pub(crate) type NetworkStarter = Sender<bool>;
+/// Receiver part of `NetworkStarter`.
+pub(crate) type NetworkStarterRecv = Receiver<bool>;
+
+/// A batch of elements to send.
 pub type Batch<T> = Vec<StreamElement<T>>;
+/// What is sent from a replica to the next.
 pub type NetworkMessage<T> = Batch<T>;
 
+/// Coordinates that identify a replica inside the network.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Coord {
+    /// The identifier of the block the replicas works on.
     pub block_id: BlockId,
+    /// The identifier of where the replica is located.
     pub host_id: HostId,
+    /// The identifier of the replica inside the host.
     pub replica_id: ReplicaId,
 }
 
@@ -41,85 +56,10 @@ impl Display for Coord {
     }
 }
 
-pub struct NetworkReceiver<In> {
-    pub coord: Coord,
-    inner: NetworkReceiverInner<In>,
-}
-
-pub enum NetworkReceiverInner<In> {
-    Local(Receiver<In>),
-}
-
-pub struct NetworkSender<Out> {
-    pub coord: Coord,
-    inner: NetworkSenderInner<Out>,
-}
-
-pub enum NetworkSenderInner<Out> {
-    Local(Sender<Out>),
-}
-
-impl<Out> Clone for NetworkSender<Out> {
-    fn clone(&self) -> Self {
-        match &self.inner {
-            NetworkSenderInner::Local(local) => NetworkSender {
-                coord: self.coord,
-                inner: NetworkSenderInner::Local(local.clone()),
-            },
-        }
-    }
-}
-
-impl<In> NetworkReceiver<In> {
-    pub fn local(coord: Coord, receiver: Receiver<In>) -> Self {
-        Self {
-            coord,
-            inner: NetworkReceiverInner::Local(receiver),
-        }
-    }
-
-    pub async fn recv(&self) -> Result<In, impl Error> {
-        match &self.inner {
-            NetworkReceiverInner::Local(local) => local.recv().await,
-        }
-    }
-}
-
-impl<In> Debug for NetworkReceiver<In> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let typ = match &self.inner {
-            NetworkReceiverInner::Local(_) => "local",
-        };
-        f.debug_struct("NetworkReceiver")
-            .field("coord", &self.coord)
-            .field("type", &typ)
-            .finish()
-    }
-}
-
-impl<Out> NetworkSender<Out> {
-    pub fn local(coord: Coord, sender: Sender<Out>) -> Self {
-        Self {
-            coord,
-            inner: NetworkSenderInner::Local(sender),
-        }
-    }
-
-    pub async fn send(&self, item: Out) -> Result<(), impl Error> {
-        match &self.inner {
-            NetworkSenderInner::Local(local) => local.send(item).await,
-        }
-    }
-}
-
-impl<Out> Debug for NetworkSender<Out> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let typ = match &self.inner {
-            NetworkSenderInner::Local(_) => "local",
-        };
-        f.debug_struct("NetworkSender")
-            .field("coord", &self.coord)
-            .field("type", &typ)
-            .finish()
+/// Wait for the start signal, return whether the component should start working or not.
+pub(crate) async fn wait_start(receiver: NetworkStarterRecv) -> bool {
+    match receiver.recv().await {
+        Ok(start) => start,
+        Err(_) => return false,
     }
 }

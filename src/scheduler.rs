@@ -72,12 +72,12 @@ pub(crate) struct Scheduler {
 impl Scheduler {
     pub fn new(config: EnvironmentConfig) -> Self {
         Self {
-            config,
             next_blocks: Default::default(),
             prev_blocks: Default::default(),
             block_info: Default::default(),
             start_handles: Default::default(),
-            network: NetworkTopology::new(),
+            network: NetworkTopology::new(config.clone()),
+            config,
         }
     }
 
@@ -112,14 +112,21 @@ impl Scheduler {
             blocks.push((coord, block));
         }
         // not all blocks can be cloned: clone only when necessary
-        for coord in &local_replicas[1..] {
-            blocks.push((*coord, blocks[0].1.clone()));
+        if local_replicas.len() > 1 {
+            for coord in &local_replicas[1..] {
+                blocks.push((*coord, blocks[0].1.clone()));
+            }
         }
+
+        // we need to register all the replicas in the network, otherwise we won't be able to
+        // register the remote ones for connecting them
+        for &coord in info.replicas.values().flatten() {
+            self.network.register_replica::<In>(coord);
+        }
+
         self.block_info.insert(block_id, info);
 
         for (coord, block) in blocks {
-            // register this block in the network
-            self.network.register_local::<In>(coord);
             // spawn the actual worker
             let start_handle = spawn_worker(block);
             self.start_handles.push((coord, start_handle));
@@ -135,12 +142,14 @@ impl Scheduler {
 
     /// Start the computation returning the list of handles used to join the workers.
     pub(crate) async fn start(mut self) -> Vec<JoinHandle<()>> {
-        info!("Starting scheduler: {:?}", self.config);
-        self.build_execution_graph();
+        info!("Starting scheduler: {:#?}", self.config);
         self.log_topology();
+        self.build_execution_graph();
         self.network.log_topology();
 
-        let mut join = Vec::new();
+        // start the remote connections
+        let mut join = self.network.start_remote().await;
+
         let num_prev = self.num_prev();
         let network = Arc::new(Mutex::new(self.network));
         // start the execution
@@ -178,15 +187,22 @@ impl Scheduler {
             .collect()
     }
 
-    /// Build the execution graph for the network topology.
+    /// Build the execution graph for the network topology considering only the part of the network
+    /// affected by the current host. This therefore discards all the connections between the other
+    /// hosts since this host is unaffected by them.
     fn build_execution_graph(&mut self) {
+        let host_id = self.config.host_id;
         for (from_block_id, next) in self.next_blocks.iter() {
             let from = &self.block_info[from_block_id];
             for to_block_id in next.iter() {
                 let to = &self.block_info[to_block_id];
-                for from_coord in from.replicas(self.config.host_id) {
-                    for to_coord in to.replicas(self.config.host_id) {
-                        self.network.connect(from_coord, to_coord);
+                // for each pair (from -> to) inside the job graph, connect all the corresponding
+                // jobs of the execution graph only if the current host is affected
+                for &from_coord in from.replicas.values().flatten() {
+                    for &to_coord in to.replicas.values().flatten() {
+                        if from_coord.host_id == host_id || to_coord.host_id == host_id {
+                            self.network.connect(from_coord, to_coord);
+                        }
                     }
                 }
             }

@@ -113,7 +113,9 @@ where
                 NextStrategy::Random => {
                     self.senders.push(senders);
                 }
-                NextStrategy::GroupBy => todo!("GroupBy is not supported yet"),
+                NextStrategy::GroupBy => {
+                    unreachable!("NextStrategy::GroupBy must use GroupByEndBlock and not EndBlock");
+                }
             }
         }
         info!(
