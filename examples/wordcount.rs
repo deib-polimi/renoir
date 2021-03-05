@@ -14,9 +14,12 @@ async fn main() {
         .nth(1)
         .expect("Pass the dataset path as an argument");
 
-    // let config = EnvironmentConfig::local(4);
-    let config = EnvironmentConfig::remote("config.yml").await.unwrap();
+    let config = EnvironmentConfig::local(8);
+    // let config = EnvironmentConfig::remote("config.yml").await.unwrap();
     let mut env = StreamEnvironment::new(config);
+
+    env.spawn_remote_workers().await;
+
     let source = source::FileSource::new(path);
     let tokenizer = Tokenizer::new();
     let stream = env

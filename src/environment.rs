@@ -52,7 +52,14 @@ impl StreamEnvironment {
         Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         S: Source<Out> + Send + 'static,
     {
-        let block_id = self.inner.borrow_mut().new_block();
+        let mut env = self.inner.borrow_mut();
+        if matches!(env.config.runtime, ExecutionRuntime::Remote(_)) {
+            // calling .spawn_remote_workers() will exit so it wont reach this point
+            if env.config.host_id.is_none() {
+                panic!("Call `StreamEnvironment::spawn_remote_workers` before calling stream!");
+            }
+        }
+        let block_id = env.new_block();
         let source_max_parallelism = source.get_max_parallelism();
         info!(
             "Creating a new stream, block_id={} with max_parallelism {:?}",
@@ -82,12 +89,6 @@ impl StreamEnvironment {
     /// Start the computation. Await on the returned future to actually start the computation.
     pub async fn execute(self) {
         let mut env = self.inner.borrow_mut();
-        if matches!(env.config.runtime, ExecutionRuntime::Remote(_)) {
-            // calling .spawn_remote_workers() will exit so it wont reach this point
-            if env.config.host_id.is_none() {
-                panic!("Call `StreamEnvironment::spawn_remote_workers` before calling execute!");
-            }
-        }
         info!("Starting execution of {} blocks", env.block_count);
         let join = env.scheduler.take().unwrap().start().await;
         // wait till the computation ends
