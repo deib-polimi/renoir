@@ -47,7 +47,7 @@ impl Tokenizer {
         self.re
             .replace_all(&value, " ")
             .split_ascii_whitespace()
-            .filter(|word| word.len() > 0)
+            .filter(|word| !word.is_empty())
             .map(|t| t.to_lowercase())
             .collect()
     }

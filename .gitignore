@@ -1,4 +1,4 @@
 /target
 .idea/
-*.yml
-*.yaml
+/*.yml
+/*.yaml
