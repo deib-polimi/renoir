@@ -30,7 +30,6 @@ mod tests {
     async fn shuffle_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..1000u16));
-        // TODO: this to work with batching requires a very low batch size
         let res = env
             .stream(source)
             .shuffle()
