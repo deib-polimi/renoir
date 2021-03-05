@@ -1,4 +1,8 @@
-use std::fmt::{Display, Formatter};
+mod next_strategy;
+
+pub(crate) use next_strategy::*;
+
+use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 
 use serde::de::DeserializeOwned;
@@ -6,25 +10,6 @@ use serde::Serialize;
 
 use crate::operator::Operator;
 use crate::stream::BlockId;
-
-/// The next strategy used at the end of a block.
-///
-/// A block in the job graph may have many next blocks. Each of them will receive the message, which
-/// of their replica will receive it depends on the value of the next strategy.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum NextStrategy {
-    /// Only one of the replicas will receive the message:
-    ///
-    /// - if the block is not replicated, the only replica will receive the message
-    /// - if the next block is replicated as much as the current block the corresponding replica
-    ///   will receive the message
-    /// - otherwise the execution graph is malformed  
-    OnlyOne,
-    /// A random replica will receive the message.
-    Random,
-    /// Among the next replica, the one is selected based on the hash of the key of the message.
-    GroupBy,
-}
 
 /// A chain of operators that will be run inside the same host. The block takes as input elements of
 /// type `In` and produces elements of type `Out`.
@@ -44,7 +29,7 @@ where
     /// The current chain of operators.
     pub(crate) operators: OperatorChain,
     /// The strategy to use for sending to the next blocks in the stream.
-    pub(crate) next_strategy: NextStrategy,
+    pub(crate) next_strategy: NextStrategy<Out>,
     /// The set of requirements that the block imposes on the scheduler.
     pub(crate) scheduler_requirements: SchedulerRequirements,
 
