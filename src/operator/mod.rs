@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
+pub use batch_mode::*;
 pub use end::*;
 pub use group_by::*;
 pub use key_by::*;
@@ -14,6 +15,7 @@ pub use unkey::*;
 
 use crate::scheduler::ExecutionMetadata;
 
+mod batch_mode;
 mod end;
 mod flatten;
 mod fold;

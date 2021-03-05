@@ -1,5 +1,7 @@
+mod batcher;
 mod next_strategy;
 
+pub(crate) use batcher::*;
 pub(crate) use next_strategy::*;
 
 use std::fmt::{Debug, Display, Formatter};
@@ -30,6 +32,8 @@ where
     pub(crate) operators: OperatorChain,
     /// The strategy to use for sending to the next blocks in the stream.
     pub(crate) next_strategy: NextStrategy<Out>,
+    /// The batch mode of this block.
+    pub(crate) batch_mode: BatchMode,
     /// The set of requirements that the block imposes on the scheduler.
     pub(crate) scheduler_requirements: SchedulerRequirements,
 
@@ -59,6 +63,7 @@ where
             id,
             operators,
             next_strategy: NextStrategy::OnlyOne,
+            batch_mode: Default::default(),
             scheduler_requirements: Default::default(),
             _in_type: Default::default(),
             _out_type: Default::default(),

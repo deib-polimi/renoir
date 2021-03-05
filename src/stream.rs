@@ -5,7 +5,7 @@ use std::rc::Rc;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::block::{InnerBlock, NextStrategy};
+use crate::block::{BatchMode, InnerBlock, NextStrategy};
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::Operator;
 use crate::operator::StartBlock;
@@ -78,6 +78,7 @@ where
                 id: self.block.id,
                 operators: get_operator(self.block.operators),
                 next_strategy: self.block.next_strategy.into(),
+                batch_mode: self.block.batch_mode,
                 scheduler_requirements: self.block.scheduler_requirements,
                 _in_type: Default::default(),
                 _out_type: Default::default(),
@@ -100,10 +101,12 @@ where
     ) -> Stream<Out, Out, StartBlock<Out>>
     where
         Op: Operator<()> + Send + 'static,
-        GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>) -> Op,
+        GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
     {
         let next_strategy = self.block.next_strategy.clone();
-        let old_stream = self.add_operator(|prev| get_end_operator(prev, next_strategy));
+        let batch_mode = self.block.batch_mode.clone();
+        let old_stream =
+            self.add_operator(|prev| get_end_operator(prev, next_strategy, batch_mode));
         let mut env = old_stream.env.borrow_mut();
         let old_id = old_stream.block.id;
         let new_id = env.new_block();

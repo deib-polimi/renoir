@@ -6,13 +6,12 @@ use serde::Serialize;
 
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::scheduler::ExecutionMetadata;
+use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
 /// The list with the interesting senders of a single block.
 #[derive(Debug, Clone)]
-pub(crate) struct SenderList<Out>(pub Vec<NetworkSender<NetworkMessage<Out>>>)
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static;
+pub(crate) struct SenderList(pub Vec<Coord>);
 
 /// The next strategy used at the end of a block.
 ///
@@ -66,14 +65,15 @@ where
     pub fn group_senders(
         &self,
         metadata: &ExecutionMetadata,
-        senders: HashMap<Coord, NetworkSender<NetworkMessage<Out>>>,
-    ) -> Vec<SenderList<Out>> {
+        senders: &HashMap<Coord, NetworkSender<NetworkMessage<Out>>>,
+    ) -> Vec<SenderList> {
         let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();
         for (coord, sender) in senders {
             by_block_id.entry(coord.block_id).or_default().push(sender);
         }
         let mut senders = Vec::new();
         for (block_id, block_senders) in by_block_id {
+            let block_senders = block_senders.iter().map(|s| s.coord).collect_vec();
             match self {
                 NextStrategy::OnlyOne => {
                     assert!(
@@ -89,7 +89,7 @@ where
                     } else {
                         let mut found = false;
                         for sender in block_senders {
-                            if sender.coord.replica_id == metadata.coord.replica_id {
+                            if sender.replica_id == metadata.coord.replica_id {
                                 found = true;
                                 senders.push(SenderList(vec![sender]));
                                 break;

@@ -28,7 +28,7 @@ where
     {
         let keyer = Arc::new(keyer);
         let new_stream = self
-            .add_block(|prev, _| {
+            .add_block(|prev, _, batch_mode| {
                 let keyer = keyer.clone();
                 EndBlock::new(
                     prev,
@@ -37,6 +37,7 @@ where
                         keyer(out).hash(&mut s);
                         s.finish() as usize
                     })),
+                    batch_mode,
                 )
             })
             .add_operator(|prev| KeyBy::new(prev, keyer));

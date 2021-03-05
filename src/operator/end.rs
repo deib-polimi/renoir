@@ -1,12 +1,16 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::block::{NextStrategy, SenderList};
+use crate::block::{BatchMode, Batcher, NextStrategy, SenderList};
+use crate::network::Coord;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
-#[derive(Debug, Clone)]
+#[derive(Derivative)]
+#[derivative(Clone, Debug)]
 pub struct EndBlock<Out, OperatorChain>
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
@@ -15,7 +19,10 @@ where
     prev: OperatorChain,
     metadata: Option<ExecutionMetadata>,
     next_strategy: NextStrategy<Out>,
-    senders: Vec<SenderList<Out>>,
+    batch_mode: BatchMode,
+    sender_groups: Vec<SenderList>,
+    #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
+    senders: HashMap<Coord, Batcher<Out>>,
 }
 
 impl<Out, OperatorChain> EndBlock<Out, OperatorChain>
@@ -23,11 +30,17 @@ where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
-    pub(crate) fn new(prev: OperatorChain, next_strategy: NextStrategy<Out>) -> Self {
+    pub(crate) fn new(
+        prev: OperatorChain,
+        next_strategy: NextStrategy<Out>,
+        batch_mode: BatchMode,
+    ) -> Self {
         Self {
             prev,
             metadata: None,
             next_strategy,
+            batch_mode,
+            sender_groups: Default::default(),
             senders: Default::default(),
         }
     }
@@ -43,7 +56,11 @@ where
         self.prev.setup(metadata.clone()).await;
 
         let senders = metadata.network.lock().await.get_senders(metadata.coord);
-        self.senders = self.next_strategy.group_senders(&metadata, senders);
+        self.sender_groups = self.next_strategy.group_senders(&metadata, &senders);
+        self.senders = senders
+            .into_iter()
+            .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode)))
+            .collect();
         self.metadata = Some(metadata);
     }
 
@@ -53,27 +70,30 @@ where
         let mut to_send = Vec::new();
         match &message {
             StreamElement::Watermark(_) | StreamElement::End => {
-                for senders in self.senders.iter() {
-                    for sender in senders.0.iter() {
+                for senders in self.sender_groups.iter() {
+                    for &sender in senders.0.iter() {
                         to_send.push((message.clone(), sender))
                     }
                 }
             }
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
                 let index = self.next_strategy.index(&item);
-                for sender in self.senders.iter() {
+                for sender in self.sender_groups.iter() {
                     let index = index % sender.0.len();
-                    to_send.push((message.clone(), &sender.0[index]));
+                    to_send.push((message.clone(), sender.0[index]));
                 }
             }
         };
         for (message, sender) in to_send {
-            sender.send(vec![message]).await.unwrap();
+            self.senders[&sender].enqueue(message).await;
         }
 
         if matches!(to_return, StreamElement::End) {
             let metadata = self.metadata.as_ref().unwrap();
-            info!("EndBlock at {} received End", metadata.coord);
+            debug!("EndBlock at {} received End", metadata.coord);
+            for (_, batcher) in self.senders.drain() {
+                batcher.end().await;
+            }
         }
         to_return
     }
@@ -85,4 +105,11 @@ where
             _ => self.prev.to_string(),
         }
     }
+}
+
+fn clone_default<T>(_: &T) -> T
+where
+    T: Default,
+{
+    T::default()
 }
