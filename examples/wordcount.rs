@@ -1,25 +1,10 @@
-#[macro_use]
-extern crate derivative;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate lazy_static;
-
-use operator::source;
-
-use crate::config::EnvironmentConfig;
-use crate::environment::StreamEnvironment;
-use regex::Regex;
 use std::env;
 
-mod block;
-mod config;
-mod environment;
-mod network;
-mod operator;
-mod scheduler;
-mod stream;
-mod worker;
+use regex::Regex;
+
+use rstream::config::EnvironmentConfig;
+use rstream::environment::StreamEnvironment;
+use rstream::operator::source;
 
 #[async_std::main]
 async fn main() {
@@ -29,8 +14,8 @@ async fn main() {
         .nth(1)
         .expect("Pass the dataset path as an argument");
 
-    let config = EnvironmentConfig::local(4);
-    //let config = EnvironmentConfig::remote("config.yml").await.unwrap();
+    // let config = EnvironmentConfig::local(4);
+    let config = EnvironmentConfig::remote("config.yml").await.unwrap();
     let mut env = StreamEnvironment::new(config);
     let source = source::FileSource::new(path);
     let tokenizer = Tokenizer::new();

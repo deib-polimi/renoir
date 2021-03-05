@@ -1,16 +1,12 @@
-use async_std::stream;
-use async_std::stream::StreamExt;
-use async_trait::async_trait;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
-use crate::operator::source::{Source, StreamSource};
-use crate::operator::{Operator, StreamElement};
-use crate::scheduler::ExecutionMetadata;
 use async_std::fs::File;
 use async_std::io::{BufReader, SeekFrom};
-use async_std::path::{Path, PathBuf};
+use async_std::path::PathBuf;
 use async_std::prelude::*;
+use async_trait::async_trait;
+
+use crate::operator::source::Source;
+use crate::operator::{Operator, StreamElement};
+use crate::scheduler::ExecutionMetadata;
 
 #[derive(Debug)]
 pub struct FileSource {

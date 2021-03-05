@@ -1,25 +1,8 @@
-#[macro_use]
-extern crate derivative;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate lazy_static;
-
 use async_std::stream::from_iter;
 
-use operator::source;
-
-use crate::config::EnvironmentConfig;
-use crate::environment::StreamEnvironment;
-
-mod block;
-mod config;
-mod environment;
-mod network;
-mod operator;
-mod scheduler;
-mod stream;
-mod worker;
+use rstream::config::EnvironmentConfig;
+use rstream::environment::StreamEnvironment;
+use rstream::operator::source;
 
 #[async_std::main]
 async fn main() {
