@@ -1,14 +1,16 @@
-use async_std::task::spawn_blocking;
-use std::io::prelude::*;
-
-use crate::config::{RemoteHostConfig, RemoteRuntimeConfig};
-use crate::scheduler::HostId;
-use ssh2::Session;
 use std::borrow::Cow;
 use std::fs::File;
+use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::Path;
+
+use async_std::task::spawn_blocking;
+use itertools::Itertools;
+use ssh2::Session;
+
+use crate::config::{RemoteHostConfig, RemoteRuntimeConfig};
+use crate::scheduler::HostId;
 
 /// Environment variable set by the runner with the host id of the process. If it's missing the
 /// process will have to spawn the processes by itself.
@@ -236,17 +238,22 @@ fn send_file(
 /// This will export all the required variables before executing the binary.
 fn build_remote_command(host_id: HostId, config_str: &str, binary_path: &str) -> String {
     let config_str = shell_escape::escape(Cow::Borrowed(config_str));
+    let args = std::env::args()
+        .skip(1)
+        .map(|arg| shell_escape::escape(Cow::Owned(arg)))
+        .join(" ");
     format!(
         "export {host_id_env}={host_id};
 export {config_env}={config};
 export RUST_LOG={rust_log};
 export RUST_LOG_STYLE=always;
-{binary_path}",
+{binary_path} {args}",
         host_id_env = HOST_ID_ENV_VAR,
         host_id = host_id,
         config_env = CONFIG_ENV_VAR,
         config = config_str,
         binary_path = binary_path,
+        args = args,
         rust_log = std::env::var("RUST_LOG").unwrap_or_default()
     )
 }
