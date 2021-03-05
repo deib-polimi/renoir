@@ -77,7 +77,6 @@ where
             );
             return self.next().await;
         }
-        debug!("Block {} received a message", metadata.coord);
         message
     }
 

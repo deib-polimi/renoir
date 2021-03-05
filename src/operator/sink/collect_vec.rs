@@ -35,7 +35,6 @@ where
                 if let Some(result) = self.result.as_mut() {
                     result.push(t);
                 }
-                debug!("Received element at collect_vec");
                 StreamElement::Item(())
             }
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
