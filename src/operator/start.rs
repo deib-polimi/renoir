@@ -9,7 +9,7 @@ use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Debug, Derivative)]
-#[derivative(Clone)]
+#[derivative(Clone, Default(bound = ""))]
 pub struct StartBlock<Out>
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
@@ -19,20 +19,6 @@ where
     receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
     buffer: VecDeque<StreamElement<Out>>,
     missing_ends: usize,
-}
-
-impl<Out> StartBlock<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
-    pub fn new() -> Self {
-        StartBlock {
-            metadata: None,
-            receiver: None,
-            buffer: Default::default(),
-            missing_ends: 0,
-        }
-    }
 }
 
 #[async_trait]
