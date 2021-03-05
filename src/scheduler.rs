@@ -264,7 +264,6 @@ impl Scheduler {
     ///
     ///  - the number of logical cores.
     ///  - the `max_parallelism` of the block.
-    ///  - the `max_local_parallelism` of the block.
     fn local_block_info<In, Out, OperatorChain>(
         &self,
         block: &InnerBlock<In, Out, OperatorChain>,
@@ -276,14 +275,12 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let max_local_parallelism = block.scheduler_requirements.max_local_parallelism;
         let num_replicas = local
             .num_cores
-            .min(max_parallelism.unwrap_or(usize::max_value()))
-            .min(max_local_parallelism.unwrap_or(usize::max_value()));
+            .min(max_parallelism.unwrap_or(usize::max_value()));
         debug!(
-            "Block {} will have {} local replicas (max_parallelism={:?}, max_local_parallelism={:?})",
-            block.id, num_replicas, max_parallelism, max_local_parallelism
+            "Block {} will have {} local replicas (max_parallelism={:?})",
+            block.id, num_replicas, max_parallelism
         );
         let host_id = self.config.host_id.unwrap();
         let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
@@ -300,8 +297,7 @@ impl Scheduler {
     /// Extract the `SchedulerBlockInfo` of a block that runs remotely.
     ///
     /// The block can be replicated at most `max_parallelism` times (if specified). Assign the
-    /// replicas starting from the first host giving as much replicas as possible without assigning
-    /// more replicas than cores and without exceeding `max_local_parallelism`.
+    /// replicas starting from the first host giving as much replicas as possible..
     fn remote_block_info<In, Out, OperatorChain>(
         &self,
         block: &InnerBlock<In, Out, OperatorChain>,
@@ -313,7 +309,6 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let max_local_parallelism = block.scheduler_requirements.max_local_parallelism;
         debug!("Allocating block {} on remote runtime", block.id);
         // number of replicas we can assign at most
         let mut remaining_replicas = max_parallelism.unwrap_or(usize::max_value());
@@ -321,13 +316,14 @@ impl Scheduler {
         let mut replicas: HashMap<_, Vec<_>> = HashMap::default();
         let mut global_ids = HashMap::default();
         for (host_id, host_info) in remote.hosts.iter().enumerate() {
-            let num_host_replicas = host_info
-                .num_cores
-                .min(remaining_replicas)
-                .min(max_local_parallelism.unwrap_or(usize::max_value()));
+            let num_host_replicas = host_info.num_cores.min(remaining_replicas);
             debug!(
-                "Block {} will have {} replicas on {} (max_parallelism={:?}, max_local_parallelism={:?}, num_cores={})",
-                block.id, num_host_replicas, host_info.to_string(), max_parallelism, max_local_parallelism, host_info.num_cores
+                "Block {} will have {} replicas on {} (max_parallelism={:?}, num_cores={})",
+                block.id,
+                num_host_replicas,
+                host_info.to_string(),
+                max_parallelism,
+                host_info.num_cores
             );
             remaining_replicas -= num_host_replicas;
             let host_replicas = replicas.entry(host_id).or_default();

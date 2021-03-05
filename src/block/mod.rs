@@ -49,8 +49,6 @@ pub(crate) struct SchedulerRequirements {
     ///
     /// The value specified is only an upper bound, the scheduler is allowed to spawn less blocks,
     pub(crate) max_parallelism: Option<usize>,
-    /// Like `max_parallelism`, but counting only the replicas inside each host,
-    pub(crate) max_local_parallelism: Option<usize>,
 }
 
 impl<In, Out, OperatorChain> InnerBlock<In, Out, OperatorChain>
@@ -88,15 +86,6 @@ impl SchedulerRequirements {
             self.max_parallelism = Some(old.min(max_parallelism));
         } else {
             self.max_parallelism = Some(max_parallelism);
-        }
-    }
-
-    /// Limit the maximum parallelism of this block inside each host.
-    pub(crate) fn max_local_parallelism(&mut self, max_local_parallelism: usize) {
-        if let Some(old) = self.max_parallelism {
-            self.max_local_parallelism = Some(old.max(max_local_parallelism));
-        } else {
-            self.max_local_parallelism = Some(max_local_parallelism);
         }
     }
 }

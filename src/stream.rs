@@ -104,7 +104,7 @@ where
         GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
     {
         let next_strategy = self.block.next_strategy.clone();
-        let batch_mode = self.block.batch_mode.clone();
+        let batch_mode = self.block.batch_mode;
         let old_stream =
             self.add_operator(|prev| get_end_operator(prev, next_strategy, batch_mode));
         let mut env = old_stream.env.borrow_mut();
