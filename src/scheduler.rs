@@ -26,6 +26,8 @@ pub struct ExecutionMetadata {
     pub(crate) coord: Coord,
     /// The total number of replicas of the block.
     pub(crate) num_replicas: usize,
+    /// The global identifier of the replica (from 0 to num_replicas-1)
+    pub(crate) global_id: usize,
     /// The total number of previous blocks inside the execution graph.
     pub(crate) num_prev: usize,
     /// A reference to the `NetworkTopology` that keeps the state of the network.
@@ -51,6 +53,8 @@ struct SchedulerBlockInfo {
     num_replicas: usize,
     /// All the replicas, grouped by host.
     replicas: HashMap<HostId, Vec<Coord>>,
+    /// All the global ids, grouped by coordinate.
+    global_ids: HashMap<Coord, usize>,
 }
 
 /// The `Scheduler` is the entity that keeps track of all the blocks of the job graph and when the
@@ -155,10 +159,13 @@ impl Scheduler {
         let network = Arc::new(Mutex::new(self.network));
         // start the execution
         for (coord, handle) in self.start_handles {
-            let num_replicas = self.block_info[&coord.block_id].num_replicas;
+            let block_info = &self.block_info[&coord.block_id];
+            let num_replicas = block_info.num_replicas;
+            let global_id = block_info.global_ids[&coord];
             let metadata = ExecutionMetadata {
                 coord,
                 num_replicas,
+                global_id,
                 num_prev: num_prev[&coord.block_id],
                 network: network.clone(),
             };
@@ -280,11 +287,13 @@ impl Scheduler {
         );
         let host_id = self.config.host_id;
         let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
+        let global_ids = (0..num_replicas).map(|r| (Coord::new(block.id, host_id, r), r));
         SchedulerBlockInfo {
             block_id: block.id,
             repr: block.to_string(),
             num_replicas,
             replicas: vec![(host_id, replicas.collect())].into_iter().collect(),
+            global_ids: global_ids.into_iter().collect(),
         }
     }
 
@@ -310,6 +319,7 @@ impl Scheduler {
         let mut remaining_replicas = max_parallelism.unwrap_or(usize::max_value());
         let mut num_replicas = 0;
         let mut replicas: HashMap<_, Vec<_>> = HashMap::default();
+        let mut global_ids = HashMap::default();
         for (host_id, host_info) in remote.hosts.iter().enumerate() {
             let num_host_replicas = host_info
                 .num_cores
@@ -320,17 +330,20 @@ impl Scheduler {
                 block.id, num_host_replicas, host_info.to_string(), max_parallelism, max_local_parallelism, host_info.num_cores
             );
             remaining_replicas -= num_host_replicas;
-            num_replicas += num_host_replicas;
             let host_replicas = replicas.entry(host_id).or_default();
             for replica_id in 0..num_host_replicas {
-                host_replicas.push(Coord::new(block.id, host_id, replica_id));
+                let coord = Coord::new(block.id, host_id, replica_id);
+                host_replicas.push(coord);
+                global_ids.insert(coord, num_replicas + replica_id);
             }
+            num_replicas += num_host_replicas;
         }
         SchedulerBlockInfo {
             block_id: block.id,
             repr: block.to_string(),
             num_replicas,
             replicas,
+            global_ids,
         }
     }
 }

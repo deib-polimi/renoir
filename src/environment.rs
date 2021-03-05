@@ -45,9 +45,15 @@ impl StreamEnvironment {
         S: Source<Out> + Send + 'static,
     {
         let block_id = self.inner.borrow_mut().new_block();
-        info!("Creating a new stream, block_id={}", block_id);
+        let source_max_parallelism = source.get_max_parallelism();
+        info!(
+            "Creating a new stream, block_id={} with max_parallelism {:?}",
+            block_id, source_max_parallelism
+        );
         let mut block = InnerBlock::new(block_id, source);
-        block.scheduler_requirements.max_parallelism(1);
+        if let Some(p) = source_max_parallelism {
+            block.scheduler_requirements.max_parallelism(p);
+        }
         Stream {
             block,
             env: self.inner.clone(),

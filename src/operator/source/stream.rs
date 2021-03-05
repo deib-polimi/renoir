@@ -26,9 +26,13 @@ impl<Out> StreamSource<Out> {
     }
 }
 
-impl<Out> Source<Out> for StreamSource<Out> where
-    Out: Clone + Serialize + DeserializeOwned + Send + Unpin + 'static
+impl<Out> Source<Out> for StreamSource<Out>
+where
+    Out: Clone + Serialize + DeserializeOwned + Send + Unpin + 'static,
 {
+    fn get_max_parallelism(&self) -> Option<usize> {
+        Some(1)
+    }
 }
 
 #[async_trait]
