@@ -8,7 +8,7 @@ use rstream::operator::source;
 
 #[async_std::main]
 async fn main() {
-    pretty_env_logger::init();
+    env_logger::init();
 
     let path = env::args()
         .nth(1)

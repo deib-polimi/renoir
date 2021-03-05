@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 use async_std::stream::from_iter;
 
 use rstream::config::EnvironmentConfig;
@@ -6,12 +9,15 @@ use rstream::operator::source;
 
 #[async_std::main]
 async fn main() {
-    pretty_env_logger::init();
+    env_logger::init();
 
     // let config = EnvironmentConfig::local(4);
     let config = EnvironmentConfig::remote("config.yml").await.unwrap();
     let mut env = StreamEnvironment::new(config);
-    let source = source::StreamSource::new(from_iter(90..110));
+
+    env.spawn_remote_workers().await;
+
+    let source = source::StreamSource::new(from_iter(90..110u8));
     let stream = env
         .stream(source)
         .map(|x| x.to_string())
@@ -20,6 +26,8 @@ async fn main() {
         .map(|(_k, s)| s.len())
         .unkey();
     let result = stream.collect_vec();
+
     env.execute().await;
-    println!("Output: {:?}", result.get());
+
+    info!("Output: {:?}", result.get());
 }

@@ -110,7 +110,7 @@ impl Scheduler {
 
         // duplicate the block in the execution graph
         let mut blocks = vec![];
-        let local_replicas = info.replicas(self.config.host_id);
+        let local_replicas = info.replicas(self.config.host_id.unwrap());
         blocks.reserve(local_replicas.len());
         if !local_replicas.is_empty() {
             let coord = local_replicas[0];
@@ -199,7 +199,7 @@ impl Scheduler {
     /// affected by the current host. This therefore discards all the connections between the other
     /// hosts since this host is unaffected by them.
     fn build_execution_graph(&mut self) {
-        let host_id = self.config.host_id;
+        let host_id = self.config.host_id.unwrap();
         for (from_block_id, next) in self.next_blocks.iter() {
             let from = &self.block_info[from_block_id];
             for to_block_id in next.iter() {
@@ -285,7 +285,7 @@ impl Scheduler {
             "Block {} will have {} local replicas (max_parallelism={:?}, max_local_parallelism={:?})",
             block.id, num_replicas, max_parallelism, max_local_parallelism
         );
-        let host_id = self.config.host_id;
+        let host_id = self.config.host_id.unwrap();
         let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
         let global_ids = (0..num_replicas).map(|r| (Coord::new(block.id, host_id, r), r));
         SchedulerBlockInfo {

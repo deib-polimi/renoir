@@ -275,8 +275,9 @@ impl NetworkTopology {
     /// This will not actually bind/connect sockets, it will just mark them as bindable/connectable,
     /// `start_remote` will start them.
     pub fn connect(&mut self, from: Coord, to: Coord) {
-        let from_remote = from.host_id != self.config.host_id;
-        let to_remote = to.host_id != self.config.host_id;
+        let host_id = self.config.host_id.unwrap();
+        let from_remote = from.host_id != host_id;
+        let to_remote = to.host_id != host_id;
         debug!(
             "New connection: {} (remote={}) -> {} (remote={})",
             from, from_remote, to, to_remote

@@ -10,6 +10,7 @@ pub mod config;
 pub mod environment;
 pub mod network;
 pub mod operator;
+pub mod runner;
 pub mod scheduler;
 pub mod stream;
 pub mod worker;
