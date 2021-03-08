@@ -73,7 +73,7 @@ where
         }
         let mut senders = Vec::new();
         for (block_id, block_senders) in by_block_id {
-            let block_senders = block_senders.iter().map(|s| s.coord).collect_vec();
+            let block_senders = block_senders.iter().map(|s| s.coord).sorted().collect_vec();
             match self {
                 NextStrategy::OnlyOne => {
                     assert!(
