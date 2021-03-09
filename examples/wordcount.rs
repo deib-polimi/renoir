@@ -5,9 +5,9 @@ use regex::Regex;
 use rstream::config::EnvironmentConfig;
 use rstream::environment::StreamEnvironment;
 use rstream::operator::source;
+use std::time::Instant;
 
-#[async_std::main]
-async fn main() {
+fn main() {
     env_logger::init();
 
     let path = env::args()
@@ -15,10 +15,10 @@ async fn main() {
         .expect("Pass the dataset path as an argument");
 
     let config = EnvironmentConfig::local(8);
-    // let config = EnvironmentConfig::remote("config.yml").await.unwrap();
+    // let config = EnvironmentConfig::remote("config.yml").unwrap();
     let mut env = StreamEnvironment::new(config);
 
-    env.spawn_remote_workers().await;
+    env.spawn_remote_workers();
 
     let source = source::FileSource::new(path);
     let tokenizer = Tokenizer::new();
@@ -29,8 +29,11 @@ async fn main() {
         .fold(0, |count, _word| count + 1)
         .unkey();
     let result = stream.collect_vec();
-    env.execute().await;
-    println!("Output: {:?}", result.get());
+    let start = Instant::now();
+    env.execute();
+    let elapsed = start.elapsed();
+    // println!("Output: {:?}", result.get());
+    println!("Elapsed: {:?}", elapsed);
 }
 
 struct Tokenizer {

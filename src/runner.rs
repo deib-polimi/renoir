@@ -5,7 +5,6 @@ use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::Path;
 
-use async_std::task::spawn_blocking;
 use itertools::Itertools;
 use ssh2::Session;
 
@@ -25,7 +24,7 @@ pub(crate) const SCP_BUFFER_SIZE: usize = 64 * 1024;
 /// the process,
 ///
 /// If this was already a spawned process to nothing.
-pub(crate) async fn spawn_remote_workers(config: RemoteRuntimeConfig) {
+pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
     // if this process already comes from a the spawner do not spawn again!
     if is_spawned_process() {
         return;
@@ -36,14 +35,14 @@ pub(crate) async fn spawn_remote_workers(config: RemoteRuntimeConfig) {
     let mut join_handles = Vec::new();
     for (host_id, host) in config.hosts.into_iter().enumerate() {
         let config_str = config_str.clone();
-        let join_handle = spawn_blocking(move || {
+        let join_handle = std::thread::spawn(move || {
             let config_str = config_str.clone();
             spawn_remote_worker(host_id, host, config_str)
         });
         join_handles.push(join_handle);
     }
     for join_handle in join_handles {
-        join_handle.await;
+        join_handle.join().unwrap();
     }
     // all the remote processes have finished, exit to avoid running the environment inside the
     // spawner process

@@ -1,17 +1,17 @@
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
+use std::sync::mpsc::{Sender, SyncSender};
+use std::thread::JoinHandle;
 
-use async_std::task::JoinHandle;
 use itertools::Itertools;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use typemap::{Key, ShareMap};
+use typemap::{Key, SendMap, ShareMap, TypeMap};
 
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, NetworkStarter};
 use crate::scheduler::HostId;
 use crate::stream::BlockId;
-use async_std::channel::Sender;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In>(PhantomData<In>);
@@ -41,7 +41,7 @@ struct ReceiverMetadata {
     /// The starter that makes the receiver start binding the socket. `Option` because it will be
     /// moved out this structure.
     #[derivative(Debug = "ignore")]
-    bind_socket: Option<Sender<usize>>,
+    bind_socket: Option<SyncSender<usize>>,
     /// `JoinHandle` of the task that binds the remote socket. `Option` because it will be moved out
     /// this structure.
     #[derivative(Debug = "ignore")]
@@ -85,17 +85,17 @@ pub(crate) struct NetworkTopology {
     /// channel (that does not depend of the element type) and later we use it to tell the task to
     /// actually start or exit.
     #[derivative(Debug = "ignore")]
-    receivers: ShareMap,
+    receivers: SendMap,
     /// All the registered local senders.
     ///
     /// It works exactly like `self.receivers`.
     #[derivative(Debug = "ignore")]
-    local_senders: ShareMap,
+    local_senders: SendMap,
     /// All the registered remote senders.
     ///
     /// It works exactly like `self.receivers`.
     #[derivative(Debug = "ignore")]
-    remote_senders: ShareMap,
+    remote_senders: SendMap,
 
     /// The adjacency list of the execution graph that interests the local host.
     next: HashMap<Coord, Vec<Coord>>,
@@ -110,9 +110,9 @@ impl NetworkTopology {
     pub(crate) fn new(config: EnvironmentConfig) -> Self {
         NetworkTopology {
             config,
-            receivers: ShareMap::custom(),
-            local_senders: ShareMap::custom(),
-            remote_senders: ShareMap::custom(),
+            receivers: SendMap::custom(),
+            local_senders: SendMap::custom(),
+            remote_senders: SendMap::custom(),
             next: Default::default(),
             receivers_metadata: Default::default(),
             senders_metadata: Default::default(),
@@ -240,7 +240,7 @@ impl NetworkTopology {
     ///
     /// First all the receivers are started and only after start also the senders, this will prevent
     /// deadlocks due to unfortunate orderings of bind/connect.
-    pub async fn start_remote(&mut self) -> Vec<JoinHandle<()>> {
+    pub fn start_remote(&mut self) -> Vec<JoinHandle<()>> {
         info!("Starting remote connections");
         let mut join_handles = Vec::new();
         // first start all the receivers
@@ -248,22 +248,22 @@ impl NetworkTopology {
             let bind_socket = remote.bind_socket.take().unwrap();
             let join_handle = remote.join_handle.take().unwrap();
             let num_connections = remote.connections.len();
-            bind_socket.send(num_connections).await.unwrap();
+            bind_socket.send(num_connections).unwrap();
             if num_connections > 0 {
                 join_handles.push(join_handle);
             } else {
-                join_handle.await;
+                join_handle.join().unwrap();
             }
         }
         // and later start all the senders
         for (_coord, remote) in self.senders_metadata.iter_mut() {
             let connect_socket = remote.connect_socket.take().unwrap();
             let join_handle = remote.join_handle.take().unwrap();
-            connect_socket.send(remote.is_remote).await.unwrap();
+            connect_socket.send(remote.is_remote).unwrap();
             if remote.is_remote {
                 join_handles.push(join_handle);
             } else {
-                join_handle.await;
+                join_handle.join().unwrap();
             }
         }
         join_handles

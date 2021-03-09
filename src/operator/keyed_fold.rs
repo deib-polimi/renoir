@@ -2,10 +2,9 @@ use core::iter::Iterator;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use async_std::sync::Arc;
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::sync::Arc;
 
 use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
@@ -30,7 +29,6 @@ where
     received_end: bool,
 }
 
-#[async_trait]
 impl<Key, Out, NewOut, PreviousOperators> Operator<KeyValue<Key, NewOut>>
     for KeyedFold<Key, Out, NewOut, PreviousOperators>
 where
@@ -39,13 +37,13 @@ where
     PreviousOperators: Operator<KeyValue<Key, Out>> + Send,
     NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<KeyValue<Key, NewOut>> {
+    fn next(&mut self) -> StreamElement<KeyValue<Key, NewOut>> {
         while !self.received_end {
-            match self.prev.next().await {
+            match self.prev.next() {
                 StreamElement::End => self.received_end = true,
                 StreamElement::Watermark(ts) => {
                     self.max_watermark = Some(self.max_watermark.unwrap_or(ts).max(ts))
@@ -128,15 +126,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
+    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
     use itertools::Itertools;
 
-    #[async_std::test]
-    async fn fold_keyed_stream() {
+    #[std::test]
+    fn fold_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..10u8));
         let res = env
@@ -145,7 +143,7 @@ mod tests {
             .fold("".to_string(), |s, n| s + &n.to_string())
             .unkey()
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let res = res.get().unwrap().into_iter().sorted().collect_vec();
         assert_eq!(res.len(), 2);
         assert_eq!(res[0].1, "02468");

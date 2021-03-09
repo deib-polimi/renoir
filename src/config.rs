@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
-use async_std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 use crate::runner::{CONFIG_ENV_VAR, HOST_ID_ENV_VAR};
 use crate::scheduler::HostId;
@@ -70,12 +70,12 @@ impl EnvironmentConfig {
     /// If it's the runner, the configuration file is read. If it's a worker, the configuration is
     /// read directly from the environment variable and not from the file (remote hosts may not have
     /// the configuration file).
-    pub async fn remote<P: AsRef<Path>>(config: P) -> Result<EnvironmentConfig> {
+    pub fn remote<P: AsRef<Path>>(config: P) -> Result<EnvironmentConfig> {
         let config = if let Some(config) = EnvironmentConfig::config_from_env() {
             config
         } else {
             debug!("Reading remote config from: {}", config.as_ref().display());
-            let content = async_std::fs::read_to_string(config).await?;
+            let content = std::fs::read_to_string(config)?;
             serde_yaml::from_str(&content)?
         };
 

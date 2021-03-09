@@ -1,12 +1,10 @@
 use std::num::NonZeroUsize;
 use std::time::Duration;
 
-use async_std::channel::{bounded, Receiver, Sender};
-use async_std::future::timeout;
-use async_std::task::spawn;
-use async_std::task::JoinHandle;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, Sender, SyncSender};
+use std::thread::{spawn, JoinHandle};
 
 use crate::network::{NetworkMessage, NetworkSender};
 use crate::operator::StreamElement;
@@ -46,7 +44,7 @@ where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     /// Sender to the internal task that does the batching.
-    sender: Sender<BatcherMessage<Out>>,
+    sender: SyncSender<BatcherMessage<Out>>,
     /// Handle to join the internal task.
     join_handle: JoinHandle<()>,
 }
@@ -56,9 +54,8 @@ where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     pub(crate) fn new(remote_sender: NetworkSender<NetworkMessage<Out>>, mode: BatchMode) -> Self {
-        let (sender, receiver) = bounded(1);
-        let join_handle =
-            spawn(async move { Batcher::batcher_body(remote_sender, mode, receiver).await });
+        let (sender, receiver) = sync_channel(1);
+        let join_handle = spawn(move || Batcher::batcher_body(remote_sender, mode, receiver));
         Self {
             sender,
             join_handle,
@@ -66,25 +63,23 @@ where
     }
 
     /// Put a message in the batch queue, it won't be sent immediately.
-    pub(crate) async fn enqueue(&self, message: StreamElement<Out>) {
+    pub(crate) fn enqueue(&self, message: StreamElement<Out>) {
         self.sender
             .send(BatcherMessage::Message(message))
-            .await
             .expect("Cannot enqueue if the Batcher already exited")
     }
 
     /// Tell the batcher that the stream is ended, flush all the messages and join the internal
     /// task.
-    pub(crate) async fn end(self) {
+    pub(crate) fn end(self) {
         self.sender
             .send(BatcherMessage::End)
-            .await
             .expect("Cannot enqueue if the Batcher already exited");
-        self.join_handle.await;
+        self.join_handle;
     }
 
     /// The body of the internal task that does the batching.
-    async fn batcher_body(
+    fn batcher_body(
         sender: NetworkSender<NetworkMessage<Out>>,
         mode: BatchMode,
         receiver: Receiver<BatcherMessage<Out>>,
@@ -95,21 +90,21 @@ where
         );
         let mut batch = Vec::with_capacity(mode.max_capacity());
         loop {
-            match timeout(mode.max_delay(), receiver.recv()).await {
-                Ok(Ok(message)) => {
+            match receiver.recv_timeout(mode.max_delay()) {
+                Ok(message) => {
                     match message {
                         BatcherMessage::Message(mex) => {
                             batch.push(mex);
                             // max capacity has been reached, send and flush the buffer
                             if batch.len() >= mode.max_capacity() {
-                                sender.send(batch).await.unwrap();
+                                sender.send(batch).unwrap();
                                 batch = Vec::with_capacity(mode.max_capacity());
                             }
                         }
                         BatcherMessage::End => {
                             // send the last elements in the batch
                             if !batch.is_empty() {
-                                sender.send(batch).await.unwrap();
+                                sender.send(batch).unwrap();
                             }
                             break;
                         }
@@ -118,11 +113,10 @@ where
                 Err(_) => {
                     // timeout occurred
                     if !batch.is_empty() {
-                        sender.send(batch).await.unwrap();
+                        sender.send(batch).unwrap();
                         batch = Vec::with_capacity(mode.max_capacity());
                     }
                 }
-                Ok(Err(_)) => break,
             }
         }
     }

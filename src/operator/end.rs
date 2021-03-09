@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -46,16 +45,15 @@ where
     }
 }
 
-#[async_trait]
 impl<Out, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata.clone()).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata.clone());
 
-        let senders = metadata.network.lock().await.get_senders(metadata.coord);
+        let senders = metadata.network.lock().unwrap().get_senders(metadata.coord);
         self.sender_groups = self.next_strategy.group_senders(&metadata, &senders);
         self.senders = senders
             .into_iter()
@@ -64,8 +62,8 @@ where
         self.metadata = Some(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<()> {
-        let message = self.prev.next().await;
+    fn next(&mut self) -> StreamElement<()> {
+        let message = self.prev.next();
         let to_return = message.take();
         let mut to_send = Vec::new();
         match &message {
@@ -85,14 +83,14 @@ where
             }
         };
         for (message, sender) in to_send {
-            self.senders[&sender].enqueue(message).await;
+            self.senders[&sender].enqueue(message);
         }
 
         if matches!(to_return, StreamElement::End) {
             let metadata = self.metadata.as_ref().unwrap();
             debug!("EndBlock at {} received End", metadata.coord);
             for (_, batcher) in self.senders.drain() {
-                batcher.end().await;
+                batcher.end();
             }
         }
         to_return

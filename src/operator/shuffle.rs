@@ -19,15 +19,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
     use itertools::Itertools;
+    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[async_std::test]
-    async fn shuffle_stream() {
+    #[std::test]
+    fn shuffle_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..1000u16));
         let res = env
@@ -38,7 +38,7 @@ mod tests {
             .shuffle()
             .shuffle()
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let res = res.get().unwrap();
         let res_sorted = res.clone().into_iter().sorted().collect_vec();
         let expected = (0..1000u16).collect_vec();

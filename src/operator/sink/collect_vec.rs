@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -18,18 +17,17 @@ where
     output: StreamOutputRef<Vec<Out>>,
 }
 
-#[async_trait]
 impl<Out, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
 where
     Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<()> {
-        match self.prev.next().await {
+    fn next(&mut self) -> StreamElement<()> {
+        match self.prev.next() {
             StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
                 // cloned CollectVecSink or already ended stream
                 if let Some(result) = self.result.as_mut() {
@@ -40,7 +38,7 @@ where
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::End => {
                 if let Some(result) = self.result.take() {
-                    *self.output.lock().await = Some(result);
+                    *self.output.lock().unwrap() = Some(result);
                 }
                 StreamElement::End
             }
@@ -93,19 +91,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
     use itertools::Itertools;
+    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[async_std::test]
-    async fn collect_vec() {
+    #[std::test]
+    fn collect_vec() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..10u8));
         let res = env.stream(source).collect_vec();
-        env.execute().await;
+        env.execute();
         assert_eq!(res.get().unwrap(), (0..10).collect_vec());
     }
 }

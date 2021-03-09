@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use async_std::channel::Sender;
-use async_std::sync::{Arc, Mutex};
-use async_std::task::JoinHandle;
 use itertools::Itertools;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::sync::mpsc::{Sender, SyncSender};
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
@@ -37,7 +37,7 @@ pub struct ExecutionMetadata {
 /// Handle that the scheduler uses to start the computation of a block.
 pub(crate) struct StartHandle {
     /// Sender for the `ExecutionMetadata` sent to the worker.
-    starter: Sender<ExecutionMetadata>,
+    starter: SyncSender<ExecutionMetadata>,
     /// `JoinHandle` used to wait until a block has finished working.
     join_handle: JoinHandle<()>,
 }
@@ -146,14 +146,14 @@ impl Scheduler {
     }
 
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) async fn start(mut self) -> Vec<JoinHandle<()>> {
+    pub(crate) fn start(mut self) -> Vec<JoinHandle<()>> {
         info!("Starting scheduler: {:#?}", self.config);
         self.log_topology();
         self.build_execution_graph();
         self.network.log_topology();
 
         // start the remote connections
-        let mut join = self.network.start_remote().await;
+        let mut join = self.network.start_remote();
 
         let num_prev = self.num_prev();
         let network = Arc::new(Mutex::new(self.network));
@@ -169,7 +169,7 @@ impl Scheduler {
                 num_prev: num_prev[&coord.block_id],
                 network: network.clone(),
             };
-            handle.starter.send(metadata).await.unwrap();
+            handle.starter.send(metadata).unwrap();
             join.push(handle.join_handle);
         }
         join
@@ -345,7 +345,7 @@ impl Scheduler {
 }
 
 impl StartHandle {
-    pub(crate) fn new(starter: Sender<ExecutionMetadata>, join_handle: JoinHandle<()>) -> Self {
+    pub(crate) fn new(starter: SyncSender<ExecutionMetadata>, join_handle: JoinHandle<()>) -> Self {
         Self {
             starter,
             join_handle,

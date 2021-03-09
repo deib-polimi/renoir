@@ -1,9 +1,8 @@
 use std::hash::Hash;
 
-use async_std::sync::Arc;
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::sync::Arc;
 
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -21,19 +20,18 @@ where
     f: Arc<dyn Fn(Out) -> NewOut + Send + Sync>,
 }
 
-#[async_trait]
 impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Map<Out, NewOut, PreviousOperators>
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<NewOut> {
-        self.prev.next().await.map(&*self.f)
+    fn next(&mut self) -> StreamElement<NewOut> {
+        self.prev.next().map(&*self.f)
     }
 
     fn to_string(&self) -> String {
@@ -88,7 +86,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
+    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
@@ -96,8 +94,8 @@ mod tests {
     use itertools::Itertools;
     use std::str::FromStr;
 
-    #[async_std::test]
-    async fn map_stream() {
+    #[std::test]
+    fn map_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..10u8));
         let res = env
@@ -106,14 +104,14 @@ mod tests {
             .map(|n| n + "000")
             .map(|n| u32::from_str(&n).unwrap())
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let res = res.get().unwrap();
         let expected = (0..10u32).map(|n| 1000 * n).collect_vec();
         assert_eq!(res, expected);
     }
 
-    #[async_std::test]
-    async fn map_keyed_stream() {
+    #[std::test]
+    fn map_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..10u8));
         let res = env
@@ -123,7 +121,7 @@ mod tests {
             .unkey()
             .map(|(_k, v)| v)
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let res = res.get().unwrap().into_iter().sorted().collect_vec();
         let expected = (0..10u8).map(|n| (n % 2) * 100 + n).sorted().collect_vec();
         assert_eq!(res, expected);

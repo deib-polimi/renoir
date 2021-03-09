@@ -77,23 +77,23 @@ impl StreamEnvironment {
 
     /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
     /// is already a spawned process nothing is done.
-    pub async fn spawn_remote_workers(&self) {
+    pub fn spawn_remote_workers(&self) {
         match &self.inner.borrow().config.runtime {
             ExecutionRuntime::Local(_) => {}
             ExecutionRuntime::Remote(remote) => {
-                spawn_remote_workers(remote.clone()).await;
+                spawn_remote_workers(remote.clone());
             }
         }
     }
 
     /// Start the computation. Await on the returned future to actually start the computation.
-    pub async fn execute(self) {
+    pub fn execute(self) {
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);
-        let join = env.scheduler.take().unwrap().start().await;
+        let join = env.scheduler.take().unwrap().start();
         // wait till the computation ends
         for join_handle in join {
-            join_handle.await;
+            join_handle.join().unwrap();
         }
     }
 }

@@ -1,9 +1,10 @@
-use async_std::net::TcpStream;
-use async_std::prelude::*;
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
 use bincode::{DefaultOptions, Options};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::io::Read;
+use std::io::Write;
+use std::net::TcpStream;
 
 use crate::network::Coord;
 
@@ -30,7 +31,7 @@ struct MessageHeader {
 /// The network protocol works as follow:
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
-pub(crate) async fn remote_send<T>(what: T, coord: Coord, stream: &mut TcpStream)
+pub(crate) fn remote_send<T>(what: T, coord: Coord, stream: &mut TcpStream)
 where
     T: Send + Serialize,
 {
@@ -45,20 +46,17 @@ where
         size: serialized.len() as _,
     };
     let serialized_header = HEADER_CONFIG.serialize(&header).unwrap();
-    stream
-        .write_all(&serialized_header)
-        .await
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failed to send size of message (was {} bytes) to {} at {}: {:?}",
-                serialized.len(),
-                coord,
-                address,
-                e
-            )
-        });
+    stream.write_all(&serialized_header).unwrap_or_else(|e| {
+        panic!(
+            "Failed to send size of message (was {} bytes) to {} at {}: {:?}",
+            serialized.len(),
+            coord,
+            address,
+            e
+        )
+    });
 
-    stream.write_all(&serialized).await.unwrap_or_else(|e| {
+    stream.write_all(&serialized).unwrap_or_else(|e| {
         panic!(
             "Failed to send {} bytes to {} at {}: {:?}",
             serialized.len(),
@@ -71,7 +69,7 @@ where
 
 /// Receive a message from the remote channel. Returns `None` if there was a failure receiving the
 /// last message.
-pub(crate) async fn remote_recv<T>(coord: Coord, stream: &mut TcpStream) -> Option<T>
+pub(crate) fn remote_recv<T>(coord: Coord, stream: &mut TcpStream) -> Option<T>
 where
     T: DeserializeOwned,
 {
@@ -83,7 +81,7 @@ where
         .serialized_size(&MessageHeader::default())
         .unwrap() as usize;
     let mut header = vec![0u8; header_size];
-    match stream.read_exact(&mut header).await {
+    match stream.read_exact(&mut header) {
         Ok(_) => {}
         Err(e) => {
             debug!(
@@ -97,7 +95,7 @@ where
         .deserialize(&header)
         .expect("Malformed header");
     let mut buf = vec![0u8; header.size as usize];
-    stream.read_exact(&mut buf).await.unwrap_or_else(|e| {
+    stream.read_exact(&mut buf).unwrap_or_else(|e| {
         panic!(
             "Failed to receive {} bytes to {} from {}: {:?}",
             header.size, coord, address, e

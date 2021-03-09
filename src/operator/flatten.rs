@@ -3,10 +3,9 @@ use std::collections::VecDeque;
 use std::hash::Hash;
 use std::iter::repeat;
 
-use async_std::sync::Arc;
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::sync::Arc;
 
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -31,7 +30,6 @@ where
     make_iter: Arc<dyn Fn(Out) -> IterOut + Send + Sync>,
 }
 
-#[async_trait]
 impl<Out, IterOut, NewOut, PreviousOperators> Operator<NewOut>
     for Flatten<Out, IterOut, NewOut, PreviousOperators>
 where
@@ -40,13 +38,13 @@ where
     PreviousOperators: Operator<Out> + Send,
     NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<NewOut> {
+    fn next(&mut self) -> StreamElement<NewOut> {
         while self.buffer.is_empty() {
-            match self.prev.next().await {
+            match self.prev.next() {
                 StreamElement::Item(item) => {
                     self.buffer = (self.make_iter)(item).map(StreamElement::Item).collect()
                 }
@@ -151,15 +149,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
     use itertools::Itertools;
+    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[async_std::test]
-    async fn flatten_stream() {
+    #[std::test]
+    fn flatten_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(vec![
             vec![],
@@ -170,12 +168,12 @@ mod tests {
             vec![],
         ]));
         let res = env.stream(source).flatten().collect_vec();
-        env.execute().await;
+        env.execute();
         assert_eq!(res.get().unwrap(), (1..=8).collect_vec());
     }
 
-    #[async_std::test]
-    async fn flatten_keyed_stream() {
+    #[std::test]
+    fn flatten_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..10u8));
         let res = env
@@ -185,7 +183,7 @@ mod tests {
             .flatten()
             .unkey()
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let expected = (0..10u8)
             .flat_map(|x| vec![(x % 2, x), (x % 2, x), (x % 2, x)])
             .sorted()
@@ -194,23 +192,23 @@ mod tests {
         assert_eq!(expected, res);
     }
 
-    #[async_std::test]
-    async fn flat_map_stream() {
+    #[std::test]
+    fn flat_map_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..10u8));
         let res = env
             .stream(source)
             .flat_map(|x| vec![x, 10 * x, 20 * x])
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let expected = (0..10u8)
             .flat_map(|x| vec![x, 10 * x, 20 * x])
             .collect_vec();
         assert_eq!(res.get().unwrap(), expected);
     }
 
-    #[async_std::test]
-    async fn flat_map_keyed_stream() {
+    #[std::test]
+    fn flat_map_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..10u8));
         let res = env
@@ -219,7 +217,7 @@ mod tests {
             .flat_map(|(_k, v)| vec![v, v, v])
             .unkey()
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let expected = (0..10u8)
             .flat_map(|x| vec![(x % 2, x), (x % 2, x), (x % 2, x)])
             .sorted()

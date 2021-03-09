@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
 
-use async_std::channel::{Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, SyncSender};
 
 pub(crate) use receiver::*;
 pub(crate) use sender::*;
@@ -18,7 +18,7 @@ mod topology;
 /// Sender that communicate to a network component to start working. Sending `true` will make the
 /// network component start working, sending `false` or dropping all the senders will make the
 /// component exit.
-pub(crate) type NetworkStarter = Sender<bool>;
+pub(crate) type NetworkStarter = SyncSender<bool>;
 /// Receiver part of `NetworkStarter`.
 pub(crate) type NetworkStarterRecv = Receiver<bool>;
 
@@ -59,8 +59,8 @@ impl Display for Coord {
 }
 
 /// Wait for the start signal, return whether the component should start working or not.
-pub(crate) async fn wait_start(receiver: NetworkStarterRecv) -> bool {
-    match receiver.recv().await {
+pub(crate) fn wait_start(receiver: NetworkStarterRecv) -> bool {
+    match receiver.recv() {
         Ok(start) => start,
         Err(_) => return false,
     }

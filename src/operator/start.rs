@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -21,13 +20,12 @@ where
     missing_ends: usize,
 }
 
-#[async_trait]
 impl<Out> Operator<Out> for StartBlock<Out>
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        let mut network = metadata.network.lock().await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        let mut network = metadata.network.lock().unwrap();
         self.receiver = Some(network.get_receiver(metadata.coord));
         drop(network);
         self.missing_ends = metadata.num_prev;
@@ -38,7 +36,7 @@ where
         self.metadata = Some(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Out> {
         let metadata = self.metadata.as_ref().unwrap();
         // all the previous blocks sent and end: we're done
         if self.missing_ends == 0 {
@@ -48,7 +46,7 @@ where
         let receiver = self.receiver.as_ref().unwrap();
         if self.buffer.is_empty() {
             // receive from any previous block
-            let buf = receiver.recv().await.unwrap();
+            let buf = receiver.recv().unwrap();
             self.buffer.append(&mut buf.into());
         }
         let message = self
@@ -61,7 +59,7 @@ where
                 "{} received an end, {} more to come",
                 metadata.coord, self.missing_ends
             );
-            return self.next().await;
+            return self.next();
         }
         message
     }

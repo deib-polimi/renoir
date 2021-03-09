@@ -1,12 +1,10 @@
 use std::io::ErrorKind;
+use std::net::{Shutdown, TcpStream, ToSocketAddrs};
+use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
+use std::thread::{sleep, spawn, JoinHandle};
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use async_std::channel::{bounded, Receiver, Sender};
-use async_std::io::timeout;
-use async_std::net::{Shutdown, TcpStream, ToSocketAddrs};
-use async_std::task::spawn;
-use async_std::task::{sleep, JoinHandle};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -30,7 +28,7 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 ///
 /// This works for both a local in-memory connection and for a remote socket connection. When this
 /// is bound to a local channel the receiver will be a `Receiver`. When it's bound to a remote
-/// connection the receiver is inside an async task that receives locally via the in-memory channel
+/// connection the receiver is inside an task that receives locally via the in-memory channel
 /// and then send the message via a socket.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
@@ -38,9 +36,9 @@ pub(crate) struct NetworkSender<Out> {
     /// The coord of the recipient.
     pub coord: Coord,
     /// The channel that will be used to send the message. It will be either to the local recipient
-    /// or to an async task that will send the message remotely.
+    /// or to an task that will send the message remotely.
     #[derivative(Debug = "ignore")]
-    sender: Sender<Out>,
+    sender: SyncSender<Out>,
 }
 
 impl<Out> NetworkSender<Out>
@@ -48,25 +46,27 @@ where
     Out: Serialize + DeserializeOwned + Send + 'static,
 {
     /// Create a new local sender that sends the data directly to the recipient.
-    pub fn local(coord: Coord, sender: Sender<Out>) -> Self {
+    pub fn local(coord: Coord, sender: SyncSender<Out>) -> Self {
         Self { coord, sender }
     }
 
     /// Create a new remote sender that will send the data via a socket to the specified address.
-    pub fn remote(coord: Coord, address: (String, u16)) -> (Self, NetworkStarter, JoinHandle<()>) {
-        let (sender, receiver) = bounded(CHANNEL_CAPACITY);
-        let (connect_socket, connect_socket_rx) = bounded(CHANNEL_CAPACITY);
-        let join_handle = spawn(async move {
-            NetworkSender::connect_remote(coord, receiver, address, connect_socket_rx).await;
+    pub fn remote(
+        coord: Coord,
+        address: (String, u16),
+    ) -> (Self, SyncSender<bool>, JoinHandle<()>) {
+        let (sender, receiver) = sync_channel(CHANNEL_CAPACITY);
+        let (connect_socket, connect_socket_rx) = sync_channel(CHANNEL_CAPACITY);
+        let join_handle = spawn(move || {
+            NetworkSender::connect_remote(coord, receiver, address, connect_socket_rx);
         });
         (Self { coord, sender }, connect_socket, join_handle)
     }
 
     /// Send a message to a replica.
-    pub async fn send(&self, item: Out) -> Result<()> {
+    pub fn send(&self, item: Out) -> Result<()> {
         self.sender
             .send(item)
-            .await
             .map_err(|e| anyhow!("Failed to send to channel to {}: {:?}", self.coord, e))
     }
 
@@ -76,14 +76,14 @@ where
     /// - Then at most `CONNECT_ATTEMPTS` are performed, and an exponential backoff is used in case
     ///   of errors.
     /// - If the connection cannot be established this function will panic.
-    async fn connect_remote(
+    fn connect_remote(
         coord: Coord,
         local_receiver: Receiver<Out>,
         address: (String, u16),
         connect_socket: NetworkStarterRecv,
     ) {
         // wait the signal before connecting the socket
-        if !wait_start(connect_socket).await {
+        if !wait_start(connect_socket) {
             debug!(
                 "Remote sender at {} is asked not to connect, exiting...",
                 coord
@@ -94,7 +94,6 @@ where
         let address = (address.0.as_str(), address.1);
         let address: Vec<_> = address
             .to_socket_addrs()
-            .await
             .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
             .unwrap()
             .collect();
@@ -104,10 +103,9 @@ where
                 "Attempt {} to connect to {} at {:?}",
                 attempt, coord, address
             );
-            let connect_fut = TcpStream::connect(&*address);
-            match timeout(CONNECT_TIMEOUT, connect_fut).await {
+            match TcpStream::connect(&*address) {
                 Ok(stream) => {
-                    NetworkSender::handle_remote_connection(coord, local_receiver, stream).await;
+                    NetworkSender::handle_remote_connection(coord, local_receiver, stream);
                     return;
                 }
                 Err(err) => {
@@ -130,7 +128,7 @@ where
                             );
                         }
                     }
-                    sleep(retry_delay).await;
+                    sleep(retry_delay);
                     retry_delay = (2 * retry_delay).min(RETRY_MAX_TIMEOUT);
                 }
             };
@@ -145,7 +143,7 @@ where
     ///
     /// Waits messages from the local receiver, then serialize the message and send it to the remote
     /// replica.
-    async fn handle_remote_connection(
+    fn handle_remote_connection(
         coord: Coord,
         local_receiver: Receiver<Out>,
         mut stream: TcpStream,
@@ -155,8 +153,8 @@ where
             .map(|a| a.to_string())
             .unwrap_or_else(|_| "unknown".to_string());
         debug!("Connection to {} at {} established", coord, address);
-        while let Ok(out) = local_receiver.recv().await {
-            remote_send(out, coord, &mut stream).await;
+        while let Ok(out) = local_receiver.recv() {
+            remote_send(out, coord, &mut stream);
         }
         let _ = stream.shutdown(Shutdown::Both);
         debug!("Remote sender for {} exited", coord);

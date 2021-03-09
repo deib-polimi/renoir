@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use async_std::sync::Arc;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::sync::Arc;
 
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::scheduler::ExecutionMetadata;

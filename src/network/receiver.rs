@@ -1,11 +1,9 @@
 use anyhow::{anyhow, Result};
-use async_std::channel::{bounded, Receiver, Sender};
-use async_std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
-use async_std::stream::StreamExt;
-use async_std::task::spawn;
-use async_std::task::JoinHandle;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
+use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
+use std::thread::{spawn, JoinHandle};
 
 use crate::network::remote::remote_recv;
 use crate::network::{Coord, NetworkSender};
@@ -20,7 +18,7 @@ const CHANNEL_CAPACITY: usize = 10;
 /// starter returned by the constructor.
 ///
 /// Internally it contains a in-memory sender-receiver pair, to get the local sender call
-/// `.sender()`. When the socket will be bound an async task will be spawned, it will bind the
+/// `.sender()`. When the socket will be bound an task will be spawned, it will bind the
 /// socket and send to the same in-memory channel the received messages.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -32,7 +30,7 @@ pub(crate) struct NetworkReceiver<In> {
     receiver: Receiver<In>,
     /// The sender associated with `self.receiver`.
     #[derivative(Debug = "ignore")]
-    local_sender: Sender<In>,
+    local_sender: SyncSender<In>,
 }
 
 impl<In> NetworkReceiver<In>
@@ -48,12 +46,12 @@ where
     ///   a socket on the specified address. The value sent is the number of senders that will
     ///   connect remotely to that socket. When they all connects the socket is unbound.
     /// - an handle where to wait for the socket task
-    pub fn new(coord: Coord, address: (String, u16)) -> (Self, Sender<usize>, JoinHandle<()>) {
-        let (sender, receiver) = bounded(CHANNEL_CAPACITY);
-        let (bind_socket, bind_socket_rx) = bounded(CHANNEL_CAPACITY);
+    pub fn new(coord: Coord, address: (String, u16)) -> (Self, SyncSender<usize>, JoinHandle<()>) {
+        let (sender, receiver) = sync_channel(CHANNEL_CAPACITY);
+        let (bind_socket, bind_socket_rx) = sync_channel(CHANNEL_CAPACITY);
         let local_sender = sender.clone();
-        let join_handle = spawn(async move {
-            NetworkReceiver::bind_remote(coord, local_sender, address, bind_socket_rx).await;
+        let join_handle = spawn(move || {
+            NetworkReceiver::bind_remote(coord, local_sender, address, bind_socket_rx);
         });
         (
             Self {
@@ -72,25 +70,24 @@ where
     }
 
     /// Receive a message from any sender.
-    pub async fn recv(&self) -> Result<In> {
+    pub fn recv(&self) -> Result<In> {
         self.receiver
             .recv()
-            .await
             .map_err(|e| anyhow!("Failed to receive from channel at {}: {:?}", self.coord, e))
     }
 
-    /// The async task that will eventually bind the socket.
+    /// The task that will eventually bind the socket.
     ///
     /// If 0 is sent to `bind_socket` no socket will be bound, otherwise exactly that number of
     /// connections will be awaited and served. After that the task will exit unbinding the socket.
-    async fn bind_remote(
+    fn bind_remote(
         coord: Coord,
-        local_sender: Sender<In>,
+        local_sender: SyncSender<In>,
         address: (String, u16),
         bind_socket: Receiver<usize>,
     ) {
         // wait the signal before binding the socket
-        let num_connections = bind_socket.recv().await.unwrap();
+        let num_connections = bind_socket.recv().unwrap();
         if num_connections == 0 {
             debug!(
                 "Remote receiver at {} is asked not to bind, exiting...",
@@ -102,12 +99,10 @@ where
         let address = (address.0.as_ref(), address.1);
         let address: Vec<_> = address
             .to_socket_addrs()
-            .await
             .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
             .unwrap()
             .collect();
         let listener = TcpListener::bind(&*address)
-            .await
             .map_err(|e| {
                 anyhow!(
                     "Failed to bind socket for {} at {:?}: {:?}",
@@ -129,7 +124,7 @@ where
         let mut incoming = listener.incoming();
         let mut join_handles = Vec::new();
         for conn_num in 1..=num_connections {
-            let stream = incoming.next().await.unwrap();
+            let stream = incoming.next().unwrap();
             let stream = match stream {
                 Ok(stream) => stream,
                 Err(e) => {
@@ -145,9 +140,8 @@ where
                 num_connections
             );
             let local_sender = local_sender.clone();
-            let join_handle = spawn(async move {
-                NetworkReceiver::handle_remote_client(coord, local_sender, stream).await
-            });
+            let join_handle =
+                spawn(move || NetworkReceiver::handle_remote_client(coord, local_sender, stream));
             join_handles.push(join_handle);
         }
         debug!(
@@ -155,7 +149,7 @@ where
             coord, address, num_connections
         );
         for join_handle in join_handles {
-            join_handle.await;
+            join_handle.join().unwrap();
         }
         debug!(
             "Remote receiver at {} ({}) finished, exiting...",
@@ -167,13 +161,13 @@ where
     ///
     /// This will receiver every message, deserialize it and send it back to the receiver using the
     /// local channel.
-    async fn handle_remote_client(coord: Coord, local_sender: Sender<In>, mut receiver: TcpStream) {
+    fn handle_remote_client(coord: Coord, local_sender: SyncSender<In>, mut receiver: TcpStream) {
         let address = receiver
             .peer_addr()
             .map(|a| a.to_string())
             .unwrap_or_else(|_| "unknown".to_string());
-        while let Some(message) = remote_recv(coord, &mut receiver).await {
-            local_sender.send(message).await.unwrap_or_else(|e| {
+        while let Some(message) = remote_recv(coord, &mut receiver) {
+            local_sender.send(message).unwrap_or_else(|e| {
                 panic!("Failed to send to local receiver at {}: {:?}", coord, e)
             });
         }

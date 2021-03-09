@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +63,7 @@ where
 /// be cloned to spawn the replicas of the block.
 ///
 /// This trait has some `async` function, due to a limitation of rust `async_trait` must be used.
-#[async_trait]
+
 pub trait Operator<Out>: Clone
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
@@ -75,10 +74,10 @@ where
     ///
     /// It's important that each operator (except the start of a chain) calls `.setup()` recursively
     /// on the previous operators.
-    async fn setup(&mut self, metadata: ExecutionMetadata);
+    fn setup(&mut self, metadata: ExecutionMetadata);
 
     /// Take a value from the previous operator, process it and return it.
-    async fn next(&mut self) -> StreamElement<Out>;
+    fn next(&mut self) -> StreamElement<Out>;
 
     /// A string representation of the operator and its predecessors.
     fn to_string(&self) -> String;

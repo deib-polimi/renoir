@@ -1,7 +1,6 @@
-use async_std::sync::Arc;
-use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::sync::Arc;
 
 use crate::block::NextStrategy;
 use crate::operator::{EndBlock, Operator, StreamElement, Timestamp};
@@ -26,20 +25,19 @@ where
     received_end: bool,
 }
 
-#[async_trait]
 impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Fold<Out, NewOut, PreviousOperators>
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<NewOut> {
+    fn next(&mut self) -> StreamElement<NewOut> {
         while !self.received_end {
-            match self.prev.next().await {
+            match self.prev.next() {
                 StreamElement::End => self.received_end = true,
                 StreamElement::Watermark(ts) => {
                     self.max_watermark = Some(self.max_watermark.unwrap_or(ts).max(ts))
@@ -134,21 +132,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
+    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[async_std::test]
-    async fn fold_stream() {
+    #[std::test]
+    fn fold_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(from_iter(0..10u8));
         let res = env
             .stream(source)
             .fold("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let res = res.get().unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0], "0123456789");

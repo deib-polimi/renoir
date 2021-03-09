@@ -1,4 +1,4 @@
-use async_std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex};
 
 pub use collect_vec::*;
 
