@@ -5,6 +5,7 @@ use regex::Regex;
 use rstream::config::EnvironmentConfig;
 use rstream::environment::StreamEnvironment;
 use rstream::operator::source;
+use std::time::Instant;
 
 #[async_std::main]
 async fn main() {
@@ -29,8 +30,10 @@ async fn main() {
         .fold(0, |count, _word| count + 1)
         .unkey();
     let result = stream.collect_vec();
+    let start = Instant::now();
     env.execute().await;
-    println!("Output: {:?}", result.get());
+    // println!("Output: {:?}", result.get());
+    println!("Elapsed: {:?}", start.elapsed());
 }
 
 struct Tokenizer {
