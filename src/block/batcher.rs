@@ -56,7 +56,7 @@ where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     pub(crate) fn new(remote_sender: NetworkSender<NetworkMessage<Out>>, mode: BatchMode) -> Self {
-        let (sender, receiver) = bounded(1);
+        let (sender, receiver) = bounded(1000);
         let join_handle =
             spawn(async move { Batcher::batcher_body(remote_sender, mode, receiver).await });
         Self {
