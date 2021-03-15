@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
-use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
-use std::thread::{spawn, JoinHandle};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::thread::JoinHandle;
 
 use crate::network::remote::remote_recv;
 use crate::network::{Coord, NetworkSender};
@@ -50,9 +50,12 @@ where
         let (sender, receiver) = sync_channel(CHANNEL_CAPACITY);
         let (bind_socket, bind_socket_rx) = sync_channel(CHANNEL_CAPACITY);
         let local_sender = sender.clone();
-        let join_handle = spawn(move || {
-            NetworkReceiver::bind_remote(coord, local_sender, address, bind_socket_rx);
-        });
+        let join_handle = std::thread::Builder::new()
+            .name(format!("NetRecv{}", coord))
+            .spawn(move || {
+                NetworkReceiver::bind_remote(coord, local_sender, address, bind_socket_rx);
+            })
+            .unwrap();
         (
             Self {
                 coord,
@@ -140,8 +143,10 @@ where
                 num_connections
             );
             let local_sender = local_sender.clone();
-            let join_handle =
-                spawn(move || NetworkReceiver::handle_remote_client(coord, local_sender, stream));
+            let join_handle = std::thread::Builder::new()
+                .name(format!("NetClient{}", coord))
+                .spawn(move || NetworkReceiver::handle_remote_client(coord, local_sender, stream))
+                .unwrap();
             join_handles.push(join_handle);
         }
         debug!(

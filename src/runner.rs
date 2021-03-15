@@ -35,10 +35,13 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
     let mut join_handles = Vec::new();
     for (host_id, host) in config.hosts.into_iter().enumerate() {
         let config_str = config_str.clone();
-        let join_handle = std::thread::spawn(move || {
-            let config_str = config_str.clone();
-            spawn_remote_worker(host_id, host, config_str)
-        });
+        let join_handle = std::thread::Builder::new()
+            .name(format!("RemoteW{}", host_id))
+            .spawn(move || {
+                let config_str = config_str.clone();
+                spawn_remote_worker(host_id, host, config_str)
+            })
+            .unwrap();
         join_handles.push(join_handle);
     }
     for join_handle in join_handles {

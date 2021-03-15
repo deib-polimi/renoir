@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
 
-use std::sync::mpsc::{Receiver, Sender, SyncSender};
+use std::sync::mpsc::{Receiver, SyncSender};
 
 pub(crate) use receiver::*;
 pub(crate) use sender::*;

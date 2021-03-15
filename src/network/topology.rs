@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
-use std::sync::mpsc::{Sender, SyncSender};
+use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 
 use itertools::Itertools;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use typemap::{Key, SendMap, ShareMap, TypeMap};
+use typemap::{Key, SendMap};
 
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, NetworkStarter};

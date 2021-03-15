@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, Sender, SyncSender};
-use std::thread::{spawn, JoinHandle};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::thread::JoinHandle;
 
 use crate::network::{NetworkMessage, NetworkSender};
 use crate::operator::StreamElement;
@@ -55,7 +55,10 @@ where
 {
     pub(crate) fn new(remote_sender: NetworkSender<NetworkMessage<Out>>, mode: BatchMode) -> Self {
         let (sender, receiver) = sync_channel(1);
-        let join_handle = spawn(move || Batcher::batcher_body(remote_sender, mode, receiver));
+        let join_handle = std::thread::Builder::new()
+            .name(format!("Batcher{}", remote_sender.coord))
+            .spawn(move || Batcher::batcher_body(remote_sender, mode, receiver))
+            .unwrap();
         Self {
             sender,
             join_handle,

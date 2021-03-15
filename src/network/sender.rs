@@ -1,7 +1,7 @@
 use std::io::ErrorKind;
 use std::net::{Shutdown, TcpStream, ToSocketAddrs};
-use std::sync::mpsc::{sync_channel, Receiver, Sender, SyncSender};
-use std::thread::{sleep, spawn, JoinHandle};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::thread::{sleep, JoinHandle};
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
@@ -9,7 +9,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::network::remote::remote_send;
-use crate::network::{wait_start, Coord, NetworkStarter, NetworkStarterRecv};
+use crate::network::{wait_start, Coord, NetworkStarterRecv};
 
 /// The capacity of the out-buffer.
 const CHANNEL_CAPACITY: usize = 10;
@@ -57,9 +57,12 @@ where
     ) -> (Self, SyncSender<bool>, JoinHandle<()>) {
         let (sender, receiver) = sync_channel(CHANNEL_CAPACITY);
         let (connect_socket, connect_socket_rx) = sync_channel(CHANNEL_CAPACITY);
-        let join_handle = spawn(move || {
-            NetworkSender::connect_remote(coord, receiver, address, connect_socket_rx);
-        });
+        let join_handle = std::thread::Builder::new()
+            .name(format!("NetSender{}", coord))
+            .spawn(move || {
+                NetworkSender::connect_remote(coord, receiver, address, connect_socket_rx);
+            })
+            .unwrap();
         (Self { coord, sender }, connect_socket, join_handle)
     }
 
