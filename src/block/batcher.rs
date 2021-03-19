@@ -15,6 +15,9 @@ use crate::operator::StreamElement;
 /// This value cannot be too big otherwise an integer overflow will happen.
 const FIXED_BATCH_MODE_MAX_DELAY: Duration = Duration::from_secs(60 * 60 * 24 * 365 * 10);
 
+/// Capacity of the channel to the `Batcher`.
+const BATCHER_CHANNEL_CAPACITY: usize = 1024;
+
 /// Which policy to use for batching the messages before sending them.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BatchMode {
@@ -54,7 +57,7 @@ where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     pub(crate) fn new(remote_sender: NetworkSender<NetworkMessage<Out>>, mode: BatchMode) -> Self {
-        let (sender, receiver) = sync_channel(1);
+        let (sender, receiver) = sync_channel(BATCHER_CHANNEL_CAPACITY);
         let join_handle = std::thread::Builder::new()
             .name(format!("Batcher{}", remote_sender.coord))
             .spawn(move || Batcher::batcher_body(remote_sender, mode, receiver))
