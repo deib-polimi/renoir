@@ -50,6 +50,8 @@ where
     /// When an operator receives a `Watermark` with timestamp `t`, the operator will never see any
     /// message with timestamp less or equal to `t`.
     Watermark(Timestamp),
+    /// Flush the internal batch since there will be too much delay till the next message to come.
+    FlushBatch,
     /// The last message an operator will receive, indicating that the stream has ended.
     End,
 }
@@ -95,6 +97,7 @@ where
             StreamElement::Timestamped(_, _) => StreamElement::Item(()),
             StreamElement::Watermark(w) => StreamElement::Watermark(*w),
             StreamElement::End => StreamElement::End,
+            StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }
 
@@ -108,6 +111,7 @@ where
             StreamElement::Timestamped(item, ts) => StreamElement::Timestamped(f(item), ts),
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::End => StreamElement::End,
+            StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }
 }

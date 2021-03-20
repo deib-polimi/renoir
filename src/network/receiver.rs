@@ -1,9 +1,11 @@
+use std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
+use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender};
+use std::thread::JoinHandle;
+use std::time::Duration;
+
 use anyhow::{anyhow, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
-use std::thread::JoinHandle;
 
 use crate::network::remote::remote_recv;
 use crate::network::{Coord, NetworkSender};
@@ -77,6 +79,11 @@ where
         self.receiver
             .recv()
             .map_err(|e| anyhow!("Failed to receive from channel at {}: {:?}", self.coord, e))
+    }
+
+    /// Receive a message from any sender with a timeout.
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<In, RecvTimeoutError> {
+        self.receiver.recv_timeout(timeout)
     }
 
     /// The task that will eventually bind the socket.

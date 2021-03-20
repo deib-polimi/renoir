@@ -55,6 +55,8 @@ where
                         item,
                     ));
                 }
+                // this block wont sent anything until the stream ends
+                StreamElement::FlushBatch => {}
             }
         }
 

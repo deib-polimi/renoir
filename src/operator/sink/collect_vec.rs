@@ -42,6 +42,7 @@ where
                 }
                 StreamElement::End
             }
+            StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }
 

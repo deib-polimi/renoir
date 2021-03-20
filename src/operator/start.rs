@@ -18,6 +18,9 @@ where
     receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
     buffer: VecDeque<StreamElement<Out>>,
     missing_ends: usize,
+    /// The last call to next caused a timeout, so a FlushBatch has been emitted. In this case this
+    /// field is set to true to avoid flooding with FlushBatch.
+    already_timed_out: bool,
 }
 
 impl<Out> Operator<Out> for StartBlock<Out>
@@ -45,8 +48,18 @@ where
         }
         let receiver = self.receiver.as_ref().unwrap();
         if self.buffer.is_empty() {
-            // receive from any previous block
-            let buf = receiver.recv().unwrap();
+            let buf = if self.already_timed_out {
+                self.already_timed_out = false;
+                receiver.recv().unwrap()
+            } else {
+                match receiver.recv_timeout(metadata.batch_mode.max_delay()) {
+                    Ok(buf) => buf,
+                    Err(_) => {
+                        self.already_timed_out = true;
+                        vec![StreamElement::FlushBatch]
+                    }
+                }
+            };
             self.buffer.append(&mut buf.into());
         }
         let message = self

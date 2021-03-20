@@ -7,7 +7,7 @@ use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
-use crate::block::InnerBlock;
+use crate::block::{BatchMode, InnerBlock};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::Operator;
@@ -32,6 +32,8 @@ pub struct ExecutionMetadata {
     pub(crate) num_prev: usize,
     /// A reference to the `NetworkTopology` that keeps the state of the network.
     pub(crate) network: Arc<Mutex<NetworkTopology>>,
+    /// The batching mode to use inside this block.
+    pub(crate) batch_mode: BatchMode,
 }
 
 /// Handle that the scheduler uses to start the computation of a block.
@@ -55,6 +57,8 @@ struct SchedulerBlockInfo {
     replicas: HashMap<HostId, Vec<Coord>>,
     /// All the global ids, grouped by coordinate.
     global_ids: HashMap<Coord, usize>,
+    /// The batching mode to use inside this block.
+    batch_mode: BatchMode,
 }
 
 /// The `Scheduler` is the entity that keeps track of all the blocks of the job graph and when the
@@ -168,6 +172,7 @@ impl Scheduler {
                 global_id,
                 num_prev: num_prev[&coord.block_id],
                 network: network.clone(),
+                batch_mode: block_info.batch_mode,
             };
             handle.starter.send(metadata).unwrap();
             join.push(handle.join_handle);
@@ -291,6 +296,7 @@ impl Scheduler {
             num_replicas,
             replicas: vec![(host_id, replicas.collect())].into_iter().collect(),
             global_ids: global_ids.into_iter().collect(),
+            batch_mode: block.batch_mode,
         }
     }
 
@@ -340,6 +346,7 @@ impl Scheduler {
             num_replicas,
             replicas,
             global_ids,
+            batch_mode: block.batch_mode,
         }
     }
 }

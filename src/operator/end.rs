@@ -86,6 +86,11 @@ where
                         .enqueue(message.clone());
                 }
             }
+            StreamElement::FlushBatch => {
+                for (_, batcher) in self.senders.iter_mut() {
+                    batcher.flush();
+                }
+            }
         };
 
         if matches!(to_return, StreamElement::End) {

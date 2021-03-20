@@ -32,7 +32,7 @@ fn main() {
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();
-    // println!("Output: {:?}", result.get());
+    println!("Output: {:?}", result.get().unwrap().len());
     println!("Elapsed: {:?}", elapsed);
 }
 

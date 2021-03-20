@@ -66,6 +66,8 @@ where
                         .and_modify(|entry| *entry = (*entry).max(ts))
                         .or_insert(ts);
                 }
+                // this block wont sent anything until the stream ends
+                StreamElement::FlushBatch => {}
             }
         }
 
