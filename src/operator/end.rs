@@ -72,12 +72,21 @@ where
             }
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
                 let index = self.next_strategy.index(&item);
-                for sender in self.sender_groups.iter() {
+                for sender in self.sender_groups.iter().skip(1) {
                     let index = index % sender.0.len();
                     self.senders
                         .get_mut(&sender.0[index])
                         .unwrap()
                         .enqueue(message.clone());
+                }
+                // avoid the last message.clone()
+                if !self.sender_groups.is_empty() {
+                    let sender = &self.sender_groups[0];
+                    let index = index % sender.0.len();
+                    self.senders
+                        .get_mut(&sender.0[index])
+                        .unwrap()
+                        .enqueue(message);
                 }
             }
             StreamElement::FlushBatch => {
