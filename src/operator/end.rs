@@ -65,12 +65,14 @@ where
     fn next(&mut self) -> StreamElement<()> {
         let message = self.prev.next();
         let to_return = message.take();
-        let mut to_send = Vec::new();
         match &message {
             StreamElement::Watermark(_) | StreamElement::End => {
                 for senders in self.sender_groups.iter() {
                     for &sender in senders.0.iter() {
-                        to_send.push((message.clone(), sender))
+                        self.senders
+                            .get_mut(&sender)
+                            .unwrap()
+                            .enqueue(message.clone());
                     }
                 }
             }
@@ -78,13 +80,13 @@ where
                 let index = self.next_strategy.index(&item);
                 for sender in self.sender_groups.iter() {
                     let index = index % sender.0.len();
-                    to_send.push((message.clone(), sender.0[index]));
+                    self.senders
+                        .get_mut(&sender.0[index])
+                        .unwrap()
+                        .enqueue(message.clone());
                 }
             }
         };
-        for (message, sender) in to_send {
-            self.senders[&sender].enqueue(message);
-        }
 
         if matches!(to_return, StreamElement::End) {
             let metadata = self.metadata.as_ref().unwrap();

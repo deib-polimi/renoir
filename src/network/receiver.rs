@@ -123,7 +123,7 @@ where
             "Remote receiver at {} is ready to accept {} connections to {}",
             coord, num_connections, address
         );
-        let local_sender = local_sender.clone();
+
         let mut incoming = listener.incoming();
         let mut join_handles = Vec::new();
         for conn_num in 1..=num_connections {

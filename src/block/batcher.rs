@@ -46,10 +46,12 @@ pub(crate) struct Batcher<Out>
 where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
-    /// Sender to the internal task that does the batching.
-    sender: SyncSender<BatcherMessage<Out>>,
-    /// Handle to join the internal task.
-    join_handle: JoinHandle<()>,
+    /// Sender used to communicate with the other replicas
+    remote_sender: NetworkSender<NetworkMessage<Out>>,
+    /// Batching mode used by the batcher
+    mode: BatchMode,
+    /// Buffer used to keep messages ready to be sent
+    buffer: Vec<StreamElement<Out>>,
 }
 
 impl<Out> Batcher<Out>
@@ -57,73 +59,29 @@ where
     Out: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     pub(crate) fn new(remote_sender: NetworkSender<NetworkMessage<Out>>, mode: BatchMode) -> Self {
-        let (sender, receiver) = sync_channel(BATCHER_CHANNEL_CAPACITY);
-        let join_handle = std::thread::Builder::new()
-            .name(format!("Batcher{}", remote_sender.coord))
-            .spawn(move || Batcher::batcher_body(remote_sender, mode, receiver))
-            .unwrap();
         Self {
-            sender,
-            join_handle,
+            remote_sender,
+            mode,
+            buffer: Default::default(),
         }
     }
 
     /// Put a message in the batch queue, it won't be sent immediately.
-    pub(crate) fn enqueue(&self, message: StreamElement<Out>) {
-        self.sender
-            .send(BatcherMessage::Message(message))
-            .expect("Cannot enqueue if the Batcher already exited")
+    pub(crate) fn enqueue(&mut self, message: StreamElement<Out>) {
+        self.buffer.push(message);
+        // max capacity has been reached, send and flush the buffer
+        if self.buffer.len() >= self.mode.max_capacity() {
+            let mut batch = Vec::with_capacity(self.mode.max_capacity());
+            std::mem::swap(&mut self.buffer, &mut batch);
+            self.remote_sender.send(batch).unwrap();
+        }
     }
 
-    /// Tell the batcher that the stream is ended, flush all the messages and join the internal
-    /// task.
+    /// Tell the batcher that the stream is ended, flush all the remaining messages.
     pub(crate) fn end(self) {
-        self.sender
-            .send(BatcherMessage::End)
-            .expect("Cannot enqueue if the Batcher already exited");
-        self.join_handle;
-    }
-
-    /// The body of the internal task that does the batching.
-    fn batcher_body(
-        sender: NetworkSender<NetworkMessage<Out>>,
-        mode: BatchMode,
-        receiver: Receiver<BatcherMessage<Out>>,
-    ) {
-        debug!(
-            "Batcher to {} is ready for working in mode {:?}",
-            sender.coord, mode
-        );
-        let mut batch = Vec::with_capacity(mode.max_capacity());
-        loop {
-            match receiver.recv_timeout(mode.max_delay()) {
-                Ok(message) => {
-                    match message {
-                        BatcherMessage::Message(mex) => {
-                            batch.push(mex);
-                            // max capacity has been reached, send and flush the buffer
-                            if batch.len() >= mode.max_capacity() {
-                                sender.send(batch).unwrap();
-                                batch = Vec::with_capacity(mode.max_capacity());
-                            }
-                        }
-                        BatcherMessage::End => {
-                            // send the last elements in the batch
-                            if !batch.is_empty() {
-                                sender.send(batch).unwrap();
-                            }
-                            break;
-                        }
-                    }
-                }
-                Err(_) => {
-                    // timeout occurred
-                    if !batch.is_empty() {
-                        sender.send(batch).unwrap();
-                        batch = Vec::with_capacity(mode.max_capacity());
-                    }
-                }
-            }
+        // Send the remaining messages
+        if !self.buffer.is_empty() {
+            self.remote_sender.send(self.buffer).unwrap();
         }
     }
 }
