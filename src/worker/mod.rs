@@ -12,7 +12,7 @@ where
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     let join_handle = std::thread::Builder::new()
-        .name(format!("Worker{}", block.id))
+        .name(format!("Block{}", block.id))
         .spawn(move || worker(block, receiver))
         .unwrap();
     StartHandle::new(sender, join_handle)

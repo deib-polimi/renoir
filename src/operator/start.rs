@@ -51,7 +51,7 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                     }
                 }
             };
-            self.buffer.append(&mut buf.into());
+            self.buffer = buf.into();
         }
         let message = self
             .buffer
