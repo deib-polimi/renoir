@@ -40,16 +40,21 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
         let receiver = self.receiver.as_ref().unwrap();
         if self.buffer.is_empty() {
             let max_delay = metadata.batch_mode.max_delay();
-            let buf = if self.already_timed_out || max_delay.is_none() {
-                self.already_timed_out = false;
-                receiver.recv().unwrap()
-            } else {
-                match receiver.recv_timeout(max_delay.unwrap()) {
+            let buf = match (self.already_timed_out, max_delay) {
+                // check the timeout only if there is one and the last time we didn't timed out
+                (false, Some(max_delay)) => match receiver.recv_timeout(max_delay) {
                     Ok(buf) => buf,
                     Err(_) => {
+                        // timed out: tell the block to flush the current batch
+                        // next time we wait indefinitely without the timeout since the batch is
+                        // currently empty
                         self.already_timed_out = true;
                         vec![StreamElement::FlushBatch]
                     }
+                },
+                _ => {
+                    self.already_timed_out = false;
+                    receiver.recv().unwrap()
                 }
             };
             self.buffer = buf.into();
