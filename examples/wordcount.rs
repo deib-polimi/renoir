@@ -13,9 +13,12 @@ fn main() {
     let path = env::args()
         .nth(1)
         .expect("Pass the dataset path as an argument");
+    let config = if let Some(ncore) = env::args().nth(2) {
+        EnvironmentConfig::local(ncore.parse().expect("invalid number of cores"))
+    } else {
+        EnvironmentConfig::remote("config.yml").unwrap()
+    };
 
-    let config = EnvironmentConfig::local(8);
-    // let config = EnvironmentConfig::remote("config.yml").unwrap();
     let mut env = StreamEnvironment::new(config);
 
     env.spawn_remote_workers();
@@ -32,8 +35,10 @@ fn main() {
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();
-    println!("Output: {:?}", result.get().unwrap().len());
-    println!("Elapsed: {:?}", elapsed);
+    if let Some(res) = result.get() {
+        eprintln!("Output: {:?}", res.len());
+    }
+    eprintln!("Elapsed: {:?}", elapsed);
 }
 
 struct Tokenizer {
