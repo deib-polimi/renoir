@@ -1,10 +1,10 @@
 use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::hash::Hasher;
 
 use std::sync::Arc;
 
 use crate::block::NextStrategy;
-use crate::operator::{Data, EndBlock};
+use crate::operator::{Data, DataKey, EndBlock};
 use crate::operator::{KeyBy, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
@@ -14,12 +14,11 @@ impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn group_by<Key, Keyer>(
+    pub fn group_by<Key: DataKey, Keyer>(
         self,
         keyer: Keyer,
     ) -> KeyedStream<Out, Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Key: Data + Hash + Eq,
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
     {
         let keyer = Arc::new(keyer);

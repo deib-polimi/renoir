@@ -1,7 +1,6 @@
-use std::hash::Hash;
 use std::sync::Arc;
 
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
@@ -54,9 +53,8 @@ where
     }
 }
 
-impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn map<NewOut: Data, F>(

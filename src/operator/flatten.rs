@@ -1,11 +1,10 @@
 use core::iter::{IntoIterator, Iterator};
 use std::collections::VecDeque;
-use std::hash::Hash;
 use std::iter::repeat;
 
 use std::sync::Arc;
 
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
@@ -99,9 +98,9 @@ where
     }
 }
 
-impl<In: Data, Key, Out: Data, NewOut: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key: DataKey, Out: Data, NewOut: Data, OperatorChain>
+    KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq,
     Out: IntoIterator<Item = NewOut>,
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
@@ -117,9 +116,8 @@ where
     }
 }
 
-impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn flat_map<NewOut: Data, MapOut: Data, F>(

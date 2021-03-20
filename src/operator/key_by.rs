@@ -1,6 +1,4 @@
-use std::hash::Hash;
-
-use crate::operator::{Data, Keyer};
+use crate::operator::{Data, DataKey, Keyer};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
@@ -8,9 +6,8 @@ use std::sync::Arc;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct KeyBy<Key, Out: Data, OperatorChain>
+pub struct KeyBy<Key: DataKey, Out: Data, OperatorChain>
 where
-    Key: Data + Hash + Eq + 'static,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
@@ -18,9 +15,8 @@ where
     keyer: Keyer<Key, Out>,
 }
 
-impl<Key, Out: Data, OperatorChain> KeyBy<Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, OperatorChain> KeyBy<Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq,
     OperatorChain: Operator<Out>,
 {
     pub fn new(prev: OperatorChain, keyer: Keyer<Key, Out>) -> Self {
@@ -28,9 +24,9 @@ where
     }
 }
 
-impl<Key, Out: Data, OperatorChain> Operator<KeyValue<Key, Out>> for KeyBy<Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, OperatorChain> Operator<KeyValue<Key, Out>>
+    for KeyBy<Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq,
     OperatorChain: Operator<Out> + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -62,12 +58,11 @@ impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn key_by<Key, Keyer>(
+    pub fn key_by<Key: DataKey, Keyer>(
         self,
         keyer: Keyer,
     ) -> KeyedStream<In, Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Key: Data + Hash + Eq,
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
     {
         let keyer = Arc::new(keyer);

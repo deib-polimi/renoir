@@ -1,11 +1,10 @@
 use std::cell::RefCell;
-use std::hash::Hash;
 use std::rc::Rc;
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy};
 use crate::environment::StreamEnvironmentInner;
-use crate::operator::StartBlock;
 use crate::operator::{Data, Operator};
+use crate::operator::{DataKey, StartBlock};
 
 /// Identifier of a block in the job graph.
 pub type BlockId = usize;
@@ -38,11 +37,10 @@ where
 /// `KeyedStream` semantics.
 ///
 /// The type of the `Key` must be a valid key inside an hashmap.
-pub struct KeyedStream<In: Data, Key, Out: Data, OperatorChain>(
+pub struct KeyedStream<In: Data, Key: DataKey, Out: Data, OperatorChain>(
     pub Stream<In, KeyValue<Key, Out>, OperatorChain>,
 )
 where
-    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>>;
 
 impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
@@ -119,9 +117,8 @@ where
     }
 }
 
-impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(

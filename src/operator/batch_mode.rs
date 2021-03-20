@@ -1,7 +1,5 @@
-use std::hash::Hash;
-
 use crate::block::BatchMode;
-use crate::operator::{Data, Operator};
+use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
@@ -14,9 +12,8 @@ where
     }
 }
 
-impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {

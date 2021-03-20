@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,10 @@ mod unkey;
 /// Marker trait that all the types inside a stream should implement.
 pub trait Data: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static {}
 impl<T: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static> Data for T {}
+
+/// Maker trait that all the keys should implement.
+pub trait DataKey: Data + Hash + Eq {}
+impl<T: Data + Hash + Eq> DataKey for T {}
 
 /// When using timestamps and watermarks, this type expresses the timestamp of a message or of a
 /// watermark.

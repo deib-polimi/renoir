@@ -1,11 +1,8 @@
-use std::hash::Hash;
-
-use crate::operator::{Data, Operator};
+use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
-impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn unkey(self) -> Stream<In, KeyValue<Key, Out>, impl Operator<KeyValue<Key, Out>>> {

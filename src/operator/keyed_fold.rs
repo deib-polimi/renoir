@@ -1,17 +1,15 @@
 use core::iter::Iterator;
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::sync::Arc;
 
-use crate::operator::{Data, Operator, StreamElement, Timestamp};
+use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct KeyedFold<Key, Out: Data, NewOut: Data, PreviousOperators>
+pub struct KeyedFold<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators>
 where
-    Key: Data + Hash + Eq,
     PreviousOperators: Operator<KeyValue<Key, Out>>,
 {
     prev: PreviousOperators,
@@ -24,10 +22,9 @@ where
     received_end: bool,
 }
 
-impl<Key, Out: Data, NewOut: Data, PreviousOperators> Operator<KeyValue<Key, NewOut>>
+impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators> Operator<KeyValue<Key, NewOut>>
     for KeyedFold<Key, Out, NewOut, PreviousOperators>
 where
-    Key: Data + Hash + Eq,
     PreviousOperators: Operator<KeyValue<Key, Out>> + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -91,9 +88,8 @@ where
     }
 }
 
-impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn fold<NewOut: Data, F>(
