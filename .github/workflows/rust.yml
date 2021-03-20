@@ -38,8 +38,9 @@ jobs:
         with:
           toolchain: stable
           override: true
-      - name: Run cargo fmt
+      - name: Run cargo test
         uses: actions-rs/cargo@v1
+        timeout-minutes: 20
         with:
           command: test
           args: --all
