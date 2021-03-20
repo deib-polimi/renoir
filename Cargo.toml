@@ -24,10 +24,11 @@ itertools = "0.10"
 
 lazy_static = "1.4"
 
-whoami = "1.1"
-
 ssh2 = { version = "0.9", features = ["vendored-openssl"] }
+whoami = "1.1"
 shell-escape = "0.1"
+
+structopt = "0.3"
 
 [dev-dependencies]
 regex = "1.4.3"

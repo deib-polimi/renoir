@@ -1,4 +1,3 @@
-use std::env;
 use std::time::Instant;
 
 use regex::Regex;
@@ -9,16 +8,11 @@ use rstream::environment::StreamEnvironment;
 use rstream::operator::source;
 
 fn main() {
-    env_logger::init();
-
-    let path = env::args()
-        .nth(1)
-        .expect("Pass the dataset path as an argument");
-    let config = if let Some(ncore) = env::args().nth(2) {
-        EnvironmentConfig::local(ncore.parse().expect("invalid number of cores"))
-    } else {
-        EnvironmentConfig::remote("config.yml").unwrap()
-    };
+    let (config, args) = EnvironmentConfig::from_args();
+    if args.len() != 1 {
+        panic!("Pass the dataset path as an argument");
+    }
+    let path = &args[0];
 
     let mut env = StreamEnvironment::new(config);
 

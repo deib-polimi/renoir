@@ -1,10 +1,11 @@
 use std::fmt::{Display, Formatter};
+use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use structopt::StructOpt;
 
 use crate::runner::{CONFIG_ENV_VAR, HOST_ID_ENV_VAR};
 use crate::scheduler::HostId;
@@ -54,7 +55,47 @@ pub(crate) struct RemoteHostSSHConfig {
     pub(crate) key_passphrase: Option<String>,
 }
 
+#[derive(Debug, StructOpt)]
+#[structopt(name = "rstream2", about = "RStream on steroids!")]
+struct CommandLineOptions {
+    /// Enable verbose output.
+    #[structopt(short, long)]
+    verbose: bool,
+
+    /// Path to the configuration file for remote execution.
+    ///
+    /// When this is specified the execution will be remote. This conflicts with `--threads`.
+    #[structopt(short, long)]
+    remote: Option<PathBuf>,
+
+    /// Number of cores in the local execution.
+    ///
+    /// When this is specified the execution will be local. This conflicts with `--remote`.
+    #[structopt(short, long)]
+    local: Option<usize>,
+
+    /// The rest of the arguments.
+    args: Vec<String>,
+}
+
 impl EnvironmentConfig {
+    /// Build the configuration from the specified args list.
+    pub fn from_args() -> (EnvironmentConfig, Vec<String>) {
+        let opt: CommandLineOptions = CommandLineOptions::from_args();
+        opt.validate();
+        if opt.verbose {
+            std::env::set_var("RUST_LOG", "debug");
+            let _ = env_logger::try_init();
+        }
+        if let Some(num_cores) = opt.local {
+            (Self::local(num_cores), opt.args)
+        } else if let Some(remote) = opt.remote {
+            (Self::remote(remote).unwrap(), opt.args)
+        } else {
+            unreachable!("Invalid configuration")
+        }
+    }
+
     /// Local environment that avoid using the network and runs concurrently using only threads.
     pub fn local(num_cores: usize) -> EnvironmentConfig {
         EnvironmentConfig {
@@ -132,6 +173,28 @@ impl EnvironmentConfig {
 impl Display for RemoteHostConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}:{}-]", self.address, self.base_port)
+    }
+}
+
+impl CommandLineOptions {
+    /// Check that the configuration provided is valid.
+    fn validate(&self) {
+        if !(self.remote.is_some() ^ self.local.is_some()) {
+            panic!("Use one of --remote or --threads");
+        }
+        if let Some(path) = self.remote.as_ref() {
+            if !path.exists() {
+                panic!(
+                    "Remote configuration file {} does not exist",
+                    path.display()
+                );
+            }
+        }
+        if let Some(threads) = self.local {
+            if threads == 0 {
+                panic!("The number of cores should be positive");
+            }
+        }
     }
 }
 
