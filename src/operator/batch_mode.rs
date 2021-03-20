@@ -36,26 +36,24 @@ where
 mod tests {
     use std::time::Duration;
 
-    use std::stream::from_iter;
-
     use crate::block::BatchMode;
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[std::test]
+    #[test]
     fn batch_mode_fixed() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::StreamSource::new(0..10u8);
         let batch_mode = BatchMode::fixed(42);
         let stream = env.stream(source).batch_mode(batch_mode);
         assert_eq!(stream.block.batch_mode, batch_mode);
     }
 
-    #[std::test]
+    #[test]
     fn batch_mode_adaptive() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::StreamSource::new(0..10u8);
         let batch_mode = BatchMode::adaptive(42, Duration::from_secs(42));
         let stream = env.stream(source).batch_mode(batch_mode);
         assert_eq!(stream.block.batch_mode, batch_mode);

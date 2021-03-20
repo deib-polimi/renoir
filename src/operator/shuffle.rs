@@ -20,16 +20,15 @@ where
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
-    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[std::test]
+    #[test]
     fn shuffle_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..1000u16));
+        let source = source::StreamSource::new(0..1000u16);
         let res = env
             .stream(source)
             .shuffle()

@@ -86,18 +86,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::stream::from_iter;
-
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
     use itertools::Itertools;
     use std::str::FromStr;
 
-    #[std::test]
+    #[test]
     fn map_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::StreamSource::new(0..10u8);
         let res = env
             .stream(source)
             .map(|n| n.to_string())
@@ -110,10 +108,10 @@ mod tests {
         assert_eq!(res, expected);
     }
 
-    #[std::test]
+    #[test]
     fn map_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::StreamSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|n| n % 2)

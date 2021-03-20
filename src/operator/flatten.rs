@@ -151,32 +151,34 @@ where
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
-    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[std::test]
+    #[test]
     fn flatten_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(vec![
-            vec![],
-            vec![1u8, 2, 3],
-            vec![4, 5],
-            vec![],
-            vec![6, 7, 8],
-            vec![],
-        ]));
+        let source = source::StreamSource::new(
+            vec![
+                vec![],
+                vec![1u8, 2, 3],
+                vec![4, 5],
+                vec![],
+                vec![6, 7, 8],
+                vec![],
+            ]
+            .into_iter(),
+        );
         let res = env.stream(source).flatten().collect_vec();
         env.execute();
         assert_eq!(res.get().unwrap(), (1..=8).collect_vec());
     }
 
-    #[std::test]
+    #[test]
     fn flatten_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::StreamSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|v| v % 2)
@@ -193,10 +195,10 @@ mod tests {
         assert_eq!(expected, res);
     }
 
-    #[std::test]
+    #[test]
     fn flat_map_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::StreamSource::new(0..10u8);
         let res = env
             .stream(source)
             .flat_map(|x| vec![x, 10 * x, 20 * x])
@@ -208,10 +210,10 @@ mod tests {
         assert_eq!(res.get().unwrap(), expected);
     }
 
-    #[std::test]
+    #[test]
     fn flat_map_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::StreamSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|v| v % 2)

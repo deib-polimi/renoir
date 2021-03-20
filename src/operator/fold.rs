@@ -134,16 +134,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[std::test]
+    #[test]
     fn fold_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::StreamSource::new(0..10u8);
         let res = env
             .stream(source)
             .fold("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)

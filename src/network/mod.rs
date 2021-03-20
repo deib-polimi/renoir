@@ -62,6 +62,6 @@ impl Display for Coord {
 pub(crate) fn wait_start(receiver: NetworkStarterRecv) -> bool {
     match receiver.recv() {
         Ok(start) => start,
-        Err(_) => return false,
+        Err(_) => false,
     }
 }
