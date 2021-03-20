@@ -1,11 +1,12 @@
 use std::env;
+use std::time::Instant;
 
 use regex::Regex;
 
+use rstream::block::BatchMode;
 use rstream::config::EnvironmentConfig;
 use rstream::environment::StreamEnvironment;
 use rstream::operator::source;
-use std::time::Instant;
 
 fn main() {
     env_logger::init();
@@ -27,6 +28,7 @@ fn main() {
     let tokenizer = Tokenizer::new();
     let stream = env
         .stream(source)
+        .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| tokenizer.tokenize(line))
         .group_by(|word| word.clone())
         .fold(0, |count, _word| count + 1)

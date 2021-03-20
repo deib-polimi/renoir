@@ -39,11 +39,12 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
         }
         let receiver = self.receiver.as_ref().unwrap();
         if self.buffer.is_empty() {
-            let buf = if self.already_timed_out {
+            let max_delay = metadata.batch_mode.max_delay();
+            let buf = if self.already_timed_out || max_delay.is_none() {
                 self.already_timed_out = false;
                 receiver.recv().unwrap()
             } else {
-                match receiver.recv_timeout(metadata.batch_mode.max_delay()) {
+                match receiver.recv_timeout(max_delay.unwrap()) {
                     Ok(buf) => buf,
                     Err(_) => {
                         self.already_timed_out = true;

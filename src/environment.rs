@@ -62,7 +62,7 @@ impl StreamEnvironment {
             "Creating a new stream, block_id={} with max_parallelism {:?}",
             block_id, source_max_parallelism
         );
-        let mut block = InnerBlock::new(block_id, source);
+        let mut block = InnerBlock::new(block_id, source, Default::default());
         if let Some(p) = source_max_parallelism {
             block.scheduler_requirements.max_parallelism(p);
         }

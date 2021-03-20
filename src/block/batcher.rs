@@ -4,12 +4,6 @@ use std::time::{Duration, Instant};
 use crate::network::{NetworkMessage, NetworkSender};
 use crate::operator::{Data, StreamElement};
 
-/// When `BatchMode::Fixed` is used the batch should not be flushed due to a timeout, for the sake
-/// of simplicity a timeout is used anyway with a very large value.
-///
-/// This value cannot be too big otherwise an integer overflow will happen.
-const FIXED_BATCH_MODE_MAX_DELAY: Duration = Duration::from_secs(60 * 60 * 24 * 365 * 10);
-
 /// Which policy to use for batching the messages before sending them.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BatchMode {
@@ -49,9 +43,11 @@ impl<Out: Data> Batcher<Out> {
         self.buffer.push(message);
         // max capacity has been reached, send and flush the buffer
         // if too much time elapsed since the last flush, flush the buffer
-        if self.buffer.len() >= self.mode.max_capacity()
-            || self.last_send.elapsed() > self.mode.max_delay()
-        {
+        let max_delay = self.mode.max_delay();
+        let timeout_elapsed = max_delay
+            .map(|max_delay| self.last_send.elapsed() > max_delay)
+            .unwrap_or(false);
+        if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed {
             self.flush();
         }
     }
@@ -96,11 +92,11 @@ impl BatchMode {
         }
     }
 
-    /// Maximum delay this mode allows.
-    pub fn max_delay(&self) -> Duration {
+    /// Maximum delay this mode allows, if any.
+    pub fn max_delay(&self) -> Option<Duration> {
         match self {
-            BatchMode::Fixed(_) => FIXED_BATCH_MODE_MAX_DELAY,
-            BatchMode::Adaptive(_, max_delay) => *max_delay,
+            BatchMode::Fixed(_) => None,
+            BatchMode::Adaptive(_, max_delay) => Some(*max_delay),
         }
     }
 }

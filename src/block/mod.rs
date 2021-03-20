@@ -1,14 +1,15 @@
-mod batcher;
-mod next_strategy;
-
-pub(crate) use batcher::*;
-pub(crate) use next_strategy::*;
-
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 
+pub use batcher::BatchMode;
+pub(crate) use batcher::*;
+pub(crate) use next_strategy::*;
+
 use crate::operator::{Data, Operator};
 use crate::stream::BlockId;
+
+mod batcher;
+mod next_strategy;
 
 /// A chain of operators that will be run inside the same host. The block takes as input elements of
 /// type `In` and produces elements of type `Out`.
@@ -51,12 +52,12 @@ impl<In: Data, Out: Data, OperatorChain> InnerBlock<In, Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
-    pub fn new(id: BlockId, operators: OperatorChain) -> Self {
+    pub fn new(id: BlockId, operators: OperatorChain, batch_mode: BatchMode) -> Self {
         Self {
             id,
             operators,
             next_strategy: NextStrategy::OnlyOne,
-            batch_mode: Default::default(),
+            batch_mode,
             scheduler_requirements: Default::default(),
             _in_type: Default::default(),
             _out_type: Default::default(),
