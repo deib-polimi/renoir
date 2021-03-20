@@ -4,30 +4,23 @@ use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 
 use itertools::Itertools;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use typemap::{Key, SendMap};
 
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, NetworkStarter};
+use crate::operator::Data;
 use crate::scheduler::HostId;
 use crate::stream::BlockId;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
-struct ReceiverKey<In>(PhantomData<In>);
-impl<In> Key for ReceiverKey<In>
-where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+struct ReceiverKey<In: Data>(PhantomData<In>);
+impl<In: Data> Key for ReceiverKey<In> {
     type Value = HashMap<Coord, NetworkReceiver<NetworkMessage<In>>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `NetworkSender`s.
-struct SenderKey<In>(PhantomData<In>);
-impl<In> Key for SenderKey<In>
-where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+struct SenderKey<In: Data>(PhantomData<In>);
+impl<In: Data> Key for SenderKey<In> {
     type Value = HashMap<Coord, NetworkSender<NetworkMessage<In>>>;
 }
 
@@ -124,10 +117,7 @@ impl NetworkTopology {
     /// This will create its sender and receiver and setup the remote counterparts. No socket is
     /// actually bound until `start_remote` is called and awaited. This method should not be called
     /// after `start_remote` has been called.
-    pub(crate) fn register_replica<T>(&mut self, coord: Coord)
-    where
-        T: Clone + Serialize + DeserializeOwned + Send + 'static,
-    {
+    pub(crate) fn register_replica<T: Data>(&mut self, coord: Coord) {
         debug!("Registering {}", coord);
         let address = match &self.config.runtime {
             // this doesn't really matter, no socket will be bound
@@ -174,10 +164,7 @@ impl NetworkTopology {
     /// Get the sending channel to a replica.
     ///
     /// The replica must be registered and `start_remote` must have been called and awaited.
-    pub fn get_sender<T>(&self, coord: Coord) -> NetworkSender<NetworkMessage<T>>
-    where
-        T: Clone + Serialize + DeserializeOwned + Send + 'static,
-    {
+    pub fn get_sender<T: Data>(&self, coord: Coord) -> NetworkSender<NetworkMessage<T>> {
         let metadata = self.senders_metadata.get(&coord).unwrap_or_else(|| {
             panic!("No sender registered for {}", coord);
         });
@@ -212,10 +199,10 @@ impl NetworkTopology {
     }
 
     /// Get all the outgoing senders from a replica.
-    pub fn get_senders<T>(&self, coord: Coord) -> HashMap<Coord, NetworkSender<NetworkMessage<T>>>
-    where
-        T: Clone + Serialize + DeserializeOwned + Send + 'static,
-    {
+    pub fn get_senders<T: Data>(
+        &self,
+        coord: Coord,
+    ) -> HashMap<Coord, NetworkSender<NetworkMessage<T>>> {
         match self.next.get(&coord) {
             None => Default::default(),
             Some(next) => next.iter().map(|&c| (c, self.get_sender(c))).collect(),
@@ -223,10 +210,7 @@ impl NetworkTopology {
     }
 
     /// Get the receiver of all the ingoing messages to a replica.
-    pub fn get_receiver<T>(&mut self, coord: Coord) -> NetworkReceiver<NetworkMessage<T>>
-    where
-        T: Clone + Serialize + DeserializeOwned + Send + 'static,
-    {
+    pub fn get_receiver<T: Data>(&mut self, coord: Coord) -> NetworkReceiver<NetworkMessage<T>> {
         let t_type_name = std::any::type_name::<T>();
         let map = self
             .receivers

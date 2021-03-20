@@ -5,11 +5,10 @@ use std::thread::{sleep, JoinHandle};
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 
 use crate::network::remote::remote_send;
 use crate::network::{wait_start, Coord, NetworkStarterRecv};
+use crate::operator::Data;
 
 /// The capacity of the out-buffer.
 const CHANNEL_CAPACITY: usize = 10;
@@ -32,7 +31,7 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 /// and then send the message via a socket.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub(crate) struct NetworkSender<Out> {
+pub(crate) struct NetworkSender<Out: Data> {
     /// The coord of the recipient.
     pub coord: Coord,
     /// The channel that will be used to send the message. It will be either to the local recipient
@@ -41,10 +40,7 @@ pub(crate) struct NetworkSender<Out> {
     sender: SyncSender<Out>,
 }
 
-impl<Out> NetworkSender<Out>
-where
-    Out: Serialize + DeserializeOwned + Send + 'static,
-{
+impl<Out: Data> NetworkSender<Out> {
     /// Create a new local sender that sends the data directly to the recipient.
     pub fn local(coord: Coord, sender: SyncSender<Out>) -> Self {
         Self { coord, sender }

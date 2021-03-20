@@ -2,13 +2,10 @@ use std::cell::RefCell;
 use std::hash::Hash;
 use std::rc::Rc;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::block::{BatchMode, InnerBlock, NextStrategy};
 use crate::environment::StreamEnvironmentInner;
-use crate::operator::Operator;
 use crate::operator::StartBlock;
+use crate::operator::{Data, Operator};
 
 /// Identifier of a block in the job graph.
 pub type BlockId = usize;
@@ -26,10 +23,8 @@ pub type KeyValue<Key, Value> = (Key, Value);
 /// The type of the chain inside the block is `OperatorChain` and it's required as type argument of
 /// the stream. This type only represents the chain inside the last block of the stream, not all the
 /// blocks inside of it.
-pub struct Stream<In, Out, OperatorChain>
+pub struct Stream<In: Data, Out: Data, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     /// The last block inside the stream.
@@ -43,19 +38,15 @@ where
 /// `KeyedStream` semantics.
 ///
 /// The type of the `Key` must be a valid key inside an hashmap.
-pub struct KeyedStream<In, Key, Out, OperatorChain>(
+pub struct KeyedStream<In: Data, Key, Out: Data, OperatorChain>(
     pub Stream<In, KeyValue<Key, Out>, OperatorChain>,
 )
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>>;
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     /// Add a new operator to the current chain inside the stream. This consumes the stream and
@@ -64,12 +55,11 @@ where
     /// `get_operator` is a function that is given the previous chain of operators and should return
     /// the new chain of operators. The new chain cannot be simply passed as argument since it is
     /// required to do a partial move of the `InnerBlock` structure.
-    pub(crate) fn add_operator<NewOut, Op, GetOp>(
+    pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
         self,
         get_operator: GetOp,
     ) -> Stream<In, NewOut, Op>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         Op: Operator<NewOut> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
     {
@@ -129,19 +119,16 @@ where
     }
 }
 
-impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub(crate) fn add_operator<NewOut, Op, GetOp>(
+    pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
         self,
         get_operator: GetOp,
     ) -> KeyedStream<In, Key, NewOut, Op>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         Op: Operator<KeyValue<Key, NewOut>> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
     {

@@ -1,11 +1,8 @@
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::network::{NetworkMessage, NetworkSender};
-use crate::operator::StreamElement;
+use crate::operator::{Data, StreamElement};
 
 /// When `BatchMode::Fixed` is used the batch should not be flushed due to a timeout, for the sake
 /// of simplicity a timeout is used anyway with a very large value.
@@ -26,10 +23,7 @@ pub enum BatchMode {
 /// A `Batcher` wraps a sender and sends the messages in batches to reduce the network overhead.
 ///
 /// Internally it spawns a new task to handle the timeouts and join it at the end.
-pub(crate) struct Batcher<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+pub(crate) struct Batcher<Out: Data> {
     /// Sender used to communicate with the other replicas
     remote_sender: NetworkSender<NetworkMessage<Out>>,
     /// Batching mode used by the batcher
@@ -40,10 +34,7 @@ where
     last_send: Instant,
 }
 
-impl<Out> Batcher<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+impl<Out: Data> Batcher<Out> {
     pub(crate) fn new(remote_sender: NetworkSender<NetworkMessage<Out>>, mode: BatchMode) -> Self {
         Self {
             remote_sender,

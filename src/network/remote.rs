@@ -1,12 +1,12 @@
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
 use bincode::{DefaultOptions, Options};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
 
 use crate::network::Coord;
+use crate::operator::Data;
 
 lazy_static! {
 /// Configuration of the header serializer: the integers must have a fixed length encoding.
@@ -31,10 +31,7 @@ struct MessageHeader {
 /// The network protocol works as follow:
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
-pub(crate) fn remote_send<T>(what: T, coord: Coord, stream: &mut TcpStream)
-where
-    T: Send + Serialize,
-{
+pub(crate) fn remote_send<T: Data>(what: T, coord: Coord, stream: &mut TcpStream) {
     let address = stream
         .peer_addr()
         .map(|a| a.to_string())
@@ -69,10 +66,7 @@ where
 
 /// Receive a message from the remote channel. Returns `None` if there was a failure receiving the
 /// last message.
-pub(crate) fn remote_recv<T>(coord: Coord, stream: &mut TcpStream) -> Option<T>
-where
-    T: DeserializeOwned,
-{
+pub(crate) fn remote_recv<T: Data>(coord: Coord, stream: &mut TcpStream) -> Option<T> {
     let address = stream
         .peer_addr()
         .map(|a| a.to_string())

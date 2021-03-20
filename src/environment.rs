@@ -2,12 +2,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::operator::source::Source;
+use crate::operator::Data;
 use crate::runner::spawn_remote_workers;
 use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
@@ -47,9 +45,8 @@ impl StreamEnvironment {
     }
 
     /// Construct a new stream bound to this environment starting with the specified source.
-    pub fn stream<Out, S>(&mut self, source: S) -> Stream<Out, Out, S>
+    pub fn stream<Out: Data, S>(&mut self, source: S) -> Stream<Out, Out, S>
     where
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         S: Source<Out> + Send + 'static,
     {
         let mut env = self.inner.borrow_mut();

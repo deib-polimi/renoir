@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -10,7 +8,7 @@ use std::thread::JoinHandle;
 use crate::block::{BatchMode, InnerBlock};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
-use crate::operator::Operator;
+use crate::operator::{Data, Operator};
 use crate::stream::BlockId;
 use crate::worker::spawn_worker;
 
@@ -95,12 +93,10 @@ impl Scheduler {
     /// This spawns a worker for each replica of the block in the execution graph and saves its
     /// start handle. The handle will be later used to actually start the worker when the
     /// computation is asked to begin.
-    pub(crate) fn add_block<In, Out, OperatorChain>(
+    pub(crate) fn add_block<In: Data, Out: Data, OperatorChain>(
         &mut self,
         block: InnerBlock<In, Out, OperatorChain>,
     ) where
-        In: Clone + Serialize + DeserializeOwned + Send + 'static,
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out> + Send + 'static,
     {
         let block_id = block.id;
@@ -248,13 +244,11 @@ impl Scheduler {
     }
 
     /// Extract the `SchedulerBlockInfo` of a block.
-    fn block_info<In, Out, OperatorChain>(
+    fn block_info<In: Data, Out: Data, OperatorChain>(
         &self,
         block: &InnerBlock<In, Out, OperatorChain>,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Serialize + DeserializeOwned + Send + 'static,
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         match &self.config.runtime {
@@ -269,14 +263,12 @@ impl Scheduler {
     ///
     ///  - the number of logical cores.
     ///  - the `max_parallelism` of the block.
-    fn local_block_info<In, Out, OperatorChain>(
+    fn local_block_info<In: Data, Out: Data, OperatorChain>(
         &self,
         block: &InnerBlock<In, Out, OperatorChain>,
         local: &LocalRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Serialize + DeserializeOwned + Send + 'static,
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
@@ -304,14 +296,12 @@ impl Scheduler {
     ///
     /// The block can be replicated at most `max_parallelism` times (if specified). Assign the
     /// replicas starting from the first host giving as much replicas as possible..
-    fn remote_block_info<In, Out, OperatorChain>(
+    fn remote_block_info<In: Data, Out: Data, OperatorChain>(
         &self,
         block: &InnerBlock<In, Out, OperatorChain>,
         remote: &RemoteRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Serialize + DeserializeOwned + Send + 'static,
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;

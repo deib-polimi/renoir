@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 pub use batch_mode::*;
@@ -28,6 +27,10 @@ pub mod source;
 mod start;
 mod unkey;
 
+/// Marker trait that all the types inside a stream should implement.
+pub trait Data: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static {}
+impl<T: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static> Data for T {}
+
 /// When using timestamps and watermarks, this type expresses the timestamp of a message or of a
 /// watermark.
 pub type Timestamp = Duration;
@@ -38,10 +41,7 @@ pub type Timestamp = Duration;
 /// value of the `Item`). Usually `Watermark` and `End` are simply forwarded to the next operator in
 /// the chain.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum StreamElement<Out>
-where
-    Out: Clone + Send + 'static,
-{
+pub enum StreamElement<Out> {
     /// A normal element containing just the value of the message.
     Item(Out),
     /// Like `Item`, but it's attached with a timestamp, it's used to ensure the ordering of the
@@ -66,10 +66,7 @@ where
 ///
 /// This trait has some `async` function, due to a limitation of rust `async_trait` must be used.
 
-pub trait Operator<Out>: Clone
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+pub trait Operator<Out: Data>: Clone {
     /// Setup the operator chain. This is called before any call to `next` and it's used to
     /// initialize the operator. When it's called the operator has already been cloned and it will
     /// never be cloned again. Therefore it's safe to store replica-specific metadata inside of it.
@@ -85,10 +82,7 @@ where
     fn to_string(&self) -> String;
 }
 
-impl<Out> StreamElement<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+impl<Out: Data> StreamElement<Out> {
     /// Create a new `StreamElement` with an `Item(())` if `self` contains an item, otherwise it
     /// returns the same variant of `self`.
     pub(crate) fn take(&self) -> StreamElement<()> {
@@ -102,10 +96,7 @@ where
     }
 
     /// Change the type of the element inside the `StreamElement`.
-    pub(crate) fn map<NewOut>(self, f: impl FnOnce(Out) -> NewOut) -> StreamElement<NewOut>
-    where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
-    {
+    pub(crate) fn map<NewOut: Data>(self, f: impl FnOnce(Out) -> NewOut) -> StreamElement<NewOut> {
         match self {
             StreamElement::Item(item) => StreamElement::Item(f(item)),
             StreamElement::Timestamped(item, ts) => StreamElement::Timestamped(f(item), ts),

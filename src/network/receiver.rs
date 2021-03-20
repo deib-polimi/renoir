@@ -4,11 +4,10 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 
 use crate::network::remote::remote_recv;
 use crate::network::{Coord, NetworkSender};
+use crate::operator::Data;
 
 /// The capacity of the in-buffer.
 const CHANNEL_CAPACITY: usize = 10;
@@ -24,7 +23,7 @@ const CHANNEL_CAPACITY: usize = 10;
 /// socket and send to the same in-memory channel the received messages.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(crate) struct NetworkReceiver<In> {
+pub(crate) struct NetworkReceiver<In: Data> {
     /// The coord of the current receiver.
     pub coord: Coord,
     /// The actual receiver where the users of this struct will wait upon.
@@ -35,10 +34,7 @@ pub(crate) struct NetworkReceiver<In> {
     local_sender: SyncSender<In>,
 }
 
-impl<In> NetworkReceiver<In>
-where
-    In: Send + Serialize + DeserializeOwned + 'static,
-{
+impl<In: Data> NetworkReceiver<In> {
     /// Construct a new `NetworkReceiver` that will be ready to bind a socket on the specified
     /// address.
     ///

@@ -1,17 +1,13 @@
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::mpsc::Receiver;
 
 use crate::block::InnerBlock;
-use crate::operator::{Operator, StreamElement};
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::{ExecutionMetadata, StartHandle};
 
-pub(crate) fn spawn_worker<In, Out, OperatorChain>(
+pub(crate) fn spawn_worker<In: Data, Out: Data, OperatorChain>(
     block: InnerBlock<In, Out, OperatorChain>,
 ) -> StartHandle
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
@@ -22,12 +18,10 @@ where
     StartHandle::new(sender, join_handle)
 }
 
-fn worker<In, Out, OperatorChain>(
+fn worker<In: Data, Out: Data, OperatorChain>(
     mut block: InnerBlock<In, Out, OperatorChain>,
     metadata_receiver: Receiver<ExecutionMetadata>,
 ) where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     let metadata = metadata_receiver.recv().unwrap();

@@ -1,19 +1,15 @@
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::Arc;
 
 use crate::block::NextStrategy;
-use crate::operator::{EndBlock, Operator, StreamElement, Timestamp};
+use crate::operator::{Data, EndBlock, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Fold<Out, NewOut, PreviousOperators>
+pub struct Fold<Out: Data, NewOut: Data, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out>,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -25,10 +21,9 @@ where
     received_end: bool,
 }
 
-impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Fold<Out, NewOut, PreviousOperators>
+impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
+    for Fold<Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -87,20 +82,17 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn fold<NewOut, Local, Global>(
+    pub fn fold<NewOut: Data, Local, Global>(
         mut self,
         init: NewOut,
         local: Local,
         global: Global,
     ) -> Stream<NewOut, NewOut, impl Operator<NewOut>>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         Local: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
         Global: Fn(NewOut, NewOut) -> NewOut + Send + Sync + 'static,
     {

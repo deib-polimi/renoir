@@ -1,18 +1,12 @@
 use std::collections::VecDeque;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::network::{NetworkMessage, NetworkReceiver};
-use crate::operator::{Operator, StreamElement};
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Debug, Derivative)]
 #[derivative(Clone, Default(bound = ""))]
-pub struct StartBlock<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+pub struct StartBlock<Out: Data> {
     metadata: Option<ExecutionMetadata>,
     #[derivative(Clone(clone_with = "clone_none"))]
     receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
@@ -23,10 +17,7 @@ where
     already_timed_out: bool,
 }
 
-impl<Out> Operator<Out> for StartBlock<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+impl<Out: Data> Operator<Out> for StartBlock<Out> {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let mut network = metadata.network.lock().unwrap();
         self.receiver = Some(network.get_receiver(metadata.coord));

@@ -1,18 +1,14 @@
 use std::collections::HashMap;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::block::{BatchMode, Batcher, NextStrategy, SenderList};
 use crate::network::Coord;
-use crate::operator::{Operator, StreamElement};
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
-pub struct EndBlock<Out, OperatorChain>
+pub struct EndBlock<Out: Data, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
@@ -24,9 +20,8 @@ where
     senders: HashMap<Coord, Batcher<Out>>,
 }
 
-impl<Out, OperatorChain> EndBlock<Out, OperatorChain>
+impl<Out: Data, OperatorChain> EndBlock<Out, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub(crate) fn new(
@@ -45,9 +40,8 @@ where
     }
 }
 
-impl<Out, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
+impl<Out: Data, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {

@@ -1,14 +1,9 @@
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::block::NextStrategy;
-use crate::operator::{EndBlock, Operator};
+use crate::operator::{Data, EndBlock, Operator};
 use crate::stream::Stream;
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn shuffle(mut self) -> Stream<Out, Out, impl Operator<Out>> {

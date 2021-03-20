@@ -1,15 +1,11 @@
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
-use crate::operator::{EndBlock, Operator, StreamElement};
+use crate::operator::{Data, EndBlock, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
 #[derive(Debug)]
-pub struct CollectVecSink<Out, PreviousOperators>
+pub struct CollectVecSink<Out: Data, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -17,9 +13,8 @@ where
     output: StreamOutputRef<Vec<Out>>,
 }
 
-impl<Out, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
+impl<Out: Data, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -51,16 +46,13 @@ where
     }
 }
 
-impl<Out, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    PreviousOperators: Operator<Out> + Send,
+impl<Out: Data, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators> where
+    PreviousOperators: Operator<Out> + Send
 {
 }
 
-impl<Out, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
+impl<Out: Data, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     fn clone(&self) -> Self {
@@ -68,10 +60,8 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {

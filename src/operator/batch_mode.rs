@@ -1,16 +1,11 @@
 use std::hash::Hash;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::block::BatchMode;
-use crate::operator::Operator;
+use crate::operator::{Data, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {
@@ -19,11 +14,9 @@ where
     }
 }
 
-impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {

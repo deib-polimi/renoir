@@ -1,23 +1,18 @@
 use core::iter::Iterator;
 use std::collections::HashMap;
 use std::hash::Hash;
-
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::Arc;
 
-use crate::operator::{Operator, StreamElement, Timestamp};
+use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct KeyedFold<Key, Out, NewOut, PreviousOperators>
+pub struct KeyedFold<Key, Out: Data, NewOut: Data, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    Key: Data + Hash + Eq,
     PreviousOperators: Operator<KeyValue<Key, Out>>,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -29,13 +24,11 @@ where
     received_end: bool,
 }
 
-impl<Key, Out, NewOut, PreviousOperators> Operator<KeyValue<Key, NewOut>>
+impl<Key, Out: Data, NewOut: Data, PreviousOperators> Operator<KeyValue<Key, NewOut>>
     for KeyedFold<Key, Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+    Key: Data + Hash + Eq,
     PreviousOperators: Operator<KeyValue<Key, Out>> + Send,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -98,20 +91,17 @@ where
     }
 }
 
-impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub fn fold<NewOut, F>(
+    pub fn fold<NewOut: Data, F>(
         self,
         init: NewOut,
         f: F,
     ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| KeyedFold {
@@ -128,10 +118,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
-    use itertools::Itertools;
 
     #[test]
     fn fold_keyed_stream() {

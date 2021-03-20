@@ -7,10 +7,7 @@ pub(crate) use next_strategy::*;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
-use crate::operator::Operator;
+use crate::operator::{Data, Operator};
 use crate::stream::BlockId;
 
 /// A chain of operators that will be run inside the same host. The block takes as input elements of
@@ -21,9 +18,8 @@ use crate::stream::BlockId;
 /// `OperatorChain` is the type of the chain of operators inside the block. It must be an operator
 /// that yields values of type `Out`.
 #[derive(Debug, Clone)]
-pub(crate) struct InnerBlock<In, Out, OperatorChain>
+pub(crate) struct InnerBlock<In: Data, Out: Data, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     /// The identifier of the block inside the environment.
@@ -51,9 +47,8 @@ pub(crate) struct SchedulerRequirements {
     pub(crate) max_parallelism: Option<usize>,
 }
 
-impl<In, Out, OperatorChain> InnerBlock<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> InnerBlock<In, Out, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub fn new(id: BlockId, operators: OperatorChain) -> Self {
@@ -69,9 +64,8 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Display for InnerBlock<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Display for InnerBlock<In, Out, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

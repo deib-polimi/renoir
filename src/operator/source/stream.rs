@@ -1,13 +1,10 @@
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::operator::source::Source;
-use crate::operator::{Operator, StreamElement};
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct StreamSource<Out, It>
+pub struct StreamSource<Out: Data, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
@@ -15,7 +12,7 @@ where
     inner: It,
 }
 
-impl<Out, It> StreamSource<Out, It>
+impl<Out: Data, It> StreamSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
@@ -24,9 +21,8 @@ where
     }
 }
 
-impl<Out, It> Source<Out> for StreamSource<Out, It>
+impl<Out: Data, It> Source<Out> for StreamSource<Out, It>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + Unpin + 'static,
     It: Iterator<Item = Out> + Send + 'static,
 {
     fn get_max_parallelism(&self) -> Option<usize> {
@@ -34,9 +30,8 @@ where
     }
 }
 
-impl<Out, It> Operator<Out> for StreamSource<Out, It>
+impl<Out: Data, It> Operator<Out> for StreamSource<Out, It>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + Unpin + 'static,
     It: Iterator<Item = Out> + Send + 'static,
 {
     fn setup(&mut self, _metadata: ExecutionMetadata) {}
@@ -54,9 +49,8 @@ where
     }
 }
 
-impl<Out, It> Clone for StreamSource<Out, It>
+impl<Out: Data, It> Clone for StreamSource<Out, It>
 where
-    Out: Send + Unpin + 'static,
     It: Iterator<Item = Out> + Send + 'static,
 {
     fn clone(&self) -> Self {

@@ -1,9 +1,6 @@
 use std::hash::Hash;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
-use crate::operator::Keyer;
+use crate::operator::{Data, Keyer};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
@@ -11,10 +8,9 @@ use std::sync::Arc;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct KeyBy<Key, Out, OperatorChain>
+pub struct KeyBy<Key, Out: Data, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq + 'static,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
@@ -22,10 +18,9 @@ where
     keyer: Keyer<Key, Out>,
 }
 
-impl<Key, Out, OperatorChain> KeyBy<Key, Out, OperatorChain>
+impl<Key, Out: Data, OperatorChain> KeyBy<Key, Out, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq,
     OperatorChain: Operator<Out>,
 {
     pub fn new(prev: OperatorChain, keyer: Keyer<Key, Out>) -> Self {
@@ -33,10 +28,9 @@ where
     }
 }
 
-impl<Key, Out, OperatorChain> Operator<KeyValue<Key, Out>> for KeyBy<Key, Out, OperatorChain>
+impl<Key, Out: Data, OperatorChain> Operator<KeyValue<Key, Out>> for KeyBy<Key, Out, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq,
     OperatorChain: Operator<Out> + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -64,10 +58,8 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn key_by<Key, Keyer>(
@@ -75,7 +67,7 @@ where
         keyer: Keyer,
     ) -> KeyedStream<In, Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+        Key: Data + Hash + Eq,
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
     {
         let keyer = Arc::new(keyer);

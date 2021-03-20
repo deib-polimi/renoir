@@ -1,18 +1,14 @@
 use std::hash::Hash;
-
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::Arc;
 
-use crate::operator::{Operator, StreamElement};
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Map<Out, NewOut, PreviousOperators>
+pub struct Map<Out: Data, NewOut: Data, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -20,10 +16,9 @@ where
     f: Arc<dyn Fn(Out) -> NewOut + Send + Sync>,
 }
 
-impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Map<Out, NewOut, PreviousOperators>
+impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
+    for Map<Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -44,15 +39,12 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn map<NewOut, F>(self, f: F) -> Stream<In, NewOut, impl Operator<NewOut>>
+    pub fn map<NewOut: Data, F>(self, f: F) -> Stream<In, NewOut, impl Operator<NewOut>>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(Out) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| Map {
@@ -62,19 +54,16 @@ where
     }
 }
 
-impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub fn map<NewOut, F>(
+    pub fn map<NewOut: Data, F>(
         self,
         f: F,
     ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(KeyValue<Key, Out>) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| Map {
@@ -86,11 +75,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use itertools::Itertools;
+
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
-    use itertools::Itertools;
-    use std::str::FromStr;
 
     #[test]
     fn map_stream() {

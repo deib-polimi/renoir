@@ -3,22 +3,18 @@ use std::collections::VecDeque;
 use std::hash::Hash;
 use std::iter::repeat;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::Arc;
 
-use crate::operator::{Operator, StreamElement};
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Flatten<Out, IterOut, NewOut, PreviousOperators>
+pub struct Flatten<Out: Data, IterOut, NewOut: Data, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
     PreviousOperators: Operator<Out>,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     prev: PreviousOperators,
     // used to store elements that have not been returned by next() yet
@@ -30,13 +26,11 @@ where
     make_iter: Arc<dyn Fn(Out) -> IterOut + Send + Sync>,
 }
 
-impl<Out, IterOut, NewOut, PreviousOperators> Operator<NewOut>
+impl<Out: Data, IterOut, NewOut: Data, PreviousOperators> Operator<NewOut>
     for Flatten<Out, IterOut, NewOut, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -72,13 +66,11 @@ where
     }
 }
 
-impl<In, Out, OperatorChain, NewOut> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain, NewOut: Data> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: IntoIterator<Item = NewOut> + Clone + Serialize + DeserializeOwned + Send + 'static,
+    Out: IntoIterator<Item = NewOut>,
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     pub fn flatten(self) -> Stream<In, NewOut, impl Operator<NewOut>> {
         self.add_operator(|prev| Flatten {
@@ -90,30 +82,28 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn flat_map<MapOut, NewOut, F>(self, f: F) -> Stream<In, NewOut, impl Operator<NewOut>>
+    pub fn flat_map<MapOut: Data, NewOut: Data, F>(
+        self,
+        f: F,
+    ) -> Stream<In, NewOut, impl Operator<NewOut>>
     where
-        MapOut: IntoIterator<Item = NewOut> + Clone + Serialize + DeserializeOwned + Send + 'static,
+        MapOut: IntoIterator<Item = NewOut>,
         <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(Out) -> MapOut + Send + Sync + 'static,
     {
         self.map(f).flatten()
     }
 }
 
-impl<In, Key, Out, NewOut, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key, Out: Data, NewOut: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: IntoIterator<Item = NewOut> + Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq,
+    Out: IntoIterator<Item = NewOut>,
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn flatten(self) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
@@ -127,21 +117,18 @@ where
     }
 }
 
-impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<In: Data, Key, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
+    Key: Data + Hash + Eq,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub fn flat_map<NewOut, MapOut, F>(
+    pub fn flat_map<NewOut: Data, MapOut: Data, F>(
         self,
         f: F,
     ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        MapOut: IntoIterator<Item = NewOut> + Clone + Serialize + DeserializeOwned + Send + 'static,
+        MapOut: IntoIterator<Item = NewOut>,
         <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(KeyValue<Key, Out>) -> MapOut + Send + Sync + 'static,
     {
         self.map(f).flatten()

@@ -1,21 +1,17 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::Arc;
 
 use crate::block::NextStrategy;
-use crate::operator::EndBlock;
+use crate::operator::{Data, EndBlock};
 use crate::operator::{KeyBy, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 pub type Keyer<Key, Out> = Arc<dyn Fn(&Out) -> Key + Send + Sync>;
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn group_by<Key, Keyer>(
@@ -23,7 +19,7 @@ where
         keyer: Keyer,
     ) -> KeyedStream<Out, Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
+        Key: Data + Hash + Eq,
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
     {
         let keyer = Arc::new(keyer);

@@ -1,13 +1,12 @@
 use std::collections::HashMap;
-
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::Arc;
 
-use crate::network::{Coord, NetworkMessage, NetworkSender};
-use crate::scheduler::ExecutionMetadata;
 use itertools::Itertools;
 use rand::{thread_rng, Rng};
+
+use crate::network::{Coord, NetworkMessage, NetworkSender};
+use crate::operator::Data;
+use crate::scheduler::ExecutionMetadata;
 
 /// The list with the interesting senders of a single block.
 #[derive(Debug, Clone)]
@@ -19,10 +18,7 @@ pub(crate) struct SenderList(pub Vec<Coord>);
 /// of their replica will receive it depends on the value of the next strategy.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub(crate) enum NextStrategy<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+pub(crate) enum NextStrategy<Out: Data> {
     /// Only one of the replicas will receive the message:
     ///
     /// - if the block is not replicated, the only replica will receive the message
@@ -36,19 +32,13 @@ where
     GroupBy(#[derivative(Debug = "ignore")] Arc<dyn Fn(&Out) -> usize + Send + Sync>),
 }
 
-impl<Out> NextStrategy<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+impl<Out: Data> NextStrategy<Out> {
     /// Convert a `NextStrategy` of a type to another. `GroupBy` cannot be converted since it should
     /// be used only at the end of the block.
     ///
     /// The `From` trait cannot be implemented since it clashes with the auto implementation
     /// `From<NextStrategy<A>> for NextStrategy<A>` inside the `core` crate.
-    pub fn into<NewOut>(self) -> NextStrategy<NewOut>
-    where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
-    {
+    pub fn into<NewOut: Data>(self) -> NextStrategy<NewOut> {
         match self {
             NextStrategy::OnlyOne => NextStrategy::OnlyOne,
             NextStrategy::Random => NextStrategy::Random,
@@ -111,10 +101,7 @@ where
     }
 }
 
-impl<Out> NextStrategy<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+impl<Out: Data> NextStrategy<Out> {
     /// Compute the index of the replica which this message should be forwarded to.
     pub fn index(&self, message: &Out) -> usize {
         match self {
