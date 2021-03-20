@@ -42,7 +42,12 @@ impl Operator<String> for FileSource {
         let global_id = metadata.global_id;
         let num_replicas = metadata.num_replicas;
 
-        let file = File::open(&self.path).expect("FileSource: error while opening file");
+        let file = File::open(&self.path).unwrap_or_else(|err| {
+            panic!(
+                "FileSource: error while opening file {:?}: {:?}",
+                self.path, err
+            )
+        });
         let file_size = file.metadata().unwrap().len() as usize;
 
         let range_size = file_size / num_replicas;

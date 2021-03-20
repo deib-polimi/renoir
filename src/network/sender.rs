@@ -95,7 +95,7 @@ where
         }
 
         let address = (address.0.as_str(), address.1);
-        let address: Vec<_> = address
+        let socket_addrs: Vec<_> = address
             .to_socket_addrs()
             .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
             .unwrap()
@@ -104,37 +104,35 @@ where
         for attempt in 1..=CONNECT_ATTEMPTS {
             debug!(
                 "Attempt {} to connect to {} at {:?}",
-                attempt, coord, address
+                attempt, coord, socket_addrs
             );
-            match TcpStream::connect(&*address) {
-                Ok(stream) => {
-                    NetworkSender::handle_remote_connection(coord, local_receiver, stream);
-                    return;
-                }
-                Err(err) => {
-                    match err.kind() {
+
+            for address in socket_addrs.iter() {
+                match TcpStream::connect_timeout(address, CONNECT_TIMEOUT) {
+                    Ok(stream) => {
+                        NetworkSender::handle_remote_connection(coord, local_receiver, stream);
+                        return;
+                    }
+                    Err(err) => match err.kind() {
                         ErrorKind::TimedOut => {
-                            debug!(
-                                "Timeout connecting to {} at {:?}, retry in {}s",
-                                coord,
-                                address,
-                                retry_delay.as_secs_f32(),
-                            );
+                            debug!("Timeout connecting to {} at {:?}", coord, address);
                         }
                         _ => {
-                            debug!(
-                                "Failed to connect to {} at {:?}, retry in {}s: {:?}",
-                                coord,
-                                address,
-                                retry_delay.as_secs_f32(),
-                                err
-                            );
+                            debug!("Failed to connect to {} at {:?}: {:?}", coord, address, err);
                         }
-                    }
-                    sleep(retry_delay);
-                    retry_delay = (2 * retry_delay).min(RETRY_MAX_TIMEOUT);
+                    },
                 }
-            };
+            }
+
+            debug!(
+                "Retrying connection to {} at {:?} in {}s",
+                coord,
+                socket_addrs,
+                retry_delay.as_secs_f32(),
+            );
+
+            sleep(retry_delay);
+            retry_delay = (2 * retry_delay).min(RETRY_MAX_TIMEOUT);
         }
         panic!(
             "Failed to connect to remote {} at {:?} after {} attempts",

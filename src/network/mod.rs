@@ -60,8 +60,5 @@ impl Display for Coord {
 
 /// Wait for the start signal, return whether the component should start working or not.
 pub(crate) fn wait_start(receiver: NetworkStarterRecv) -> bool {
-    match receiver.recv() {
-        Ok(start) => start,
-        Err(_) => false,
-    }
+    receiver.recv().unwrap_or(false)
 }
