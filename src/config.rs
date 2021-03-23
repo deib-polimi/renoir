@@ -182,14 +182,6 @@ impl CommandLineOptions {
         if !(self.remote.is_some() ^ self.local.is_some()) {
             panic!("Use one of --remote or --threads");
         }
-        if let Some(path) = self.remote.as_ref() {
-            if !path.exists() {
-                panic!(
-                    "Remote configuration file {} does not exist",
-                    path.display()
-                );
-            }
-        }
         if let Some(threads) = self.local {
             if threads == 0 {
                 panic!("The number of cores should be positive");
