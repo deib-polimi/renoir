@@ -127,7 +127,7 @@ where
     where
         MapOut: IntoIterator<Item = NewOut>,
         <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-        F: Fn(KeyValue<Key, Out>) -> MapOut + Send + Sync + 'static,
+        F: Fn(KeyValue<&Key, Out>) -> MapOut + Send + Sync + 'static,
     {
         self.map(f).flatten()
     }

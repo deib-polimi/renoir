@@ -21,6 +21,7 @@ mod fold;
 mod group_by;
 mod key_by;
 mod keyed_fold;
+mod keyed_reduce;
 mod map;
 mod shuffle;
 pub mod sink;

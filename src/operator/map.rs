@@ -62,11 +62,14 @@ where
         f: F,
     ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        F: Fn(KeyValue<Key, Out>) -> NewOut + Send + Sync + 'static,
+        F: Fn(KeyValue<&Key, Out>) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| Map {
             prev,
-            f: Arc::new(move |(k, v)| (k.clone(), f((k, v)))),
+            f: Arc::new(move |(k, v)| {
+                let mapped_value = f((&k, v));
+                (k, mapped_value)
+            }),
         })
     }
 }
