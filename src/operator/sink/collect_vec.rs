@@ -61,7 +61,7 @@ where
     }
 }
 
-impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {

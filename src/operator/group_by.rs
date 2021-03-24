@@ -10,14 +10,14 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 
 pub type Keyer<Key, Out> = Arc<dyn Fn(&Out) -> Key + Send + Sync>;
 
-impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn group_by<Key: DataKey, Keyer>(
         self,
         keyer: Keyer,
-    ) -> KeyedStream<Out, Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
     {

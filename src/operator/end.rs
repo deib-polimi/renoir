@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::block::{BatchMode, Batcher, NextStrategy, SenderList};
-use crate::network::Coord;
+use crate::network::ReceiverEndpoint;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
@@ -17,7 +17,7 @@ where
     batch_mode: BatchMode,
     sender_groups: Vec<SenderList>,
     #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
-    senders: HashMap<Coord, Batcher<Out>>,
+    senders: HashMap<ReceiverEndpoint, Batcher<Out>>,
 }
 
 impl<Out: Data, OperatorChain> EndBlock<Out, OperatorChain>

@@ -82,7 +82,7 @@ where
     }
 }
 
-impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
@@ -91,7 +91,7 @@ where
         init: NewOut,
         local: Local,
         global: Global,
-    ) -> Stream<NewOut, NewOut, impl Operator<NewOut>>
+    ) -> Stream<NewOut, impl Operator<NewOut>>
     where
         Local: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
         Global: Fn(NewOut, NewOut) -> NewOut + Send + Sync + 'static,

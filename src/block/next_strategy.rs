@@ -4,13 +4,13 @@ use std::sync::Arc;
 use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
-use crate::network::{Coord, NetworkMessage, NetworkSender};
+use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::Data;
 use crate::scheduler::ExecutionMetadata;
 
 /// The list with the interesting senders of a single block.
 #[derive(Debug, Clone)]
-pub(crate) struct SenderList(pub Vec<Coord>);
+pub(crate) struct SenderList(pub Vec<ReceiverEndpoint>);
 
 /// The next strategy used at the end of a block.
 ///
@@ -40,15 +40,22 @@ impl<Out: Data> NextStrategy<Out> {
     pub fn group_senders(
         &self,
         metadata: &ExecutionMetadata,
-        senders: &HashMap<Coord, NetworkSender<NetworkMessage<Out>>>,
+        senders: &HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<Out>>>,
     ) -> Vec<SenderList> {
         let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();
         for (coord, sender) in senders {
-            by_block_id.entry(coord.block_id).or_default().push(sender);
+            by_block_id
+                .entry(coord.coord.block_id)
+                .or_default()
+                .push(sender);
         }
         let mut senders = Vec::new();
         for (block_id, block_senders) in by_block_id {
-            let block_senders = block_senders.iter().map(|s| s.coord).sorted().collect_vec();
+            let block_senders = block_senders
+                .iter()
+                .map(|s| s.receiver_endpoint)
+                .sorted()
+                .collect_vec();
             match self {
                 NextStrategy::OnlyOne => {
                     assert!(
@@ -63,10 +70,10 @@ impl<Out: Data> NextStrategy<Out> {
                         senders.push(SenderList(block_senders));
                     } else {
                         let mut found = false;
-                        for sender in block_senders {
-                            if sender.replica_id == metadata.coord.replica_id {
+                        for receiver_endpoint in block_senders {
+                            if receiver_endpoint.coord.replica_id == metadata.coord.replica_id {
                                 found = true;
-                                senders.push(SenderList(vec![sender]));
+                                senders.push(SenderList(vec![receiver_endpoint]));
                                 break;
                             }
                         }

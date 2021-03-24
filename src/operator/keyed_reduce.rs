@@ -1,11 +1,11 @@
 use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream};
 
-impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub fn reduce<F>(self, f: F) -> KeyedStream<In, Key, Out, impl Operator<KeyValue<Key, Out>>>
+    pub fn reduce<F>(self, f: F) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
         F: Fn(Out, Out) -> Out + Send + Sync + 'static,
     {

@@ -19,7 +19,7 @@ mod next_strategy;
 /// `OperatorChain` is the type of the chain of operators inside the block. It must be an operator
 /// that yields values of type `Out`.
 #[derive(Debug, Clone)]
-pub(crate) struct InnerBlock<In: Data, Out: Data, OperatorChain>
+pub(crate) struct InnerBlock<Out: Data, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -32,7 +32,6 @@ where
     /// The set of requirements that the block imposes on the scheduler.
     pub(crate) scheduler_requirements: SchedulerRequirements,
 
-    pub _in_type: PhantomData<In>,
     pub _out_type: PhantomData<Out>,
 }
 
@@ -46,7 +45,7 @@ pub(crate) struct SchedulerRequirements {
     pub(crate) max_parallelism: Option<usize>,
 }
 
-impl<In: Data, Out: Data, OperatorChain> InnerBlock<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> InnerBlock<Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -56,13 +55,12 @@ where
             operators,
             batch_mode,
             scheduler_requirements: Default::default(),
-            _in_type: Default::default(),
             _out_type: Default::default(),
         }
     }
 }
 
-impl<In: Data, Out: Data, OperatorChain> Display for InnerBlock<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> Display for InnerBlock<Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {

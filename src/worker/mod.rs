@@ -4,8 +4,8 @@ use crate::block::InnerBlock;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::{ExecutionMetadata, StartHandle};
 
-pub(crate) fn spawn_worker<In: Data, Out: Data, OperatorChain>(
-    block: InnerBlock<In, Out, OperatorChain>,
+pub(crate) fn spawn_worker<Out: Data, OperatorChain>(
+    block: InnerBlock<Out, OperatorChain>,
 ) -> StartHandle
 where
     OperatorChain: Operator<Out> + Send + 'static,
@@ -18,8 +18,8 @@ where
     StartHandle::new(sender, join_handle)
 }
 
-fn worker<In: Data, Out: Data, OperatorChain>(
-    mut block: InnerBlock<In, Out, OperatorChain>,
+fn worker<Out: Data, OperatorChain>(
+    mut block: InnerBlock<Out, OperatorChain>,
     metadata_receiver: Receiver<ExecutionMetadata>,
 ) where
     OperatorChain: Operator<Out> + Send + 'static,

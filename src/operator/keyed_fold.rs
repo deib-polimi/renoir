@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
@@ -96,7 +96,7 @@ where
         self,
         init: NewOut,
         f: F,
-    ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
         F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
     {

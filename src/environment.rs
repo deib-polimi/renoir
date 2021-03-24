@@ -45,7 +45,7 @@ impl StreamEnvironment {
     }
 
     /// Construct a new stream bound to this environment starting with the specified source.
-    pub fn stream<Out: Data, S>(&mut self, source: S) -> Stream<Out, Out, S>
+    pub fn stream<Out: Data, S>(&mut self, source: S) -> Stream<Out, S>
     where
         S: Source<Out> + Send + 'static,
     {
@@ -87,11 +87,7 @@ impl StreamEnvironment {
     pub fn execute(self) {
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);
-        let join = env.scheduler.take().unwrap().start();
-        // wait till the computation ends
-        for join_handle in join {
-            join_handle.join().unwrap();
-        }
+        env.scheduler.take().unwrap().start();
     }
 }
 

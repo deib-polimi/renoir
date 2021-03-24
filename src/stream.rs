@@ -22,12 +22,12 @@ pub type KeyValue<Key, Value> = (Key, Value);
 /// The type of the chain inside the block is `OperatorChain` and it's required as type argument of
 /// the stream. This type only represents the chain inside the last block of the stream, not all the
 /// blocks inside of it.
-pub struct Stream<In: Data, Out: Data, OperatorChain>
+pub struct Stream<Out: Data, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
     /// The last block inside the stream.
-    pub(crate) block: InnerBlock<In, Out, OperatorChain>,
+    pub(crate) block: InnerBlock<Out, OperatorChain>,
     /// A reference to the environment this stream lives in.
     pub(crate) env: Rc<RefCell<StreamEnvironmentInner>>,
 }
@@ -37,13 +37,13 @@ where
 /// `KeyedStream` semantics.
 ///
 /// The type of the `Key` must be a valid key inside an hashmap.
-pub struct KeyedStream<In: Data, Key: DataKey, Out: Data, OperatorChain>(
-    pub Stream<In, KeyValue<Key, Out>, OperatorChain>,
+pub struct KeyedStream<Key: DataKey, Out: Data, OperatorChain>(
+    pub Stream<KeyValue<Key, Out>, OperatorChain>,
 )
 where
     OperatorChain: Operator<KeyValue<Key, Out>>;
 
-impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
@@ -56,7 +56,7 @@ where
     pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
         self,
         get_operator: GetOp,
-    ) -> Stream<In, NewOut, Op>
+    ) -> Stream<NewOut, Op>
     where
         Op: Operator<NewOut> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
@@ -67,7 +67,6 @@ where
                 operators: get_operator(self.block.operators),
                 batch_mode: self.block.batch_mode,
                 scheduler_requirements: self.block.scheduler_requirements,
-                _in_type: Default::default(),
                 _out_type: Default::default(),
             },
             env: self.env,
@@ -86,7 +85,7 @@ where
         self,
         get_end_operator: GetEndOp,
         next_strategy: NextStrategy<Out>,
-    ) -> Stream<Out, Out, StartBlock<Out>>
+    ) -> Stream<Out, StartBlock<Out>>
     where
         Op: Operator<()> + Send + 'static,
         GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
@@ -136,14 +135,14 @@ where
     }
 }
 
-impl<In: Data, Key: DataKey, Out: Data, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
         self,
         get_operator: GetOp,
-    ) -> KeyedStream<In, Key, NewOut, Op>
+    ) -> KeyedStream<Key, NewOut, Op>
     where
         Op: Operator<KeyValue<Key, NewOut>> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,

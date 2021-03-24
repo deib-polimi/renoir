@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::network::{NetworkMessage, NetworkReceiver};
+use crate::network::{NetworkMessage, NetworkReceiver, ReceiverEndpoint};
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
@@ -20,12 +20,24 @@ pub struct StartBlock<Out: Data> {
 impl<Out: Data> Operator<Out> for StartBlock<Out> {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let mut network = metadata.network.lock().unwrap();
-        self.receiver = Some(network.get_receiver(metadata.coord));
+        let prev = &metadata.prev;
+        if prev.is_empty() {
+            panic!("StartBlock needs at least one previous block");
+        }
+        let prev_block_id = prev[0].block_id;
+        for prev in prev {
+            if prev.block_id != prev_block_id {
+                panic!("StartBlock does not support multiple preceding blocks");
+            }
+        }
+        let endpoint = ReceiverEndpoint::new(metadata.coord, prev_block_id);
+        let receiver = network.get_receiver(endpoint);
+        self.receiver = Some(receiver);
         drop(network);
-        self.missing_ends = metadata.num_prev;
+        self.missing_ends = metadata.prev.len();
         info!(
             "StartBlock {} initialized, {} previous blocks, receiver is: {:?}",
-            metadata.coord, metadata.num_prev, self.receiver
+            metadata.coord, self.missing_ends, self.receiver
         );
         self.metadata = Some(metadata);
     }

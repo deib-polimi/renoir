@@ -1,60 +1,47 @@
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
-use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 
 use itertools::Itertools;
 use typemap::{Key, SendMap};
 
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
-use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, NetworkStarter};
+use crate::network::remote::{DemultiplexingReceiver, MultiplexingSender};
+use crate::network::{
+    BlockCoord, Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint,
+};
 use crate::operator::Data;
-use crate::scheduler::HostId;
-use crate::stream::BlockId;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In: Data>(PhantomData<In>);
 impl<In: Data> Key for ReceiverKey<In> {
-    type Value = HashMap<Coord, NetworkReceiver<NetworkMessage<In>>>;
+    type Value = HashMap<ReceiverEndpoint, NetworkReceiver<NetworkMessage<In>>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `NetworkSender`s.
 struct SenderKey<In: Data>(PhantomData<In>);
 impl<In: Data> Key for SenderKey<In> {
-    type Value = HashMap<Coord, NetworkSender<NetworkMessage<In>>>;
+    type Value = HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<In>>>;
 }
 
-/// Metadata about a registered receiver.
-#[derive(Derivative)]
-#[derivative(Debug)]
-struct ReceiverMetadata {
-    /// The set of blocks that connect to this receiver. All the replicas of a block inside a single
-    /// host will share the same socket, so they should be counted once.
-    connections: HashSet<(BlockId, HostId)>,
-    /// The starter that makes the receiver start binding the socket. `Option` because it will be
-    /// moved out this structure.
-    #[derivative(Debug = "ignore")]
-    bind_socket: Option<SyncSender<usize>>,
-    /// `JoinHandle` of the task that binds the remote socket. `Option` because it will be moved out
-    /// this structure.
-    #[derivative(Debug = "ignore")]
-    join_handle: Option<JoinHandle<()>>,
+/// This struct is used to index inside the `typemap` with the `DemultiplexingReceiver`s.
+struct DemultiplexingReceiverKey<In: Data>(PhantomData<In>);
+impl<In: Data> Key for DemultiplexingReceiverKey<In> {
+    type Value = HashMap<BlockCoord, DemultiplexingReceiver<NetworkMessage<In>>>;
+}
+
+/// This struct is used to index inside the `typemap` with the `MultiplexingSender`s.
+struct MultiplexingSenderKey<In: Data>(PhantomData<In>);
+impl<In: Data> Key for MultiplexingSenderKey<In> {
+    type Value = HashMap<BlockCoord, MultiplexingSender<NetworkMessage<In>>>;
 }
 
 /// Metadata about a registered sender.
-#[derive(Derivative)]
+#[derive(Default, Derivative)]
 #[derivative(Debug)]
 struct SenderMetadata {
     /// This sender should connect to the remote recipient.
     is_remote: bool,
-    /// The starter that makes the sender start connecting the socket. `Option` because it will be
-    /// moved out this structure.
-    #[derivative(Debug = "ignore")]
-    connect_socket: Option<NetworkStarter>,
-    /// `JoinHandle` of the task that connects the remote socket. `Option` because it will be moved
-    /// out this structure.
-    #[derivative(Debug = "ignore")]
-    join_handle: Option<JoinHandle<()>>,
 }
 
 /// This struct keeps track of the network topology, all the registered replicas and their
@@ -64,7 +51,6 @@ struct SenderMetadata {
 pub(crate) struct NetworkTopology {
     /// Configuration of the environment.
     config: EnvironmentConfig,
-
     /// All the registered receivers.
     ///
     /// Since the `NetworkReceiver` is generic over the element type we cannot simply store them
@@ -77,26 +63,42 @@ pub(crate) struct NetworkTopology {
     /// At registration all the tasks start and immediately wait on a channel. We then store that
     /// channel (that does not depend of the element type) and later we use it to tell the task to
     /// actually start or exit.
+    ///
+    /// This map is indexed using `ReceiverKey`.
     #[derivative(Debug = "ignore")]
     receivers: SendMap,
     /// All the registered local senders.
     ///
     /// It works exactly like `self.receivers`.
-    #[derivative(Debug = "ignore")]
-    local_senders: SendMap,
-    /// All the registered remote senders.
     ///
-    /// It works exactly like `self.receivers`.
+    /// This map is indexed using `SenderKey`.
     #[derivative(Debug = "ignore")]
-    remote_senders: SendMap,
+    senders: SendMap,
+
+    /// All the registered demultiplexers.
+    ///
+    /// This map is indexed using `DemultiplexingReceiverKey`.
+    #[derivative(Debug = "ignore")]
+    demultiplexers: SendMap,
+    /// All the registered multiplexers.
+    ///
+    /// This map is indexed using `MultiplexingSenderKey`.
+    #[derivative(Debug = "ignore")]
+    multiplexers: SendMap,
 
     /// The adjacency list of the execution graph that interests the local host.
     next: HashMap<Coord, Vec<Coord>>,
-
-    /// The metadata about all the registered receivers.
-    receivers_metadata: HashMap<Coord, ReceiverMetadata>,
     /// The metadata about all the registered senders.
-    senders_metadata: HashMap<Coord, SenderMetadata>,
+    senders_metadata: HashMap<ReceiverEndpoint, SenderMetadata>,
+
+    /// The set of the used receivers.
+    ///
+    /// This set makes sure that a given receiver is not initialized twice. Bad things may happen if
+    /// the same receiver is initialized twice (the same socket may be bound twice).
+    used_receivers: HashSet<ReceiverEndpoint>,
+
+    /// The set of join handles of the various threads spawned by the topology.
+    join_handles: Vec<JoinHandle<()>>,
 }
 
 impl NetworkTopology {
@@ -104,160 +106,184 @@ impl NetworkTopology {
         NetworkTopology {
             config,
             receivers: SendMap::custom(),
-            local_senders: SendMap::custom(),
-            remote_senders: SendMap::custom(),
+            senders: SendMap::custom(),
+            demultiplexers: SendMap::custom(),
+            multiplexers: SendMap::custom(),
             next: Default::default(),
-            receivers_metadata: Default::default(),
             senders_metadata: Default::default(),
+            used_receivers: Default::default(),
+            join_handles: Default::default(),
         }
     }
 
-    /// Register a new replica to the network.
-    ///
-    /// This will create its sender and receiver and setup the remote counterparts. No socket is
-    /// actually bound until `start_remote` is called and awaited. This method should not be called
-    /// after `start_remote` has been called.
-    pub(crate) fn register_replica<T: Data>(&mut self, coord: Coord) {
-        debug!("Registering {}", coord);
-        let address = match &self.config.runtime {
-            // this doesn't really matter, no socket will be bound
-            ExecutionRuntime::Local(_) => ("127.0.0.1".to_string(), 0),
-            ExecutionRuntime::Remote(remote) => {
-                let host = &remote.hosts[coord.host_id];
-                let address = host.address.clone();
-                // TODO: this will be wrong with the multiplexer
-                let port = coord.block_id * host.num_cores + coord.replica_id;
-                (address, port as u16 + host.base_port)
-            }
-        };
-        let (receiver, bind_socket, receiver_join_handle) =
-            NetworkReceiver::new(coord, address.clone());
-        let (sender, connect_socket, sender_join_handle) = NetworkSender::remote(coord, address);
-        self.receivers_metadata
-            .entry(coord)
-            .or_insert_with(|| ReceiverMetadata {
-                bind_socket: Some(bind_socket),
-                connections: Default::default(),
-                join_handle: Some(receiver_join_handle),
-            });
-        self.senders_metadata
-            .entry(coord)
-            .or_insert_with(|| SenderMetadata {
-                connect_socket: Some(connect_socket),
-                is_remote: false,
-                join_handle: Some(sender_join_handle),
-            });
-        self.local_senders
-            .entry::<SenderKey<T>>()
-            .or_insert_with(Default::default)
-            .insert(coord, receiver.sender());
-        self.remote_senders
-            .entry::<SenderKey<T>>()
-            .or_insert_with(Default::default)
-            .insert(coord, sender);
-        self.receivers
-            .entry::<ReceiverKey<T>>()
-            .or_insert_with(Default::default)
-            .insert(coord, receiver);
-    }
-
-    /// Get the sending channel to a replica.
-    ///
-    /// The replica must be registered and `start_remote` must have been called and awaited.
-    pub fn get_sender<T: Data>(&self, coord: Coord) -> NetworkSender<NetworkMessage<T>> {
-        let metadata = self.senders_metadata.get(&coord).unwrap_or_else(|| {
-            panic!("No sender registered for {}", coord);
-        });
-        let t_type_name = std::any::type_name::<T>();
-        if metadata.is_remote {
-            let map = self
-                .remote_senders
-                .get::<SenderKey<T>>()
-                .unwrap_or_else(|| panic!("No remote sender registered for type: {}", t_type_name));
-            map.get(&coord)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Remote sender for ({}, {}) not registered",
-                        t_type_name, coord
-                    )
-                })
-                .clone()
-        } else {
-            let map = self
-                .local_senders
-                .get::<SenderKey<T>>()
-                .unwrap_or_else(|| panic!("No local sender registered for type: {}", t_type_name));
-            map.get(&coord)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Local sender for ({}, {}) not registered",
-                        t_type_name, coord
-                    )
-                })
-                .clone()
+    /// Knowing that the computation ended, tear down the topology wait for all of its thread to
+    /// exit.
+    pub(crate) fn stop_and_wait(&mut self) {
+        // drop all the senders/receivers making sure no dangling sender keep alive their network
+        // receivers.
+        // SAFETY: this is safe since we are not altering the content of the typemaps, just emptying
+        // them.
+        unsafe {
+            self.receivers.data_mut().drain();
+            self.senders.data_mut().drain();
+            self.demultiplexers.data_mut().drain();
+            self.multiplexers.data_mut().drain();
+        }
+        for handle in self.join_handles.drain(..) {
+            handle.join().unwrap();
         }
     }
 
     /// Get all the outgoing senders from a replica.
     pub fn get_senders<T: Data>(
-        &self,
+        &mut self,
         coord: Coord,
-    ) -> HashMap<Coord, NetworkSender<NetworkMessage<T>>> {
+    ) -> HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<T>>> {
         match self.next.get(&coord) {
             None => Default::default(),
-            Some(next) => next.iter().map(|&c| (c, self.get_sender(c))).collect(),
+            Some(next) => {
+                let next = next.clone();
+                next.iter()
+                    .map(|&c| {
+                        let receiver_endpoint = ReceiverEndpoint::new(c, coord.block_id);
+                        (receiver_endpoint, self.get_sender(receiver_endpoint))
+                    })
+                    .collect()
+            }
         }
     }
 
-    /// Get the receiver of all the ingoing messages to a replica.
-    pub fn get_receiver<T: Data>(&mut self, coord: Coord) -> NetworkReceiver<NetworkMessage<T>> {
-        let t_type_name = std::any::type_name::<T>();
-        let map = self
-            .receivers
-            .get_mut::<ReceiverKey<T>>()
-            .unwrap_or_else(|| panic!("No receiver registered for type: {}", t_type_name));
-        map.remove(&coord)
-            .unwrap_or_else(|| panic!("Receiver for ({}, {:?}) not registered", t_type_name, coord))
+    /// Get the sender associated with a given receiver endpoint. This may register a new channel if
+    /// it was not registered before.
+    fn get_sender<T: Data>(
+        &mut self,
+        receiver_endpoint: ReceiverEndpoint,
+    ) -> NetworkSender<NetworkMessage<T>> {
+        if !self.senders.contains::<SenderKey<T>>() {
+            self.senders.insert::<SenderKey<T>>(Default::default());
+        }
+        let entry = self.senders.get_mut::<SenderKey<T>>().unwrap();
+        if !entry.contains_key(&receiver_endpoint) {
+            self.register_channel::<T>(receiver_endpoint);
+        }
+        self.senders
+            .get::<SenderKey<T>>()
+            .unwrap()
+            .get(&receiver_endpoint)
+            .unwrap()
+            .clone()
     }
 
-    /// Start all of the remote connections.
+    /// Get the receiver of all the ingoing messages to a replica endpoint. This may register a new
+    /// channel if it was not registered before.
     ///
-    /// First all the receivers are started and only after start also the senders, this will prevent
-    /// deadlocks due to unfortunate orderings of bind/connect.
-    pub fn start_remote(&mut self) -> Vec<JoinHandle<()>> {
-        info!("Starting remote connections");
-        let mut join_handles = Vec::new();
-        // first start all the receivers
-        for (_coord, remote) in self.receivers_metadata.iter_mut() {
-            let bind_socket = remote.bind_socket.take().unwrap();
-            let join_handle = remote.join_handle.take().unwrap();
-            let num_connections = remote.connections.len();
-            bind_socket.send(num_connections).unwrap();
-            if num_connections > 0 {
-                join_handles.push(join_handle);
-            } else {
-                join_handle.join().unwrap();
-            }
+    /// Calling this function twice with the same parameter will panic.
+    pub fn get_receiver<T: Data>(
+        &mut self,
+        receiver_endpoint: ReceiverEndpoint,
+    ) -> NetworkReceiver<NetworkMessage<T>> {
+        if self.used_receivers.contains(&receiver_endpoint) {
+            panic!(
+                "The receiver for {} has already been got",
+                receiver_endpoint
+            );
         }
-        // and later start all the senders
-        for (_coord, remote) in self.senders_metadata.iter_mut() {
-            let connect_socket = remote.connect_socket.take().unwrap();
-            let join_handle = remote.join_handle.take().unwrap();
-            connect_socket.send(remote.is_remote).unwrap();
-            if remote.is_remote {
-                join_handles.push(join_handle);
-            } else {
-                join_handle.join().unwrap();
-            }
+        self.used_receivers.insert(receiver_endpoint);
+
+        if !self.receivers.contains::<ReceiverKey<T>>() {
+            self.receivers.insert::<ReceiverKey<T>>(Default::default());
         }
-        join_handles
+        let entry = self.receivers.get_mut::<ReceiverKey<T>>().unwrap();
+        // if the channel has not been registered yet, register it
+        if !entry.contains_key(&receiver_endpoint) {
+            self.register_channel::<T>(receiver_endpoint);
+        }
+        self.receivers
+            .get_mut::<ReceiverKey<T>>()
+            .unwrap()
+            .remove(&receiver_endpoint)
+            .unwrap()
     }
 
-    /// Register the connection between two (already registered) replicas.
+    /// Register the channel for the given receiver.
+    ///
+    /// This will initialize both the sender and the receiver to the receiver. If it's appropriate
+    /// also the multiplexer and/or the demultiplexer are initialized and started.
+    fn register_channel<T: Data>(&mut self, receiver_endpoint: ReceiverEndpoint) {
+        debug!("Registering {}", receiver_endpoint);
+        let sender_metadata = self.senders_metadata.get(&receiver_endpoint).unwrap();
+
+        // create the receiver part of the channel
+        let receiver = NetworkReceiver::<NetworkMessage<T>>::new(receiver_endpoint);
+        let local_sender = receiver.sender();
+
+        // if the receiver is local and the runtime is remote, register it to the demultiplexer
+        if receiver_endpoint.coord.host_id == self.config.host_id.unwrap() {
+            if let ExecutionRuntime::Remote(remote) = &self.config.runtime {
+                let demuxes = self
+                    .demultiplexers
+                    .entry::<DemultiplexingReceiverKey<T>>()
+                    .or_insert_with(Default::default);
+                let block_coord = BlockCoord::from(receiver_endpoint.coord);
+                if !demuxes.contains_key(&block_coord) {
+                    // find the set of all the previous blocks that have a MultiplexingSender that
+                    // point to this DemultiplexingReceiver.
+                    let mut prev = HashSet::new();
+                    for (from, to) in &self.next {
+                        // local blocks won't use the multiplexer
+                        if from.host_id == block_coord.host_id {
+                            continue;
+                        }
+                        for to in to {
+                            if BlockCoord::from(*to) == block_coord {
+                                prev.insert(BlockCoord::from(*from));
+                            }
+                        }
+                    }
+                    let (demux, join_handle) =
+                        DemultiplexingReceiver::new(block_coord, remote, prev.len());
+                    self.join_handles.push(join_handle);
+                    demuxes.insert(block_coord, demux);
+                }
+                demuxes[&block_coord].register(receiver_endpoint, receiver.local_sender.clone());
+            }
+        }
+        self.receivers
+            .entry::<ReceiverKey<T>>()
+            .or_insert_with(Default::default)
+            .insert(receiver_endpoint, receiver);
+
+        // create the sending part of the channel
+        let sender = if sender_metadata.is_remote {
+            // this channel ends to a remote host: connect it to the multiplexer
+            if let ExecutionRuntime::Remote(remote) = &self.config.runtime {
+                let muxers = self
+                    .multiplexers
+                    .entry::<MultiplexingSenderKey<T>>()
+                    .or_insert_with(Default::default);
+                let block_coord = BlockCoord::from(receiver_endpoint.coord);
+                if !muxers.contains_key(&block_coord) {
+                    let (mux, join_handle) = MultiplexingSender::new(block_coord, remote);
+                    self.join_handles.push(join_handle);
+                    muxers.insert(block_coord, mux);
+                }
+                NetworkSender::remote(receiver_endpoint, muxers[&block_coord].clone())
+            } else {
+                panic!("Sender is marked as remote, but the runtime is not");
+            }
+        } else {
+            local_sender
+        };
+        self.senders
+            .entry::<SenderKey<T>>()
+            .or_insert_with(Default::default)
+            .insert(receiver_endpoint, sender);
+    }
+
+    /// Register the connection between two replicas.
     ///
     /// At least one of the 2 replicas must be local (we cannot connect 2 remote replicas).
-    /// This will not actually bind/connect sockets, it will just mark them as bindable/connectable,
-    /// `start_remote` will start them.
+    /// This will not actually bind/connect sockets, it will just mark them as bindable/connectable.
     pub fn connect(&mut self, from: Coord, to: Coord) {
         let host_id = self.config.host_id.unwrap();
         let from_remote = from.host_id != host_id;
@@ -275,14 +301,15 @@ impl NetworkTopology {
             to
         );
 
-        // a remote client wants to connect: this receiver should be remote
-        if from_remote {
-            let metadata = self.receivers_metadata.get_mut(&to).unwrap();
-            metadata.connections.insert((from.block_id, from.host_id));
-        }
+        let receiver_endpoint = ReceiverEndpoint::new(to, from.block_id);
+        self.senders_metadata
+            .entry(receiver_endpoint)
+            .or_insert_with(Default::default);
+
         // we want to connect to a remote: this sender should be remote
         if to_remote {
-            self.senders_metadata.get_mut(&to).unwrap().is_remote = true;
+            let metadata = self.senders_metadata.get_mut(&receiver_endpoint).unwrap();
+            metadata.is_remote = true;
         }
     }
 
