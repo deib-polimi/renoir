@@ -225,6 +225,7 @@ impl NetworkTopology {
                     .entry::<DemultiplexingReceiverKey<T>>()
                     .or_insert_with(Default::default);
                 let block_coord = BlockCoord::from(receiver_endpoint.coord);
+                #[allow(clippy::map_entry)]
                 if !demuxes.contains_key(&block_coord) {
                     // find the set of all the previous blocks that have a MultiplexingSender that
                     // point to this DemultiplexingReceiver.
@@ -262,6 +263,7 @@ impl NetworkTopology {
                     .entry::<MultiplexingSenderKey<T>>()
                     .or_insert_with(Default::default);
                 let block_coord = BlockCoord::from(receiver_endpoint.coord);
+                #[allow(clippy::map_entry)]
                 if !muxers.contains_key(&block_coord) {
                     let (mux, join_handle) = MultiplexingSender::new(block_coord, remote);
                     self.join_handles.push(join_handle);
