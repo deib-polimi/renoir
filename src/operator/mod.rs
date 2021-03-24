@@ -26,6 +26,7 @@ mod map;
 mod shuffle;
 pub mod sink;
 pub mod source;
+mod split;
 mod start;
 mod unkey;
 

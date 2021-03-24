@@ -33,21 +33,6 @@ pub(crate) enum NextStrategy<Out: Data> {
 }
 
 impl<Out: Data> NextStrategy<Out> {
-    /// Convert a `NextStrategy` of a type to another. `GroupBy` cannot be converted since it should
-    /// be used only at the end of the block.
-    ///
-    /// The `From` trait cannot be implemented since it clashes with the auto implementation
-    /// `From<NextStrategy<A>> for NextStrategy<A>` inside the `core` crate.
-    pub fn into<NewOut: Data>(self) -> NextStrategy<NewOut> {
-        match self {
-            NextStrategy::OnlyOne => NextStrategy::OnlyOne,
-            NextStrategy::Random => NextStrategy::Random,
-            NextStrategy::GroupBy(_) => {
-                panic!("Cannot convert a NextStrategy::GroupBy from a type to another")
-            }
-        }
-    }
-
     /// Group the senders from a block using the current next strategy.
     ///
     /// The returned value is a list of `SenderList`s, one for each next block in the execution

@@ -196,6 +196,11 @@ impl Scheduler {
             .collect()
     }
 
+    /// Get the ids of the previous blocks of a given block in the job graph
+    pub(crate) fn prev_blocks(&self, block_id: BlockId) -> Option<Vec<BlockId>> {
+        self.prev_blocks.get(&block_id).cloned()
+    }
+
     /// Build the execution graph for the network topology considering only the part of the network
     /// affected by the current host. This therefore discards all the connections between the other
     /// hosts since this host is unaffected by them.

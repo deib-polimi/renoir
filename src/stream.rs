@@ -65,7 +65,6 @@ where
             block: InnerBlock {
                 id: self.block.id,
                 operators: get_operator(self.block.operators),
-                next_strategy: self.block.next_strategy.into(),
                 batch_mode: self.block.batch_mode,
                 scheduler_requirements: self.block.scheduler_requirements,
                 _in_type: Default::default(),
@@ -86,12 +85,12 @@ where
     pub(crate) fn add_block<GetEndOp, Op>(
         self,
         get_end_operator: GetEndOp,
+        next_strategy: NextStrategy<Out>,
     ) -> Stream<Out, Out, StartBlock<Out>>
     where
         Op: Operator<()> + Send + 'static,
         GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
     {
-        let next_strategy = self.block.next_strategy.clone();
         let batch_mode = self.block.batch_mode;
         let old_stream =
             self.add_operator(|prev| get_end_operator(prev, next_strategy, batch_mode));
@@ -105,6 +104,26 @@ where
         Stream {
             block: InnerBlock::new(new_id, StartBlock::default(), batch_mode),
             env: old_stream.env,
+        }
+    }
+
+    /// Clone the given block, taking care of connecting the new block to the same previous blocks
+    /// of the original one.
+    pub(crate) fn clone(&mut self) -> Self {
+        let mut env = self.env.borrow_mut();
+        let prev_nodes = env.scheduler_mut().prev_blocks(self.block.id).unwrap();
+        let new_id = env.new_block();
+
+        for prev_node in prev_nodes.into_iter() {
+            env.scheduler_mut().connect_blocks(prev_node, new_id);
+        }
+        drop(env);
+
+        let mut new_block = self.block.clone();
+        new_block.id = new_id;
+        Stream {
+            block: new_block,
+            env: self.env.clone(),
         }
     }
 

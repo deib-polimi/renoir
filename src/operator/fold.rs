@@ -87,7 +87,7 @@ where
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn fold<NewOut: Data, Local, Global>(
-        mut self,
+        self,
         init: NewOut,
         local: Local,
         global: Global,
@@ -97,7 +97,6 @@ where
         Global: Fn(NewOut, NewOut) -> NewOut + Send + Sync + 'static,
     {
         // Local fold
-        self.block.next_strategy = NextStrategy::OnlyOne;
         let mut second_part = self
             .add_operator(|prev| Fold {
                 prev,
@@ -108,7 +107,7 @@ where
                 max_watermark: None,
                 received_end: false,
             })
-            .add_block(EndBlock::new);
+            .add_block(EndBlock::new, NextStrategy::OnlyOne);
 
         // Global fold (which is done on only one node)
         second_part.block.scheduler_requirements.max_parallelism(1);

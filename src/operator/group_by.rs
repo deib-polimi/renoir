@@ -22,19 +22,16 @@ where
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
     {
         let keyer = Arc::new(keyer);
+        let keyer2 = keyer.clone();
+
+        let next_strategy = NextStrategy::GroupBy(Arc::new(move |out| {
+            let mut s = DefaultHasher::new();
+            keyer2(out).hash(&mut s);
+            s.finish() as usize
+        }));
+
         let new_stream = self
-            .add_block(|prev, _, batch_mode| {
-                let keyer = keyer.clone();
-                EndBlock::new(
-                    prev,
-                    NextStrategy::GroupBy(Arc::new(move |out| {
-                        let mut s = DefaultHasher::new();
-                        keyer(out).hash(&mut s);
-                        s.finish() as usize
-                    })),
-                    batch_mode,
-                )
-            })
+            .add_block(EndBlock::new, next_strategy)
             .add_operator(|prev| KeyBy::new(prev, keyer));
         KeyedStream(new_stream)
     }

@@ -6,9 +6,8 @@ impl<In: Data, Out: Data, OperatorChain> Stream<In, Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn shuffle(mut self) -> Stream<Out, Out, impl Operator<Out>> {
-        self.block.next_strategy = NextStrategy::Random;
-        self.add_block(EndBlock::new)
+    pub fn shuffle(self) -> Stream<Out, Out, impl Operator<Out>> {
+        self.add_block(EndBlock::new, NextStrategy::Random)
     }
 }
 

@@ -27,8 +27,6 @@ where
     pub(crate) id: BlockId,
     /// The current chain of operators.
     pub(crate) operators: OperatorChain,
-    /// The strategy to use for sending to the next blocks in the stream.
-    pub(crate) next_strategy: NextStrategy<Out>,
     /// The batch mode of this block.
     pub(crate) batch_mode: BatchMode,
     /// The set of requirements that the block imposes on the scheduler.
@@ -56,7 +54,6 @@ where
         Self {
             id,
             operators,
-            next_strategy: NextStrategy::OnlyOne,
             batch_mode,
             scheduler_requirements: Default::default(),
             _in_type: Default::default(),
