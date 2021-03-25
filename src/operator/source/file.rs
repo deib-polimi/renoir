@@ -88,7 +88,7 @@ impl Operator<String> for FileSource {
                     StreamElement::Item(line)
                 }
                 Ok(_) => StreamElement::End,
-                Err(e) => panic!(e),
+                Err(e) => panic!("Error while reading file: {:?}", e),
             }
         } else {
             StreamElement::End

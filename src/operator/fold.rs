@@ -21,6 +21,25 @@ where
     received_end: bool,
 }
 
+impl<Out: Data, NewOut: Data, PreviousOperators: Operator<Out>>
+    Fold<Out, NewOut, PreviousOperators>
+{
+    fn new<F>(prev: PreviousOperators, init: NewOut, fold: F) -> Self
+    where
+        F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
+    {
+        Fold {
+            prev,
+            fold: Arc::new(fold),
+            init,
+            accumulator: None,
+            timestamp: None,
+            max_watermark: None,
+            received_end: false,
+        }
+    }
+}
+
 impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
     for Fold<Out, NewOut, PreviousOperators>
 where
@@ -86,7 +105,17 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn fold<NewOut: Data, Local, Global>(
+    pub fn fold<NewOut: Data, F>(self, init: NewOut, f: F) -> Stream<NewOut, impl Operator<NewOut>>
+    where
+        F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
+    {
+        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::OnlyOne);
+        // FIXME: when implementing Stream::max_parallelism use that here
+        new_stream.block.scheduler_requirements.max_parallelism(1);
+        new_stream.add_operator(|prev| Fold::new(prev, init, f))
+    }
+
+    pub fn fold_assoc<NewOut: Data, Local, Global>(
         self,
         init: NewOut,
         local: Local,
@@ -98,28 +127,13 @@ where
     {
         // Local fold
         let mut second_part = self
-            .add_operator(|prev| Fold {
-                prev,
-                fold: Arc::new(local),
-                init: init.clone(),
-                accumulator: None,
-                timestamp: None,
-                max_watermark: None,
-                received_end: false,
-            })
+            .add_operator(|prev| Fold::new(prev, init.clone(), local))
             .add_block(EndBlock::new, NextStrategy::OnlyOne);
 
         // Global fold (which is done on only one node)
+        // FIXME: when implementing Stream::max_parallelism use that here
         second_part.block.scheduler_requirements.max_parallelism(1);
-        second_part.add_operator(|prev| Fold {
-            prev,
-            fold: Arc::new(global),
-            init,
-            accumulator: None,
-            timestamp: None,
-            max_watermark: None,
-            received_end: false,
-        })
+        second_part.add_operator(|prev| Fold::new(prev, init, global))
     }
 }
 
@@ -136,11 +150,70 @@ mod tests {
         let source = source::StreamSource::new(0..10u8);
         let res = env
             .stream(source)
-            .fold("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
+            .fold("".to_string(), |s, n| s + &n.to_string())
             .collect_vec();
         env.execute();
         let res = res.get().unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0], "0123456789");
+    }
+
+    #[test]
+    fn fold_assoc_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(0..10u8);
+        let res = env
+            .stream(source)
+            .fold_assoc("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
+            .collect_vec();
+        env.execute();
+        let res = res.get().unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0], "0123456789");
+    }
+
+    #[test]
+    fn fold_shuffled_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(0..10u8);
+        let res = env
+            .stream(source)
+            .shuffle()
+            .fold(Vec::new(), |mut v, n| {
+                v.push(n);
+                v
+            })
+            .collect_vec();
+        env.execute();
+        let mut res = res.get().unwrap();
+        assert_eq!(res.len(), 1);
+        res[0].sort_unstable();
+        assert_eq!(res[0], (0..10u8).into_iter().collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn fold_assoc_shuffled_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::StreamSource::new(0..10u8);
+        let res = env
+            .stream(source)
+            .shuffle()
+            .fold_assoc(
+                Vec::new(),
+                |mut v, n| {
+                    v.push(n);
+                    v
+                },
+                |mut v1, mut v2| {
+                    v2.append(&mut v1);
+                    v2
+                },
+            )
+            .collect_vec();
+        env.execute();
+        let mut res = res.get().unwrap();
+        assert_eq!(res.len(), 1);
+        res[0].sort_unstable();
+        assert_eq!(res[0], (0..10u8).into_iter().collect::<Vec<_>>());
     }
 }
