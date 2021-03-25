@@ -101,7 +101,7 @@ where
         scheduler.connect_blocks(old_id, new_id);
         drop(env);
         Stream {
-            block: InnerBlock::new(new_id, StartBlock::default(), batch_mode),
+            block: InnerBlock::new(new_id, StartBlock::new(old_id), batch_mode),
             env: old_stream.env,
         }
     }

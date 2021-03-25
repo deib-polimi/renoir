@@ -3,9 +3,10 @@ use std::collections::VecDeque;
 use crate::network::{NetworkMessage, NetworkReceiver, ReceiverEndpoint};
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
+use crate::stream::BlockId;
 
 #[derive(Debug, Derivative)]
-#[derivative(Clone, Default(bound = ""))]
+#[derivative(Clone)]
 pub struct StartBlock<Out: Data> {
     metadata: Option<ExecutionMetadata>,
     #[derivative(Clone(clone_with = "clone_none"))]
@@ -15,22 +16,28 @@ pub struct StartBlock<Out: Data> {
     /// The last call to next caused a timeout, so a FlushBatch has been emitted. In this case this
     /// field is set to true to avoid flooding with FlushBatch.
     already_timed_out: bool,
+    /// The id of the previous block in the job graph. This block is unique since `StartBlock` does
+    /// not support multiple inputs.
+    prev_block_id: BlockId,
+}
+
+impl<Out: Data> StartBlock<Out> {
+    pub(crate) fn new(prev_block_id: BlockId) -> Self {
+        Self {
+            metadata: Default::default(),
+            receiver: Default::default(),
+            buffer: Default::default(),
+            missing_ends: Default::default(),
+            already_timed_out: Default::default(),
+            prev_block_id,
+        }
+    }
 }
 
 impl<Out: Data> Operator<Out> for StartBlock<Out> {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let mut network = metadata.network.lock().unwrap();
-        let prev = &metadata.prev;
-        if prev.is_empty() {
-            panic!("StartBlock needs at least one previous block");
-        }
-        let prev_block_id = prev[0].block_id;
-        for prev in prev {
-            if prev.block_id != prev_block_id {
-                panic!("StartBlock does not support multiple preceding blocks");
-            }
-        }
-        let endpoint = ReceiverEndpoint::new(metadata.coord, prev_block_id);
+        let endpoint = ReceiverEndpoint::new(metadata.coord, self.prev_block_id);
         let receiver = network.get_receiver(endpoint);
         self.receiver = Some(receiver);
         drop(network);
