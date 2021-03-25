@@ -23,6 +23,7 @@ mod key_by;
 mod keyed_fold;
 mod keyed_reduce;
 mod map;
+mod reduce;
 mod shuffle;
 pub mod sink;
 pub mod source;
