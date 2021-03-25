@@ -33,9 +33,27 @@ structopt = "0.3"
 [dev-dependencies]
 # for the tests
 tempfile = "3.2"
+criterion = { version = "0.3", features = ["html_reports"] }
+fake = "2.4"
 
 # for the examples
 regex = "1.4.3"
+
+[[bench]]
+name = "wordcount"
+harness = false
+
+[[bench]]
+name = "shuffle"
+harness = false
+
+[[bench]]
+name = "fold_vs_reduce"
+harness = false
+
+[[bench]]
+name = "batch_mode"
+harness = false
 
 [profile.release]
 debug = true
