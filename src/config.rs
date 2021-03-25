@@ -45,6 +45,7 @@ pub(crate) struct RemoteHostConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Derivative)]
 #[derivative(Default)]
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) struct RemoteHostSSHConfig {
     #[derivative(Default(value = "22"))]
     #[serde(default = "ssh_default_port")]
