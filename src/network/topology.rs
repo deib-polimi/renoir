@@ -528,10 +528,7 @@ mod tests {
             .collect_vec();
         assert_eq!(
             res,
-            expected
-                .into_iter()
-                .map(|x| StreamElement::Item(x))
-                .collect_vec()
+            expected.into_iter().map(StreamElement::Item).collect_vec()
         );
     }
 }

@@ -214,7 +214,6 @@ mod tests {
 
     #[test]
     fn group_by_fold_shuffled_stream() {
-        //todo!();
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::StreamSource::new(0..10u8);
         let res = env
