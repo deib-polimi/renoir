@@ -47,7 +47,7 @@ pub type Timestamp = Duration;
 /// An operator may need to change the content of a `StreamElement` (e.g. a `Map` may change the
 /// value of the `Item`). Usually `Watermark` and `End` are simply forwarded to the next operator in
 /// the chain.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub enum StreamElement<Out> {
     /// A normal element containing just the value of the message.
     Item(Out),

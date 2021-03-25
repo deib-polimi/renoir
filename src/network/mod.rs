@@ -9,6 +9,8 @@ use crate::operator::StreamElement;
 use crate::scheduler::{HostId, ReplicaId};
 use crate::stream::BlockId;
 
+mod demultiplexer;
+mod multiplexer;
 mod receiver;
 mod remote;
 mod sender;

@@ -2,7 +2,7 @@ use std::sync::mpsc::SyncSender;
 
 use anyhow::{anyhow, Result};
 
-use crate::network::remote::MultiplexingSender;
+use crate::network::multiplexer::MultiplexingSender;
 use crate::network::ReceiverEndpoint;
 use crate::operator::Data;
 

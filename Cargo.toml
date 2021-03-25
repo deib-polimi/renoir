@@ -31,6 +31,10 @@ shell-escape = "0.1"
 structopt = "0.3"
 
 [dev-dependencies]
+# for the tests
+tempfile = "3.2"
+
+# for the examples
 regex = "1.4.3"
 
 [profile.release]

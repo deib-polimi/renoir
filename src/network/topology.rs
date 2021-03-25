@@ -6,7 +6,8 @@ use itertools::Itertools;
 use typemap::{Key, SendMap};
 
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
-use crate::network::remote::{DemultiplexingReceiver, MultiplexingSender};
+use crate::network::demultiplexer::DemultiplexingReceiver;
+use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{
     BlockCoord, Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint,
 };
@@ -14,24 +15,21 @@ use crate::operator::Data;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In: Data>(PhantomData<In>);
+
 impl<In: Data> Key for ReceiverKey<In> {
     type Value = HashMap<ReceiverEndpoint, NetworkReceiver<NetworkMessage<In>>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `NetworkSender`s.
 struct SenderKey<In: Data>(PhantomData<In>);
+
 impl<In: Data> Key for SenderKey<In> {
     type Value = HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<In>>>;
 }
 
-/// This struct is used to index inside the `typemap` with the `DemultiplexingReceiver`s.
-struct DemultiplexingReceiverKey<In: Data>(PhantomData<In>);
-impl<In: Data> Key for DemultiplexingReceiverKey<In> {
-    type Value = HashMap<BlockCoord, DemultiplexingReceiver<NetworkMessage<In>>>;
-}
-
 /// This struct is used to index inside the `typemap` with the `MultiplexingSender`s.
 struct MultiplexingSenderKey<In: Data>(PhantomData<In>);
+
 impl<In: Data> Key for MultiplexingSenderKey<In> {
     type Value = HashMap<BlockCoord, MultiplexingSender<NetworkMessage<In>>>;
 }
@@ -77,9 +75,9 @@ pub(crate) struct NetworkTopology {
 
     /// All the registered demultiplexers.
     ///
-    /// This map is indexed using `DemultiplexingReceiverKey`.
+    /// There is a demultiplexer for each block of the job graph inside each host.
     #[derivative(Debug = "ignore")]
-    demultiplexers: SendMap,
+    demultiplexers: HashMap<BlockCoord, DemultiplexingReceiver>,
     /// All the registered multiplexers.
     ///
     /// This map is indexed using `MultiplexingSenderKey`.
@@ -107,7 +105,7 @@ impl NetworkTopology {
             config,
             receivers: SendMap::custom(),
             senders: SendMap::custom(),
-            demultiplexers: SendMap::custom(),
+            demultiplexers: Default::default(),
             multiplexers: SendMap::custom(),
             next: Default::default(),
             senders_metadata: Default::default(),
@@ -126,7 +124,7 @@ impl NetworkTopology {
         unsafe {
             self.receivers.data_mut().drain();
             self.senders.data_mut().drain();
-            self.demultiplexers.data_mut().drain();
+            self.demultiplexers.drain();
             self.multiplexers.data_mut().drain();
         }
         for handle in self.join_handles.drain(..) {
@@ -220,13 +218,9 @@ impl NetworkTopology {
         // if the receiver is local and the runtime is remote, register it to the demultiplexer
         if receiver_endpoint.coord.host_id == self.config.host_id.unwrap() {
             if let ExecutionRuntime::Remote(remote) = &self.config.runtime {
-                let demuxes = self
-                    .demultiplexers
-                    .entry::<DemultiplexingReceiverKey<T>>()
-                    .or_insert_with(Default::default);
                 let block_coord = BlockCoord::from(receiver_endpoint.coord);
                 #[allow(clippy::map_entry)]
-                if !demuxes.contains_key(&block_coord) {
+                if !self.demultiplexers.contains_key(&block_coord) {
                     // find the set of all the previous blocks that have a MultiplexingSender that
                     // point to this DemultiplexingReceiver.
                     let mut prev = HashSet::new();
@@ -244,9 +238,16 @@ impl NetworkTopology {
                     let (demux, join_handle) =
                         DemultiplexingReceiver::new(block_coord, remote, prev.len());
                     self.join_handles.push(join_handle);
-                    demuxes.insert(block_coord, demux);
+                    self.demultiplexers.insert(block_coord, demux);
                 }
-                demuxes[&block_coord].register(receiver_endpoint, receiver.local_sender.clone());
+                let join_handle = self
+                    .demultiplexers
+                    .get_mut(&block_coord)
+                    .unwrap()
+                    .register(receiver_endpoint, receiver.local_sender.clone());
+                if let Some(join_handle) = join_handle {
+                    self.join_handles.push(join_handle);
+                }
             }
         }
         self.receivers
@@ -290,18 +291,16 @@ impl NetworkTopology {
         let host_id = self.config.host_id.unwrap();
         let from_remote = from.host_id != host_id;
         let to_remote = to.host_id != host_id;
+
+        if from_remote && to_remote {
+            warn!("Cannot connect two remote replicas: {} -> {}", from, to)
+        }
+
         debug!(
             "New connection: {} (remote={}) -> {} (remote={})",
             from, from_remote, to, to_remote
         );
         self.next.entry(from).or_default().push(to);
-
-        assert!(
-            !(from_remote && to_remote),
-            "Cannot connect two remote replicas: {} -> {}",
-            from,
-            to
-        );
 
         let receiver_endpoint = ReceiverEndpoint::new(to, from.block_id);
         self.senders_metadata
@@ -324,5 +323,215 @@ impl NetworkTopology {
             }
         }
         debug!("{}", topology);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Debug;
+    use std::io::Write;
+
+    use crate::operator::StreamElement;
+    use crate::scheduler::HostId;
+
+    use super::*;
+
+    #[test]
+    fn test_local_topology() {
+        let config = EnvironmentConfig::local(4);
+        let mut topology = NetworkTopology::new(config);
+
+        // s1 [b0, h0] -> r1 [b2, h0] (endpoint 1) type=i32
+        // s2 [b1, h0] -> r1 [b2, h0] (endpoint 2) type=u64
+        // s2 [b1, h0] -> r2 [b3, h0] (endpoint 3) type=u64
+
+        let sender1 = Coord::new(0, 0, 0);
+        let sender2 = Coord::new(1, 0, 0);
+        let receiver1 = Coord::new(2, 0, 0);
+        let receiver2 = Coord::new(3, 0, 0);
+
+        topology.connect(sender1, receiver1);
+        topology.connect(sender2, receiver1);
+        topology.connect(sender2, receiver2);
+
+        let endpoint1 = ReceiverEndpoint::new(receiver1, 0);
+        let endpoint2 = ReceiverEndpoint::new(receiver1, 1);
+        let endpoint3 = ReceiverEndpoint::new(receiver2, 1);
+
+        let tx1 = topology.get_senders::<i32>(sender1);
+        assert_eq!(tx1.len(), 1);
+        tx1[&endpoint1]
+            .send(vec![StreamElement::Item(123i32)])
+            .unwrap();
+
+        let tx2 = topology.get_senders::<u64>(sender2);
+        assert_eq!(tx2.len(), 2);
+        tx2[&endpoint2]
+            .send(vec![StreamElement::Item(666u64)])
+            .unwrap();
+        tx2[&endpoint3]
+            .send(vec![StreamElement::Item(42u64)])
+            .unwrap();
+
+        let rx1 = topology.get_receiver::<i32>(endpoint1);
+        assert_eq!(rx1.recv().unwrap(), vec![StreamElement::Item(123i32)]);
+
+        let rx2 = topology.get_receiver::<u64>(endpoint2);
+        assert_eq!(rx2.recv().unwrap(), vec![StreamElement::Item(666u64)]);
+
+        let rx3 = topology.get_receiver::<u64>(endpoint3);
+        assert_eq!(rx3.recv().unwrap(), vec![StreamElement::Item(42u64)]);
+    }
+
+    #[test]
+    fn test_remote_topology() {
+        let mut config = tempfile::NamedTempFile::new().unwrap();
+        let config_yaml = "hosts:\n".to_string()
+            + " - address: 127.0.0.1\n"
+            + "   base_port: 21841\n"
+            + "   num_cores: 1\n"
+            + " - address: 127.0.0.1\n"
+            + "   base_port: 31258\n"
+            + "   num_cores: 1\n";
+        config.write_all(config_yaml.as_bytes()).unwrap();
+        let config = EnvironmentConfig::remote(config.path()).unwrap();
+
+        // s1 [b0, h0, r0] -> r1 [b2, h1, r0] (endpoint 1) type=i32
+        // s2 [b0, h1, r0] -> r1 [b2, h1, r0] (endpoint 1) type=i32
+        // s3 [b1, h0, r0] -> r1 [b2, h1, r0] (endpoint 2) type=u64
+        // s4 [b1, h0, r1] -> r1 [b2, h1, r0] (endpoint 2) type=u64
+        // s3 [b1, h0, r0] -> r2 [b2, h1, r1] (endpoint 3) type=u64
+        // s4 [b1, h0, r1] -> r2 [b2, h1, r1] (endpoint 3) type=u64
+
+        let run = |mut config: EnvironmentConfig, host: HostId| {
+            config.host_id = Some(host);
+
+            let mut topology = NetworkTopology::new(config);
+
+            let s1 = Coord::new(0, 0, 0);
+            let s2 = Coord::new(0, 1, 0);
+            let s3 = Coord::new(1, 0, 0);
+            let s4 = Coord::new(1, 0, 1);
+
+            let r1 = Coord::new(2, 1, 0);
+            let r2 = Coord::new(2, 1, 1);
+
+            topology.connect(s1, r1);
+            topology.connect(s2, r1);
+            topology.connect(s3, r1);
+            topology.connect(s4, r1);
+            topology.connect(s3, r2);
+            topology.connect(s4, r2);
+
+            let endpoint1 = ReceiverEndpoint::new(r1, 0);
+            let endpoint2 = ReceiverEndpoint::new(r1, 1);
+            let endpoint3 = ReceiverEndpoint::new(r2, 1);
+
+            if s1.host_id == host {
+                let tx1 = topology.get_senders::<i32>(s1);
+                assert_eq!(tx1.len(), 1);
+                tx1[&endpoint1]
+                    .send(vec![StreamElement::Item(123i32)])
+                    .unwrap();
+            }
+
+            if s2.host_id == host {
+                let tx2 = topology.get_senders::<i32>(s2);
+                assert_eq!(tx2.len(), 1);
+                tx2[&endpoint1]
+                    .send(vec![StreamElement::Item(456i32)])
+                    .unwrap();
+            }
+
+            if s3.host_id == host {
+                let tx3 = topology.get_senders::<u64>(s3);
+                assert_eq!(tx3.len(), 2);
+                tx3[&endpoint2]
+                    .send(vec![StreamElement::Item(666u64)])
+                    .unwrap();
+                tx3[&endpoint3]
+                    .send(vec![StreamElement::Item(42u64)])
+                    .unwrap();
+            }
+
+            if s4.host_id == host {
+                let tx4 = topology.get_senders::<u64>(s4);
+                assert_eq!(tx4.len(), 2);
+                tx4[&endpoint2]
+                    .send(vec![StreamElement::Item(111u64)])
+                    .unwrap();
+                tx4[&endpoint3]
+                    .send(vec![StreamElement::Item(4242u64)])
+                    .unwrap();
+            }
+
+            let mut join_handles = vec![];
+
+            if endpoint1.coord.host_id == host {
+                let rx1 = topology.get_receiver::<i32>(endpoint1);
+                join_handles.push(
+                    std::thread::Builder::new()
+                        .name("rx1".into())
+                        .spawn(move || receiver(rx1, vec![123i32, 456i32]))
+                        .unwrap(),
+                );
+            }
+
+            if endpoint2.coord.host_id == host {
+                let rx2 = topology.get_receiver::<u64>(endpoint2);
+                join_handles.push(
+                    std::thread::Builder::new()
+                        .name("rx2".into())
+                        .spawn(move || receiver(rx2, vec![111u64, 666u64]))
+                        .unwrap(),
+                );
+            }
+
+            if endpoint3.coord.host_id == host {
+                let rx3 = topology.get_receiver::<u64>(endpoint3);
+                join_handles.push(
+                    std::thread::Builder::new()
+                        .name("rx3".into())
+                        .spawn(move || receiver(rx3, vec![42u64, 4242u64]))
+                        .unwrap(),
+                );
+            }
+
+            for handle in join_handles {
+                handle.join().unwrap();
+            }
+            topology.stop_and_wait();
+        };
+
+        let config0 = config.clone();
+        let join0 = std::thread::Builder::new()
+            .name("host0".into())
+            .spawn(move || run(config0, 0))
+            .unwrap();
+        let join1 = std::thread::Builder::new()
+            .name("host1".into())
+            .spawn(move || run(config, 1))
+            .unwrap();
+
+        join0.join().unwrap();
+        join1.join().unwrap();
+    }
+
+    fn receiver<T: Data + Ord + Debug>(
+        receiver: NetworkReceiver<NetworkMessage<T>>,
+        expected: Vec<T>,
+    ) {
+        let res = (0..expected.len())
+            .map(|_| receiver.recv().unwrap())
+            .flatten()
+            .sorted()
+            .collect_vec();
+        assert_eq!(
+            res,
+            expected
+                .into_iter()
+                .map(|x| StreamElement::Item(x))
+                .collect_vec()
+        );
     }
 }
