@@ -1,34 +1,49 @@
 [package]
 name = "rstream"
 version = "0.1.0"
-authors = ["Edoardo Morassutto <edoardo.morassutto@gmail.com>"]
+authors = [
+    "Edoardo Morassutto <edoardo.morassutto@gmail.com>",
+    "Marco Donadoni <marco.donadoni@mail.polimi.it>"
+]
 edition = "2018"
 
 [dependencies]
+# for logging to the console
 log = "0.4"
 env_logger = "0.8"
 
+# used by the network for storing type-generic structures
 typemap = "0.3"
 
+# the shuffle() operator requires a random source
 rand = "0.8"
 
+# utility macros for customizing the derive Debug, Default, ...
 derivative = "2.2"
 
-serde = { version="1.0", features = ["derive"] }
+# serialization library used for reading the config file (yaml) and serializing
+# the messages on the network
+serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 bincode = "1.3"
 
+# handy Result type
 anyhow = "1.0"
 
+# handy iterators functions
 itertools = "0.10"
 
+# for storing non-mutable static variables with non-trivial initialization
 lazy_static = "1.4"
 
+# used for spawning the remote workers
 ssh2 = { version = "0.9", features = ["vendored-openssl"] }
 whoami = "1.1"
 shell-escape = "0.1"
 
+# command line parsing utility
 structopt = "0.3"
+
 
 [dev-dependencies]
 # for the tests
@@ -39,21 +54,23 @@ fake = "2.4"
 # for the examples
 regex = "1.4.3"
 
+
+# The list of benchmarks, all of them require "harness = false" in order to
+# work with criterion.rs. Cannot set `[lib] harness = false` because the tests
+# require the harness.
 [[bench]]
 name = "wordcount"
 harness = false
-
 [[bench]]
 name = "shuffle"
 harness = false
-
 [[bench]]
 name = "fold_vs_reduce"
 harness = false
-
 [[bench]]
 name = "batch_mode"
 harness = false
+
 
 [profile.release]
 debug = true
