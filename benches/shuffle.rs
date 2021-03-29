@@ -29,12 +29,12 @@ fn shuffle(dataset: &'static [u32]) {
 
 fn shuffle_benchmark(c: &mut Criterion) {
     let seed = b"rstream2 by edomora97 and mark03".to_owned();
-    let ref mut r = StdRng::from_seed(seed);
+    let r = &mut StdRng::from_seed(seed);
 
     const DATASET_SIZE: usize = 100_000;
     let mut dataset: [u32; DATASET_SIZE] = [0; DATASET_SIZE];
-    for i in 0..DATASET_SIZE {
-        dataset[i] = r.gen();
+    for item in dataset.iter_mut() {
+        *item = r.gen();
     }
 
     let dataset = Box::leak(Box::new(dataset)) as &_;
