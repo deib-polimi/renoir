@@ -85,7 +85,7 @@ fn wordcount_reduce_assoc(path: &Path) {
 fn wordcount_benchmark(c: &mut Criterion) {
     let mut file = tempfile::NamedTempFile::new().unwrap();
     let seed = b"rstream2 by edomora97 and mark03".to_owned();
-    let ref mut r = StdRng::from_seed(seed);
+    let r = &mut StdRng::from_seed(seed);
 
     const N_LINES: usize = 100_000;
     for _ in 0..N_LINES {
