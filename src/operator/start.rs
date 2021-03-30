@@ -41,7 +41,11 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
         let receiver = network.get_receiver(endpoint);
         self.receiver = Some(receiver);
         drop(network);
-        self.missing_ends = metadata.prev.len();
+        for &prev in metadata.prev.iter() {
+            if prev.block_id == self.prev_block_id {
+                self.missing_ends += 1;
+            }
+        }
         info!(
             "StartBlock {} initialized, {} previous blocks, receiver is: {:?}",
             metadata.coord, self.missing_ends, self.receiver

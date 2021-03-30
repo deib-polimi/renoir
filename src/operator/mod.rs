@@ -12,6 +12,7 @@ pub use shuffle::*;
 pub use start::*;
 pub use unkey::*;
 pub use window::*;
+pub use zip::*;
 
 use crate::scheduler::ExecutionMetadata;
 
@@ -32,6 +33,7 @@ mod split;
 mod start;
 mod unkey;
 mod window;
+mod zip;
 
 /// Marker trait that all the types inside a stream should implement.
 pub trait Data: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static {}

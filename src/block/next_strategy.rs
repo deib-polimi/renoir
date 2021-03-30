@@ -63,8 +63,8 @@ impl<Out: Data> NextStrategy<Out> {
                         "OnlyOne cannot mix the number of replicas: block {} -> {}, replicas {} -> {}",
                         metadata.coord.block_id,
                         block_id,
+                        metadata.num_replicas,
                         block_senders.len(),
-                        metadata.num_replicas
                     );
                     if block_senders.len() == 1 {
                         senders.push(SenderList(block_senders));
