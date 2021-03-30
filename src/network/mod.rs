@@ -94,7 +94,7 @@ impl DemuxCoord {
 
     /// Check whether the connection from->to would pass through this `DemuxCoord`.
     pub fn includes_channel(&self, from: Coord, to: Coord) -> bool {
-        return self.coord == BlockCoord::from(to) && self.prev_block_id == from.block_id;
+        self.coord == BlockCoord::from(to) && self.prev_block_id == from.block_id
     }
 }
 
