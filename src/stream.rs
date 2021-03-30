@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy};
 use crate::environment::StreamEnvironmentInner;
-use crate::operator::{Data, Operator};
+use crate::operator::{Data, Operator, WindowDescription};
 use crate::operator::{DataKey, StartBlock};
 
 /// Identifier of a block in the job graph.
@@ -42,6 +42,15 @@ pub struct KeyedStream<Key: DataKey, Out: Data, OperatorChain>(
 )
 where
     OperatorChain: Operator<KeyValue<Key, Out>>;
+
+pub struct WindowedStream<Out: Data, OperatorChain, WinDescr>
+where
+    OperatorChain: Operator<Out>,
+    WinDescr: WindowDescription<Out>,
+{
+    pub(crate) inner: Stream<Out, OperatorChain>,
+    pub(crate) window: WinDescr,
+}
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
