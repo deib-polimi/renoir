@@ -144,6 +144,7 @@ impl Scheduler {
         info!("Starting scheduler: {:#?}", self.config);
         self.log_topology();
         self.build_execution_graph();
+        self.network.finalize_topology();
         self.network.log_topology();
 
         let mut join = vec![];
@@ -194,22 +195,18 @@ impl Scheduler {
         self.prev_blocks.get(&block_id).cloned()
     }
 
-    /// Build the execution graph for the network topology considering only the part of the network
-    /// affected by the current host. This therefore discards all the connections between the other
-    /// hosts since this host is unaffected by them.
+    /// Build the execution graph for the network topology, multiplying each block of the job graph
+    /// into all its replicas.
     fn build_execution_graph(&mut self) {
-        let host_id = self.config.host_id.unwrap();
         for (from_block_id, next) in self.next_blocks.iter() {
             let from = &self.block_info[from_block_id];
             for to_block_id in next.iter() {
                 let to = &self.block_info[to_block_id];
                 // for each pair (from -> to) inside the job graph, connect all the corresponding
-                // jobs of the execution graph only if the current host is affected
+                // jobs of the execution graph
                 for &from_coord in from.replicas.values().flatten() {
                     for &to_coord in to.replicas.values().flatten() {
-                        if from_coord.host_id == host_id || to_coord.host_id == host_id {
-                            self.network.connect(from_coord, to_coord);
-                        }
+                        self.network.connect(from_coord, to_coord);
                     }
                 }
             }
@@ -270,9 +267,7 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let num_replicas = local
-            .num_cores
-            .min(max_parallelism.unwrap_or(usize::max_value()));
+        let num_replicas = local.num_cores.min(max_parallelism.unwrap_or(usize::MAX));
         debug!(
             "Block {} will have {} local replicas (max_parallelism={:?})",
             block.id, num_replicas, max_parallelism
@@ -305,7 +300,7 @@ impl Scheduler {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
         debug!("Allocating block {} on remote runtime", block.id);
         // number of replicas we can assign at most
-        let mut remaining_replicas = max_parallelism.unwrap_or(usize::max_value());
+        let mut remaining_replicas = max_parallelism.unwrap_or(usize::MAX);
         let mut num_replicas = 0;
         let mut replicas: HashMap<_, Vec<_>> = HashMap::default();
         let mut global_ids = HashMap::default();

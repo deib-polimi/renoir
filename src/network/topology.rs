@@ -9,9 +9,10 @@ use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::demultiplexer::DemultiplexingReceiver;
 use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{
-    BlockCoord, Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint,
+    BlockCoord, Coord, DemuxCoord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint,
 };
 use crate::operator::Data;
+use crate::scheduler::HostId;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In: Data>(PhantomData<In>);
@@ -27,11 +28,18 @@ impl<In: Data> Key for SenderKey<In> {
     type Value = HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<In>>>;
 }
 
+/// This struct is used to index inside the `typemap` with the `DemultiplexingReceiver`s.
+struct DemultiplexingReceiverKey<In: Data>(PhantomData<In>);
+
+impl<In: Data> Key for DemultiplexingReceiverKey<In> {
+    type Value = HashMap<DemuxCoord, DemultiplexingReceiver<NetworkMessage<In>>>;
+}
+
 /// This struct is used to index inside the `typemap` with the `MultiplexingSender`s.
 struct MultiplexingSenderKey<In: Data>(PhantomData<In>);
 
 impl<In: Data> Key for MultiplexingSenderKey<In> {
-    type Value = HashMap<BlockCoord, MultiplexingSender<NetworkMessage<In>>>;
+    type Value = HashMap<DemuxCoord, MultiplexingSender<NetworkMessage<In>>>;
 }
 
 /// Metadata about a registered sender.
@@ -75,9 +83,9 @@ pub(crate) struct NetworkTopology {
 
     /// All the registered demultiplexers.
     ///
-    /// There is a demultiplexer for each block of the job graph inside each host.
+    /// This map is indexed using `DemultiplexingReceiverKey`.
     #[derivative(Debug = "ignore")]
-    demultiplexers: HashMap<BlockCoord, DemultiplexingReceiver>,
+    demultiplexers: SendMap,
     /// All the registered multiplexers.
     ///
     /// This map is indexed using `MultiplexingSenderKey`.
@@ -95,6 +103,10 @@ pub(crate) struct NetworkTopology {
     /// the same receiver is initialized twice (the same socket may be bound twice).
     used_receivers: HashSet<ReceiverEndpoint>,
 
+    /// The mapping between the coordinate of a demultiplexer of a block to the actual address/port
+    /// of that demultiplexer in the network.
+    demultiplexer_addresses: HashMap<DemuxCoord, (String, u16)>,
+
     /// The set of join handles of the various threads spawned by the topology.
     join_handles: Vec<JoinHandle<()>>,
 }
@@ -105,11 +117,12 @@ impl NetworkTopology {
             config,
             receivers: SendMap::custom(),
             senders: SendMap::custom(),
-            demultiplexers: Default::default(),
+            demultiplexers: SendMap::custom(),
             multiplexers: SendMap::custom(),
             next: Default::default(),
             senders_metadata: Default::default(),
             used_receivers: Default::default(),
+            demultiplexer_addresses: Default::default(),
             join_handles: Default::default(),
         }
     }
@@ -124,7 +137,7 @@ impl NetworkTopology {
         unsafe {
             self.receivers.data_mut().drain();
             self.senders.data_mut().drain();
-            self.demultiplexers.drain();
+            self.demultiplexers.data_mut().drain();
             self.multiplexers.data_mut().drain();
         }
         for handle in self.join_handles.drain(..) {
@@ -217,37 +230,38 @@ impl NetworkTopology {
 
         // if the receiver is local and the runtime is remote, register it to the demultiplexer
         if receiver_endpoint.coord.host_id == self.config.host_id.unwrap() {
-            if let ExecutionRuntime::Remote(remote) = &self.config.runtime {
-                let block_coord = BlockCoord::from(receiver_endpoint.coord);
+            if let ExecutionRuntime::Remote(_) = &self.config.runtime {
+                let demux_coord = DemuxCoord::from(receiver_endpoint);
+                let demuxes = self
+                    .demultiplexers
+                    .entry::<DemultiplexingReceiverKey<T>>()
+                    .or_insert_with(Default::default);
                 #[allow(clippy::map_entry)]
-                if !self.demultiplexers.contains_key(&block_coord) {
+                if !demuxes.contains_key(&demux_coord) {
                     // find the set of all the previous blocks that have a MultiplexingSender that
                     // point to this DemultiplexingReceiver.
                     let mut prev = HashSet::new();
-                    for (from, to) in &self.next {
+                    for (&from, to) in &self.next {
                         // local blocks won't use the multiplexer
-                        if from.host_id == block_coord.host_id {
+                        if from.host_id == demux_coord.coord.host_id {
                             continue;
                         }
-                        for to in to {
-                            if BlockCoord::from(*to) == block_coord {
-                                prev.insert(BlockCoord::from(*from));
+                        for &to in to {
+                            if demux_coord.includes_channel(from, to) {
+                                prev.insert(BlockCoord::from(from));
                             }
                         }
                     }
+                    let address = self.demultiplexer_addresses[&demux_coord].clone();
                     let (demux, join_handle) =
-                        DemultiplexingReceiver::new(block_coord, remote, prev.len());
+                        DemultiplexingReceiver::new(demux_coord, address, prev.len());
                     self.join_handles.push(join_handle);
-                    self.demultiplexers.insert(block_coord, demux);
+                    demuxes.insert(demux_coord, demux);
                 }
-                let join_handle = self
-                    .demultiplexers
-                    .get_mut(&block_coord)
+                demuxes
+                    .get_mut(&demux_coord)
                     .unwrap()
                     .register(receiver_endpoint, receiver.local_sender.clone());
-                if let Some(join_handle) = join_handle {
-                    self.join_handles.push(join_handle);
-                }
             }
         }
         self.receivers
@@ -258,19 +272,20 @@ impl NetworkTopology {
         // create the sending part of the channel
         let sender = if sender_metadata.is_remote {
             // this channel ends to a remote host: connect it to the multiplexer
-            if let ExecutionRuntime::Remote(remote) = &self.config.runtime {
+            if let ExecutionRuntime::Remote(_) = &self.config.runtime {
                 let muxers = self
                     .multiplexers
                     .entry::<MultiplexingSenderKey<T>>()
                     .or_insert_with(Default::default);
-                let block_coord = BlockCoord::from(receiver_endpoint.coord);
+                let demux_coord = DemuxCoord::from(receiver_endpoint);
                 #[allow(clippy::map_entry)]
-                if !muxers.contains_key(&block_coord) {
-                    let (mux, join_handle) = MultiplexingSender::new(block_coord, remote);
+                if !muxers.contains_key(&demux_coord) {
+                    let address = self.demultiplexer_addresses[&demux_coord].clone();
+                    let (mux, join_handle) = MultiplexingSender::new(demux_coord, address);
                     self.join_handles.push(join_handle);
-                    muxers.insert(block_coord, mux);
+                    muxers.insert(demux_coord, mux);
                 }
-                NetworkSender::remote(receiver_endpoint, muxers[&block_coord].clone())
+                NetworkSender::remote(receiver_endpoint, muxers[&demux_coord].clone())
             } else {
                 panic!("Sender is marked as remote, but the runtime is not");
             }
@@ -285,22 +300,26 @@ impl NetworkTopology {
 
     /// Register the connection between two replicas.
     ///
-    /// At least one of the 2 replicas must be local (we cannot connect 2 remote replicas).
+    /// If the 2 replicas are remote this function saves the connection between them, but does not
+    /// prepare any sender/receiver for that channel.
+    ///
     /// This will not actually bind/connect sockets, it will just mark them as bindable/connectable.
     pub fn connect(&mut self, from: Coord, to: Coord) {
         let host_id = self.config.host_id.unwrap();
         let from_remote = from.host_id != host_id;
         let to_remote = to.host_id != host_id;
 
-        if from_remote && to_remote {
-            warn!("Cannot connect two remote replicas: {} -> {}", from, to)
-        }
-
         debug!(
             "New connection: {} (remote={}) -> {} (remote={})",
             from, from_remote, to, to_remote
         );
         self.next.entry(from).or_default().push(to);
+
+        if from_remote && to_remote {
+            // totally remote channels are not interesting for this host, but they need to be
+            // considered in `self.next` for a deterministic assignment of the demultiplexer ports.
+            return;
+        }
 
         let receiver_endpoint = ReceiverEndpoint::new(to, from.block_id);
         self.senders_metadata
@@ -311,6 +330,39 @@ impl NetworkTopology {
         if to_remote {
             let metadata = self.senders_metadata.get_mut(&receiver_endpoint).unwrap();
             metadata.is_remote = true;
+        }
+    }
+
+    /// Finalize the network topology setting up internal properties.
+    ///
+    /// This has to be called after all the calls to `connect` and before any call to `get_senders`
+    /// and `get_receiver`.
+    ///
+    /// Internally this computes the mapping between `DemuxCoord` and actual TCP port.
+    pub fn finalize_topology(&mut self) {
+        let config = if let ExecutionRuntime::Remote(config) = &self.config.runtime {
+            config
+        } else {
+            return;
+        };
+        let mut coords = HashSet::new();
+        for (&from, to) in self.next.iter() {
+            for &to in to {
+                let coord = DemuxCoord::new(from, to);
+                coords.insert(coord);
+            }
+        }
+        let mut used_ports: HashMap<HostId, u16> = HashMap::new();
+        // sort the coords in order to have a deterministic assignment between all the hosts
+        for coord in coords.into_iter().sorted() {
+            let host_id = coord.coord.host_id;
+            let port_offset = used_ports.entry(host_id).or_default();
+            let host = &config.hosts[host_id];
+            let port = host.base_port + *port_offset;
+            *port_offset += 1;
+            let address = (host.address.clone(), port);
+            debug!("Demultiplexer of {} is at {:?}", coord, address);
+            self.demultiplexer_addresses.insert(coord, address);
         }
     }
 
@@ -353,6 +405,7 @@ mod tests {
         topology.connect(sender1, receiver1);
         topology.connect(sender2, receiver1);
         topology.connect(sender2, receiver2);
+        topology.finalize_topology();
 
         let endpoint1 = ReceiverEndpoint::new(receiver1, 0);
         let endpoint2 = ReceiverEndpoint::new(receiver1, 1);
@@ -422,6 +475,7 @@ mod tests {
             topology.connect(s4, r1);
             topology.connect(s3, r2);
             topology.connect(s4, r2);
+            topology.finalize_topology();
 
             let endpoint1 = ReceiverEndpoint::new(r1, 0);
             let endpoint2 = ReceiverEndpoint::new(r1, 1);

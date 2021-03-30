@@ -7,7 +7,7 @@ use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, With
 use bincode::{DefaultOptions, Options};
 use serde::{Deserialize, Serialize};
 
-use crate::network::{BlockCoord, Coord, ReceiverEndpoint};
+use crate::network::{Coord, DemuxCoord, ReceiverEndpoint};
 use crate::operator::Data;
 use crate::scheduler::ReplicaId;
 use crate::stream::BlockId;
@@ -84,7 +84,7 @@ pub(crate) fn remote_send<T: Data>(what: T, dest: ReceiverEndpoint, stream: &mut
 ///
 /// The message won't be deserialized, use `deserialize()`.
 pub(crate) fn remote_recv(
-    coord: BlockCoord,
+    coord: DemuxCoord,
     stream: &mut TcpStream,
 ) -> Option<(ReceiverEndpoint, SerializedMessage)> {
     let address = stream
@@ -116,7 +116,7 @@ pub(crate) fn remote_recv(
         )
     });
     let receiver_endpoint = ReceiverEndpoint::new(
-        Coord::new(coord.block_id, coord.host_id, header.replica_id),
+        Coord::new(coord.coord.block_id, coord.coord.host_id, header.replica_id),
         header.sender_block_id,
     );
     Some((receiver_endpoint, buf))

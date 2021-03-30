@@ -6,9 +6,8 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 
-use crate::config::RemoteRuntimeConfig;
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
-use crate::network::{BlockCoord, ReceiverEndpoint};
+use crate::network::{DemuxCoord, ReceiverEndpoint};
 use crate::operator::Data;
 
 /// Maximum number of attempts to make for connecting to a remote host.
@@ -23,7 +22,7 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// Like `NetworkSender`, but this should be used in a multiplexed channel (i.e. a remote one).
 ///
-/// With the actual message the receiver endpoint is sent in order to demultiplex the message.
+/// The `ReceiverEndpoint` is sent alongside the actual message in order to demultiplex it.
 #[derive(Debug, Clone)]
 pub(crate) struct MultiplexingSender<Out: Data> {
     /// The internal sender that points to the actual multiplexed channel.
@@ -34,11 +33,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     /// Construct a new `MultiplexingSender` for a block.
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).
-    pub fn new(
-        coord: BlockCoord,
-        remote_runtime_config: &RemoteRuntimeConfig,
-    ) -> (Self, JoinHandle<()>) {
-        let address = coord.address(remote_runtime_config);
+    pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
         let (sender, receiver) = sync_channel(CHANNEL_CAPACITY);
         let join_handle = std::thread::Builder::new()
             .name(format!("NetSender{}", coord))
@@ -63,7 +58,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     ///   of errors.
     /// - If the connection cannot be established this function will panic.
     fn connect_remote(
-        coord: BlockCoord,
+        coord: DemuxCoord,
         address: (String, u16),
         local_receiver: Receiver<(ReceiverEndpoint, Out)>,
     ) {
@@ -117,7 +112,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     /// Waits messages from the local receiver, then serialize the message and send it to the remote
     /// replica.
     fn handle_remote_connection(
-        coord: BlockCoord,
+        coord: DemuxCoord,
         local_receiver: Receiver<(ReceiverEndpoint, Out)>,
         mut stream: TcpStream,
     ) {

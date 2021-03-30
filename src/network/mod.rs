@@ -4,7 +4,6 @@ pub(crate) use receiver::*;
 pub(crate) use sender::*;
 pub(crate) use topology::*;
 
-use crate::config::RemoteRuntimeConfig;
 use crate::operator::StreamElement;
 use crate::scheduler::{HostId, ReplicaId};
 use crate::stream::BlockId;
@@ -54,6 +53,18 @@ pub(crate) struct ReceiverEndpoint {
     pub prev_block_id: BlockId,
 }
 
+/// The identifier of a demultiplexer inside an host.
+///
+/// Each block has as many demultiplexers as incoming blocks in the job graph. This coordinate
+/// identify each of them inside a specific host.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub(crate) struct DemuxCoord {
+    /// The coordinate of the block inside an host.
+    pub coord: BlockCoord,
+    /// The id of the previous block in the job graph.
+    pub prev_block_id: BlockId,
+}
+
 impl Coord {
     pub fn new(block_id: BlockId, host_id: HostId, replica_id: ReplicaId) -> Self {
         Self {
@@ -64,20 +75,26 @@ impl Coord {
     }
 }
 
-impl BlockCoord {
-    /// Get the address/port to bind for the current block.
-    pub fn address(&self, remote_runtime_config: &RemoteRuntimeConfig) -> (String, u16) {
-        let host = &remote_runtime_config.hosts[self.host_id];
-        (host.address.clone(), host.base_port + self.block_id as u16)
-    }
-}
-
 impl ReceiverEndpoint {
     pub fn new(coord: Coord, prev_block_id: BlockId) -> Self {
         Self {
             coord,
             prev_block_id,
         }
+    }
+}
+
+impl DemuxCoord {
+    pub fn new(from: Coord, to: Coord) -> Self {
+        Self {
+            coord: to.into(),
+            prev_block_id: from.block_id,
+        }
+    }
+
+    /// Check whether the connection from->to would pass through this `DemuxCoord`.
+    pub fn includes_channel(&self, from: Coord, to: Coord) -> bool {
+        return self.coord == BlockCoord::from(to) && self.prev_block_id == from.block_id;
     }
 }
 
@@ -107,11 +124,26 @@ impl Display for ReceiverEndpoint {
     }
 }
 
+impl Display for DemuxCoord {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DemuxCoord[{}, prev {}]", self.coord, self.prev_block_id)
+    }
+}
+
 impl From<Coord> for BlockCoord {
     fn from(coord: Coord) -> Self {
         Self {
             block_id: coord.block_id,
             host_id: coord.host_id,
+        }
+    }
+}
+
+impl From<ReceiverEndpoint> for DemuxCoord {
+    fn from(endpoint: ReceiverEndpoint) -> Self {
+        Self {
+            coord: endpoint.coord.into(),
+            prev_block_id: endpoint.prev_block_id,
         }
     }
 }
