@@ -1,6 +1,5 @@
-use std::sync::mpsc::SyncSender;
-
 use anyhow::{anyhow, Result};
+use crossbeam_channel::Sender;
 
 use crate::network::multiplexer::MultiplexingSender;
 use crate::network::ReceiverEndpoint;
@@ -26,14 +25,14 @@ pub(crate) struct NetworkSender<Out: Data> {
 #[derive(Clone)]
 pub(crate) enum NetworkSenderImpl<Out: Data> {
     /// The channel is local, use an in-memory channel.
-    Local(SyncSender<Out>),
+    Local(Sender<Out>),
     /// The channel is remote, use the multiplexer.
     Remote(MultiplexingSender<Out>),
 }
 
 impl<Out: Data> NetworkSender<Out> {
     /// Create a new local sender that sends the data directly to the recipient.
-    pub fn local(receiver_endpoint: ReceiverEndpoint, sender: SyncSender<Out>) -> Self {
+    pub fn local(receiver_endpoint: ReceiverEndpoint, sender: Sender<Out>) -> Self {
         Self {
             receiver_endpoint,
             sender: NetworkSenderImpl::Local(sender),
@@ -59,6 +58,14 @@ impl<Out: Data> NetworkSender<Out> {
                 )
             }),
             NetworkSenderImpl::Remote(sender) => sender.send(self.receiver_endpoint, item),
+        }
+    }
+
+    /// Get the inner sender if the channel is local.
+    pub fn inner(&self) -> Option<&Sender<Out>> {
+        match &self.sender {
+            NetworkSenderImpl::Local(inner) => Some(inner),
+            NetworkSenderImpl::Remote(_) => None,
         }
     }
 }

@@ -44,6 +44,8 @@ shell-escape = "0.1"
 # command line parsing utility
 structopt = "0.3"
 
+# used for NetworkReceiver since it requires select
+crossbeam-channel = "0.5"
 
 [dev-dependencies]
 # for the tests
