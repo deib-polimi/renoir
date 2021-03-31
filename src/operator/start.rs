@@ -9,46 +9,58 @@ use crate::stream::BlockId;
 #[derivative(Clone)]
 pub struct StartBlock<Out: Data> {
     metadata: Option<ExecutionMetadata>,
-    #[derivative(Clone(clone_with = "clone_none"))]
-    receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
+    #[derivative(Clone(clone_with = "clone_empty"))]
+    receivers: Vec<NetworkReceiver<NetworkMessage<Out>>>,
     buffer: VecDeque<StreamElement<Out>>,
     missing_ends: usize,
     /// The last call to next caused a timeout, so a FlushBatch has been emitted. In this case this
     /// field is set to true to avoid flooding with FlushBatch.
     already_timed_out: bool,
-    /// The id of the previous block in the job graph. This block is unique since `StartBlock` does
-    /// not support multiple inputs.
-    prev_block_id: BlockId,
+    /// The id of the previous blocks in the job graph.
+    prev_block_ids: Vec<BlockId>,
 }
 
 impl<Out: Data> StartBlock<Out> {
     pub(crate) fn new(prev_block_id: BlockId) -> Self {
         Self {
             metadata: Default::default(),
-            receiver: Default::default(),
+            receivers: Default::default(),
             buffer: Default::default(),
             missing_ends: Default::default(),
             already_timed_out: Default::default(),
-            prev_block_id,
+            prev_block_ids: vec![prev_block_id],
+        }
+    }
+
+    pub(crate) fn concat(prev_block_ids: Vec<BlockId>) -> Self {
+        Self {
+            metadata: Default::default(),
+            receivers: Default::default(),
+            buffer: Default::default(),
+            missing_ends: Default::default(),
+            already_timed_out: Default::default(),
+            prev_block_ids,
         }
     }
 }
 
 impl<Out: Data> Operator<Out> for StartBlock<Out> {
     fn setup(&mut self, metadata: ExecutionMetadata) {
-        let mut network = metadata.network.lock().unwrap();
-        let endpoint = ReceiverEndpoint::new(metadata.coord, self.prev_block_id);
-        let receiver = network.get_receiver(endpoint);
-        self.receiver = Some(receiver);
-        drop(network);
-        for &prev in metadata.prev.iter() {
-            if prev.block_id == self.prev_block_id {
-                self.missing_ends += 1;
+        for &prev_block_id in &self.prev_block_ids {
+            let mut network = metadata.network.lock().unwrap();
+            let endpoint = ReceiverEndpoint::new(metadata.coord, prev_block_id);
+            let receiver = network.get_receiver(endpoint);
+            self.receivers.push(receiver);
+            drop(network);
+            for &prev in metadata.prev.iter() {
+                if prev.block_id == prev_block_id {
+                    self.missing_ends += 1;
+                }
             }
         }
         info!(
-            "StartBlock {} initialized, {} previous blocks, receiver is: {:?}",
-            metadata.coord, self.missing_ends, self.receiver
+            "StartBlock {} initialized, {:?} are the previous blocks, a total of {} previous replicas",
+            metadata.coord, self.prev_block_ids, self.missing_ends
         );
         self.metadata = Some(metadata);
     }
@@ -60,24 +72,27 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
             info!("StartBlock for {} has ended", metadata.coord);
             return StreamElement::End;
         }
-        let receiver = self.receiver.as_ref().unwrap();
         if self.buffer.is_empty() {
             let max_delay = metadata.batch_mode.max_delay();
             let buf = match (self.already_timed_out, max_delay) {
                 // check the timeout only if there is one and the last time we didn't timed out
-                (false, Some(max_delay)) => match receiver.recv_timeout(max_delay) {
-                    Ok(buf) => buf,
-                    Err(_) => {
-                        // timed out: tell the block to flush the current batch
-                        // next time we wait indefinitely without the timeout since the batch is
-                        // currently empty
-                        self.already_timed_out = true;
-                        vec![StreamElement::FlushBatch]
+                (false, Some(max_delay)) => {
+                    match NetworkReceiver::select_any_timeout(self.receivers.iter(), max_delay) {
+                        Ok(buf) => buf.result.expect("One of the receivers failed"),
+                        Err(_) => {
+                            // timed out: tell the block to flush the current batch
+                            // next time we wait indefinitely without the timeout since the batch is
+                            // currently empty
+                            self.already_timed_out = true;
+                            vec![StreamElement::FlushBatch]
+                        }
                     }
-                },
+                }
                 _ => {
                     self.already_timed_out = false;
-                    receiver.recv().unwrap()
+                    NetworkReceiver::select_any(self.receivers.iter())
+                        .result
+                        .expect("One of the receivers failed")
                 }
             };
             self.buffer = buf.into();
@@ -102,6 +117,6 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
     }
 }
 
-fn clone_none<T>(_: &Option<T>) -> Option<T> {
-    None
+fn clone_empty<T>(_: &[T]) -> Vec<T> {
+    Vec::new()
 }

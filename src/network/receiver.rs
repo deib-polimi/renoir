@@ -10,6 +10,7 @@ use crate::operator::Data;
 const CHANNEL_CAPACITY: usize = 10;
 
 /// An _either_ type with the result of a select on 2 channels.
+#[allow(dead_code)] // TODO: remove once joins are implemented
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SelectResult<In1, In2> {
     /// The result refers to the first selected channel.
@@ -70,6 +71,7 @@ impl<In: Data> NetworkReceiver<In> {
     }
 
     /// Receive a message from any sender.
+    #[allow(dead_code)]
     pub fn recv(&self) -> Result<In> {
         self.receiver.recv().map_err(|e| {
             anyhow!(
@@ -81,6 +83,7 @@ impl<In: Data> NetworkReceiver<In> {
     }
 
     /// Receive a message from any sender with a timeout.
+    #[allow(dead_code)]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<In, RecvTimeoutError> {
         self.receiver.recv_timeout(timeout)
     }
@@ -90,6 +93,7 @@ impl<In: Data> NetworkReceiver<In> {
     /// The first message of the two is returned. If both receivers are ready one of them is chosen
     /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
     /// fairness property.
+    #[allow(dead_code)] // TODO: remove once joins are implemented
     pub fn select<In2: Data>(&self, other: &NetworkReceiver<In2>) -> SelectResult<In, In2> {
         select! {
             recv(self.receiver) -> elem => SelectResult::A(elem),
@@ -98,6 +102,7 @@ impl<In: Data> NetworkReceiver<In> {
     }
 
     /// Same as `select`, with a timeout.
+    #[allow(dead_code)] // TODO: remove once joins are implemented
     pub fn select_timeout<In2: Data>(
         &self,
         other: &NetworkReceiver<In2>,
