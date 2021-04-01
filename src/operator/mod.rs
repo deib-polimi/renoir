@@ -4,6 +4,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 pub use batch_mode::*;
+pub use concat::*;
 pub use end::*;
 pub use group_by::*;
 pub use key_by::*;
@@ -18,6 +19,7 @@ pub use zip::*;
 use crate::scheduler::ExecutionMetadata;
 
 mod batch_mode;
+mod concat;
 mod end;
 mod flatten;
 mod fold;

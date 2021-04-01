@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy};
 use crate::environment::StreamEnvironmentInner;
-use crate::operator::{Data, Operator, WindowDescription};
+use crate::operator::{Data, EndBlock, Operator, WindowDescription};
 use crate::operator::{DataKey, StartBlock};
 
 /// Identifier of a block in the job graph.
@@ -113,6 +113,71 @@ where
             block: InnerBlock::new(new_id, StartBlock::new(old_id), batch_mode),
             env: old_stream.env,
         }
+    }
+
+    /// Similar to `.add_block`, but with 2 incoming blocks.
+    ///
+    /// This will add a new Y connection between two blocks. The two incoming blocks will be closed
+    /// and a new one will be created with the 2 previous ones coming into it.
+    ///
+    /// This won't add any network shuffle, hence the next strategy will be `OnlyOne`. For this
+    /// reason the 2 input streams must have the same parallelism, otherwise this function panics.
+    ///
+    /// The start operator of the new block must support multiple inputs: the provided function
+    /// will be called with the ids of the 2 input blocks and should return the new start operator
+    /// of the new block.
+    pub(crate) fn add_y_connection<Out2, OperatorChain2, NewOut, StartOperator, GetStartOp>(
+        self,
+        oth: Stream<Out2, OperatorChain2>,
+        get_start_operator: GetStartOp,
+    ) -> Stream<NewOut, StartOperator>
+    where
+        Out2: Data,
+        OperatorChain2: Operator<Out2> + Send + 'static,
+        NewOut: Data,
+        StartOperator: Operator<NewOut>,
+        GetStartOp: Fn(BlockId, BlockId) -> StartOperator,
+    {
+        let batch_mode = self.block.batch_mode;
+        let scheduler_requirements1 = self.block.scheduler_requirements.clone();
+        let scheduler_requirements2 = oth.block.scheduler_requirements.clone();
+        if scheduler_requirements1.max_parallelism != scheduler_requirements2.max_parallelism {
+            panic!(
+                "The parallelism of the 2 blocks coming inside a Y connection must be equal. \
+                On the left ({}) is {:?}, on the right ({}) is {:?}",
+                self.block.to_string(),
+                scheduler_requirements1.max_parallelism,
+                oth.block.to_string(),
+                scheduler_requirements2.max_parallelism
+            );
+        }
+
+        // close previous blocks
+        let old_stream1 =
+            self.add_operator(|prev| EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode));
+        let old_stream2 =
+            oth.add_operator(|prev| EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode));
+
+        let mut env = old_stream1.env.borrow_mut();
+        let old_id1 = old_stream1.block.id;
+        let old_id2 = old_stream2.block.id;
+        let new_id = env.new_block();
+
+        // add and connect the old blocks with the new one
+        let scheduler = env.scheduler_mut();
+        scheduler.add_block(old_stream1.block);
+        scheduler.add_block(old_stream2.block);
+        scheduler.connect_blocks(old_id1, new_id);
+        scheduler.connect_blocks(old_id2, new_id);
+        drop(env);
+
+        let mut new_stream = Stream {
+            block: InnerBlock::new(new_id, get_start_operator(old_id1, old_id2), batch_mode),
+            env: old_stream1.env,
+        };
+        // make sure the new block has the same parallelism of the previous one
+        new_stream.block.scheduler_requirements = scheduler_requirements1;
+        new_stream
     }
 
     /// Clone the given block, taking care of connecting the new block to the same previous blocks

@@ -225,8 +225,8 @@ impl NetworkTopology {
         let sender_metadata = self.senders_metadata.get(&receiver_endpoint).unwrap();
 
         // create the receiver part of the channel
-        let receiver = NetworkReceiver::<NetworkMessage<T>>::new(receiver_endpoint);
-        let local_sender = receiver.sender();
+        let mut receiver = NetworkReceiver::<NetworkMessage<T>>::new(receiver_endpoint);
+        let local_sender = receiver.sender().unwrap();
 
         // if the receiver is local and the runtime is remote, register it to the demultiplexer
         if receiver_endpoint.coord.host_id == self.config.host_id.unwrap() {
@@ -261,7 +261,7 @@ impl NetworkTopology {
                 demuxes
                     .get_mut(&demux_coord)
                     .unwrap()
-                    .register(receiver_endpoint, receiver.local_sender.clone());
+                    .register(receiver_endpoint, local_sender.inner().unwrap().clone());
             }
         }
         self.receivers

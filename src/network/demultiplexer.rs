@@ -22,7 +22,7 @@ pub(crate) struct DemultiplexingReceiver<In: Data> {
     /// The coordinate of this demultiplexer.
     coord: DemuxCoord,
     /// Tell the demultiplexer that a new receiver is present,
-    register_receiver: Sender<(ReceiverEndpoint, SyncSender<In>)>,
+    register_receiver: Sender<(ReceiverEndpoint, crossbeam_channel::Sender<In>)>,
 }
 
 impl<In: Data> DemultiplexingReceiver<In> {
@@ -52,7 +52,11 @@ impl<In: Data> DemultiplexingReceiver<In> {
     }
 
     /// Register a local receiver to this demultiplexer.
-    pub fn register(&mut self, receiver_endpoint: ReceiverEndpoint, local_sender: SyncSender<In>) {
+    pub fn register(
+        &mut self,
+        receiver_endpoint: ReceiverEndpoint,
+        local_sender: crossbeam_channel::Sender<In>,
+    ) {
         debug!(
             "Registering {} to the demultiplexer of {}",
             receiver_endpoint, self.coord
@@ -66,7 +70,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
     fn bind_remote(
         coord: DemuxCoord,
         address: (String, u16),
-        register_receiver: Receiver<(ReceiverEndpoint, SyncSender<In>)>,
+        register_receiver: Receiver<(ReceiverEndpoint, crossbeam_channel::Sender<In>)>,
         num_clients: usize,
     ) {
         let address = (address.0.as_ref(), address.1);
@@ -146,7 +150,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
     fn demultiplexer_thread(
         coord: DemuxCoord,
         message_receiver: Receiver<(ReceiverEndpoint, SerializedMessage)>,
-        register_receiver: Receiver<(ReceiverEndpoint, SyncSender<In>)>,
+        register_receiver: Receiver<(ReceiverEndpoint, crossbeam_channel::Sender<In>)>,
     ) {
         debug!("Starting demultiplexer for {}", coord);
         let mut known_receivers = HashMap::new();

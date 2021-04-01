@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::block::{InnerBlock, NextStrategy};
-use crate::operator::{Data, EndBlock, Operator, StartBlock, StreamElement, Timestamp};
+use crate::operator::{Data, Operator, StartBlock, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
 
@@ -99,40 +98,7 @@ where
     where
         OperatorChain2: Operator<Out2> + Send + 'static,
     {
-        let batch_mode = self.block.batch_mode;
-        let scheduler_requirements1 = self.block.scheduler_requirements.clone();
-        let scheduler_requirements2 = oth.block.scheduler_requirements.clone();
-        if scheduler_requirements1.max_parallelism != scheduler_requirements2.max_parallelism {
-            panic!("The parallelism of the 2 blocks coming inside a zip must be equal. On self is {:?}, on oth is {:?}", scheduler_requirements1.max_parallelism, scheduler_requirements2.max_parallelism);
-        }
-
-        // close previous blocks
-        let old_stream1 =
-            self.add_operator(|prev| EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode));
-        let old_stream2 =
-            oth.add_operator(|prev| EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode));
-
-        let mut env = old_stream1.env.borrow_mut();
-        let old_id1 = old_stream1.block.id;
-        let old_id2 = old_stream2.block.id;
-        let new_id = env.new_block();
-
-        // add and connect the old blocks with the new one
-        let scheduler = env.scheduler_mut();
-        scheduler.add_block(old_stream1.block);
-        scheduler.add_block(old_stream2.block);
-        scheduler.connect_blocks(old_id1, new_id);
-        scheduler.connect_blocks(old_id2, new_id);
-        drop(env);
-
-        let block = Zip::new(old_id1, old_id2);
-        let mut new_stream = Stream {
-            block: InnerBlock::new(new_id, block, batch_mode),
-            env: old_stream1.env,
-        };
-        // make sure the new block has the same parallelism of the previous one
-        new_stream.block.scheduler_requirements = scheduler_requirements1;
-        new_stream
+        self.add_y_connection(oth, Zip::new)
     }
 }
 
