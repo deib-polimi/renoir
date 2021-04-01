@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 pub use count_window::*;
 
-use crate::operator::{Data, Operator, StreamElement, Timestamp};
+use crate::operator::{Data, Operator, Reorder, StreamElement, Timestamp};
 use crate::stream::{Stream, WindowedStream};
 
 mod count_window;
@@ -47,9 +47,9 @@ where
     pub fn window<WinDescr: WindowDescription<Out>>(
         self,
         window: WinDescr,
-    ) -> WindowedStream<Out, OperatorChain, WinDescr> {
+    ) -> WindowedStream<Out, impl Operator<Out>, WinDescr> {
         WindowedStream {
-            inner: self,
+            inner: self.add_operator(Reorder::new),
             window,
         }
     }
