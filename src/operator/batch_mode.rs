@@ -34,7 +34,7 @@ mod tests {
     #[test]
     fn batch_mode_fixed() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let batch_mode = BatchMode::fixed(42);
         let stream = env.stream(source).batch_mode(batch_mode);
         assert_eq!(stream.block.batch_mode, batch_mode);
@@ -43,7 +43,7 @@ mod tests {
     #[test]
     fn batch_mode_adaptive() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let batch_mode = BatchMode::adaptive(42, Duration::from_secs(42));
         let stream = env.stream(source).batch_mode(batch_mode);
         assert_eq!(stream.block.batch_mode, batch_mode);
@@ -52,7 +52,7 @@ mod tests {
     #[test]
     fn batch_inherit_from_previous() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let batch_mode = BatchMode::adaptive(42, Duration::from_secs(42));
         let stream = env.stream(source).batch_mode(batch_mode).group_by(|_| 0);
         assert_eq!(stream.0.block.batch_mode, batch_mode);

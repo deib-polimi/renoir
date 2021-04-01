@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn fold_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .fold("".to_string(), |s, n| s + &n.to_string())
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn fold_assoc_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .fold_assoc("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn fold_shuffled_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .shuffle()
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn fold_assoc_shuffled_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .shuffle()

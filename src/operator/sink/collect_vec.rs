@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn collect_vec() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).collect_vec();
         env.execute();
         assert_eq!(res.get().unwrap(), (0..10).collect_vec());

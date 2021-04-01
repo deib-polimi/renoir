@@ -21,7 +21,7 @@ mod tests {
     #[test]
     fn unkey_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .key_by(|&n| n.to_string())

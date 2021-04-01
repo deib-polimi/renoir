@@ -5,13 +5,13 @@ use rand::{Rng, SeedableRng};
 use rstream::block::BatchMode;
 use rstream::config::EnvironmentConfig;
 use rstream::environment::StreamEnvironment;
-use rstream::operator::source::StreamSource;
+use rstream::operator::source::IteratorSource;
 
 fn shuffle(dataset: &'static [u32]) {
     let config = EnvironmentConfig::local(4);
     let mut env = StreamEnvironment::new(config);
 
-    let source = StreamSource::new(dataset.iter().cloned());
+    let source = IteratorSource::new(dataset.iter().cloned());
     let stream = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))

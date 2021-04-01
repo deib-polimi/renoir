@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn key_by_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).key_by(|&n| n).unkey().collect_vec();
         env.execute();
         let res = res.get().unwrap().into_iter().sorted().collect_vec();
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn key_by_stream2() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..100u8);
+        let source = source::IteratorSource::new(0..100u8);
         let res = env
             .stream(source)
             .key_by(|&n| n.to_string().chars().next().unwrap())

@@ -27,8 +27,8 @@ mod tests {
     #[test]
     fn concat_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source1 = source::StreamSource::new(0..10000u16);
-        let source2 = source::StreamSource::new(10000..20000u16);
+        let source1 = source::IteratorSource::new(0..10000u16);
+        let source2 = source::IteratorSource::new(10000..20000u16);
 
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
@@ -44,8 +44,8 @@ mod tests {
     #[test]
     fn concat_stream_with_empty() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source1 = source::StreamSource::new(0..10000u16);
-        let source2 = source::StreamSource::new(0..0u16);
+        let source1 = source::IteratorSource::new(0..10000u16);
+        let source2 = source::IteratorSource::new(0..0u16);
 
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
@@ -61,8 +61,8 @@ mod tests {
     #[test]
     fn concat_stream_with_empty_other_way() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source1 = source::StreamSource::new(0..0u16);
-        let source2 = source::StreamSource::new(0..10000u16);
+        let source1 = source::IteratorSource::new(0..0u16);
+        let source2 = source::IteratorSource::new(0..10000u16);
 
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
@@ -78,8 +78,8 @@ mod tests {
     #[test]
     fn concat_empty_with_empty() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source1 = source::StreamSource::new(0..0u16);
-        let source2 = source::StreamSource::new(0..0u16);
+        let source1 = source::IteratorSource::new(0..0u16);
+        let source2 = source::IteratorSource::new(0..0u16);
 
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);

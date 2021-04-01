@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn map_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .map(|n| n.to_string())
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn map_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|n| n % 2)

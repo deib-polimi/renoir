@@ -53,7 +53,7 @@ mod tests {
     #[test]
     fn reduce_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).reduce(|acc, v| acc + v).collect_vec();
         env.execute();
         let res = res.get().unwrap();
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn reduce_assoc_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .reduce_assoc(|acc, v| acc + v)
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn reduce_shuffled_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .shuffle()
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn reduce_assoc_shuffled_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .shuffle()

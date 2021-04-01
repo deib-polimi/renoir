@@ -115,8 +115,8 @@ mod tests {
         let items1 = 0..10u8;
         let items2 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
 
-        let source1 = source::StreamSource::new(items1.clone());
-        let source2 = source::StreamSource::new(items2.clone().into_iter());
+        let source1 = source::IteratorSource::new(items1.clone());
+        let source2 = source::IteratorSource::new(items2.clone().into_iter());
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
         let res = stream1.zip(stream2).collect_vec();

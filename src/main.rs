@@ -14,7 +14,7 @@ fn main() {
 
     env.spawn_remote_workers();
 
-    let source = source::StreamSource::new(90..110u8);
+    let source = source::IteratorSource::new(90..110u8);
     let stream = env
         .stream(source)
         .map(|x| x.to_string())

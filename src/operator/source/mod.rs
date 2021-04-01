@@ -1,12 +1,12 @@
-pub use event_time_stream::*;
+pub use event_time_iterator::*;
 pub use file::*;
-pub use stream::*;
+pub use iterator::*;
 
 use crate::operator::{Data, Operator};
 
-mod event_time_stream;
+mod event_time_iterator;
 mod file;
-mod stream;
+mod iterator;
 
 pub trait Source<Out: Data>: Operator<Out> {
     fn get_max_parallelism(&self) -> Option<usize>;

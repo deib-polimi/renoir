@@ -4,7 +4,7 @@ use crate::scheduler::ExecutionMetadata;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct EventTimeStreamSource<Out: Data, It, WatermarkGen>
+pub struct EventTimeIteratorSource<Out: Data, It, WatermarkGen>
 where
     It: Iterator<Item = (Out, Timestamp)> + Send + 'static,
     WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
@@ -16,7 +16,7 @@ where
     pending_watermark: Option<Timestamp>,
 }
 
-impl<Out: Data, It, WatermarkGen> EventTimeStreamSource<Out, It, WatermarkGen>
+impl<Out: Data, It, WatermarkGen> EventTimeIteratorSource<Out, It, WatermarkGen>
 where
     It: Iterator<Item = (Out, Timestamp)> + Send + 'static,
     WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
@@ -30,7 +30,7 @@ where
     }
 }
 
-impl<Out: Data, It, WatermarkGen> Source<Out> for EventTimeStreamSource<Out, It, WatermarkGen>
+impl<Out: Data, It, WatermarkGen> Source<Out> for EventTimeIteratorSource<Out, It, WatermarkGen>
 where
     It: Iterator<Item = (Out, Timestamp)> + Send + 'static,
     WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
@@ -40,7 +40,7 @@ where
     }
 }
 
-impl<Out: Data, It, WatermarkGen> Operator<Out> for EventTimeStreamSource<Out, It, WatermarkGen>
+impl<Out: Data, It, WatermarkGen> Operator<Out> for EventTimeIteratorSource<Out, It, WatermarkGen>
 where
     It: Iterator<Item = (Out, Timestamp)> + Send + 'static,
     WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
@@ -67,7 +67,7 @@ where
     }
 }
 
-impl<Out: Data, It, WatermarkGen> Clone for EventTimeStreamSource<Out, It, WatermarkGen>
+impl<Out: Data, It, WatermarkGen> Clone for EventTimeIteratorSource<Out, It, WatermarkGen>
 where
     It: Iterator<Item = (Out, Timestamp)> + Send + 'static,
     WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn event_time_source() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::EventTimeStreamSource::new(
+        let source = source::EventTimeIteratorSource::new(
             (0..10u64).map(|x| (x, Timestamp::new(x, 0))),
             |item, ts| {
                 if item % 2 == 1 {

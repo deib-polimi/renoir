@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn group_by_fold_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by_fold(
@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn fold_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|n| n % 2)
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn group_by_fold_shuffled_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .shuffle()
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn fold_shuffled_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .shuffle()

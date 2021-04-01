@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn flatten_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(
+        let source = source::IteratorSource::new(
             vec![
                 vec![],
                 vec![1u8, 2, 3],
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn flatten_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|v| v % 2)
@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn flat_map_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .flat_map(|x| vec![x, 10 * x, 20 * x])
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn flat_map_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..10u8);
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|v| v % 2)

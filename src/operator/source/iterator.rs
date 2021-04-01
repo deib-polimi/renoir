@@ -4,7 +4,7 @@ use crate::scheduler::ExecutionMetadata;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct StreamSource<Out: Data, It>
+pub struct IteratorSource<Out: Data, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
@@ -12,7 +12,7 @@ where
     inner: It,
 }
 
-impl<Out: Data, It> StreamSource<Out, It>
+impl<Out: Data, It> IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
@@ -21,7 +21,7 @@ where
     }
 }
 
-impl<Out: Data, It> Source<Out> for StreamSource<Out, It>
+impl<Out: Data, It> Source<Out> for IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
@@ -30,7 +30,7 @@ where
     }
 }
 
-impl<Out: Data, It> Operator<Out> for StreamSource<Out, It>
+impl<Out: Data, It> Operator<Out> for IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
@@ -49,7 +49,7 @@ where
     }
 }
 
-impl<Out: Data, It> Clone for StreamSource<Out, It>
+impl<Out: Data, It> Clone for IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {

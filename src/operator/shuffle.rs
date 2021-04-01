@@ -22,7 +22,7 @@ mod tests {
     #[test]
     fn shuffle_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(0..1000u16);
+        let source = source::IteratorSource::new(0..1000u16);
         let res = env
             .stream(source)
             .shuffle()
