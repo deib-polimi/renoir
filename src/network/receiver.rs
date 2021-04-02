@@ -116,10 +116,7 @@ impl<In: Data> NetworkReceiver<In> {
     }
 
     /// Same as `select`, but takes multiple receivers to select from.
-    pub fn select_any<'a, I: Iterator<Item = &'a NetworkReceiver<In>>>(
-        receivers: I,
-    ) -> SelectAnyResult<In> {
-        let receivers: Vec<_> = receivers.collect();
+    pub fn select_any(receivers: &[NetworkReceiver<In>]) -> SelectAnyResult<In> {
         // select is pretty expensive, when there is only one receiver select == recv
         if receivers.len() == 1 {
             SelectAnyResult {
@@ -128,7 +125,7 @@ impl<In: Data> NetworkReceiver<In> {
             }
         } else {
             let mut select = Select::new();
-            for &receiver in &receivers {
+            for receiver in receivers.iter() {
                 select.recv(&receiver.receiver);
             }
             let index = select.ready();
@@ -140,11 +137,10 @@ impl<In: Data> NetworkReceiver<In> {
     }
 
     /// Same as `select_timeout`, but takes multiple receivers to select from.
-    pub fn select_any_timeout<'a, I: Iterator<Item = &'a NetworkReceiver<In>>>(
-        receivers: I,
+    pub fn select_any_timeout(
+        receivers: &[NetworkReceiver<In>],
         timeout: Duration,
     ) -> Result<SelectAnyResult<In>, RecvTimeoutError> {
-        let receivers: Vec<_> = receivers.collect();
         // select is pretty expensive, when there is only one receiver select == recv
         if receivers.len() == 1 {
             match receivers[0].receiver.recv_timeout(timeout) {
@@ -160,7 +156,7 @@ impl<In: Data> NetworkReceiver<In> {
             }
         } else {
             let mut select = Select::new();
-            for &receiver in &receivers {
+            for receiver in receivers.iter() {
                 select.recv(&receiver.receiver);
             }
             let index = select
@@ -324,20 +320,20 @@ mod tests {
 
         sender1.send(123).unwrap();
 
-        let elem1 = NetworkReceiver::select_any(receivers.iter());
+        let elem1 = NetworkReceiver::select_any(&receivers);
         assert_eq!(elem1.index, 0);
         assert_eq!(elem1.result, Ok(123));
 
         sender2.send(456).unwrap();
 
-        let elem1 = NetworkReceiver::select_any(receivers.iter());
+        let elem1 = NetworkReceiver::select_any(&receivers);
         assert_eq!(elem1.index, 1);
         assert_eq!(elem1.result, Ok(456));
 
         drop(sender1);
         drop(sender2);
 
-        let err = NetworkReceiver::select_any(receivers.iter());
+        let err = NetworkReceiver::select_any(&receivers);
         assert!(err.result.is_err());
     }
 
@@ -352,26 +348,25 @@ mod tests {
 
         sender1.send(123).unwrap();
 
-        let elem1 = NetworkReceiver::select_any_timeout(receivers.iter(), Duration::from_millis(1))
-            .unwrap();
+        let elem1 =
+            NetworkReceiver::select_any_timeout(&receivers, Duration::from_millis(1)).unwrap();
         assert_eq!(elem1.index, 0);
         assert_eq!(elem1.result, Ok(123));
 
-        let timeout =
-            NetworkReceiver::select_any_timeout(receivers.iter(), Duration::from_millis(50));
+        let timeout = NetworkReceiver::select_any_timeout(&receivers, Duration::from_millis(50));
         assert!(timeout.is_err());
 
         sender2.send(456).unwrap();
 
-        let elem1 = NetworkReceiver::select_any_timeout(receivers.iter(), Duration::from_millis(1))
-            .unwrap();
+        let elem1 =
+            NetworkReceiver::select_any_timeout(&receivers, Duration::from_millis(1)).unwrap();
         assert_eq!(elem1.index, 1);
         assert_eq!(elem1.result, Ok(456));
 
         drop(sender1);
         drop(sender2);
 
-        let err = NetworkReceiver::select_any(receivers.iter());
+        let err = NetworkReceiver::select_any(&receivers);
         assert!(err.result.is_err());
     }
 }

@@ -56,7 +56,7 @@ fn select(size: usize) {
     run(size, |recv| {
         let recv = vec![recv];
         for _ in 0..size {
-            NetworkReceiver::select_any(recv.iter()).result.unwrap();
+            NetworkReceiver::select_any(&recv).result.unwrap();
         }
     });
 }

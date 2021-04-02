@@ -77,7 +77,7 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
             let buf = match (self.already_timed_out, max_delay) {
                 // check the timeout only if there is one and the last time we didn't timed out
                 (false, Some(max_delay)) => {
-                    match NetworkReceiver::select_any_timeout(self.receivers.iter(), max_delay) {
+                    match NetworkReceiver::select_any_timeout(&self.receivers, max_delay) {
                         Ok(buf) => buf.result.expect("One of the receivers failed"),
                         Err(_) => {
                             // timed out: tell the block to flush the current batch
@@ -90,7 +90,7 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                 }
                 _ => {
                     self.already_timed_out = false;
-                    NetworkReceiver::select_any(self.receivers.iter())
+                    NetworkReceiver::select_any(&self.receivers)
                         .result
                         .expect("One of the receivers failed")
                 }
