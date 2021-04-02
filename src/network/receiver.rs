@@ -20,7 +20,7 @@ pub enum SelectResult<In1, In2> {
 }
 
 /// The result of a `NetworkReceiver::select_any`.
-pub(crate) struct SelectAnyResult<In> {
+pub struct SelectAnyResult<In> {
     /// The actual value returned by the select.
     pub result: Result<In, RecvError>,
     /// The index of the receiver this result refers to.
@@ -38,7 +38,7 @@ pub(crate) struct SelectAnyResult<In> {
 /// socket and send to the same in-memory channel the received messages.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(crate) struct NetworkReceiver<In: Data> {
+pub struct NetworkReceiver<In: Data> {
     /// The ReceiverEndpoint of the current receiver.
     pub receiver_endpoint: ReceiverEndpoint,
     /// The actual receiver where the users of this struct will wait upon.
@@ -120,14 +120,22 @@ impl<In: Data> NetworkReceiver<In> {
         receivers: I,
     ) -> SelectAnyResult<In> {
         let receivers: Vec<_> = receivers.collect();
-        let mut select = Select::new();
-        for &receiver in &receivers {
-            select.recv(&receiver.receiver);
-        }
-        let index = select.ready();
-        SelectAnyResult {
-            index,
-            result: receivers[index].receiver.recv(),
+        // select is pretty expensive, when there is only one receiver select == recv
+        if receivers.len() == 1 {
+            SelectAnyResult {
+                result: receivers[0].receiver.recv(),
+                index: 0,
+            }
+        } else {
+            let mut select = Select::new();
+            for &receiver in &receivers {
+                select.recv(&receiver.receiver);
+            }
+            let index = select.ready();
+            SelectAnyResult {
+                index,
+                result: receivers[index].receiver.recv(),
+            }
         }
     }
 
@@ -137,17 +145,32 @@ impl<In: Data> NetworkReceiver<In> {
         timeout: Duration,
     ) -> Result<SelectAnyResult<In>, RecvTimeoutError> {
         let receivers: Vec<_> = receivers.collect();
-        let mut select = Select::new();
-        for &receiver in &receivers {
-            select.recv(&receiver.receiver);
+        // select is pretty expensive, when there is only one receiver select == recv
+        if receivers.len() == 1 {
+            match receivers[0].receiver.recv_timeout(timeout) {
+                Ok(res) => Ok(SelectAnyResult {
+                    result: Ok(res),
+                    index: 0,
+                }),
+                Err(RecvTimeoutError::Disconnected) => Ok(SelectAnyResult {
+                    result: Err(RecvError),
+                    index: 0,
+                }),
+                Err(RecvTimeoutError::Timeout) => Err(RecvTimeoutError::Timeout),
+            }
+        } else {
+            let mut select = Select::new();
+            for &receiver in &receivers {
+                select.recv(&receiver.receiver);
+            }
+            let index = select
+                .ready_timeout(timeout)
+                .map_err(|_| RecvTimeoutError::Timeout)?;
+            Ok(SelectAnyResult {
+                index,
+                result: receivers[index].receiver.recv(),
+            })
         }
-        let index = select
-            .ready_timeout(timeout)
-            .map_err(|_| RecvTimeoutError::Timeout)?;
-        Ok(SelectAnyResult {
-            index,
-            result: receivers[index].receiver.recv(),
-        })
     }
 }
 

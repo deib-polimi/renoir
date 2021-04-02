@@ -24,7 +24,7 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 ///
 /// The `ReceiverEndpoint` is sent alongside the actual message in order to demultiplex it.
 #[derive(Debug, Clone)]
-pub(crate) struct MultiplexingSender<Out: Data> {
+pub struct MultiplexingSender<Out: Data> {
     /// The internal sender that points to the actual multiplexed channel.
     sender: SyncSender<(ReceiverEndpoint, Out)>,
 }

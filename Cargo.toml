@@ -72,6 +72,9 @@ harness = false
 [[bench]]
 name = "batch_mode"
 harness = false
+[[bench]]
+name = "recv_vs_select"
+harness = false
 
 
 [profile.release]

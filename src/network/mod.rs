@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
-pub(crate) use receiver::*;
-pub(crate) use sender::*;
+pub use receiver::*;
+pub use sender::*;
 pub(crate) use topology::*;
 
 use crate::operator::StreamElement;
@@ -22,7 +22,7 @@ pub(crate) type NetworkMessage<T> = Batch<T>;
 
 /// Coordinates that identify a block inside the network.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub(crate) struct BlockCoord {
+pub struct BlockCoord {
     /// The identifier of the block the replicas works on.
     pub block_id: BlockId,
     /// The identifier of where the replica is located.
@@ -31,7 +31,7 @@ pub(crate) struct BlockCoord {
 
 /// Coordinates that identify a replica inside the network.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub(crate) struct Coord {
+pub struct Coord {
     /// The identifier of the block the replicas works on.
     pub block_id: BlockId,
     /// The identifier of where the replica is located.
@@ -46,7 +46,7 @@ pub(crate) struct Coord {
 /// it has to have more than one receiver. In particular it should have a receiver for each
 /// previous block in the job graph.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub(crate) struct ReceiverEndpoint {
+pub struct ReceiverEndpoint {
     /// Coordinate of the receiver replica.
     pub coord: Coord,
     /// Id of the sender block.
@@ -58,7 +58,7 @@ pub(crate) struct ReceiverEndpoint {
 /// Each block has as many demultiplexers as incoming blocks in the job graph. This coordinate
 /// identify each of them inside a specific host.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub(crate) struct DemuxCoord {
+pub struct DemuxCoord {
     /// The coordinate of the block inside an host.
     pub coord: BlockCoord,
     /// The id of the previous block in the job graph.

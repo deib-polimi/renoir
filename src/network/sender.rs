@@ -12,7 +12,7 @@ use crate::operator::Data;
 /// connection internally this points to the multiplexer that handles the remote channel.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub(crate) struct NetworkSender<Out: Data> {
+pub struct NetworkSender<Out: Data> {
     /// The ReceiverEndpoint of the recipient.
     pub receiver_endpoint: ReceiverEndpoint,
     /// The generic sender that will send the message either locally or remotely.
