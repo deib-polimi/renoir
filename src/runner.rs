@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::TcpStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 use ssh2::Session;
@@ -149,7 +149,7 @@ fn spawn_remote_worker(host_id: HostId, mut host: RemoteHostConfig, config_str: 
     );
 
     // build the remote command
-    let command = build_remote_command(host_id, config_str.as_str(), remote_path);
+    let command = build_remote_command(host_id, config_str.as_str(), remote_path, &host.perf_path);
     debug!("Executing on host {}:\n{}", host_id, command);
 
     let mut channel = session.channel_session().unwrap();
@@ -238,22 +238,37 @@ fn send_file(
 /// Build the command for running the remote worker.
 ///
 /// This will export all the required variables before executing the binary.
-fn build_remote_command(host_id: HostId, config_str: &str, binary_path: &str) -> String {
+fn build_remote_command(
+    host_id: HostId,
+    config_str: &str,
+    binary_path: &str,
+    perf_path: &Option<PathBuf>,
+) -> String {
     let config_str = shell_escape::escape(Cow::Borrowed(config_str));
     let args = std::env::args()
         .skip(1)
         .map(|arg| shell_escape::escape(Cow::Owned(arg)))
         .join(" ");
+    let perf_cmd = if let Some(path) = perf_path.as_ref() {
+        warn!("Running remote process on host {} with perf enabled. This may cause performance regressions.", host_id);
+        format!(
+            "perf record --call-graph dwarf -o {} -- ",
+            shell_escape::escape(Cow::Borrowed(path.to_str().expect("non UTF-8 perf path")))
+        )
+    } else {
+        "".to_string()
+    };
     format!(
         "export {host_id_env}={host_id};
 export {config_env}={config};
 export RUST_LOG={rust_log};
 export RUST_LOG_STYLE=always;
-{binary_path} {args}",
+{perf_cmd}{binary_path} {args}",
         host_id_env = HOST_ID_ENV_VAR,
         host_id = host_id,
         config_env = CONFIG_ENV_VAR,
         config = config_str,
+        perf_cmd = perf_cmd,
         binary_path = binary_path,
         args = args,
         rust_log = std::env::var("RUST_LOG").unwrap_or_default()

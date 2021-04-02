@@ -41,6 +41,7 @@ pub(crate) struct RemoteHostConfig {
     pub(crate) num_cores: usize,
     #[serde(default)]
     pub(crate) ssh: RemoteHostSSHConfig,
+    pub(crate) perf_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Derivative)]

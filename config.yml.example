@@ -8,6 +8,8 @@ hosts:
     base_port: 9600
     # Number of replicas to spawn in this host.
     num_cores: 4
+    # If specified run the remote program using perf recording a profile
+    # perf_path: /tmp/perf.data
     # Optional ssh configuration to this remote host. When missing ssh-agent
     # will be prompt for the missing information. If ssh-agent is not present
     # you need to specify `username` and one of the authentication methods.
