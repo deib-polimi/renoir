@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 pub use count_window::*;
+pub use event_time_window::*;
 
 use crate::operator::{Data, DataKey, Operator, Reorder, StreamElement, Timestamp};
 use crate::stream::{KeyValue, KeyedStream, WindowedStream};
@@ -8,7 +9,9 @@ use hashbrown::hash_map::IterMut;
 use hashbrown::HashMap;
 
 mod count_window;
+mod event_time_window;
 mod first;
+
 /// A WindowDescription describes how a window behaves.
 pub trait WindowDescription<Key: DataKey, Out: Data> {
     /// The type of the window generator of this window.
