@@ -127,8 +127,8 @@ mod select_impl {
     macro_rules! select_impl {
         ($self:expr, $other:expr) => {{
             flume::Selector::new()
-                .recv(&$self.0, |elem| SelectResult::A(elem))
-                .recv(&$other.0, |elem| SelectResult::B(elem))
+                .recv(&$self.0, SelectResult::A)
+                .recv(&$other.0, SelectResult::B)
                 .wait()
         }};
     }
@@ -136,8 +136,8 @@ mod select_impl {
     macro_rules! select_timeout_impl {
         ($self:expr, $other:expr, $timeout:expr) => {
             flume::Selector::new()
-                .recv(&$self.0, |elem| SelectResult::A(elem))
-                .recv(&$other.0, |elem| SelectResult::B(elem))
+                .recv(&$self.0, SelectResult::A)
+                .recv(&$other.0, SelectResult::B)
                 .wait_timeout($timeout)
                 .map_err(|_| RecvTimeoutError::Timeout)
         };
