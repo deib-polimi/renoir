@@ -1,11 +1,11 @@
 use std::io::ErrorKind;
 use std::net::{Shutdown, TcpStream, ToSocketAddrs};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::thread::{sleep, JoinHandle};
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 
+use crate::channel::{BoundedChannelReceiver, BoundedChannelSender};
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
 use crate::network::{DemuxCoord, ReceiverEndpoint};
 use crate::operator::Data;
@@ -26,7 +26,7 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 #[derive(Debug, Clone)]
 pub struct MultiplexingSender<Out: Data> {
     /// The internal sender that points to the actual multiplexed channel.
-    sender: SyncSender<(ReceiverEndpoint, Out)>,
+    sender: BoundedChannelSender<(ReceiverEndpoint, Out)>,
 }
 
 impl<Out: Data> MultiplexingSender<Out> {
@@ -34,7 +34,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
-        let (sender, receiver) = sync_channel(CHANNEL_CAPACITY);
+        let (sender, receiver) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
         let join_handle = std::thread::Builder::new()
             .name(format!("NetSender{}", coord))
             .spawn(move || Self::connect_remote(coord, address, receiver))
@@ -60,7 +60,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     fn connect_remote(
         coord: DemuxCoord,
         address: (String, u16),
-        local_receiver: Receiver<(ReceiverEndpoint, Out)>,
+        local_receiver: BoundedChannelReceiver<(ReceiverEndpoint, Out)>,
     ) {
         let socket_addrs: Vec<_> = address
             .to_socket_addrs()
@@ -113,7 +113,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     /// replica.
     fn handle_remote_connection(
         coord: DemuxCoord,
-        local_receiver: Receiver<(ReceiverEndpoint, Out)>,
+        local_receiver: BoundedChannelReceiver<(ReceiverEndpoint, Out)>,
         mut stream: TcpStream,
     ) {
         let address = stream

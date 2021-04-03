@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 use crate::block::{BatchMode, InnerBlock};
+use crate::channel::BoundedChannelSender;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
@@ -37,7 +37,7 @@ pub struct ExecutionMetadata {
 /// Handle that the scheduler uses to start the computation of a block.
 pub(crate) struct StartHandle {
     /// Sender for the `ExecutionMetadata` sent to the worker.
-    starter: SyncSender<ExecutionMetadata>,
+    starter: BoundedChannelSender<ExecutionMetadata>,
     /// `JoinHandle` used to wait until a block has finished working.
     join_handle: JoinHandle<()>,
 }
@@ -335,7 +335,10 @@ impl Scheduler {
 }
 
 impl StartHandle {
-    pub(crate) fn new(starter: SyncSender<ExecutionMetadata>, join_handle: JoinHandle<()>) -> Self {
+    pub(crate) fn new(
+        starter: BoundedChannelSender<ExecutionMetadata>,
+        join_handle: JoinHandle<()>,
+    ) -> Self {
         Self {
             starter,
             join_handle,

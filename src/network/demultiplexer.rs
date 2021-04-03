@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
-use std::sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender};
 use std::thread::JoinHandle;
 
 use anyhow::anyhow;
 use derivative::Derivative;
 
+use crate::channel::{
+    BoundedChannelReceiver, BoundedChannelSender, UnboundedChannelReceiver, UnboundedChannelSender,
+};
 use crate::network::remote::{deserialize, remote_recv, SerializedMessage, CHANNEL_CAPACITY};
 use crate::network::{DemuxCoord, ReceiverEndpoint};
 use crate::operator::Data;
@@ -22,7 +24,7 @@ pub(crate) struct DemultiplexingReceiver<In: Data> {
     /// The coordinate of this demultiplexer.
     coord: DemuxCoord,
     /// Tell the demultiplexer that a new receiver is present,
-    register_receiver: Sender<(ReceiverEndpoint, crossbeam_channel::Sender<In>)>,
+    register_receiver: UnboundedChannelSender<(ReceiverEndpoint, BoundedChannelSender<In>)>,
 }
 
 impl<In: Data> DemultiplexingReceiver<In> {
@@ -37,7 +39,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
         address: (String, u16),
         num_clients: usize,
     ) -> (Self, JoinHandle<()>) {
-        let (sender, receiver) = channel();
+        let (sender, receiver) = UnboundedChannelReceiver::new();
         let join_handle = std::thread::Builder::new()
             .name(format!("Net{}", coord))
             .spawn(move || Self::bind_remote(coord, address, receiver, num_clients))
@@ -55,7 +57,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
     pub fn register(
         &mut self,
         receiver_endpoint: ReceiverEndpoint,
-        local_sender: crossbeam_channel::Sender<In>,
+        local_sender: BoundedChannelSender<In>,
     ) {
         debug!(
             "Registering {} to the demultiplexer of {}",
@@ -70,7 +72,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
     fn bind_remote(
         coord: DemuxCoord,
         address: (String, u16),
-        register_receiver: Receiver<(ReceiverEndpoint, crossbeam_channel::Sender<In>)>,
+        register_receiver: UnboundedChannelReceiver<(ReceiverEndpoint, BoundedChannelSender<In>)>,
         num_clients: usize,
     ) {
         let address = (address.0.as_ref(), address.1);
@@ -98,7 +100,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
             coord, address
         );
 
-        let (message_sender, message_receiver) = sync_channel(CHANNEL_CAPACITY);
+        let (message_sender, message_receiver) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
         // spawn an extra thread that keeps track of the connected clients and registered receivers
         let join_handle = std::thread::Builder::new()
             .name(format!("{}", coord))
@@ -149,8 +151,8 @@ impl<In: Data> DemultiplexingReceiver<In> {
     /// messages to the correct replica.
     fn demultiplexer_thread(
         coord: DemuxCoord,
-        message_receiver: Receiver<(ReceiverEndpoint, SerializedMessage)>,
-        register_receiver: Receiver<(ReceiverEndpoint, crossbeam_channel::Sender<In>)>,
+        message_receiver: BoundedChannelReceiver<(ReceiverEndpoint, SerializedMessage)>,
+        register_receiver: UnboundedChannelReceiver<(ReceiverEndpoint, BoundedChannelSender<In>)>,
     ) {
         debug!("Starting demultiplexer for {}", coord);
         let mut known_receivers = HashMap::new();
@@ -173,7 +175,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
     /// This will receive every message and send it to the demultiplexer using the local channel.
     fn handle_remote_client(
         coord: DemuxCoord,
-        local_sender: SyncSender<(ReceiverEndpoint, SerializedMessage)>,
+        local_sender: BoundedChannelSender<(ReceiverEndpoint, SerializedMessage)>,
         mut receiver: TcpStream,
     ) {
         let address = receiver

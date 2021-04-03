@@ -1,6 +1,5 @@
-use std::sync::mpsc::Receiver;
-
 use crate::block::InnerBlock;
+use crate::channel::BoundedChannelReceiver;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::{ExecutionMetadata, StartHandle};
 
@@ -10,7 +9,7 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain>(
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    let (sender, receiver) = BoundedChannelReceiver::new(1);
     let join_handle = std::thread::Builder::new()
         .name(format!("Block{}", block.id))
         .spawn(move || worker(block, receiver))
@@ -20,7 +19,7 @@ where
 
 fn worker<Out: Data, OperatorChain>(
     mut block: InnerBlock<Out, OperatorChain>,
-    metadata_receiver: Receiver<ExecutionMetadata>,
+    metadata_receiver: BoundedChannelReceiver<ExecutionMetadata>,
 ) where
     OperatorChain: Operator<Out> + Send + 'static,
 {
