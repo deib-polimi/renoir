@@ -5,14 +5,23 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use crossbeam_channel::{select, Select};
-use crossbeam_channel::{Receiver, Sender};
+
+#[cfg(all(feature = "crossbeam", not(feature = "flume")))]
+use crossbeam_channel::{
+    bounded, select, unbounded, Receiver, RecvError as ExtRecvError,
+    RecvTimeoutError as ExtRecvTimeoutError, Select, Sender,
+};
+#[cfg(all(not(feature = "crossbeam"), feature = "flume"))]
+use flume::{
+    bounded, unbounded, Receiver, RecvError as ExtRecvError,
+    RecvTimeoutError as ExtRecvTimeoutError, Sender,
+};
 
 pub trait ChannelItem: Send + Sync + 'static {}
 impl<T: Send + Sync + 'static> ChannelItem for T {}
 
-pub type RecvError = crossbeam_channel::RecvError;
-pub type RecvTimeoutError = crossbeam_channel::RecvTimeoutError;
+pub type RecvError = ExtRecvError;
+pub type RecvTimeoutError = ExtRecvTimeoutError;
 
 /// An _either_ type with the result of a select on 2 channels.
 #[allow(dead_code)] // TODO: remove once joins are implemented
@@ -32,80 +41,158 @@ pub struct SelectAnyResult<In> {
     pub index: usize,
 }
 
-macro_rules! select_impl {
-    ($self:expr, $other:expr) => {
-        select! {
-            recv($self.0) -> elem => SelectResult::A(elem),
-            recv($other.0) -> elem => SelectResult::B(elem),
-        }
-    };
-}
-
-macro_rules! select_timeout_impl {
-    ($self:expr, $other:expr, $timeout:expr) => {
-        select! {
-            recv($self.0) -> elem => Ok(SelectResult::A(elem)),
-            recv($other.0) -> elem => Ok(SelectResult::B(elem)),
-            default($timeout) => Err(RecvTimeoutError::Timeout),
-        }
-    };
-}
-
-macro_rules! select_any_impl {
-    ($receivers:expr) => {
-        // select is pretty expensive, when there is only one receiver select == recv
-        if $receivers.len() == 1 {
-            SelectAnyResult {
-                result: $receivers.nth(0).unwrap().0.recv(),
-                index: 0,
+#[cfg(all(feature = "crossbeam", not(feature = "flume")))]
+#[macro_use]
+mod select_impl {
+    macro_rules! select_impl {
+        ($self:expr, $other:expr) => {
+            select! {
+                recv($self.0) -> elem => SelectResult::A(elem),
+                recv($other.0) -> elem => SelectResult::B(elem),
             }
-        } else {
-            let mut select = Select::new();
-            // need to clone the iterator to avoid consuming it
-            let iter = $receivers.clone();
-            for receiver in iter {
-                select.recv(&receiver.0);
-            }
-            let index = select.ready();
-            SelectAnyResult {
-                index,
-                result: $receivers.nth(index).unwrap().0.recv(),
-            }
-        }
-    };
-}
+        };
+    }
 
-macro_rules! select_any_timeout_impl {
-    ($receivers:expr, $timeout:expr) => {
-        // select is pretty expensive, when there is only one receiver select == recv
-        if $receivers.len() == 1 {
-            match $receivers.nth(0).unwrap().0.recv_timeout($timeout) {
-                Ok(res) => Ok(SelectAnyResult {
-                    result: Ok(res),
+    macro_rules! select_timeout_impl {
+        ($self:expr, $other:expr, $timeout:expr) => {
+            select! {
+                recv($self.0) -> elem => Ok(SelectResult::A(elem)),
+                recv($other.0) -> elem => Ok(SelectResult::B(elem)),
+                default($timeout) => Err(RecvTimeoutError::Timeout),
+            }
+        };
+    }
+
+    macro_rules! select_any_impl {
+        ($receivers:expr) => {
+            // select is pretty expensive, when there is only one receiver select == recv
+            if $receivers.len() == 1 {
+                SelectAnyResult {
+                    result: $receivers.nth(0).unwrap().0.recv(),
                     index: 0,
-                }),
-                Err(RecvTimeoutError::Disconnected) => Ok(SelectAnyResult {
-                    result: Err(RecvError {}),
+                }
+            } else {
+                let mut select = Select::new();
+                // need to clone the iterator to avoid consuming it
+                let iter = $receivers.clone();
+                for receiver in iter {
+                    select.recv(&receiver.0);
+                }
+                let index = select.ready();
+                SelectAnyResult {
+                    index,
+                    result: $receivers.nth(index).unwrap().0.recv(),
+                }
+            }
+        };
+    }
+
+    macro_rules! select_any_timeout_impl {
+        ($receivers:expr, $timeout:expr) => {
+            // select is pretty expensive, when there is only one receiver select == recv
+            if $receivers.len() == 1 {
+                match $receivers.nth(0).unwrap().0.recv_timeout($timeout) {
+                    Ok(res) => Ok(SelectAnyResult {
+                        result: Ok(res),
+                        index: 0,
+                    }),
+                    Err(RecvTimeoutError::Disconnected) => Ok(SelectAnyResult {
+                        result: Err(RecvError {}),
+                        index: 0,
+                    }),
+                    Err(RecvTimeoutError::Timeout) => Err(RecvTimeoutError::Timeout),
+                }
+            } else {
+                let mut select = Select::new();
+                // need to clone the iterator to avoid consuming it
+                let iter = $receivers.clone();
+                for receiver in iter {
+                    select.recv(&receiver.0);
+                }
+                let index = select
+                    .ready_timeout($timeout)
+                    .map_err(|_| RecvTimeoutError::Timeout)?;
+                Ok(SelectAnyResult {
+                    index,
+                    result: $receivers.nth(index).unwrap().0.recv(),
+                })
+            }
+        };
+    }
+}
+
+#[cfg(all(not(feature = "crossbeam"), feature = "flume"))]
+#[macro_use]
+mod select_impl {
+    macro_rules! select_impl {
+        ($self:expr, $other:expr) => {{
+            flume::Selector::new()
+                .recv(&$self.0, |elem| SelectResult::A(elem))
+                .recv(&$other.0, |elem| SelectResult::B(elem))
+                .wait()
+        }};
+    }
+
+    macro_rules! select_timeout_impl {
+        ($self:expr, $other:expr, $timeout:expr) => {
+            flume::Selector::new()
+                .recv(&$self.0, |elem| SelectResult::A(elem))
+                .recv(&$other.0, |elem| SelectResult::B(elem))
+                .wait_timeout($timeout)
+                .map_err(|_| RecvTimeoutError::Timeout)
+        };
+    }
+
+    macro_rules! select_any_impl {
+        ($receivers:expr) => {
+            // select is pretty expensive, when there is only one receiver select == recv
+            if $receivers.len() == 1 {
+                SelectAnyResult {
+                    result: $receivers.nth(0).unwrap().0.recv(),
                     index: 0,
-                }),
-                Err(RecvTimeoutError::Timeout) => Err(RecvTimeoutError::Timeout),
+                }
+            } else {
+                let mut select = flume::Selector::new();
+                for (index, receiver) in $receivers.enumerate() {
+                    select = select.recv(&receiver.0, move |elem| SelectAnyResult {
+                        result: elem,
+                        index,
+                    });
+                }
+                select.wait()
             }
-        } else {
-            let mut select = Select::new();
-            // need to clone the iterator to avoid consuming it
-            let iter = $receivers.clone();
-            for receiver in iter {
-                select.recv(&receiver.0);
+        };
+    }
+
+    macro_rules! select_any_timeout_impl {
+        ($receivers:expr, $timeout:expr) => {
+            // select is pretty expensive, when there is only one receiver select == recv
+            if $receivers.len() == 1 {
+                match $receivers.nth(0).unwrap().0.recv_timeout($timeout) {
+                    Ok(res) => Ok(SelectAnyResult {
+                        result: Ok(res),
+                        index: 0,
+                    }),
+                    Err(RecvTimeoutError::Disconnected) => Ok(SelectAnyResult {
+                        result: Err(RecvError::Disconnected),
+                        index: 0,
+                    }),
+                    Err(RecvTimeoutError::Timeout) => Err(RecvTimeoutError::Timeout),
+                }
+            } else {
+                let mut select = flume::Selector::new();
+                for (index, receiver) in $receivers.enumerate() {
+                    select = select.recv(&receiver.0, move |elem| SelectAnyResult {
+                        result: elem,
+                        index,
+                    });
+                }
+                select
+                    .wait_timeout($timeout)
+                    .map_err(|_| RecvTimeoutError::Timeout)
             }
-            let index = select
-                .ready_timeout($timeout)
-                .map_err(|_| RecvTimeoutError::Timeout)?;
-            Ok(SelectAnyResult {
-                index,
-                result: $receivers.nth(index).unwrap().0.recv(),
-            })
-        }
-    };
+        };
+    }
 }
 
 /// A wrapper on a bounded channel sender.
@@ -126,7 +213,7 @@ impl<T: ChannelItem> BoundedChannelSender<T> {
 impl<T: ChannelItem> BoundedChannelReceiver<T> {
     /// Crate a new pair sender/receiver with limited capacity.
     pub fn new(cap: usize) -> (BoundedChannelSender<T>, BoundedChannelReceiver<T>) {
-        let (sender, receiver) = crossbeam_channel::bounded(cap);
+        let (sender, receiver) = bounded(cap);
         (
             BoundedChannelSender(sender),
             BoundedChannelReceiver(receiver),
@@ -212,7 +299,7 @@ impl<T: ChannelItem> UnboundedChannelSender<T> {
 impl<T: ChannelItem> UnboundedChannelReceiver<T> {
     /// Crate a new pair sender/receiver with unlimited capacity.
     pub fn new() -> (UnboundedChannelSender<T>, UnboundedChannelReceiver<T>) {
-        let (sender, receiver) = crossbeam_channel::unbounded();
+        let (sender, receiver) = unbounded();
         (
             UnboundedChannelSender(sender),
             UnboundedChannelReceiver(receiver),
