@@ -47,6 +47,9 @@ structopt = "0.3"
 # used for NetworkReceiver since it requires select
 crossbeam-channel = "0.5"
 
+# Used for KeyedWindowManager
+hashbrown = "0.11"
+
 [dev-dependencies]
 # for the tests
 tempfile = "3.2"
