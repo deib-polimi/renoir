@@ -43,13 +43,13 @@ pub struct KeyedStream<Key: DataKey, Out: Data, OperatorChain>(
 where
     OperatorChain: Operator<KeyValue<Key, Out>>;
 
-pub struct WindowedStream<Out: Data, OperatorChain, WinDescr>
+pub struct WindowedStream<Key: DataKey, Out: Data, OperatorChain, WinDescr>
 where
-    OperatorChain: Operator<Out>,
-    WinDescr: WindowDescription<Out>,
+    OperatorChain: Operator<KeyValue<Key, Out>>,
+    WinDescr: WindowDescription<Key, Out>,
 {
-    pub(crate) inner: Stream<Out, OperatorChain>,
-    pub(crate) window: WinDescr,
+    pub(crate) inner: KeyedStream<Key, Out, OperatorChain>,
+    pub(crate) descr: WinDescr,
 }
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>

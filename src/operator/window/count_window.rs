@@ -2,7 +2,9 @@ use std::collections::VecDeque;
 use std::num::NonZeroUsize;
 
 use crate::operator::window::{Window, WindowDescription, WindowGenerator};
-use crate::operator::{Data, StreamElement, Timestamp};
+use crate::operator::{Data, DataKey, StreamElement, Timestamp};
+use crate::stream::KeyValue;
+use std::marker::PhantomData;
 
 #[derive(Clone, Debug)]
 pub struct CountWindow {
@@ -19,66 +21,70 @@ impl CountWindow {
     }
 }
 
-impl<Out: Data> WindowDescription<Out> for CountWindow {
-    type GeneratorType = CountWindowGenerator<Out>;
+impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for CountWindow {
+    type Generator = CountWindowGenerator<Key, Out>;
 
-    fn into_generator(self) -> Self::GeneratorType {
-        CountWindowGenerator::new(self)
+    fn new_generator(&self) -> Self::Generator {
+        CountWindowGenerator::new(self.clone())
+    }
+
+    fn to_string(&self) -> String {
+        format!(
+            "CountWindow[size={}, step={}]",
+            self.size.get(),
+            self.step.get()
+        )
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct CountWindowGenerator<Out: Data> {
+pub struct CountWindowGenerator<Key: DataKey, Out: Data> {
     descr: CountWindow,
     buffer: VecDeque<Out>,
     timestamp_buffer: VecDeque<Timestamp>,
-    extra_items: Vec<StreamElement<Out>>,
     received_end: bool,
+    _key: PhantomData<Key>,
 }
 
-impl<Out: Data> CountWindowGenerator<Out> {
+impl<Key: DataKey, Out: Data> CountWindowGenerator<Key, Out> {
     fn new(descr: CountWindow) -> Self {
         Self {
             descr,
             buffer: Default::default(),
             timestamp_buffer: Default::default(),
-            extra_items: Default::default(),
             received_end: false,
+            _key: Default::default(),
         }
     }
 }
 
-impl<Out: Data> WindowGenerator<Out> for CountWindowGenerator<Out> {
-    fn add(&mut self, item: StreamElement<Out>) {
+impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator<Key, Out> {
+    fn add(&mut self, item: StreamElement<KeyValue<Key, Out>>) {
         match item {
-            StreamElement::Item(item) => self.buffer.push_back(item),
-            StreamElement::Timestamped(item, ts) => {
+            StreamElement::Item((_, item)) => self.buffer.push_back(item),
+            StreamElement::Timestamped((_, item), ts) => {
                 self.buffer.push_back(item);
                 self.timestamp_buffer.push_back(ts);
             }
             StreamElement::Watermark(_) => {
-                todo!()
+                // Watermarks are not used by count windows
             }
-            StreamElement::FlushBatch => {
-                // TODO: is this ok?
-                self.extra_items.push(item);
-            }
+            StreamElement::FlushBatch => unreachable!("Windows do not handle FlushBatch"),
             StreamElement::End => {
                 self.received_end = true;
             }
         }
     }
 
-    fn next_window(&mut self) -> Option<Window<Out>> {
-        if self.buffer.len() >= self.descr.size.get() || self.received_end {
-            // the stream has ended, make sure to send End only when also the last window is closed
-            if self.received_end && self.buffer.is_empty() && self.extra_items.is_empty() {
-                self.extra_items.push(StreamElement::End);
-            }
+    fn next_window(&mut self) -> Option<Window<Key, Out>> {
+        if self.buffer.len() >= self.descr.size.get()
+            || (self.received_end && !self.buffer.is_empty())
+        {
             Some(Window {
                 size: self.descr.size.get().min(self.buffer.len()),
-                extra_items: std::mem::take(&mut self.extra_items),
                 gen: self,
+                // TODO: handle timestamp
+                // TODO: make sure the last incomplete windows do not have timestamps bigger than old watermarks
                 timestamp: None,
             })
         } else {
@@ -95,12 +101,5 @@ impl<Out: Data> WindowGenerator<Out> for CountWindowGenerator<Out> {
 
     fn buffer(&self) -> &VecDeque<Out> {
         &self.buffer
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "CountWindow[size={}, step={}]",
-            self.descr.size, self.descr.step
-        )
     }
 }
