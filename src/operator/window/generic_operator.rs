@@ -68,7 +68,13 @@ where
                 return item;
             }
 
-            for (key, window_gen) in self.manager.add(self.prev.next()) {
+            let item = self.prev.next();
+            // the manager is not interested in FlushBatch
+            if matches!(item, StreamElement::FlushBatch) {
+                return StreamElement::FlushBatch;
+            }
+
+            for (key, window_gen) in self.manager.add(item) {
                 while let Some(window) = window_gen.next_window() {
                     let value = (self.process_func)(&window);
                     self.buffer.push_back(if let Some(ts) = window.timestamp {
