@@ -1,10 +1,12 @@
 use std::sync::{Arc, Mutex};
 
 pub use collect_vec::*;
+pub use for_each::*;
 
 use crate::operator::Operator;
 
 mod collect_vec;
+mod for_each;
 
 pub trait Sink: Operator<()> {}
 
