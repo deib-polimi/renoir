@@ -11,6 +11,8 @@ use hashbrown::HashMap;
 mod count_window;
 mod event_time_window;
 mod first;
+mod fold;
+mod generic_operator;
 
 /// A WindowDescription describes how a window behaves.
 pub trait WindowDescription<Key: DataKey, Out: Data> {
@@ -130,7 +132,7 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
     }
 
     /// Return extra elements that should be forwarded downstream
-    fn next_extra_item(&mut self) -> Option<StreamElement<KeyValue<Key, Out>>> {
+    fn next_extra_elements(&mut self) -> Option<StreamElement<KeyValue<Key, Out>>> {
         self.extra_items.pop_front()
     }
 
