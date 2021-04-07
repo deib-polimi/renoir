@@ -13,6 +13,9 @@ mod event_time_window;
 mod first;
 mod fold;
 mod generic_operator;
+mod max;
+mod min;
+mod sum;
 
 /// A WindowDescription describes how a window behaves.
 pub trait WindowDescription<Key: DataKey, Out: Data> {

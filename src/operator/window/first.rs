@@ -10,8 +10,10 @@ where
 {
     /// For each window, return the first element.
     pub fn first(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        let descr = self.descr.clone();
-        self.inner.add_operator(|prev| {
+        let stream = self.inner;
+        let descr = self.descr;
+
+        stream.add_operator(|prev| {
             GenericWindowOperator::new("First", prev, descr, |window| {
                 window.items().next().unwrap().clone()
             })
