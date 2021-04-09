@@ -1,19 +1,13 @@
-use std::hash::Hash;
+use std::sync::Arc;
 
-use async_std::sync::Arc;
-use async_trait::async_trait;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
-use crate::operator::{Operator, StreamElement};
+use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Map<Out, NewOut, PreviousOperators>
+pub struct Map<Out: Data, NewOut: Data, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -21,19 +15,17 @@ where
     f: Arc<dyn Fn(Out) -> NewOut + Send + Sync>,
 }
 
-#[async_trait]
-impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Map<Out, NewOut, PreviousOperators>
+impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
+    for Map<Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<NewOut> {
-        self.prev.next().await.map(&*self.f)
+    fn next(&mut self) -> StreamElement<NewOut> {
+        self.prev.next().map(&*self.f)
     }
 
     fn to_string(&self) -> String {
@@ -46,15 +38,12 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn map<NewOut, F>(self, f: F) -> Stream<In, NewOut, impl Operator<NewOut>>
+    pub fn map<NewOut: Data, F>(self, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         F: Fn(Out) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| Map {
@@ -64,58 +53,57 @@ where
     }
 }
 
-impl<In, Key, Out, OperatorChain> KeyedStream<In, Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    Key: Clone + Serialize + DeserializeOwned + Send + Hash + Eq + 'static,
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub fn map<NewOut, F>(
+    pub fn map<NewOut: Data, F>(
         self,
         f: F,
-    ) -> KeyedStream<In, Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
-        F: Fn(KeyValue<Key, Out>) -> NewOut + Send + Sync + 'static,
+        F: Fn(KeyValue<&Key, Out>) -> NewOut + Send + Sync + 'static,
     {
         self.add_operator(|prev| Map {
             prev,
-            f: Arc::new(move |(k, v)| (k.clone(), f((k, v)))),
+            f: Arc::new(move |(k, v)| {
+                let mapped_value = f((&k, v));
+                (k, mapped_value)
+            }),
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
+    use std::str::FromStr;
+
+    use itertools::Itertools;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
-    use itertools::Itertools;
-    use std::str::FromStr;
 
-    #[async_std::test]
-    async fn map_stream() {
+    #[test]
+    fn map_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .map(|n| n.to_string())
             .map(|n| n + "000")
             .map(|n| u32::from_str(&n).unwrap())
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let res = res.get().unwrap();
         let expected = (0..10u32).map(|n| 1000 * n).collect_vec();
         assert_eq!(res, expected);
     }
 
-    #[async_std::test]
-    async fn map_keyed_stream() {
+    #[test]
+    fn map_keyed_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|n| n % 2)
@@ -123,7 +111,7 @@ mod tests {
             .unkey()
             .map(|(_k, v)| v)
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let res = res.get().unwrap().into_iter().sorted().collect_vec();
         let expected = (0..10u8).map(|n| (n % 2) * 100 + n).sorted().collect_vec();
         assert_eq!(res, expected);

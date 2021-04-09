@@ -1,19 +1,14 @@
 use std::collections::HashMap;
 
-use async_trait::async_trait;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::block::{BatchMode, Batcher, NextStrategy, SenderList};
-use crate::network::Coord;
-use crate::operator::{Operator, StreamElement};
+use crate::network::ReceiverEndpoint;
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
-pub struct EndBlock<Out, OperatorChain>
+pub struct EndBlock<Out: Data, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
@@ -22,12 +17,11 @@ where
     batch_mode: BatchMode,
     sender_groups: Vec<SenderList>,
     #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
-    senders: HashMap<Coord, Batcher<Out>>,
+    senders: HashMap<ReceiverEndpoint, Batcher<Out>>,
 }
 
-impl<Out, OperatorChain> EndBlock<Out, OperatorChain>
+impl<Out: Data, OperatorChain> EndBlock<Out, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out>,
 {
     pub(crate) fn new(
@@ -46,16 +40,14 @@ where
     }
 }
 
-#[async_trait]
-impl<Out, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
+impl<Out: Data, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata.clone()).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata.clone());
 
-        let senders = metadata.network.lock().await.get_senders(metadata.coord);
+        let senders = metadata.network.lock().unwrap().get_senders(metadata.coord);
         self.sender_groups = self.next_strategy.group_senders(&metadata, &senders);
         self.senders = senders
             .into_iter()
@@ -64,35 +56,51 @@ where
         self.metadata = Some(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<()> {
-        let message = self.prev.next().await;
+    fn next(&mut self) -> StreamElement<()> {
+        let message = self.prev.next();
         let to_return = message.take();
-        let mut to_send = Vec::new();
         match &message {
             StreamElement::Watermark(_) | StreamElement::End => {
                 for senders in self.sender_groups.iter() {
                     for &sender in senders.0.iter() {
-                        to_send.push((message.clone(), sender))
+                        self.senders
+                            .get_mut(&sender)
+                            .unwrap()
+                            .enqueue(message.clone());
                     }
                 }
             }
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
                 let index = self.next_strategy.index(&item);
-                for sender in self.sender_groups.iter() {
+                for sender in self.sender_groups.iter().skip(1) {
                     let index = index % sender.0.len();
-                    to_send.push((message.clone(), sender.0[index]));
+                    self.senders
+                        .get_mut(&sender.0[index])
+                        .unwrap()
+                        .enqueue(message.clone());
+                }
+                // avoid the last message.clone()
+                if !self.sender_groups.is_empty() {
+                    let sender = &self.sender_groups[0];
+                    let index = index % sender.0.len();
+                    self.senders
+                        .get_mut(&sender.0[index])
+                        .unwrap()
+                        .enqueue(message);
+                }
+            }
+            StreamElement::FlushBatch => {
+                for (_, batcher) in self.senders.iter_mut() {
+                    batcher.flush();
                 }
             }
         };
-        for (message, sender) in to_send {
-            self.senders[&sender].enqueue(message).await;
-        }
 
         if matches!(to_return, StreamElement::End) {
             let metadata = self.metadata.as_ref().unwrap();
             debug!("EndBlock at {} received End", metadata.coord);
             for (_, batcher) in self.senders.drain() {
-                batcher.end().await;
+                batcher.end();
             }
         }
         to_return

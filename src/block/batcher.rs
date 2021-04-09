@@ -1,21 +1,8 @@
 use std::num::NonZeroUsize;
-use std::time::Duration;
-
-use async_std::channel::{bounded, Receiver, Sender};
-use async_std::future::timeout;
-use async_std::task::spawn;
-use async_std::task::JoinHandle;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use std::time::{Duration, Instant};
 
 use crate::network::{NetworkMessage, NetworkSender};
-use crate::operator::StreamElement;
-
-/// When `BatchMode::Fixed` is used the batch should not be flushed due to a timeout, for the sake
-/// of simplicity a timeout is used anyway with a very large value.
-///
-/// This value cannot be too big otherwise an integer overflow will happen.
-const FIXED_BATCH_MODE_MAX_DELAY: Duration = Duration::from_secs(60 * 60 * 24 * 365 * 10);
+use crate::operator::{Data, StreamElement};
 
 /// Which policy to use for batching the messages before sending them.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -27,103 +14,59 @@ pub enum BatchMode {
     Adaptive(NonZeroUsize, Duration),
 }
 
-/// Message sent to the batcher task.
-pub(crate) enum BatcherMessage<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
-    /// An actual message to put in the queue has arrived.
-    Message(StreamElement<Out>),
-    /// The stream is ended, flush and exit.
-    End,
-}
-
 /// A `Batcher` wraps a sender and sends the messages in batches to reduce the network overhead.
 ///
 /// Internally it spawns a new task to handle the timeouts and join it at the end.
-pub(crate) struct Batcher<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
-    /// Sender to the internal task that does the batching.
-    sender: Sender<BatcherMessage<Out>>,
-    /// Handle to join the internal task.
-    join_handle: JoinHandle<()>,
+pub(crate) struct Batcher<Out: Data> {
+    /// Sender used to communicate with the other replicas
+    remote_sender: NetworkSender<NetworkMessage<Out>>,
+    /// Batching mode used by the batcher
+    mode: BatchMode,
+    /// Buffer used to keep messages ready to be sent
+    buffer: Vec<StreamElement<Out>>,
+    /// Time of the last flush of the buffer.    
+    last_send: Instant,
 }
 
-impl<Out> Batcher<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+impl<Out: Data> Batcher<Out> {
     pub(crate) fn new(remote_sender: NetworkSender<NetworkMessage<Out>>, mode: BatchMode) -> Self {
-        let (sender, receiver) = bounded(1000);
-        let join_handle =
-            spawn(async move { Batcher::batcher_body(remote_sender, mode, receiver).await });
         Self {
-            sender,
-            join_handle,
+            remote_sender,
+            mode,
+            buffer: Default::default(),
+            last_send: Instant::now(),
         }
     }
 
     /// Put a message in the batch queue, it won't be sent immediately.
-    pub(crate) async fn enqueue(&self, message: StreamElement<Out>) {
-        self.sender
-            .send(BatcherMessage::Message(message))
-            .await
-            .expect("Cannot enqueue if the Batcher already exited")
+    pub(crate) fn enqueue(&mut self, message: StreamElement<Out>) {
+        self.buffer.push(message);
+        // max capacity has been reached, send and flush the buffer
+        // if too much time elapsed since the last flush, flush the buffer
+        let max_delay = self.mode.max_delay();
+        let timeout_elapsed = max_delay
+            .map(|max_delay| self.last_send.elapsed() > max_delay)
+            .unwrap_or(false);
+        if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed {
+            self.flush();
+        }
     }
 
-    /// Tell the batcher that the stream is ended, flush all the messages and join the internal
-    /// task.
-    pub(crate) async fn end(self) {
-        self.sender
-            .send(BatcherMessage::End)
-            .await
-            .expect("Cannot enqueue if the Batcher already exited");
-        self.join_handle.await;
+    /// Flush the internal buffer if it's not empty.
+    pub(crate) fn flush(&mut self) {
+        if !self.buffer.is_empty() {
+            let mut batch = Vec::with_capacity(self.mode.max_capacity());
+            std::mem::swap(&mut self.buffer, &mut batch);
+            self.remote_sender.send(batch).unwrap();
+            self.last_send = Instant::now();
+        }
     }
 
-    /// The body of the internal task that does the batching.
-    async fn batcher_body(
-        sender: NetworkSender<NetworkMessage<Out>>,
-        mode: BatchMode,
-        receiver: Receiver<BatcherMessage<Out>>,
-    ) {
-        debug!(
-            "Batcher to {} is ready for working in mode {:?}",
-            sender.coord, mode
-        );
-        let mut batch = Vec::with_capacity(mode.max_capacity());
-        loop {
-            match timeout(mode.max_delay(), receiver.recv()).await {
-                Ok(Ok(message)) => {
-                    match message {
-                        BatcherMessage::Message(mex) => {
-                            batch.push(mex);
-                            // max capacity has been reached, send and flush the buffer
-                            if batch.len() >= mode.max_capacity() {
-                                sender.send(batch).await.unwrap();
-                                batch = Vec::with_capacity(mode.max_capacity());
-                            }
-                        }
-                        BatcherMessage::End => {
-                            // send the last elements in the batch
-                            if !batch.is_empty() {
-                                sender.send(batch).await.unwrap();
-                            }
-                            break;
-                        }
-                    }
-                }
-                Err(_) => {
-                    // timeout occurred
-                    if !batch.is_empty() {
-                        sender.send(batch).await.unwrap();
-                        batch = Vec::with_capacity(mode.max_capacity());
-                    }
-                }
-                Ok(Err(_)) => break,
-            }
+    /// Tell the batcher that the stream is ended, flush all the remaining messages.
+    pub(crate) fn end(self) {
+        // Send the remaining messages
+        if !self.buffer.is_empty() {
+            self.remote_sender.send(self.buffer).unwrap();
         }
     }
 }
@@ -143,17 +86,17 @@ impl BatchMode {
     }
 
     /// Size of the batch in this mode.
-    fn max_capacity(&self) -> usize {
+    pub fn max_capacity(&self) -> usize {
         match self {
             BatchMode::Fixed(cap) | BatchMode::Adaptive(cap, _) => cap.get(),
         }
     }
 
-    /// Maximum delay this mode allows.
-    fn max_delay(&self) -> Duration {
+    /// Maximum delay this mode allows, if any.
+    pub fn max_delay(&self) -> Option<Duration> {
         match self {
-            BatchMode::Fixed(_) => FIXED_BATCH_MODE_MAX_DELAY,
-            BatchMode::Adaptive(_, max_delay) => *max_delay,
+            BatchMode::Fixed(_) => None,
+            BatchMode::Adaptive(_, max_delay) => Some(*max_delay),
         }
     }
 }

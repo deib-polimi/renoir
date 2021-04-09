@@ -2,6 +2,27 @@ hosts:
   - address: localhost
     base_port: 9500
     num_cores: 4
-  - address: localhost
+  - # IP address or domain name of the remote host.
+    address: localhost
+    # Initial port to use, note that more than one port will be used.
     base_port: 9600
+    # Number of replicas to spawn in this host.
     num_cores: 4
+    # If specified run the remote program using perf recording a profile
+    # perf_path: /tmp/perf.data
+    # Optional ssh configuration to this remote host. When missing ssh-agent
+    # will be prompt for the missing information. If ssh-agent is not present
+    # you need to specify `username` and one of the authentication methods.
+    #ssh:
+    #  # Which port to use to connect via ssh, defaults to 22.
+    #  ssh_port: 22
+    #  # Username of the remote host. When missing the local username is used.
+    #  username: user
+    #  # Password of the remote user. When missing the key_file is used.
+    #  password: password
+    #  # Path to the private ssh key to use for the authentication.
+    #  key_file: /home/user/.ssh/id_rsa
+    #  # Passphrase of the private key file. When missing it's assumed the key
+    #  # is not protected. When using the ssh-agent the passphrase may be
+    #  # omitted.
+    #  key_passphrase: pass

@@ -1,8 +1,8 @@
-use async_std::fs::File;
-use async_std::io::{BufReader, SeekFrom};
-use async_std::path::PathBuf;
-use async_std::prelude::*;
-use async_trait::async_trait;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::Seek;
+use std::io::{BufReader, SeekFrom};
+use std::path::PathBuf;
 
 use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
@@ -37,16 +37,18 @@ impl Source<String> for FileSource {
     }
 }
 
-#[async_trait]
 impl Operator<String> for FileSource {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: ExecutionMetadata) {
         let global_id = metadata.global_id;
         let num_replicas = metadata.num_replicas;
 
-        let file = File::open(&self.path)
-            .await
-            .expect("FileSource: error while opening file");
-        let file_size = file.metadata().await.unwrap().len() as usize;
+        let file = File::open(&self.path).unwrap_or_else(|err| {
+            panic!(
+                "FileSource: error while opening file {:?}: {:?}",
+                self.path, err
+            )
+        });
+        let file_size = file.metadata().unwrap().len() as usize;
 
         let range_size = file_size / num_replicas;
         let start = range_size * global_id;
@@ -61,20 +63,18 @@ impl Operator<String> for FileSource {
         // Seek reader to the first byte to be read
         reader
             .seek(SeekFrom::Current(start as i64))
-            .await
             .expect("seek file");
         if global_id != 0 {
             // discard first line
             let mut s = String::new();
             self.current += reader
                 .read_line(&mut s)
-                .await
                 .expect("Cannot read line from file");
         }
         self.reader = Some(reader);
     }
 
-    async fn next(&mut self) -> StreamElement<String> {
+    fn next(&mut self) -> StreamElement<String> {
         let element = if self.current <= self.end {
             let mut line = String::new();
             match self
@@ -82,14 +82,13 @@ impl Operator<String> for FileSource {
                 .as_mut()
                 .expect("BufReader was not initialized")
                 .read_line(&mut line)
-                .await
             {
                 Ok(len) if len > 0 => {
                     self.current += len;
                     StreamElement::Item(line)
                 }
                 Ok(_) => StreamElement::End,
-                Err(e) => panic!(e),
+                Err(e) => panic!("Error while reading file: {:?}", e),
             }
         } else {
             StreamElement::End

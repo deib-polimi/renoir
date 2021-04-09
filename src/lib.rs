@@ -6,6 +6,7 @@ extern crate log;
 extern crate lazy_static;
 
 pub mod block;
+pub mod channel;
 pub mod config;
 pub mod environment;
 pub mod network;

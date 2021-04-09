@@ -1,14 +1,12 @@
-use anyhow::{anyhow, Result};
-use async_std::channel::{bounded, Receiver, Sender};
-use async_std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
-use async_std::stream::StreamExt;
-use async_std::task::spawn;
-use async_std::task::JoinHandle;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use std::time::Duration;
 
-use crate::network::remote::remote_recv;
-use crate::network::{Coord, NetworkSender};
+use anyhow::{anyhow, Result};
+
+use crate::channel::{
+    BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectAnyResult, SelectResult,
+};
+use crate::network::{NetworkSender, ReceiverEndpoint};
+use crate::operator::Data;
 
 /// The capacity of the in-buffer.
 const CHANNEL_CAPACITY: usize = 10;
@@ -20,164 +18,90 @@ const CHANNEL_CAPACITY: usize = 10;
 /// starter returned by the constructor.
 ///
 /// Internally it contains a in-memory sender-receiver pair, to get the local sender call
-/// `.sender()`. When the socket will be bound an async task will be spawned, it will bind the
+/// `.sender()`. When the socket will be bound an task will be spawned, it will bind the
 /// socket and send to the same in-memory channel the received messages.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(crate) struct NetworkReceiver<In> {
-    /// The coord of the current receiver.
-    pub coord: Coord,
+pub struct NetworkReceiver<In: Data> {
+    /// The ReceiverEndpoint of the current receiver.
+    pub receiver_endpoint: ReceiverEndpoint,
     /// The actual receiver where the users of this struct will wait upon.
     #[derivative(Debug = "ignore")]
-    receiver: Receiver<In>,
+    receiver: BoundedChannelReceiver<In>,
     /// The sender associated with `self.receiver`.
     #[derivative(Debug = "ignore")]
-    local_sender: Sender<In>,
+    local_sender: Option<BoundedChannelSender<In>>,
 }
 
-impl<In> NetworkReceiver<In>
-where
-    In: Send + Serialize + DeserializeOwned + 'static,
-{
-    /// Construct a new `NetworkReceiver` that will be ready to bind a socket on the specified
-    /// address.
+impl<In: Data> NetworkReceiver<In> {
+    /// Construct a new `NetworkReceiver`.
     ///
-    /// The returned value is:
-    /// - the `NetworkReceiver`
-    /// - a sender that will control the binding of the socket: sending a positive value will bind
-    ///   a socket on the specified address. The value sent is the number of senders that will
-    ///   connect remotely to that socket. When they all connects the socket is unbound.
-    /// - an handle where to wait for the socket task
-    pub fn new(coord: Coord, address: (String, u16)) -> (Self, Sender<usize>, JoinHandle<()>) {
-        let (sender, receiver) = bounded(CHANNEL_CAPACITY);
-        let (bind_socket, bind_socket_rx) = bounded(CHANNEL_CAPACITY);
-        let local_sender = sender.clone();
-        let join_handle = spawn(async move {
-            NetworkReceiver::bind_remote(coord, local_sender, address, bind_socket_rx).await;
-        });
-        (
-            Self {
-                coord,
-                receiver,
-                local_sender: sender,
-            },
-            bind_socket,
-            join_handle,
-        )
+    /// To get its sender use `.sender()` for a `NetworkSender` or directly `.local_sender` for the
+    /// raw channel.
+    pub fn new(receiver_endpoint: ReceiverEndpoint) -> Self {
+        let (sender, receiver) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
+        Self {
+            receiver_endpoint,
+            receiver,
+            local_sender: Some(sender),
+        }
     }
 
     /// Obtain a `NetworkSender` that will send messages that will arrive to this receiver.
-    pub fn sender(&self) -> NetworkSender<In> {
-        NetworkSender::local(self.coord, self.local_sender.clone())
+    pub fn sender(&mut self) -> Option<NetworkSender<In>> {
+        self.local_sender
+            .take()
+            .map(|sender| NetworkSender::local(self.receiver_endpoint, sender))
     }
 
     /// Receive a message from any sender.
-    pub async fn recv(&self) -> Result<In> {
-        self.receiver
-            .recv()
-            .await
-            .map_err(|e| anyhow!("Failed to receive from channel at {}: {:?}", self.coord, e))
+    #[allow(dead_code)]
+    pub fn recv(&self) -> Result<In> {
+        self.receiver.recv().map_err(|e| {
+            anyhow!(
+                "Failed to receive from channel at {:?}: {:?}",
+                self.receiver_endpoint,
+                e
+            )
+        })
     }
 
-    /// The async task that will eventually bind the socket.
-    ///
-    /// If 0 is sent to `bind_socket` no socket will be bound, otherwise exactly that number of
-    /// connections will be awaited and served. After that the task will exit unbinding the socket.
-    async fn bind_remote(
-        coord: Coord,
-        local_sender: Sender<In>,
-        address: (String, u16),
-        bind_socket: Receiver<usize>,
-    ) {
-        // wait the signal before binding the socket
-        let num_connections = bind_socket.recv().await.unwrap();
-        if num_connections == 0 {
-            debug!(
-                "Remote receiver at {} is asked not to bind, exiting...",
-                coord
-            );
-            return;
-        }
-        // from now we can start binding the socket
-        let address = (address.0.as_ref(), address.1);
-        let address: Vec<_> = address
-            .to_socket_addrs()
-            .await
-            .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
-            .unwrap()
-            .collect();
-        let listener = TcpListener::bind(&*address)
-            .await
-            .map_err(|e| {
-                anyhow!(
-                    "Failed to bind socket for {} at {:?}: {:?}",
-                    coord,
-                    address,
-                    e
-                )
-            })
-            .unwrap();
-        let address = listener
-            .local_addr()
-            .map(|a| a.to_string())
-            .unwrap_or_else(|_| "unknown".to_string());
-        info!(
-            "Remote receiver at {} is ready to accept {} connections to {}",
-            coord, num_connections, address
-        );
-        let local_sender = local_sender.clone();
-        let mut incoming = listener.incoming();
-        let mut join_handles = Vec::new();
-        for conn_num in 1..=num_connections {
-            let stream = incoming.next().await.unwrap();
-            let stream = match stream {
-                Ok(stream) => stream,
-                Err(e) => {
-                    warn!("Failed to accept incoming connection at {}: {:?}", coord, e);
-                    continue;
-                }
-            };
-            info!(
-                "Remote receiver at {} accepted a new connection from {:?} ({} / {})",
-                coord,
-                stream.peer_addr(),
-                conn_num,
-                num_connections
-            );
-            let local_sender = local_sender.clone();
-            let join_handle = spawn(async move {
-                NetworkReceiver::handle_remote_client(coord, local_sender, stream).await
-            });
-            join_handles.push(join_handle);
-        }
-        debug!(
-            "Remote receiver at {} ({}) accepted all {} connections, joining them...",
-            coord, address, num_connections
-        );
-        for join_handle in join_handles {
-            join_handle.await;
-        }
-        debug!(
-            "Remote receiver at {} ({}) finished, exiting...",
-            coord, address
-        );
+    /// Receive a message from any sender with a timeout.
+    #[allow(dead_code)]
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<In, RecvTimeoutError> {
+        self.receiver.recv_timeout(timeout)
     }
 
-    /// Handle the connection with a remote sender.
+    /// Receive a message from any sender of this receiver of the other provided receiver.
     ///
-    /// This will receiver every message, deserialize it and send it back to the receiver using the
-    /// local channel.
-    async fn handle_remote_client(coord: Coord, local_sender: Sender<In>, mut receiver: TcpStream) {
-        let address = receiver
-            .peer_addr()
-            .map(|a| a.to_string())
-            .unwrap_or_else(|_| "unknown".to_string());
-        while let Some(message) = remote_recv(coord, &mut receiver).await {
-            local_sender.send(message).await.unwrap_or_else(|e| {
-                panic!("Failed to send to local receiver at {}: {:?}", coord, e)
-            });
-        }
-        let _ = receiver.shutdown(Shutdown::Both);
-        debug!("Remote receiver for {} at {} exited", coord, address);
+    /// The first message of the two is returned. If both receivers are ready one of them is chosen
+    /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
+    /// fairness property.
+    #[allow(dead_code)] // TODO: remove once joins are implemented
+    pub fn select<In2: Data>(&self, other: &NetworkReceiver<In2>) -> SelectResult<In, In2> {
+        self.receiver.select(&other.receiver)
+    }
+
+    /// Same as `select`, with a timeout.
+    #[allow(dead_code)] // TODO: remove once joins are implemented
+    pub fn select_timeout<In2: Data>(
+        &self,
+        other: &NetworkReceiver<In2>,
+        timeout: Duration,
+    ) -> Result<SelectResult<In, In2>, RecvTimeoutError> {
+        self.receiver.select_timeout(&other.receiver, timeout)
+    }
+
+    /// Same as `select`, but takes multiple receivers to select from.
+    pub fn select_any(receivers: &[NetworkReceiver<In>]) -> SelectAnyResult<In> {
+        BoundedChannelReceiver::select_any(receivers.iter().map(|r| &r.receiver))
+    }
+
+    /// Same as `select_timeout`, but takes multiple receivers to select from.
+    pub fn select_any_timeout(
+        receivers: &[NetworkReceiver<In>],
+        timeout: Duration,
+    ) -> Result<SelectAnyResult<In>, RecvTimeoutError> {
+        BoundedChannelReceiver::select_any_timeout(receivers.iter().map(|r| &r.receiver), timeout)
     }
 }

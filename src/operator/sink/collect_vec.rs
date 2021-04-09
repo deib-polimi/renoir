@@ -1,16 +1,12 @@
-use async_trait::async_trait;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
+use crate::block::NextStrategy;
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
-use crate::operator::{EndBlock, Operator, StreamElement};
+use crate::operator::{Data, EndBlock, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
 #[derive(Debug)]
-pub struct CollectVecSink<Out, PreviousOperators>
+pub struct CollectVecSink<Out: Data, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -18,18 +14,16 @@ where
     output: StreamOutputRef<Vec<Out>>,
 }
 
-#[async_trait]
-impl<Out, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
+impl<Out: Data, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<()> {
-        match self.prev.next().await {
+    fn next(&mut self) -> StreamElement<()> {
+        match self.prev.next() {
             StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
                 // cloned CollectVecSink or already ended stream
                 if let Some(result) = self.result.as_mut() {
@@ -40,10 +34,11 @@ where
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::End => {
                 if let Some(result) = self.result.take() {
-                    *self.output.lock().await = Some(result);
+                    *self.output.lock().unwrap() = Some(result);
                 }
                 StreamElement::End
             }
+            StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }
 
@@ -52,16 +47,13 @@ where
     }
 }
 
-impl<Out, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    PreviousOperators: Operator<Out> + Send,
+impl<Out: Data, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators> where
+    PreviousOperators: Operator<Out> + Send
 {
 }
 
-impl<Out, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
+impl<Out: Data, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
     fn clone(&self) -> Self {
@@ -69,15 +61,13 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {
         let output = StreamOutputRef::default();
-        let mut new_stream = self.add_block(EndBlock::new);
+        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::OnlyOne);
         // FIXME: when implementing Stream::max_parallelism use that here
         new_stream.block.scheduler_requirements.max_parallelism(1);
         new_stream
@@ -93,19 +83,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
     use itertools::Itertools;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[async_std::test]
-    async fn collect_vec() {
+    #[test]
+    fn collect_vec() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).collect_vec();
-        env.execute().await;
+        env.execute();
         assert_eq!(res.get().unwrap(), (0..10).collect_vec());
     }
 }

@@ -1,17 +1,13 @@
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
+pub use event_time_iterator::*;
 pub use file::*;
-pub use stream::*;
+pub use iterator::*;
 
-use crate::operator::Operator;
+use crate::operator::{Data, Operator};
 
+mod event_time_iterator;
 mod file;
-mod stream;
+mod iterator;
 
-pub trait Source<Out>: Operator<Out>
-where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-{
+pub trait Source<Out: Data>: Operator<Out> {
     fn get_max_parallelism(&self) -> Option<usize>;
 }

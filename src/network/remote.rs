@@ -1,11 +1,21 @@
-use async_std::net::TcpStream;
-use async_std::prelude::*;
+use std::io::Read;
+use std::io::Write;
+use std::net::TcpStream;
+
+use anyhow::Result;
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
 use bincode::{DefaultOptions, Options};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use crate::network::Coord;
+use crate::network::{Coord, DemuxCoord, ReceiverEndpoint};
+use crate::operator::Data;
+use crate::scheduler::ReplicaId;
+use crate::stream::BlockId;
+
+pub(crate) type SerializedMessage = Vec<u8>;
+
+/// The capacity of the out-buffer.
+pub(crate) const CHANNEL_CAPACITY: usize = 10;
 
 lazy_static! {
 /// Configuration of the header serializer: the integers must have a fixed length encoding.
@@ -23,6 +33,10 @@ lazy_static! {
 struct MessageHeader {
     /// The size of the actual message
     size: u32,
+    /// The id of the replica this message is for.
+    replica_id: ReplicaId,
+    /// The id of the block that is sending the message.
+    sender_block_id: BlockId,
 }
 
 /// Serialize and send a message to a remote socket.
@@ -30,39 +44,35 @@ struct MessageHeader {
 /// The network protocol works as follow:
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
-pub(crate) async fn remote_send<T>(what: T, coord: Coord, stream: &mut TcpStream)
-where
-    T: Send + Serialize,
-{
+pub(crate) fn remote_send<T: Data>(what: T, dest: ReceiverEndpoint, stream: &mut TcpStream) {
     let address = stream
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
     let serialized = MESSAGE_CONFIG
         .serialize(&what)
-        .unwrap_or_else(|e| panic!("Failed to serialize outgoing message to {}: {:?}", coord, e));
+        .unwrap_or_else(|e| panic!("Failed to serialize outgoing message to {}: {:?}", dest, e));
     let header = MessageHeader {
         size: serialized.len() as _,
+        replica_id: dest.coord.replica_id,
+        sender_block_id: dest.prev_block_id,
     };
     let serialized_header = HEADER_CONFIG.serialize(&header).unwrap();
-    stream
-        .write_all(&serialized_header)
-        .await
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failed to send size of message (was {} bytes) to {} at {}: {:?}",
-                serialized.len(),
-                coord,
-                address,
-                e
-            )
-        });
+    stream.write_all(&serialized_header).unwrap_or_else(|e| {
+        panic!(
+            "Failed to send size of message (was {} bytes) to {} at {}: {:?}",
+            serialized.len(),
+            dest,
+            address,
+            e
+        )
+    });
 
-    stream.write_all(&serialized).await.unwrap_or_else(|e| {
+    stream.write_all(&serialized).unwrap_or_else(|e| {
         panic!(
             "Failed to send {} bytes to {} at {}: {:?}",
             serialized.len(),
-            coord,
+            dest,
             address,
             e
         )
@@ -71,10 +81,12 @@ where
 
 /// Receive a message from the remote channel. Returns `None` if there was a failure receiving the
 /// last message.
-pub(crate) async fn remote_recv<T>(coord: Coord, stream: &mut TcpStream) -> Option<T>
-where
-    T: DeserializeOwned,
-{
+///
+/// The message won't be deserialized, use `deserialize()`.
+pub(crate) fn remote_recv(
+    coord: DemuxCoord,
+    stream: &mut TcpStream,
+) -> Option<(ReceiverEndpoint, SerializedMessage)> {
     let address = stream
         .peer_addr()
         .map(|a| a.to_string())
@@ -83,7 +95,7 @@ where
         .serialized_size(&MessageHeader::default())
         .unwrap() as usize;
     let mut header = vec![0u8; header_size];
-    match stream.read_exact(&mut header).await {
+    match stream.read_exact(&mut header) {
         Ok(_) => {}
         Err(e) => {
             debug!(
@@ -97,16 +109,20 @@ where
         .deserialize(&header)
         .expect("Malformed header");
     let mut buf = vec![0u8; header.size as usize];
-    stream.read_exact(&mut buf).await.unwrap_or_else(|e| {
+    stream.read_exact(&mut buf).unwrap_or_else(|e| {
         panic!(
             "Failed to receive {} bytes to {} from {}: {:?}",
             header.size, coord, address, e
         )
     });
-    Some(MESSAGE_CONFIG.deserialize(&buf).unwrap_or_else(|e| {
-        panic!(
-            "Failed to deserialize {} bytes to {} from {}: {:?}",
-            header.size, coord, address, e
-        )
-    }))
+    let receiver_endpoint = ReceiverEndpoint::new(
+        Coord::new(coord.coord.block_id, coord.coord.host_id, header.replica_id),
+        header.sender_block_id,
+    );
+    Some((receiver_endpoint, buf))
+}
+
+/// Try to deserialize a serialized message.
+pub(crate) fn deserialize<T: Data>(message: SerializedMessage) -> Result<T> {
+    Ok(MESSAGE_CONFIG.deserialize(&message)?)
 }

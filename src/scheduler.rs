@@ -1,16 +1,14 @@
 use std::collections::HashMap;
 
-use async_std::channel::Sender;
-use async_std::sync::{Arc, Mutex};
-use async_std::task::JoinHandle;
 use itertools::Itertools;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 
-use crate::block::InnerBlock;
+use crate::block::{BatchMode, InnerBlock};
+use crate::channel::BoundedChannelSender;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
-use crate::operator::Operator;
+use crate::operator::{Data, Operator};
 use crate::stream::BlockId;
 use crate::worker::spawn_worker;
 
@@ -29,15 +27,17 @@ pub struct ExecutionMetadata {
     /// The global identifier of the replica (from 0 to num_replicas-1)
     pub(crate) global_id: usize,
     /// The total number of previous blocks inside the execution graph.
-    pub(crate) num_prev: usize,
+    pub(crate) prev: Vec<Coord>,
     /// A reference to the `NetworkTopology` that keeps the state of the network.
     pub(crate) network: Arc<Mutex<NetworkTopology>>,
+    /// The batching mode to use inside this block.
+    pub(crate) batch_mode: BatchMode,
 }
 
 /// Handle that the scheduler uses to start the computation of a block.
 pub(crate) struct StartHandle {
     /// Sender for the `ExecutionMetadata` sent to the worker.
-    starter: Sender<ExecutionMetadata>,
+    starter: BoundedChannelSender<ExecutionMetadata>,
     /// `JoinHandle` used to wait until a block has finished working.
     join_handle: JoinHandle<()>,
 }
@@ -55,6 +55,8 @@ struct SchedulerBlockInfo {
     replicas: HashMap<HostId, Vec<Coord>>,
     /// All the global ids, grouped by coordinate.
     global_ids: HashMap<Coord, usize>,
+    /// The batching mode to use inside this block.
+    batch_mode: BatchMode,
 }
 
 /// The `Scheduler` is the entity that keeps track of all the blocks of the job graph and when the
@@ -91,12 +93,10 @@ impl Scheduler {
     /// This spawns a worker for each replica of the block in the execution graph and saves its
     /// start handle. The handle will be later used to actually start the worker when the
     /// computation is asked to begin.
-    pub(crate) fn add_block<In, Out, OperatorChain>(
+    pub(crate) fn add_block<Out: Data, OperatorChain>(
         &mut self,
-        block: InnerBlock<In, Out, OperatorChain>,
+        block: InnerBlock<Out, OperatorChain>,
     ) where
-        In: Clone + Serialize + DeserializeOwned + Send + 'static,
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out> + Send + 'static,
     {
         let block_id = block.id;
@@ -123,12 +123,6 @@ impl Scheduler {
             }
         }
 
-        // we need to register all the replicas in the network, otherwise we won't be able to
-        // register the remote ones for connecting them
-        for &coord in info.replicas.values().flatten() {
-            self.network.register_replica::<In>(coord);
-        }
-
         self.block_info.insert(block_id, info);
 
         for (coord, block) in blocks {
@@ -146,16 +140,20 @@ impl Scheduler {
     }
 
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) async fn start(mut self) -> Vec<JoinHandle<()>> {
+    pub(crate) fn start(mut self) {
         info!("Starting scheduler: {:#?}", self.config);
         self.log_topology();
         self.build_execution_graph();
+        self.network.finalize_topology();
         self.network.log_topology();
 
-        // start the remote connections
-        let mut join = self.network.start_remote().await;
+        let mut join = vec![];
 
-        let num_prev = self.num_prev();
+        let prev: HashMap<_, _> = self
+            .block_info
+            .keys()
+            .map(|&id| (id, self.prev(id)))
+            .collect();
         let network = Arc::new(Mutex::new(self.network));
         // start the execution
         for (coord, handle) in self.start_handles {
@@ -166,51 +164,49 @@ impl Scheduler {
                 coord,
                 num_replicas,
                 global_id,
-                num_prev: num_prev[&coord.block_id],
+                prev: prev[&coord.block_id].clone(),
                 network: network.clone(),
+                batch_mode: block_info.batch_mode,
             };
-            handle.starter.send(metadata).await.unwrap();
+            handle.starter.send(metadata).unwrap();
             join.push(handle.join_handle);
         }
-        join
+        for handle in join {
+            handle.join().unwrap();
+        }
+        network.lock().unwrap().stop_and_wait();
     }
 
-    /// Compute the number of predecessors of each block inside the execution graph.
-    fn num_prev(&self) -> HashMap<BlockId, usize> {
-        self.block_info
-            .keys()
-            .map(|&block_id| {
-                (
-                    block_id,
-                    if let Some(prev_blocks) = self.prev_blocks.get(&block_id) {
-                        prev_blocks
-                            .iter()
-                            .map(|b| self.block_info[b].num_replicas)
-                            .sum()
-                    } else {
-                        0
-                    },
-                )
-            })
-            .collect()
+    /// Get the list of replicas before the specified block.
+    fn prev(&self, block_id: BlockId) -> Vec<Coord> {
+        if let Some(prev) = self.prev_blocks.get(&block_id) {
+            let mut result = Vec::new();
+            for prev in prev {
+                result.extend(self.block_info[prev].replicas.values().flatten());
+            }
+            result
+        } else {
+            Default::default()
+        }
     }
 
-    /// Build the execution graph for the network topology considering only the part of the network
-    /// affected by the current host. This therefore discards all the connections between the other
-    /// hosts since this host is unaffected by them.
+    /// Get the ids of the previous blocks of a given block in the job graph
+    pub(crate) fn prev_blocks(&self, block_id: BlockId) -> Option<Vec<BlockId>> {
+        self.prev_blocks.get(&block_id).cloned()
+    }
+
+    /// Build the execution graph for the network topology, multiplying each block of the job graph
+    /// into all its replicas.
     fn build_execution_graph(&mut self) {
-        let host_id = self.config.host_id.unwrap();
         for (from_block_id, next) in self.next_blocks.iter() {
             let from = &self.block_info[from_block_id];
             for to_block_id in next.iter() {
                 let to = &self.block_info[to_block_id];
                 // for each pair (from -> to) inside the job graph, connect all the corresponding
-                // jobs of the execution graph only if the current host is affected
+                // jobs of the execution graph
                 for &from_coord in from.replicas.values().flatten() {
                     for &to_coord in to.replicas.values().flatten() {
-                        if from_coord.host_id == host_id || to_coord.host_id == host_id {
-                            self.network.connect(from_coord, to_coord);
-                        }
+                        self.network.connect(from_coord, to_coord);
                     }
                 }
             }
@@ -243,13 +239,11 @@ impl Scheduler {
     }
 
     /// Extract the `SchedulerBlockInfo` of a block.
-    fn block_info<In, Out, OperatorChain>(
+    fn block_info<Out: Data, OperatorChain>(
         &self,
-        block: &InnerBlock<In, Out, OperatorChain>,
+        block: &InnerBlock<Out, OperatorChain>,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Serialize + DeserializeOwned + Send + 'static,
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         match &self.config.runtime {
@@ -264,20 +258,16 @@ impl Scheduler {
     ///
     ///  - the number of logical cores.
     ///  - the `max_parallelism` of the block.
-    fn local_block_info<In, Out, OperatorChain>(
+    fn local_block_info<Out: Data, OperatorChain>(
         &self,
-        block: &InnerBlock<In, Out, OperatorChain>,
+        block: &InnerBlock<Out, OperatorChain>,
         local: &LocalRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Serialize + DeserializeOwned + Send + 'static,
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let num_replicas = local
-            .num_cores
-            .min(max_parallelism.unwrap_or(usize::max_value()));
+        let num_replicas = local.num_cores.min(max_parallelism.unwrap_or(usize::MAX));
         debug!(
             "Block {} will have {} local replicas (max_parallelism={:?})",
             block.id, num_replicas, max_parallelism
@@ -291,6 +281,7 @@ impl Scheduler {
             num_replicas,
             replicas: vec![(host_id, replicas.collect())].into_iter().collect(),
             global_ids: global_ids.into_iter().collect(),
+            batch_mode: block.batch_mode,
         }
     }
 
@@ -298,20 +289,18 @@ impl Scheduler {
     ///
     /// The block can be replicated at most `max_parallelism` times (if specified). Assign the
     /// replicas starting from the first host giving as much replicas as possible..
-    fn remote_block_info<In, Out, OperatorChain>(
+    fn remote_block_info<Out: Data, OperatorChain>(
         &self,
-        block: &InnerBlock<In, Out, OperatorChain>,
+        block: &InnerBlock<Out, OperatorChain>,
         remote: &RemoteRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        In: Clone + Serialize + DeserializeOwned + Send + 'static,
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
         debug!("Allocating block {} on remote runtime", block.id);
         // number of replicas we can assign at most
-        let mut remaining_replicas = max_parallelism.unwrap_or(usize::max_value());
+        let mut remaining_replicas = max_parallelism.unwrap_or(usize::MAX);
         let mut num_replicas = 0;
         let mut replicas: HashMap<_, Vec<_>> = HashMap::default();
         let mut global_ids = HashMap::default();
@@ -340,12 +329,16 @@ impl Scheduler {
             num_replicas,
             replicas,
             global_ids,
+            batch_mode: block.batch_mode,
         }
     }
 }
 
 impl StartHandle {
-    pub(crate) fn new(starter: Sender<ExecutionMetadata>, join_handle: JoinHandle<()>) -> Self {
+    pub(crate) fn new(
+        starter: BoundedChannelSender<ExecutionMetadata>,
+        join_handle: JoinHandle<()>,
+    ) -> Self {
         Self {
             starter,
             join_handle,

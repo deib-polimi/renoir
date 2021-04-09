@@ -2,12 +2,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::operator::source::Source;
+use crate::operator::Data;
 use crate::runner::spawn_remote_workers;
 use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
@@ -47,9 +45,8 @@ impl StreamEnvironment {
     }
 
     /// Construct a new stream bound to this environment starting with the specified source.
-    pub fn stream<Out, S>(&mut self, source: S) -> Stream<Out, Out, S>
+    pub fn stream<Out: Data, S>(&mut self, source: S) -> Stream<Out, S>
     where
-        Out: Clone + Serialize + DeserializeOwned + Send + 'static,
         S: Source<Out> + Send + 'static,
     {
         let mut env = self.inner.borrow_mut();
@@ -65,7 +62,7 @@ impl StreamEnvironment {
             "Creating a new stream, block_id={} with max_parallelism {:?}",
             block_id, source_max_parallelism
         );
-        let mut block = InnerBlock::new(block_id, source);
+        let mut block = InnerBlock::new(block_id, source, Default::default());
         if let Some(p) = source_max_parallelism {
             block.scheduler_requirements.max_parallelism(p);
         }
@@ -77,24 +74,20 @@ impl StreamEnvironment {
 
     /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
     /// is already a spawned process nothing is done.
-    pub async fn spawn_remote_workers(&self) {
+    pub fn spawn_remote_workers(&self) {
         match &self.inner.borrow().config.runtime {
             ExecutionRuntime::Local(_) => {}
             ExecutionRuntime::Remote(remote) => {
-                spawn_remote_workers(remote.clone()).await;
+                spawn_remote_workers(remote.clone());
             }
         }
     }
 
     /// Start the computation. Await on the returned future to actually start the computation.
-    pub async fn execute(self) {
+    pub fn execute(self) {
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);
-        let join = env.scheduler.take().unwrap().start().await;
-        // wait till the computation ends
-        for join_handle in join {
-            join_handle.await;
-        }
+        env.scheduler.take().unwrap().start();
     }
 }
 

@@ -1,20 +1,15 @@
-use async_std::sync::Arc;
-use async_trait::async_trait;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use std::sync::Arc;
 
 use crate::block::NextStrategy;
-use crate::operator::{EndBlock, Operator, StreamElement, Timestamp};
+use crate::operator::{Data, EndBlock, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Fold<Out, NewOut, PreviousOperators>
+pub struct Fold<Out: Data, NewOut: Data, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out>,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -26,20 +21,37 @@ where
     received_end: bool,
 }
 
-#[async_trait]
-impl<Out, NewOut, PreviousOperators> Operator<NewOut> for Fold<Out, NewOut, PreviousOperators>
+impl<Out: Data, NewOut: Data, PreviousOperators: Operator<Out>>
+    Fold<Out, NewOut, PreviousOperators>
+{
+    fn new<F>(prev: PreviousOperators, init: NewOut, fold: F) -> Self
+    where
+        F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
+    {
+        Fold {
+            prev,
+            fold: Arc::new(fold),
+            init,
+            accumulator: None,
+            timestamp: None,
+            max_watermark: None,
+            received_end: false,
+        }
+    }
+}
+
+impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
+    for Fold<Out, NewOut, PreviousOperators>
 where
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
-    NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
     PreviousOperators: Operator<Out> + Send,
 {
-    async fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata).await;
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
     }
 
-    async fn next(&mut self) -> StreamElement<NewOut> {
+    fn next(&mut self) -> StreamElement<NewOut> {
         while !self.received_end {
-            match self.prev.next().await {
+            match self.prev.next() {
                 StreamElement::End => self.received_end = true,
                 StreamElement::Watermark(ts) => {
                     self.max_watermark = Some(self.max_watermark.unwrap_or(ts).max(ts))
@@ -57,6 +69,8 @@ where
                         item,
                     ));
                 }
+                // this block wont sent anything until the stream ends
+                StreamElement::FlushBatch => {}
             }
         }
 
@@ -87,70 +101,119 @@ where
     }
 }
 
-impl<In, Out, OperatorChain> Stream<In, Out, OperatorChain>
+impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    In: Clone + Serialize + DeserializeOwned + Send + 'static,
-    Out: Clone + Serialize + DeserializeOwned + Send + 'static,
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn fold<NewOut, Local, Global>(
-        mut self,
+    pub fn fold<NewOut: Data, F>(self, init: NewOut, f: F) -> Stream<NewOut, impl Operator<NewOut>>
+    where
+        F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
+    {
+        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::OnlyOne);
+        // FIXME: when implementing Stream::max_parallelism use that here
+        new_stream.block.scheduler_requirements.max_parallelism(1);
+        new_stream.add_operator(|prev| Fold::new(prev, init, f))
+    }
+
+    pub fn fold_assoc<NewOut: Data, Local, Global>(
+        self,
         init: NewOut,
         local: Local,
         global: Global,
-    ) -> Stream<NewOut, NewOut, impl Operator<NewOut>>
+    ) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        NewOut: Clone + Serialize + DeserializeOwned + Send + 'static,
         Local: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
         Global: Fn(NewOut, NewOut) -> NewOut + Send + Sync + 'static,
     {
         // Local fold
-        self.block.next_strategy = NextStrategy::OnlyOne;
         let mut second_part = self
-            .add_operator(|prev| Fold {
-                prev,
-                fold: Arc::new(local),
-                init: init.clone(),
-                accumulator: None,
-                timestamp: None,
-                max_watermark: None,
-                received_end: false,
-            })
-            .add_block(EndBlock::new);
+            .add_operator(|prev| Fold::new(prev, init.clone(), local))
+            .add_block(EndBlock::new, NextStrategy::OnlyOne);
 
         // Global fold (which is done on only one node)
+        // FIXME: when implementing Stream::max_parallelism use that here
         second_part.block.scheduler_requirements.max_parallelism(1);
-        second_part.add_operator(|prev| Fold {
-            prev,
-            fold: Arc::new(global),
-            init,
-            accumulator: None,
-            timestamp: None,
-            max_watermark: None,
-            received_end: false,
-        })
+        second_part.add_operator(|prev| Fold::new(prev, init, global))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use async_std::stream::from_iter;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source;
 
-    #[async_std::test]
-    async fn fold_stream() {
+    #[test]
+    fn fold_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::StreamSource::new(from_iter(0..10u8));
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
-            .fold("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
+            .fold("".to_string(), |s, n| s + &n.to_string())
             .collect_vec();
-        env.execute().await;
+        env.execute();
         let res = res.get().unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0], "0123456789");
+    }
+
+    #[test]
+    fn fold_assoc_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::IteratorSource::new(0..10u8);
+        let res = env
+            .stream(source)
+            .fold_assoc("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
+            .collect_vec();
+        env.execute();
+        let res = res.get().unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0], "0123456789");
+    }
+
+    #[test]
+    fn fold_shuffled_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::IteratorSource::new(0..10u8);
+        let res = env
+            .stream(source)
+            .shuffle()
+            .fold(Vec::new(), |mut v, n| {
+                v.push(n);
+                v
+            })
+            .collect_vec();
+        env.execute();
+        let mut res = res.get().unwrap();
+        assert_eq!(res.len(), 1);
+        res[0].sort_unstable();
+        assert_eq!(res[0], (0..10u8).into_iter().collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn fold_assoc_shuffled_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = source::IteratorSource::new(0..10u8);
+        let res = env
+            .stream(source)
+            .shuffle()
+            .fold_assoc(
+                Vec::new(),
+                |mut v, n| {
+                    v.push(n);
+                    v
+                },
+                |mut v1, mut v2| {
+                    v2.append(&mut v1);
+                    v2
+                },
+            )
+            .collect_vec();
+        env.execute();
+        let mut res = res.get().unwrap();
+        assert_eq!(res.len(), 1);
+        res[0].sort_unstable();
+        assert_eq!(res[0], (0..10u8).into_iter().collect::<Vec<_>>());
     }
 }
