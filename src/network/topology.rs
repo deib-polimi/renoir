@@ -146,6 +146,9 @@ impl NetworkTopology {
     }
 
     /// Get all the outgoing senders from a replica.
+    ///
+    /// If a replica has more that one _outgoing_ type this method must not be used, but separate
+    /// calls to `get_sender` should be done.
     pub fn get_senders<T: Data>(
         &mut self,
         coord: Coord,
@@ -166,7 +169,7 @@ impl NetworkTopology {
 
     /// Get the sender associated with a given receiver endpoint. This may register a new channel if
     /// it was not registered before.
-    fn get_sender<T: Data>(
+    pub fn get_sender<T: Data>(
         &mut self,
         receiver_endpoint: ReceiverEndpoint,
     ) -> NetworkSender<NetworkMessage<T>> {
@@ -584,5 +587,38 @@ mod tests {
             res,
             expected.into_iter().map(StreamElement::Item).collect_vec()
         );
+    }
+
+    #[test]
+    fn test_multiple_output_types() {
+        let config = EnvironmentConfig::local(4);
+        let mut topology = NetworkTopology::new(config);
+
+        // s1 [b0, h0] -> r1 [b1, h0] (endpoint 1) type=i32
+        // s2 [b0, h0] -> r2 [b2, h0] (endpoint 2) type=u64
+
+        let sender1 = Coord::new(0, 0, 0);
+        let sender2 = Coord::new(0, 0, 0);
+        let receiver1 = Coord::new(1, 0, 0);
+        let receiver2 = Coord::new(2, 0, 0);
+
+        topology.connect(sender1, receiver1);
+        topology.connect(sender2, receiver2);
+        topology.finalize_topology();
+
+        let endpoint1 = ReceiverEndpoint::new(receiver1, 0);
+        let endpoint2 = ReceiverEndpoint::new(receiver2, 0);
+
+        let tx1 = topology.get_sender::<i32>(endpoint1);
+        tx1.send(vec![StreamElement::Item(123i32)]).unwrap();
+
+        let tx2 = topology.get_sender::<u64>(endpoint2);
+        tx2.send(vec![StreamElement::Item(666u64)]).unwrap();
+
+        let rx1 = topology.get_receiver::<i32>(endpoint1);
+        assert_eq!(rx1.recv().unwrap(), vec![StreamElement::Item(123i32)]);
+
+        let rx2 = topology.get_receiver::<u64>(endpoint2);
+        assert_eq!(rx2.recv().unwrap(), vec![StreamElement::Item(666u64)]);
     }
 }
