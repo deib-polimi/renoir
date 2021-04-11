@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 pub use count_window::*;
 pub use event_time_window::*;
+pub use processing_time_window::*;
 
 use crate::operator::{Data, DataKey, Operator, Reorder, StreamElement, Timestamp};
 use crate::stream::{KeyValue, KeyedStream, WindowedStream};
@@ -15,7 +16,9 @@ mod fold;
 mod generic_operator;
 mod max;
 mod min;
+mod processing_time_window;
 mod sum;
+mod time_window;
 
 /// A WindowDescription describes how a window behaves.
 pub trait WindowDescription<Key: DataKey, Out: Data> {
