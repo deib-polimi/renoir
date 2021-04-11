@@ -22,9 +22,9 @@ pub type ReplicaId = usize;
 pub struct ExecutionMetadata {
     /// The coordinate of the block (it's id, replica id, ...).
     pub(crate) coord: Coord,
-    /// The total number of replicas of the block.
-    pub(crate) num_replicas: usize,
-    /// The global identifier of the replica (from 0 to num_replicas-1)
+    /// The list of replicas of this block.
+    pub(crate) replicas: Vec<Coord>,
+    /// The global identifier of the replica (from 0 to `replicas.len()-1`)
     pub(crate) global_id: usize,
     /// The total number of previous blocks inside the execution graph.
     pub(crate) prev: Vec<Coord>,
@@ -158,11 +158,11 @@ impl Scheduler {
         // start the execution
         for (coord, handle) in self.start_handles {
             let block_info = &self.block_info[&coord.block_id];
-            let num_replicas = block_info.num_replicas;
+            let replicas = block_info.replicas.values().flatten().cloned().collect();
             let global_id = block_info.global_ids[&coord];
             let metadata = ExecutionMetadata {
                 coord,
-                num_replicas,
+                replicas,
                 global_id,
                 prev: prev[&coord.block_id].clone(),
                 network: network.clone(),

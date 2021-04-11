@@ -59,11 +59,11 @@ impl<Out: Data> NextStrategy<Out> {
             match self {
                 NextStrategy::OnlyOne => {
                     assert!(
-                        block_senders.len() == 1 || block_senders.len() == metadata.num_replicas,
+                        block_senders.len() == 1 || block_senders.len() == metadata.replicas.len(),
                         "OnlyOne cannot mix the number of replicas: block {} -> {}, replicas {} -> {}",
                         metadata.coord.block_id,
                         block_id,
-                        metadata.num_replicas,
+                        metadata.replicas.len(),
                         block_senders.len(),
                     );
                     if block_senders.len() == 1 {

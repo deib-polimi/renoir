@@ -40,7 +40,7 @@ impl Source<String> for FileSource {
 impl Operator<String> for FileSource {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let global_id = metadata.global_id;
-        let num_replicas = metadata.num_replicas;
+        let num_replicas = metadata.replicas.len();
 
         let file = File::open(&self.path).unwrap_or_else(|err| {
             panic!(
