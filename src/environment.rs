@@ -5,7 +5,7 @@ use std::sync::Once;
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::operator::source::Source;
-use crate::operator::Data;
+use crate::operator::{Data, IterationState, IterationStateHandle};
 use crate::runner::spawn_remote_workers;
 use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
@@ -70,6 +70,11 @@ impl StreamEnvironment {
             block,
             env: self.inner.clone(),
         }
+    }
+
+    /// Initialize a new iteration state.
+    pub fn state<T: Data>(&self, init: T) -> (IterationState<T>, IterationStateHandle<T>) {
+        IterationState::new(init)
     }
 
     /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
