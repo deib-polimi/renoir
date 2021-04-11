@@ -75,6 +75,9 @@ where
                 StreamElement::Watermark(ts) => self.last_watermark = Some(ts),
                 StreamElement::FlushBatch => return StreamElement::FlushBatch,
                 StreamElement::End => self.received_end = true,
+                StreamElement::IterEnd => {
+                    unimplemented!("Reorder is not yet supported inside an iteration (and probably never will)")
+                }
             }
         }
 

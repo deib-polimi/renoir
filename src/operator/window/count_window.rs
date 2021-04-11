@@ -73,6 +73,9 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
             StreamElement::End => {
                 self.received_end = true;
             }
+            StreamElement::IterEnd => {
+                todo!("Count windows inside an iteration are not supported yet");
+            }
         }
     }
 

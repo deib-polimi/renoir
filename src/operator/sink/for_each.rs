@@ -33,6 +33,7 @@ where
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::End => StreamElement::End,
             StreamElement::FlushBatch => StreamElement::FlushBatch,
+            StreamElement::IterEnd => StreamElement::IterEnd,
         }
     }
 

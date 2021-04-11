@@ -116,7 +116,7 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
                 );
             }
 
-            StreamElement::End | StreamElement::Watermark(_) => {
+            StreamElement::End | StreamElement::IterEnd | StreamElement::Watermark(_) => {
                 // Pass the element to every window generator
                 for (_key, gen) in self.generators.iter_mut() {
                     gen.add(el.clone());

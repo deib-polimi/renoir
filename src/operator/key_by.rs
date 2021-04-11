@@ -41,6 +41,7 @@ where
             }
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::End => StreamElement::End,
+            StreamElement::IterEnd => StreamElement::IterEnd,
             StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }

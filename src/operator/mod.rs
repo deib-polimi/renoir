@@ -70,6 +70,11 @@ pub enum StreamElement<Out> {
     FlushBatch,
     /// The last message an operator will receive, indicating that the stream has ended.
     End,
+    /// The iteration has ended.
+    ///
+    /// This message is received only by the blocks inside a loop. This flags that the current
+    /// iteration has ended, and the following data will refer to the next iteration.
+    IterEnd,
 }
 
 /// An operator represents a unit of computation. It's always included inside a chain of operators,
@@ -107,6 +112,7 @@ impl<Out: Data> StreamElement<Out> {
             StreamElement::Timestamped(_, _) => StreamElement::Item(()),
             StreamElement::Watermark(w) => StreamElement::Watermark(*w),
             StreamElement::End => StreamElement::End,
+            StreamElement::IterEnd => StreamElement::IterEnd,
             StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }
@@ -118,6 +124,7 @@ impl<Out: Data> StreamElement<Out> {
             StreamElement::Timestamped(item, ts) => StreamElement::Timestamped(f(item), ts),
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::End => StreamElement::End,
+            StreamElement::IterEnd => StreamElement::IterEnd,
             StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }

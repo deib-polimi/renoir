@@ -60,7 +60,7 @@ where
         let message = self.prev.next();
         let to_return = message.take();
         match &message {
-            StreamElement::Watermark(_) | StreamElement::End => {
+            StreamElement::Watermark(_) | StreamElement::End | StreamElement::IterEnd => {
                 for senders in self.sender_groups.iter() {
                     for &sender in senders.0.iter() {
                         self.senders

@@ -48,6 +48,7 @@ where
                 }
                 StreamElement::Watermark(ts) => return StreamElement::Watermark(ts),
                 StreamElement::End => return StreamElement::End,
+                StreamElement::IterEnd => return StreamElement::IterEnd,
                 StreamElement::FlushBatch => return StreamElement::FlushBatch,
             }
         }

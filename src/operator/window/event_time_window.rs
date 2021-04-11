@@ -132,6 +132,9 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for EventTimeWindowGener
             StreamElement::End => {
                 self.last_seen = Timestamp::new(u64::MAX, 0);
             }
+            StreamElement::IterEnd => {
+                unimplemented!("Event time windows inside iterations are not supported yet (and probably never will)");
+            }
         }
     }
 

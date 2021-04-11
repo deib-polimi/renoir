@@ -23,6 +23,7 @@ where
     timestamps: HashMap<Key, Timestamp>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
+    received_end_iter: bool,
 }
 
 impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators: Operator<KeyValue<Key, Out>>>
@@ -40,6 +41,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators: Operator<KeyValue
             timestamps: Default::default(),
             max_watermark: None,
             received_end: false,
+            received_end_iter: false,
         }
     }
 }
@@ -57,6 +59,10 @@ where
         while !self.received_end {
             match self.prev.next() {
                 StreamElement::End => self.received_end = true,
+                StreamElement::IterEnd => {
+                    self.received_end = true;
+                    self.received_end_iter = true;
+                }
                 StreamElement::Watermark(ts) => {
                     self.max_watermark = Some(self.max_watermark.unwrap_or(ts).max(ts))
                 }
@@ -95,6 +101,13 @@ where
 
         if let Some(ts) = self.max_watermark.take() {
             return StreamElement::Watermark(ts);
+        }
+
+        // the end was not really the end... just the end of one iteration!
+        if self.received_end_iter {
+            self.received_end_iter = false;
+            self.received_end = false;
+            return StreamElement::IterEnd;
         }
 
         StreamElement::End
