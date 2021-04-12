@@ -48,7 +48,7 @@ where
         self.prev.setup(metadata.clone());
 
         let senders = metadata.network.lock().unwrap().get_senders(metadata.coord);
-        self.sender_groups = self.next_strategy.group_senders(&metadata, &senders);
+        self.sender_groups = self.next_strategy.group_senders(&senders);
         self.senders = senders
             .into_iter()
             .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode)))
@@ -98,7 +98,11 @@ where
 
         if matches!(to_return, StreamElement::End) {
             let metadata = self.metadata.as_ref().unwrap();
-            debug!("EndBlock at {} received End", metadata.coord);
+            debug!(
+                "EndBlock at {} received End, closing {} channels",
+                metadata.coord,
+                self.senders.len()
+            );
             for (_, batcher) in self.senders.drain() {
                 batcher.end();
             }

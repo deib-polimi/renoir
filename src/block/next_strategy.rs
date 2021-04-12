@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use itertools::Itertools;
 use rand::{thread_rng, Rng};
 
 use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::Data;
-use crate::scheduler::ExecutionMetadata;
 
 /// The list with the interesting senders of a single block.
 #[derive(Debug, Clone)]
@@ -39,7 +37,6 @@ impl<Out: Data> NextStrategy<Out> {
     /// graph. The messages will be sent to one replica of each group, according to the strategy.
     pub fn group_senders(
         &self,
-        metadata: &ExecutionMetadata,
         senders: &HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<Out>>>,
     ) -> Vec<SenderList> {
         let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();
@@ -47,53 +44,19 @@ impl<Out: Data> NextStrategy<Out> {
             by_block_id
                 .entry(coord.coord.block_id)
                 .or_default()
-                .push(sender);
+                .push(sender.receiver_endpoint);
         }
         let mut senders = Vec::new();
-        for (block_id, block_senders) in by_block_id {
-            let block_senders = block_senders
-                .iter()
-                .map(|s| s.receiver_endpoint)
-                .sorted()
-                .collect_vec();
-            match self {
-                NextStrategy::OnlyOne => {
-                    assert!(
-                        block_senders.len() == 1 || block_senders.len() == metadata.replicas.len(),
-                        "OnlyOne cannot mix the number of replicas: block {} -> {}, replicas {} -> {}",
-                        metadata.coord.block_id,
-                        block_id,
-                        metadata.replicas.len(),
-                        block_senders.len(),
-                    );
-                    if block_senders.len() == 1 {
-                        senders.push(SenderList(block_senders));
-                    } else {
-                        let mut found = false;
-                        for receiver_endpoint in block_senders {
-                            if receiver_endpoint.coord.replica_id == metadata.coord.replica_id {
-                                found = true;
-                                senders.push(SenderList(vec![receiver_endpoint]));
-                                break;
-                            }
-                        }
-                        assert!(
-                            found,
-                            "Cannot found next sender for the block with the same replica_id: {}",
-                            metadata.coord
-                        );
-                    }
-                }
-                NextStrategy::Random | NextStrategy::GroupBy(_) => {
-                    senders.push(SenderList(block_senders))
-                }
+        for (_block_id, mut block_senders) in by_block_id {
+            block_senders.sort_unstable();
+            if matches!(self, NextStrategy::OnlyOne) {
+                assert_eq!(block_senders.len(), 1, "OnlyOne must have a single sender");
             }
+            senders.push(SenderList(block_senders));
         }
         senders
     }
-}
 
-impl<Out: Data> NextStrategy<Out> {
     /// Compute the index of the replica which this message should be forwarded to.
     pub fn index(&self, message: &Out) -> usize {
         match self {

@@ -29,6 +29,8 @@ where
     pub(crate) operators: OperatorChain,
     /// The batch mode of this block.
     pub(crate) batch_mode: BatchMode,
+    /// Whether this block has `NextStrategy::OnlyOne`.
+    pub(crate) is_only_one_strategy: bool,
     /// The set of requirements that the block imposes on the scheduler.
     pub(crate) scheduler_requirements: SchedulerRequirements,
 
@@ -54,6 +56,7 @@ where
             id,
             operators,
             batch_mode,
+            is_only_one_strategy: false,
             scheduler_requirements: Default::default(),
             _out_type: Default::default(),
         }

@@ -57,6 +57,8 @@ struct SchedulerBlockInfo {
     global_ids: HashMap<Coord, usize>,
     /// The batching mode to use inside this block.
     batch_mode: BatchMode,
+    /// Whether this block has `NextStrategy::OnlyOne`.
+    is_only_one_strategy: bool,
 }
 
 /// The `Scheduler` is the entity that keeps track of all the blocks of the job graph and when the
@@ -149,11 +151,6 @@ impl Scheduler {
 
         let mut join = vec![];
 
-        let prev: HashMap<_, _> = self
-            .block_info
-            .keys()
-            .map(|&id| (id, self.prev(id)))
-            .collect();
         let network = Arc::new(Mutex::new(self.network));
         // start the execution
         for (coord, handle) in self.start_handles {
@@ -164,7 +161,7 @@ impl Scheduler {
                 coord,
                 replicas,
                 global_id,
-                prev: prev[&coord.block_id].clone(),
+                prev: network.lock().unwrap().prev(coord),
                 network: network.clone(),
                 batch_mode: block_info.batch_mode,
             };
@@ -175,19 +172,6 @@ impl Scheduler {
             handle.join().unwrap();
         }
         network.lock().unwrap().stop_and_wait();
-    }
-
-    /// Get the list of replicas before the specified block.
-    fn prev(&self, block_id: BlockId) -> Vec<Coord> {
-        if let Some(prev) = self.prev_blocks.get(&block_id) {
-            let mut result = Vec::new();
-            for prev in prev {
-                result.extend(self.block_info[prev].replicas.values().flatten());
-            }
-            result
-        } else {
-            Default::default()
-        }
     }
 
     /// Get the ids of the previous blocks of a given block in the job graph
@@ -205,8 +189,18 @@ impl Scheduler {
                 // for each pair (from -> to) inside the job graph, connect all the corresponding
                 // jobs of the execution graph
                 for &from_coord in from.replicas.values().flatten() {
-                    for &to_coord in to.replicas.values().flatten() {
-                        self.network.connect(from_coord, to_coord);
+                    let to: Vec<_> = to.replicas.values().flatten().collect();
+                    for &to_coord in &to {
+                        if from.is_only_one_strategy {
+                            if to.len() == 1
+                                || (to_coord.host_id == from_coord.host_id
+                                    && to_coord.replica_id == from_coord.replica_id)
+                            {
+                                self.network.connect(from_coord, *to_coord);
+                            }
+                        } else {
+                            self.network.connect(from_coord, *to_coord);
+                        }
                     }
                 }
             }
@@ -269,8 +263,8 @@ impl Scheduler {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
         let num_replicas = local.num_cores.min(max_parallelism.unwrap_or(usize::MAX));
         debug!(
-            "Block {} will have {} local replicas (max_parallelism={:?})",
-            block.id, num_replicas, max_parallelism
+            "Block {} will have {} local replicas (max_parallelism={:?}), is_only_one_strategy={}",
+            block.id, num_replicas, max_parallelism, block.is_only_one_strategy
         );
         let host_id = self.config.host_id.unwrap();
         let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
@@ -282,6 +276,7 @@ impl Scheduler {
             replicas: vec![(host_id, replicas.collect())].into_iter().collect(),
             global_ids: global_ids.into_iter().collect(),
             batch_mode: block.batch_mode,
+            is_only_one_strategy: block.is_only_one_strategy,
         }
     }
 
@@ -304,6 +299,8 @@ impl Scheduler {
         let mut num_replicas = 0;
         let mut replicas: HashMap<_, Vec<_>> = HashMap::default();
         let mut global_ids = HashMap::default();
+        // FIXME: if the next_strategy of the previous blocks are OnlyOne the replicas of this block
+        //        must be in the same hosts are the previous blocks.
         for (host_id, host_info) in remote.hosts.iter().enumerate() {
             let num_host_replicas = host_info.num_cores.min(remaining_replicas);
             debug!(
@@ -330,6 +327,7 @@ impl Scheduler {
             replicas,
             global_ids,
             batch_mode: block.batch_mode,
+            is_only_one_strategy: block.is_only_one_strategy,
         }
     }
 }

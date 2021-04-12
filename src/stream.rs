@@ -75,6 +75,7 @@ where
                 id: self.block.id,
                 operators: get_operator(self.block.operators),
                 batch_mode: self.block.batch_mode,
+                is_only_one_strategy: false,
                 scheduler_requirements: self.block.scheduler_requirements,
                 _out_type: Default::default(),
             },
@@ -100,8 +101,9 @@ where
         GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
     {
         let batch_mode = self.block.batch_mode;
-        let old_stream =
-            self.add_operator(|prev| get_end_operator(prev, next_strategy, batch_mode));
+        let mut old_stream =
+            self.add_operator(|prev| get_end_operator(prev, next_strategy.clone(), batch_mode));
+        old_stream.block.is_only_one_strategy = matches!(next_strategy, NextStrategy::OnlyOne);
         let mut env = old_stream.env.borrow_mut();
         let old_id = old_stream.block.id;
         let new_id = env.new_block();
@@ -153,10 +155,12 @@ where
         }
 
         // close previous blocks
-        let old_stream1 =
+        let mut old_stream1 =
             self.add_operator(|prev| EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode));
-        let old_stream2 =
+        let mut old_stream2 =
             oth.add_operator(|prev| EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode));
+        old_stream1.block.is_only_one_strategy = true;
+        old_stream2.block.is_only_one_strategy = true;
 
         let mut env = old_stream1.env.borrow_mut();
         let old_id1 = old_stream1.block.id;

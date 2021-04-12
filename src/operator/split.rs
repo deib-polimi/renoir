@@ -34,7 +34,7 @@ mod tests {
     fn split_stream() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::IteratorSource::new(0..5u8);
-        let mut splits = env.stream(source).map(|n| n.to_string()).split(2);
+        let mut splits = env.stream(source).shuffle().map(|n| n.to_string()).split(2);
         let v1 = splits.pop().unwrap().map(|x| x.clone() + &x).collect_vec();
         let v2 = splits.pop().unwrap().map(|x| x + "a").collect_vec();
         env.execute();

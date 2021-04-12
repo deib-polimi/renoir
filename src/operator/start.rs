@@ -104,8 +104,8 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
         if matches!(message, StreamElement::End) {
             self.missing_ends -= 1;
             debug!(
-                "{} received an end, {} more to come",
-                metadata.coord, self.missing_ends
+                "{}/{:?} received an end, {} more to come",
+                metadata.coord, self.prev_block_ids, self.missing_ends
             );
             return self.next();
         }

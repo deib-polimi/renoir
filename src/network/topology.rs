@@ -92,8 +92,10 @@ pub(crate) struct NetworkTopology {
     #[derivative(Debug = "ignore")]
     multiplexers: SendMap,
 
-    /// The adjacency list of the execution graph that interests the local host.
+    /// The adjacency list of the execution graph.
     next: HashMap<Coord, Vec<Coord>>,
+    /// The inverse adjacency list of the execution graph.
+    prev: HashMap<Coord, Vec<Coord>>,
     /// The metadata about all the registered senders.
     senders_metadata: HashMap<ReceiverEndpoint, SenderMetadata>,
 
@@ -120,6 +122,7 @@ impl NetworkTopology {
             demultiplexers: SendMap::custom(),
             multiplexers: SendMap::custom(),
             next: Default::default(),
+            prev: Default::default(),
             senders_metadata: Default::default(),
             used_receivers: Default::default(),
             demultiplexer_addresses: Default::default(),
@@ -317,6 +320,7 @@ impl NetworkTopology {
             from, from_remote, to, to_remote
         );
         self.next.entry(from).or_default().push(to);
+        self.prev.entry(to).or_default().push(from);
 
         if from_remote && to_remote {
             // totally remote channels are not interesting for this host, but they need to be
@@ -333,6 +337,15 @@ impl NetworkTopology {
         if to_remote {
             let metadata = self.senders_metadata.get_mut(&receiver_endpoint).unwrap();
             metadata.is_remote = true;
+        }
+    }
+
+    /// The list of previous replicas of a given replica.
+    pub fn prev(&self, coord: Coord) -> Vec<Coord> {
+        if let Some(prev) = self.prev.get(&coord) {
+            prev.clone()
+        } else {
+            vec![]
         }
     }
 
