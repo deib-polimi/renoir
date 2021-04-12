@@ -24,6 +24,7 @@ mod batch_mode;
 mod concat;
 mod end;
 mod filter;
+mod filter_map;
 mod flatten;
 mod fold;
 mod group_by;
