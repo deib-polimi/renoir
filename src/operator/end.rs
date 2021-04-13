@@ -63,10 +63,12 @@ where
             StreamElement::Watermark(_) | StreamElement::End | StreamElement::IterEnd => {
                 for senders in self.sender_groups.iter() {
                     for &sender in senders.0.iter() {
-                        self.senders
-                            .get_mut(&sender)
-                            .unwrap()
-                            .enqueue(message.clone());
+                        let sender = self.senders.get_mut(&sender).unwrap();
+                        sender.enqueue(message.clone());
+                        // make sure to flush at the end of each iteration
+                        if matches!(message, StreamElement::IterEnd) {
+                            sender.flush();
+                        }
                     }
                 }
             }
