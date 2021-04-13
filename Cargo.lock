@@ -799,6 +799,7 @@ dependencies = [
  "bincode",
  "criterion",
  "crossbeam-channel",
+ "csv",
  "derivative",
  "env_logger",
  "fake",

@@ -55,6 +55,9 @@ flume = { version = "0.10", optional = true }
 # Used for KeyedWindowManager
 hashbrown = "0.11"
 
+# used for csv file source
+csv = "1.1"
+
 [dev-dependencies]
 # for the tests
 tempfile = "3.2"
