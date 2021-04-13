@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -109,7 +110,7 @@ where
         let new_id = env.new_block();
         let scheduler = env.scheduler_mut();
         scheduler.add_block(old_stream.block);
-        scheduler.connect_blocks(old_id, new_id);
+        scheduler.connect_blocks(old_id, new_id, TypeId::of::<Out>());
         drop(env);
         Stream {
             block: InnerBlock::new(new_id, StartBlock::new(old_id), batch_mode),
@@ -171,8 +172,8 @@ where
         let scheduler = env.scheduler_mut();
         scheduler.add_block(old_stream1.block);
         scheduler.add_block(old_stream2.block);
-        scheduler.connect_blocks(old_id1, new_id);
-        scheduler.connect_blocks(old_id2, new_id);
+        scheduler.connect_blocks(old_id1, new_id, TypeId::of::<Out>());
+        scheduler.connect_blocks(old_id2, new_id, TypeId::of::<Out2>());
         drop(env);
 
         let mut new_stream = Stream {
@@ -191,8 +192,8 @@ where
         let prev_nodes = env.scheduler_mut().prev_blocks(self.block.id).unwrap();
         let new_id = env.new_block();
 
-        for prev_node in prev_nodes.into_iter() {
-            env.scheduler_mut().connect_blocks(prev_node, new_id);
+        for (prev_node, typ) in prev_nodes.into_iter() {
+            env.scheduler_mut().connect_blocks(prev_node, new_id, typ);
         }
         drop(env);
 

@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::thread::JoinHandle;
@@ -13,6 +14,7 @@ use crate::network::{
 };
 use crate::operator::Data;
 use crate::scheduler::HostId;
+use crate::stream::BlockId;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In: Data>(PhantomData<In>);
@@ -93,17 +95,23 @@ pub(crate) struct NetworkTopology {
     multiplexers: SendMap,
 
     /// The adjacency list of the execution graph.
-    next: HashMap<Coord, Vec<Coord>>,
+    next: HashMap<(Coord, TypeId), Vec<Coord>>,
     /// The inverse adjacency list of the execution graph.
-    prev: HashMap<Coord, Vec<Coord>>,
+    prev: HashMap<Coord, Vec<(Coord, TypeId)>>,
     /// The metadata about all the registered senders.
     senders_metadata: HashMap<ReceiverEndpoint, SenderMetadata>,
+    /// The list of all the replicas, indexed by block.
+    block_replicas: HashMap<BlockId, HashSet<Coord>>,
 
     /// The set of the used receivers.
     ///
     /// This set makes sure that a given receiver is not initialized twice. Bad things may happen if
     /// the same receiver is initialized twice (the same socket may be bound twice).
     used_receivers: HashSet<ReceiverEndpoint>,
+    /// The set of the registered endpoints.
+    ///
+    /// This just makes sure no endpoint is registered twice.
+    registered_receivers: HashSet<ReceiverEndpoint>,
 
     /// The mapping between the coordinate of a demultiplexer of a block to the actual address/port
     /// of that demultiplexer in the network.
@@ -124,7 +132,9 @@ impl NetworkTopology {
             next: Default::default(),
             prev: Default::default(),
             senders_metadata: Default::default(),
+            block_replicas: Default::default(),
             used_receivers: Default::default(),
+            registered_receivers: Default::default(),
             demultiplexer_addresses: Default::default(),
             join_handles: Default::default(),
         }
@@ -156,7 +166,8 @@ impl NetworkTopology {
         &mut self,
         coord: Coord,
     ) -> HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<T>>> {
-        match self.next.get(&coord) {
+        let typ = TypeId::of::<T>();
+        match self.next.get(&(coord, typ)) {
             None => Default::default(),
             Some(next) => {
                 let next = next.clone();
@@ -228,7 +239,15 @@ impl NetworkTopology {
     /// also the multiplexer and/or the demultiplexer are initialized and started.
     fn register_channel<T: Data>(&mut self, receiver_endpoint: ReceiverEndpoint) {
         debug!("Registering {}", receiver_endpoint);
-        let sender_metadata = self.senders_metadata.get(&receiver_endpoint).unwrap();
+        assert!(
+            self.registered_receivers.insert(receiver_endpoint),
+            "Receiver {} has already been registered",
+            receiver_endpoint
+        );
+        let sender_metadata = self
+            .senders_metadata
+            .get(&receiver_endpoint)
+            .unwrap_or_else(|| panic!("Channel for endpoint {} not registered", receiver_endpoint));
 
         // create the receiver part of the channel
         let mut receiver = NetworkReceiver::<NetworkMessage<T>>::new(receiver_endpoint);
@@ -247,9 +266,14 @@ impl NetworkTopology {
                     // find the set of all the previous blocks that have a MultiplexingSender that
                     // point to this DemultiplexingReceiver.
                     let mut prev = HashSet::new();
-                    for (&from, to) in &self.next {
+                    // FIXME: maybe this can benefit from self.prev
+                    for (&(from, typ), to) in &self.next {
                         // local blocks won't use the multiplexer
                         if from.host_id == demux_coord.coord.host_id {
+                            continue;
+                        }
+                        // ignore channels of the wrong type
+                        if typ != TypeId::of::<T>() {
                             continue;
                         }
                         for &to in to {
@@ -310,7 +334,7 @@ impl NetworkTopology {
     /// prepare any sender/receiver for that channel.
     ///
     /// This will not actually bind/connect sockets, it will just mark them as bindable/connectable.
-    pub fn connect(&mut self, from: Coord, to: Coord) {
+    pub fn connect(&mut self, from: Coord, to: Coord, typ: TypeId) {
         let host_id = self.config.host_id.unwrap();
         let from_remote = from.host_id != host_id;
         let to_remote = to.host_id != host_id;
@@ -319,8 +343,18 @@ impl NetworkTopology {
             "New connection: {} (remote={}) -> {} (remote={})",
             from, from_remote, to, to_remote
         );
-        self.next.entry(from).or_default().push(to);
-        self.prev.entry(to).or_default().push(from);
+        self.next.entry((from, typ)).or_default().push(to);
+        self.prev.entry(to).or_default().push((from, typ));
+
+        // save the replicas
+        self.block_replicas
+            .entry(from.block_id)
+            .or_default()
+            .insert(from);
+        self.block_replicas
+            .entry(to.block_id)
+            .or_default()
+            .insert(to);
 
         if from_remote && to_remote {
             // totally remote channels are not interesting for this host, but they need to be
@@ -341,9 +375,18 @@ impl NetworkTopology {
     }
 
     /// The list of previous replicas of a given replica.
-    pub fn prev(&self, coord: Coord) -> Vec<Coord> {
+    pub fn prev(&self, coord: Coord) -> Vec<(Coord, TypeId)> {
         if let Some(prev) = self.prev.get(&coord) {
             prev.clone()
+        } else {
+            vec![]
+        }
+    }
+
+    /// Return the list of all the replicas of a block.
+    pub fn replicas(&self, block_id: BlockId) -> Vec<Coord> {
+        if let Some(replicas) = self.block_replicas.get(&block_id) {
+            replicas.iter().cloned().collect()
         } else {
             vec![]
         }
@@ -362,7 +405,7 @@ impl NetworkTopology {
             return;
         };
         let mut coords = HashSet::new();
-        for (&from, to) in self.next.iter() {
+        for (&(from, _typ), to) in self.next.iter() {
             for &to in to {
                 let coord = DemuxCoord::new(from, to);
                 coords.insert(coord);
@@ -384,7 +427,7 @@ impl NetworkTopology {
 
     pub fn log_topology(&self) {
         let mut topology = "Execution graph:".to_owned();
-        for (coord, next) in self.next.iter().sorted() {
+        for ((coord, _typ), next) in self.next.iter().sorted() {
             topology += &format!("\n  {}:", coord);
             for next in next.iter().sorted() {
                 topology += &format!(" {}", next);
@@ -418,9 +461,9 @@ mod tests {
         let receiver1 = Coord::new(2, 0, 0);
         let receiver2 = Coord::new(3, 0, 0);
 
-        topology.connect(sender1, receiver1);
-        topology.connect(sender2, receiver1);
-        topology.connect(sender2, receiver2);
+        topology.connect(sender1, receiver1, TypeId::of::<i32>());
+        topology.connect(sender2, receiver1, TypeId::of::<u64>());
+        topology.connect(sender2, receiver2, TypeId::of::<u64>());
         topology.finalize_topology();
 
         let endpoint1 = ReceiverEndpoint::new(receiver1, 0);
@@ -485,12 +528,12 @@ mod tests {
             let r1 = Coord::new(2, 1, 0);
             let r2 = Coord::new(2, 1, 1);
 
-            topology.connect(s1, r1);
-            topology.connect(s2, r1);
-            topology.connect(s3, r1);
-            topology.connect(s4, r1);
-            topology.connect(s3, r2);
-            topology.connect(s4, r2);
+            topology.connect(s1, r1, TypeId::of::<i32>());
+            topology.connect(s2, r1, TypeId::of::<i32>());
+            topology.connect(s3, r1, TypeId::of::<u64>());
+            topology.connect(s4, r1, TypeId::of::<u64>());
+            topology.connect(s3, r2, TypeId::of::<u64>());
+            topology.connect(s4, r2, TypeId::of::<u64>());
             topology.finalize_topology();
 
             let endpoint1 = ReceiverEndpoint::new(r1, 0);
@@ -615,8 +658,8 @@ mod tests {
         let receiver1 = Coord::new(1, 0, 0);
         let receiver2 = Coord::new(2, 0, 0);
 
-        topology.connect(sender1, receiver1);
-        topology.connect(sender2, receiver2);
+        topology.connect(sender1, receiver1, TypeId::of::<i32>());
+        topology.connect(sender2, receiver2, TypeId::of::<u64>());
         topology.finalize_topology();
 
         let endpoint1 = ReceiverEndpoint::new(receiver1, 0);

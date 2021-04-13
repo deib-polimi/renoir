@@ -1,8 +1,9 @@
+use std::any::TypeId;
 use std::collections::HashMap;
-
-use itertools::Itertools;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+
+use itertools::Itertools;
 
 use crate::block::{BatchMode, InnerBlock};
 use crate::channel::BoundedChannelSender;
@@ -27,7 +28,7 @@ pub struct ExecutionMetadata {
     /// The global identifier of the replica (from 0 to `replicas.len()-1`)
     pub(crate) global_id: usize,
     /// The total number of previous blocks inside the execution graph.
-    pub(crate) prev: Vec<Coord>,
+    pub(crate) prev: Vec<(Coord, TypeId)>,
     /// A reference to the `NetworkTopology` that keeps the state of the network.
     pub(crate) network: Arc<Mutex<NetworkTopology>>,
     /// The batching mode to use inside this block.
@@ -67,9 +68,9 @@ pub(crate) struct Scheduler {
     /// The configuration of the environment.
     config: EnvironmentConfig,
     /// Adjacency list of the job graph.
-    next_blocks: HashMap<BlockId, Vec<BlockId>>,
+    next_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>>,
     /// Reverse adjacency list of the job graph.
-    prev_blocks: HashMap<BlockId, Vec<BlockId>>,
+    prev_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>>,
     /// Information about the blocks known to the scheduler.
     block_info: HashMap<BlockId, SchedulerBlockInfo>,
     /// The list of handles of each block in the execution graph.
@@ -135,10 +136,10 @@ impl Scheduler {
     }
 
     /// Connect a pair of blocks inside the job graph.
-    pub(crate) fn connect_blocks(&mut self, from: BlockId, to: BlockId) {
+    pub(crate) fn connect_blocks(&mut self, from: BlockId, to: BlockId, typ: TypeId) {
         info!("Connecting blocks: {} -> {}", from, to);
-        self.next_blocks.entry(from).or_default().push(to);
-        self.prev_blocks.entry(to).or_default().push(from);
+        self.next_blocks.entry(from).or_default().push((to, typ));
+        self.prev_blocks.entry(to).or_default().push((from, typ));
     }
 
     /// Start the computation returning the list of handles used to join the workers.
@@ -175,7 +176,7 @@ impl Scheduler {
     }
 
     /// Get the ids of the previous blocks of a given block in the job graph
-    pub(crate) fn prev_blocks(&self, block_id: BlockId) -> Option<Vec<BlockId>> {
+    pub(crate) fn prev_blocks(&self, block_id: BlockId) -> Option<Vec<(BlockId, TypeId)>> {
         self.prev_blocks.get(&block_id).cloned()
     }
 
@@ -184,8 +185,8 @@ impl Scheduler {
     fn build_execution_graph(&mut self) {
         for (from_block_id, next) in self.next_blocks.iter() {
             let from = &self.block_info[from_block_id];
-            for to_block_id in next.iter() {
-                let to = &self.block_info[to_block_id];
+            for &(to_block_id, typ) in next.iter() {
+                let to = &self.block_info[&to_block_id];
                 // for each pair (from -> to) inside the job graph, connect all the corresponding
                 // jobs of the execution graph
                 for &from_coord in from.replicas.values().flatten() {
@@ -196,10 +197,10 @@ impl Scheduler {
                                 || (to_coord.host_id == from_coord.host_id
                                     && to_coord.replica_id == from_coord.replica_id)
                             {
-                                self.network.connect(from_coord, *to_coord);
+                                self.network.connect(from_coord, *to_coord, typ);
                             }
                         } else {
-                            self.network.connect(from_coord, *to_coord);
+                            self.network.connect(from_coord, *to_coord, typ);
                         }
                     }
                 }
@@ -212,7 +213,7 @@ impl Scheduler {
         for block_id in 0..self.block_info.len() {
             topology += &format!("\n  {}: {}", block_id, self.block_info[&block_id].repr);
             if let Some(next) = &self.next_blocks.get(&block_id) {
-                let sorted = next.iter().sorted().collect_vec();
+                let sorted = next.iter().map(|(x, _)| x).sorted().collect_vec();
                 topology += &format!("\n    -> {:?}", sorted);
             }
         }
