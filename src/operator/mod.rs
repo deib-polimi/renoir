@@ -133,4 +133,16 @@ impl<Out: Data> StreamElement<Out> {
             StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }
+
+    /// A string representation of the variant of this `StreamElement`.
+    pub(crate) fn variant(&self) -> &'static str {
+        match self {
+            StreamElement::Item(_) => "Item",
+            StreamElement::Timestamped(_, _) => "Timestamped",
+            StreamElement::Watermark(_) => "Watermark",
+            StreamElement::FlushBatch => "FlushBatch",
+            StreamElement::End => "End",
+            StreamElement::IterEnd => "IterEnd",
+        }
+    }
 }

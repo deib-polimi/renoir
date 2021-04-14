@@ -244,30 +244,25 @@ where
         });
         let iter_in_id = iter_start.block.id;
 
-        let iter_end = body(iter_start, state_clone);
+        let iter_end = body(iter_start, state_clone)
+            .key_by(|_| ())
+            .fold(DeltaUpdate::default(), local_fold)
+            .unkey()
+            .map(|(_, x)| DeltaUpdateMessage::<DeltaUpdate, State>::DeltaUpdate(x));
 
         /// Close the loop by connecting the provided stream to the block containing the `Replay`
         /// operator.
         fn close_loop<
             State: Data,
-            Out: Data,
-            OperatorChain: Operator<Out> + Send + 'static,
+            OperatorChain: Operator<DeltaUpdateMessage<DeltaUpdate, State>> + Send + 'static,
             DeltaUpdate: Data + Default,
-            F: Fn(DeltaUpdate, Out) -> DeltaUpdate + Send + Sync + 'static,
         >(
-            stream: Stream<Out, OperatorChain>,
-            local_fold: F,
+            stream: Stream<DeltaUpdateMessage<DeltaUpdate, State>, OperatorChain>,
             replay_block_id: BlockId,
         ) -> BlockId {
-            // at the end of the loop perform the local reduction and add the ReplayEndBlock
-            let iter_end = stream
-                .key_by(|_| ())
-                .fold(DeltaUpdate::default(), local_fold)
-                .unkey()
-                .map(|(_, x)| DeltaUpdateMessage::<DeltaUpdate, State>::DeltaUpdate(x))
-                .add_operator(|prev| ReplayEndBlock::new(prev, replay_block_id));
-
+            let iter_end = stream.add_operator(|prev| ReplayEndBlock::new(prev, replay_block_id));
             let replay_end_block_id = iter_end.block.id;
+
             let mut env = iter_end.env.borrow_mut();
             let scheduler = env.scheduler_mut();
             scheduler.add_block(iter_end.block);
@@ -293,13 +288,12 @@ where
         // channel full. But if that block is the same as the leader's Replay, a deadlock occurs
         // since that channel cannot be consumed.
         let replay_end_block_id = if iter_end.block.id == iter_in_id {
-            close_loop::<State, _, _, _, _>(
+            close_loop(
                 iter_end.add_block(EndBlock::new, NextStrategy::OnlyOne),
-                local_fold,
                 iter_in_id,
             )
         } else {
-            close_loop::<State, _, _, _, _>(iter_end, local_fold, iter_in_id)
+            close_loop(iter_end, iter_in_id)
         };
 
         // TODO: check parallelism and make sure the blocks are spawned on the same replicas
@@ -505,9 +499,12 @@ where
                         should_continue,
                         new_state,
                     )) => break (should_continue, new_state),
-                    // the StartBlock may generate this messages, we should ignore them
-                    StreamElement::FlushBatch => continue,
-                    _ => unreachable!("Leader sent something other than an Item(NextIteration)"),
+                    elem => {
+                        unreachable!(
+                            "Leader sent something other than an Item(NextIteration): {}",
+                            elem.variant()
+                        )
+                    }
                 };
             };
             self.state_ref.set(&new_state);
