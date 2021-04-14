@@ -48,7 +48,14 @@ where
         self.prev.setup(metadata.clone());
 
         let senders = metadata.network.lock().unwrap().get_senders(metadata.coord);
-        self.sender_groups = self.next_strategy.group_senders(&senders);
+        // Group the senders based on the strategy. Ignore all the senders to this very block.
+        // This is needed by the iterations and maybe more complex operators: self-loops inside the
+        // job graph are used for sending messages between replicas of the same block. In this case
+        // the EndBlock should ignore those destinations and those channels must be manually managed
+        // by the operators that use them.
+        self.sender_groups = self
+            .next_strategy
+            .group_senders(&senders, Some(metadata.coord.block_id));
         self.senders = senders
             .into_iter()
             .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode)))

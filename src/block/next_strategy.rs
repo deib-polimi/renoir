@@ -5,6 +5,7 @@ use rand::{thread_rng, Rng};
 
 use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::Data;
+use crate::stream::BlockId;
 
 /// The list with the interesting senders of a single block.
 #[derive(Debug, Clone)]
@@ -35,9 +36,12 @@ impl<Out: Data> NextStrategy<Out> {
     ///
     /// The returned value is a list of `SenderList`s, one for each next block in the execution
     /// graph. The messages will be sent to one replica of each group, according to the strategy.
+    ///
+    /// If `ignore_block` is specified, no senders to the specified block will be returned.
     pub fn group_senders(
         &self,
         senders: &HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<Out>>>,
+        ignore_block: Option<BlockId>,
     ) -> Vec<SenderList> {
         let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();
         for (coord, sender) in senders {
@@ -45,6 +49,9 @@ impl<Out: Data> NextStrategy<Out> {
                 .entry(coord.coord.block_id)
                 .or_default()
                 .push(sender.receiver_endpoint);
+        }
+        if let Some(ignore_block) = ignore_block {
+            by_block_id.remove(&ignore_block);
         }
         let mut senders = Vec::new();
         for (_block_id, mut block_senders) in by_block_id {
