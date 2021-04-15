@@ -5,7 +5,7 @@ use std::sync::Once;
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::operator::source::Source;
-use crate::operator::{Data, IterationState, IterationStateHandle};
+use crate::operator::Data;
 use crate::runner::spawn_remote_workers;
 use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
@@ -49,32 +49,7 @@ impl StreamEnvironment {
     where
         S: Source<Out> + Send + 'static,
     {
-        let mut env = self.inner.borrow_mut();
-        if matches!(env.config.runtime, ExecutionRuntime::Remote(_)) {
-            // calling .spawn_remote_workers() will exit so it wont reach this point
-            if env.config.host_id.is_none() {
-                panic!("Call `StreamEnvironment::spawn_remote_workers` before calling stream!");
-            }
-        }
-        let block_id = env.new_block();
-        let source_max_parallelism = source.get_max_parallelism();
-        info!(
-            "Creating a new stream, block_id={} with max_parallelism {:?}",
-            block_id, source_max_parallelism
-        );
-        let mut block = InnerBlock::new(block_id, source, Default::default());
-        if let Some(p) = source_max_parallelism {
-            block.scheduler_requirements.max_parallelism(p);
-        }
-        Stream {
-            block,
-            env: self.inner.clone(),
-        }
-    }
-
-    /// Initialize a new iteration state.
-    pub fn state<T: Data>(&self, init: T) -> (IterationState<T>, IterationStateHandle<T>) {
-        IterationState::new(init)
+        StreamEnvironmentInner::stream(self.inner.clone(), source)
     }
 
     /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
@@ -106,6 +81,34 @@ impl StreamEnvironmentInner {
             block_count: 0,
             scheduler: Some(Scheduler::new(config)),
         }
+    }
+
+    pub fn stream<Out: Data, S>(
+        env_rc: Rc<RefCell<StreamEnvironmentInner>>,
+        source: S,
+    ) -> Stream<Out, S>
+    where
+        S: Source<Out> + Send + 'static,
+    {
+        let mut env = env_rc.borrow_mut();
+        if matches!(env.config.runtime, ExecutionRuntime::Remote(_)) {
+            // calling .spawn_remote_workers() will exit so it wont reach this point
+            if env.config.host_id.is_none() {
+                panic!("Call `StreamEnvironment::spawn_remote_workers` before calling stream!");
+            }
+        }
+        let block_id = env.new_block();
+        let source_max_parallelism = source.get_max_parallelism();
+        info!(
+            "Creating a new stream, block_id={} with max_parallelism {:?}",
+            block_id, source_max_parallelism
+        );
+        let mut block = InnerBlock::new(block_id, source, Default::default());
+        if let Some(p) = source_max_parallelism {
+            block.scheduler_requirements.max_parallelism(p);
+        }
+        drop(env);
+        Stream { block, env: env_rc }
     }
 
     /// Allocate a new BlockId inside the environment.

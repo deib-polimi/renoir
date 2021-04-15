@@ -55,6 +55,6 @@ where
 {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
-        panic!("StreamSource cannot be cloned, max_parallelism should be 1");
+        panic!("IteratorSource cannot be cloned, max_parallelism should be 1");
     }
 }

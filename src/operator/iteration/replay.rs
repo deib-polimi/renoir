@@ -5,10 +5,16 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::block::NextStrategy;
+use crate::channel::{BoundedChannelReceiver, BoundedChannelSender};
+use crate::environment::StreamEnvironmentInner;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
+use crate::operator::source::ChannelSource;
 use crate::operator::{Data, EndBlock, IterationStateHandle, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
+
+/// The capacity of the local channel that sends the final state to the output block.
+const OUTPUT_CHANNEL_CAPACITY: usize = 2;
 
 /// Message exchanged between `Replay` and `ReplayEndBlock` signaling the delta updates and the
 /// information for the next iteration.
@@ -75,6 +81,8 @@ where
     ///
     /// It is used to send the `DeltaUpdateMessage::NextIteration` messages.
     senders: Vec<NetworkSender<NetworkMessage<DeltaUpdateMessage<DeltaUpdate, State>>>>,
+    /// The sender used to send the final state to the output block.
+    output_sender: BoundedChannelSender<StreamElement<State>>,
 
     /// The content of the stream to replay.
     content: Vec<StreamElement<Out>>,
@@ -100,7 +108,7 @@ where
 
     /// The current global state of the iteration.
     state: Option<State>,
-    /// A reference to the state for outputing it back to the user.
+    /// A reference to the state of the iteration that is visible to the loop operators.
     state_ref: IterationStateHandle<State>,
 
     /// The function that combines the global state with a delta update.
@@ -163,6 +171,7 @@ impl<Out: Data, DeltaUpdate: Data, State: Data, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         prev: OperatorChain,
         initial_state: State,
@@ -171,12 +180,14 @@ where
         global_fold: impl Fn(State, DeltaUpdate) -> State + Send + Sync + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
         feedback_block_id: Arc<AtomicUsize>,
+        output_sender: BoundedChannelSender<StreamElement<State>>,
     ) -> Self {
         Self {
             // these fields will be set inside the `setup` method
             coord: Coord::new(0, 0, 0),
             feedback: None,
             senders: Default::default(),
+            output_sender,
             is_leader: false,
             num_replicas: 0,
 
@@ -207,29 +218,28 @@ where
     pub fn replay<Body, DeltaUpdate: Data + Default, State: Data, OperatorChain2>(
         self,
         num_iterations: usize,
-        state: IterationStateHandle<State>,
+        initial_state: State,
         body: Body,
         local_fold: impl Fn(DeltaUpdate, Out) -> DeltaUpdate + Send + Sync + 'static,
         global_fold: impl Fn(State, DeltaUpdate) -> State + Send + Sync + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
-    ) where
+    ) -> Stream<State, impl Operator<State>>
+    where
         Body: Fn(
             Stream<Out, Replay<Out, DeltaUpdate, State, OperatorChain>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,
         OperatorChain2: Operator<Out> + Send + 'static,
     {
-        let initial_state = state
-            .result
-            .read()
-            .expect("failed to lock state")
-            .clone()
-            .expect("already consumed state");
-
+        let state = IterationStateHandle::new(initial_state.clone());
         let state_clone = state.clone();
+        let env = self.env.clone();
+
         // the id of the block where ReplayEndBlock is. At this moment we cannot know it, so we
         // store a fake value inside this and as soon as we know it we set it to the right value.
         let feedback_block_id = Arc::new(AtomicUsize::new(0));
+
+        let (output_sender, output_receiver) = BoundedChannelReceiver::new(OUTPUT_CHANNEL_CAPACITY);
 
         let iter_start = self.add_operator(|prev| {
             Replay::new(
@@ -240,6 +250,7 @@ where
                 Box::new(global_fold),
                 Box::new(loop_condition),
                 feedback_block_id.clone(),
+                output_sender,
             )
         });
         let iter_in_id = iter_start.block.id;
@@ -296,12 +307,12 @@ where
             close_loop(iter_end, iter_in_id)
         };
 
-        // TODO: check parallelism and make sure the blocks are spawned on the same replicas
-
         // store the id of the block containing the ReplayEndBlock
         feedback_block_id.store(replay_end_block_id, Ordering::Release);
 
-        // TODO: this function returns a stream with the final state of the iteration
+        // TODO: check parallelism and make sure the blocks are spawned on the same replicas
+
+        StreamEnvironmentInner::stream(env, ChannelSource::new(output_receiver))
     }
 }
 
@@ -474,7 +485,7 @@ where
             }
             // the loop condition may change the state
             let should_continue = (self.loop_condition)(&mut state);
-            self.state_ref.set(&state);
+            self.state_ref.set(state.clone());
             debug!(
                 "Replay leader at {} checked loop condition and resulted in {}",
                 self.coord, should_continue
@@ -507,7 +518,7 @@ where
                     }
                 };
             };
-            self.state_ref.set(&new_state);
+            self.state_ref.set(new_state.clone());
             self.state = Some(new_state);
             should_continue
         };
@@ -515,10 +526,20 @@ where
         self.content_index = 0;
         self.iteration_index += 1;
 
+        // the loop has ended
         if !should_continue || self.iteration_index >= self.num_iterations {
             // cleanup so that if this is a nested iteration next time we'll be good to start again
             self.content.clear();
             self.iteration_index = 0;
+            // send the output state to the output block if this Replay is the leader
+            if self.is_leader {
+                self.output_sender
+                    .send(StreamElement::Item(self.state.clone().unwrap()))
+                    .unwrap();
+                self.output_sender
+                    .send(self.has_ended.clone().unwrap().map(|_| unreachable!()))
+                    .unwrap();
+            }
             return self.has_ended.take().unwrap();
         }
 
@@ -550,14 +571,14 @@ mod tests {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(n as usize + 2));
 
         let source = source::IteratorSource::new(0..n);
-        let (state, handle) = env.state(1);
-        env.stream(source)
+        let state = env
+            .stream(source)
             .shuffle()
             .map(|x| x)
             // the body of this iteration does not split the block (it's just a map)
             .replay(
                 n_iter,
-                handle,
+                1,
                 |s, state| s.map(move |x| x * state.get()),
                 |delta: u64, x| delta + x,
                 |old_state, delta| old_state + delta,
@@ -565,9 +586,14 @@ mod tests {
                     *state -= 1;
                     true
                 },
-            );
+            )
+            .collect_vec();
         env.execute();
+
         let res = state.get().unwrap();
+        assert_eq!(res.len(), 1);
+        let res = res.into_iter().next().unwrap();
+
         let mut state = 1;
         for _ in 0..n_iter {
             let s: u64 = (0..n).map(|x| x * state).sum();
@@ -585,14 +611,14 @@ mod tests {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(n as usize + 2));
 
         let source = source::IteratorSource::new(0..n);
-        let (state, handle) = env.state(1);
-        env.stream(source)
+        let state = env
+            .stream(source)
             .shuffle()
             .map(|x| x)
             // the body of this iteration will split the block (there is a shuffle)
             .replay(
                 n_iter,
-                handle,
+                1,
                 |s, state| s.map(move |x| x * state.get()).shuffle(),
                 |delta: u64, x| delta + x,
                 |old_state, delta| old_state + delta,
@@ -600,9 +626,14 @@ mod tests {
                     *state -= 1;
                     true
                 },
-            );
+            )
+            .collect_vec();
         env.execute();
+
         let res = state.get().unwrap();
+        assert_eq!(res.len(), 1);
+        let res = res.into_iter().next().unwrap();
+
         let mut state = 1;
         for _ in 0..n_iter {
             let s: u64 = (0..n).map(|x| x * state).sum();
