@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::block::NextStrategy;
+use crate::block::{BlockStructure, NextStrategy, OperatorStructure};
 use crate::operator::{Data, EndBlock, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
@@ -111,6 +111,12 @@ where
             std::any::type_name::<Out>(),
             std::any::type_name::<NewOut>()
         )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<NewOut, _>("Fold"))
     }
 }
 

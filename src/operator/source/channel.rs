@@ -1,3 +1,4 @@
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::channel::BoundedChannelReceiver;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
@@ -32,6 +33,12 @@ impl<Out: Data> Operator<Out> for ChannelSource<Out> {
 
     fn to_string(&self) -> String {
         format!("ChannelSource<{}>", std::any::type_name::<Out>())
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("ChannelSource");
+        operator.kind = OperatorKind::Source;
+        BlockStructure::new().add_operator(operator)
     }
 }
 

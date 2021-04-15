@@ -18,6 +18,7 @@ pub use unkey::*;
 pub use window::*;
 pub use zip::*;
 
+use crate::block::BlockStructure;
 use crate::scheduler::ExecutionMetadata;
 
 mod batch_mode;
@@ -106,6 +107,9 @@ pub trait Operator<Out: Data>: Clone {
 
     /// A string representation of the operator and its predecessors.
     fn to_string(&self) -> String;
+
+    /// A more refined representation of the operator and its predecessors.
+    fn structure(&self) -> BlockStructure;
 }
 
 impl<Out: Data> StreamElement<Out> {

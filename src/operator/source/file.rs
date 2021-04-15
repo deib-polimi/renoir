@@ -4,6 +4,7 @@ use std::io::Seek;
 use std::io::{BufReader, SeekFrom};
 use std::path::PathBuf;
 
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -99,6 +100,12 @@ impl Operator<String> for FileSource {
 
     fn to_string(&self) -> String {
         format!("FileSource<{}>", std::any::type_name::<String>())
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<String, _>("FileSource");
+        operator.kind = OperatorKind::Source;
+        BlockStructure::new().add_operator(operator)
     }
 }
 

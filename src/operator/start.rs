@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::collections::VecDeque;
 
+use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::network::{NetworkMessage, NetworkReceiver, ReceiverEndpoint};
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -145,6 +146,16 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
 
     fn to_string(&self) -> String {
         format!("[{}]", std::any::type_name::<Out>())
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("StartBlock");
+        for &block_id in &self.prev_block_ids {
+            operator
+                .receivers
+                .push(OperatorReceiver::new::<Out>(block_id));
+        }
+        BlockStructure::new().add_operator(operator)
     }
 }
 

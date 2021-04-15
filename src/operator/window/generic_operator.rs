@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::window::KeyedWindowManager;
 use crate::operator::{
     Data, DataKey, Operator, StreamElement, Window, WindowDescription, WindowGenerator,
@@ -110,5 +111,13 @@ where
             self.name,
             std::any::type_name::<NewOut>(),
         )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<KeyValue<Key, NewOut>, _>(
+                &self.name,
+            ))
     }
 }

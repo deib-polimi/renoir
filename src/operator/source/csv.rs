@@ -1,3 +1,4 @@
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -154,6 +155,12 @@ impl<Out: Data> Operator<Out> for CsvSource<Out> {
 
     fn to_string(&self) -> String {
         format!("CsvSource<{}>", std::any::type_name::<Out>())
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("CSVSource");
+        operator.kind = OperatorKind::Source;
+        BlockStructure::new().add_operator(operator)
     }
 }
 

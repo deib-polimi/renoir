@@ -8,8 +8,7 @@ use rstream::operator::source;
 fn main() {
     env_logger::init();
 
-    // let config = EnvironmentConfig::local(4);
-    let config = EnvironmentConfig::remote("config.yml").unwrap();
+    let (config, _args) = EnvironmentConfig::from_args();
     let mut env = StreamEnvironment::new(config);
 
     env.spawn_remote_workers();

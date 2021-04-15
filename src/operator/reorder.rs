@@ -1,3 +1,4 @@
+use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use std::cmp::Ordering;
@@ -106,10 +107,17 @@ where
             std::any::type_name::<Out>(),
         )
     }
+
+    fn structure(&self) -> BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<Out, _>("Reorder"))
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::block::{BlockStructure, OperatorStructure};
     use crate::operator::reorder::Reorder;
     use crate::operator::{Data, Operator, StreamElement};
     use crate::scheduler::ExecutionMetadata;
@@ -142,6 +150,10 @@ mod tests {
 
         fn to_string(&self) -> String {
             format!("FakeOperator<{}>", std::any::type_name::<Out>())
+        }
+
+        fn structure(&self) -> BlockStructure {
+            BlockStructure::new().add_operator(OperatorStructure::new::<Out, _>("FakeOperator"))
         }
     }
 

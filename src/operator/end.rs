@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::block::{BatchMode, Batcher, NextStrategy, SenderList};
+use crate::block::{
+    BatchMode, Batcher, BlockStructure, Connection, NextStrategy, OperatorStructure, SenderList,
+};
 use crate::network::ReceiverEndpoint;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -125,6 +127,19 @@ where
             NextStrategy::OnlyOne => format!("{} -> OnlyOne", self.prev.to_string()),
             _ => self.prev.to_string(),
         }
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("EndBlock");
+        for sender_group in &self.sender_groups {
+            if !sender_group.0.is_empty() {
+                let block_id = sender_group.0[0].coord.block_id;
+                operator
+                    .connections
+                    .push(Connection::new::<Out>(block_id, &self.next_strategy));
+            }
+        }
+        self.prev.structure().add_operator(operator)
     }
 }
 

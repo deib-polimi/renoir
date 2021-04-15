@@ -1,3 +1,4 @@
+use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Keyer};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -52,6 +53,12 @@ where
             self.prev.to_string(),
             std::any::type_name::<Key>(),
         )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<KeyValue<Key, Out>, _>("KeyBy"))
     }
 }
 

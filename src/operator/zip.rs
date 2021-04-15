@@ -1,11 +1,14 @@
 use std::collections::VecDeque;
 
+use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::operator::{Data, Operator, StartBlock, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
 
 #[derive(Debug, Clone)]
 pub struct Zip<Out1: Data, Out2: Data> {
+    prev_block_id1: BlockId,
+    prev_block_id2: BlockId,
     prev1: StartBlock<Out1>,
     prev2: StartBlock<Out2>,
     watermarks1: VecDeque<Timestamp>,
@@ -16,6 +19,8 @@ pub struct Zip<Out1: Data, Out2: Data> {
 impl<Out1: Data, Out2: Data> Zip<Out1, Out2> {
     fn new(prev_block_id1: BlockId, prev_block_id2: BlockId) -> Self {
         Self {
+            prev_block_id1,
+            prev_block_id2,
             prev1: StartBlock::new(prev_block_id1),
             prev2: StartBlock::new(prev_block_id2),
             watermarks1: Default::default(),
@@ -84,6 +89,17 @@ impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
             std::any::type_name::<Out1>(),
             std::any::type_name::<Out2>()
         )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<(Out1, Out2), _>("Zip");
+        operator
+            .receivers
+            .push(OperatorReceiver::new::<Out1>(self.prev_block_id1));
+        operator
+            .receivers
+            .push(OperatorReceiver::new::<Out2>(self.prev_block_id2));
+        BlockStructure::new().add_operator(operator)
     }
 }
 

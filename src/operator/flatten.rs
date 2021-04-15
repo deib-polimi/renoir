@@ -4,6 +4,7 @@ use std::iter::repeat;
 
 use std::sync::Arc;
 
+use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
@@ -63,6 +64,12 @@ where
             std::any::type_name::<Out>(),
             std::any::type_name::<NewOut>()
         )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<NewOut, _>("Flatten"))
     }
 }
 

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::Sink;
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -39,6 +40,12 @@ where
 
     fn to_string(&self) -> String {
         format!("{} -> ForEach", self.prev.to_string())
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("ForEachSink");
+        operator.kind = OperatorKind::Sink;
+        self.prev.structure().add_operator(operator)
     }
 }
 

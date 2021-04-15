@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::block::NextStrategy;
+use crate::block::{BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure};
 use crate::channel::{BoundedChannelReceiver, BoundedChannelSender};
 use crate::environment::StreamEnvironmentInner;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
@@ -83,6 +83,8 @@ where
     senders: Vec<NetworkSender<NetworkMessage<DeltaUpdateMessage<DeltaUpdate, State>>>>,
     /// The sender used to send the final state to the output block.
     output_sender: BoundedChannelSender<StreamElement<State>>,
+    /// The identifier of the block where the final state should be sent to.
+    output_block_id: BlockId,
 
     /// The content of the stream to replay.
     content: Vec<StreamElement<Out>>,
@@ -181,18 +183,20 @@ where
         loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
         feedback_block_id: Arc<AtomicUsize>,
         output_sender: BoundedChannelSender<StreamElement<State>>,
+        output_block_id: BlockId,
     ) -> Self {
         Self {
             // these fields will be set inside the `setup` method
             coord: Coord::new(0, 0, 0),
             feedback: None,
             senders: Default::default(),
-            output_sender,
             is_leader: false,
             num_replicas: 0,
 
             prev,
             feedback_block_id,
+            output_block_id,
+            output_sender,
             content: Default::default(),
             content_index: 0,
             iteration_index: 0,
@@ -240,6 +244,8 @@ where
         let feedback_block_id = Arc::new(AtomicUsize::new(0));
 
         let (output_sender, output_receiver) = BoundedChannelReceiver::new(OUTPUT_CHANNEL_CAPACITY);
+        let output_stream =
+            StreamEnvironmentInner::stream(env, ChannelSource::new(output_receiver));
 
         let iter_start = self.add_operator(|prev| {
             Replay::new(
@@ -251,6 +257,7 @@ where
                 Box::new(loop_condition),
                 feedback_block_id.clone(),
                 output_sender,
+                output_stream.block.id,
             )
         });
         let iter_in_id = iter_start.block.id;
@@ -312,7 +319,7 @@ where
 
         // TODO: check parallelism and make sure the blocks are spawned on the same replicas
 
-        StreamEnvironmentInner::stream(env, ChannelSource::new(output_receiver))
+        output_stream
     }
 }
 
@@ -371,6 +378,18 @@ where
             self.prev.to_string(),
             std::any::type_name::<DeltaUpdateMessage<DeltaUpdate, State>>()
         )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator =
+            OperatorStructure::new::<DeltaUpdateMessage<DeltaUpdate, State>, _>("ReplayEndBlock");
+        operator
+            .connections
+            .push(Connection::new::<DeltaUpdateMessage<DeltaUpdate, State>>(
+                self.replay_block_id,
+                &NextStrategy::OnlyOne,
+            ));
+        self.prev.structure().add_operator(operator)
     }
 }
 
@@ -554,6 +573,30 @@ where
             self.prev.to_string(),
             std::any::type_name::<Out>()
         )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("Replay");
+        // feedback from ReplayEndBlock
+        operator.receivers.push(OperatorReceiver::new::<
+            DeltaUpdateMessage<DeltaUpdate, State>,
+        >(self.feedback_block_id.load(Ordering::Acquire)));
+        // self loop
+        operator.receivers.push(OperatorReceiver::new::<
+            DeltaUpdateMessage<DeltaUpdate, State>,
+        >(self.coord.block_id));
+        operator
+            .connections
+            .push(Connection::new::<DeltaUpdateMessage<DeltaUpdate, State>>(
+                self.coord.block_id,
+                &NextStrategy::OnlyOne,
+            ));
+        // output
+        operator.connections.push(Connection::new::<State>(
+            self.output_block_id,
+            &NextStrategy::OnlyOne,
+        ));
+        self.prev.structure().add_operator(operator)
     }
 }
 

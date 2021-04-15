@@ -2,7 +2,7 @@ use core::iter::Iterator;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::block::NextStrategy;
+use crate::block::{BlockStructure, NextStrategy, OperatorStructure};
 use crate::operator::{Data, DataKey, EndBlock, KeyBy, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
@@ -120,6 +120,14 @@ where
             std::any::type_name::<KeyValue<Key, Out>>(),
             std::any::type_name::<KeyValue<Key, NewOut>>()
         )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<KeyValue<Key, NewOut>, _>(
+                "KeyedFold",
+            ))
     }
 }
 

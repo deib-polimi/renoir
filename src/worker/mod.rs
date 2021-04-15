@@ -52,6 +52,11 @@ fn worker<Out: Data, OperatorChain>(
     COORD.with(|x| *x.borrow_mut() = Some(metadata.coord));
     // notify the operators that we are about to start
     block.operators.setup(metadata.clone());
+    let structure = block.operators.structure();
+    error!(
+        "Structure of block {} is:\n{:#?}",
+        metadata.coord, structure
+    );
     while !matches!(block.operators.next(), StreamElement::End) {
         // nothing to do
     }

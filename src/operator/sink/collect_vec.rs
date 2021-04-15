@@ -1,4 +1,4 @@
-use crate::block::NextStrategy;
+use crate::block::{BlockStructure, NextStrategy, OperatorKind, OperatorStructure};
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
 use crate::operator::{Data, EndBlock, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -45,6 +45,12 @@ where
 
     fn to_string(&self) -> String {
         format!("{} -> CollectVecSink", self.prev.to_string())
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("CollectVecSink");
+        operator.kind = OperatorKind::Sink;
+        self.prev.structure().add_operator(operator)
     }
 }
 

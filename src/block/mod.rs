@@ -4,12 +4,14 @@ use std::marker::PhantomData;
 pub use batcher::BatchMode;
 pub(crate) use batcher::*;
 pub(crate) use next_strategy::*;
+pub(crate) use structure::*;
 
 use crate::operator::{Data, Operator};
 use crate::stream::BlockId;
 
 mod batcher;
 mod next_strategy;
+mod structure;
 
 /// A chain of operators that will be run inside the same host. The block takes as input elements of
 /// type `In` and produces elements of type `Out`.
