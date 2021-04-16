@@ -105,7 +105,7 @@ impl Operator<String> for FileSource {
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<String, _>("FileSource");
         operator.kind = OperatorKind::Source;
-        BlockStructure::new().add_operator(operator)
+        BlockStructure::default().add_operator(operator)
     }
 }
 

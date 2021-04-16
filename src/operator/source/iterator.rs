@@ -52,7 +52,7 @@ where
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<Out, _>("IteratorSource");
         operator.kind = OperatorKind::Source;
-        BlockStructure::new().add_operator(operator)
+        BlockStructure::default().add_operator(operator)
     }
 }
 

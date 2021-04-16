@@ -13,7 +13,7 @@ pub struct DataType(String);
 /// The structural information about a block.
 ///
 /// This contains the structural information about the block and the operators it contains.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BlockStructure {
     /// The structural information about the operators inside the block.
     ///
@@ -135,12 +135,6 @@ impl Display for DataType {
 }
 
 impl BlockStructure {
-    pub fn new() -> Self {
-        Self {
-            operators: Default::default(),
-        }
-    }
-
     pub fn add_operator(mut self, operator: OperatorStructure) -> Self {
         self.operators.push(operator);
         self

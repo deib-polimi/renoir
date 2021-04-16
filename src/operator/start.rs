@@ -155,7 +155,7 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                 .receivers
                 .push(OperatorReceiver::new::<Out>(block_id));
         }
-        BlockStructure::new().add_operator(operator)
+        BlockStructure::default().add_operator(operator)
     }
 }
 

@@ -160,7 +160,7 @@ impl<Out: Data> Operator<Out> for CsvSource<Out> {
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<Out, _>("CSVSource");
         operator.kind = OperatorKind::Source;
-        BlockStructure::new().add_operator(operator)
+        BlockStructure::default().add_operator(operator)
     }
 }
 

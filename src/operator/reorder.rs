@@ -153,7 +153,7 @@ mod tests {
         }
 
         fn structure(&self) -> BlockStructure {
-            BlockStructure::new().add_operator(OperatorStructure::new::<Out, _>("FakeOperator"))
+            BlockStructure::default().add_operator(OperatorStructure::new::<Out, _>("FakeOperator"))
         }
     }
 

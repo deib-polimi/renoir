@@ -99,7 +99,7 @@ impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
         operator
             .receivers
             .push(OperatorReceiver::new::<Out2>(self.prev_block_id2));
-        BlockStructure::new().add_operator(operator)
+        BlockStructure::default().add_operator(operator)
     }
 }
 
