@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 
 pub use batcher::BatchMode;
 pub(crate) use batcher::*;
+pub(crate) use graph_generator::*;
 pub(crate) use next_strategy::*;
 pub(crate) use structure::*;
 
@@ -10,6 +11,7 @@ use crate::operator::{Data, Operator};
 use crate::stream::BlockId;
 
 mod batcher;
+mod graph_generator;
 mod next_strategy;
 mod structure;
 

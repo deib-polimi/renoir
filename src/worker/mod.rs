@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
-use crate::block::InnerBlock;
-use crate::channel::BoundedChannelReceiver;
+use crate::block::{BlockStructure, InnerBlock};
+use crate::channel::{BoundedChannelReceiver, UnboundedChannelSender};
 use crate::network::Coord;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::{ExecutionMetadata, StartHandle};
@@ -23,6 +23,7 @@ pub fn replica_coord() -> Option<Coord> {
 
 pub(crate) fn spawn_worker<Out: Data, OperatorChain>(
     block: InnerBlock<Out, OperatorChain>,
+    structure_sender: UnboundedChannelSender<(Coord, BlockStructure)>,
 ) -> StartHandle
 where
     OperatorChain: Operator<Out> + Send + 'static,
@@ -30,7 +31,7 @@ where
     let (sender, receiver) = BoundedChannelReceiver::new(1);
     let join_handle = std::thread::Builder::new()
         .name(format!("Block{}", block.id))
-        .spawn(move || worker(block, receiver))
+        .spawn(move || worker(block, receiver, structure_sender))
         .unwrap();
     StartHandle::new(sender, join_handle)
 }
@@ -38,6 +39,7 @@ where
 fn worker<Out: Data, OperatorChain>(
     mut block: InnerBlock<Out, OperatorChain>,
     metadata_receiver: BoundedChannelReceiver<ExecutionMetadata>,
+    structure_sender: UnboundedChannelSender<(Coord, BlockStructure)>,
 ) where
     OperatorChain: Operator<Out> + Send + 'static,
 {
@@ -52,11 +54,15 @@ fn worker<Out: Data, OperatorChain>(
     COORD.with(|x| *x.borrow_mut() = Some(metadata.coord));
     // notify the operators that we are about to start
     block.operators.setup(metadata.clone());
+
     let structure = block.operators.structure();
-    error!(
-        "Structure of block {} is:\n{:#?}",
+    debug!(
+        "Block {} has this structure:\n{:#?}",
         metadata.coord, structure
     );
+    structure_sender.send((metadata.coord, structure)).unwrap();
+    drop(structure_sender);
+
     while !matches!(block.operators.next(), StreamElement::End) {
         // nothing to do
     }

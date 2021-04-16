@@ -5,8 +5,8 @@ use std::thread::JoinHandle;
 
 use itertools::Itertools;
 
-use crate::block::{BatchMode, InnerBlock};
-use crate::channel::BoundedChannelSender;
+use crate::block::{BatchMode, BlockStructure, InnerBlock, JobGraphGenerator};
+use crate::channel::{BoundedChannelSender, UnboundedChannelReceiver, UnboundedChannelSender};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
@@ -77,10 +77,15 @@ pub(crate) struct Scheduler {
     start_handles: Vec<(Coord, StartHandle)>,
     /// The network topology that keeps track of all the connections inside the execution graph.
     network: NetworkTopology,
+    /// Receiver with the structure of the block sent by a worker.  
+    block_structure_receiver: UnboundedChannelReceiver<(Coord, BlockStructure)>,
+    /// Sender to give to a worker for sending back the block structure.
+    block_structure_sender: UnboundedChannelSender<(Coord, BlockStructure)>,
 }
 
 impl Scheduler {
     pub fn new(config: EnvironmentConfig) -> Self {
+        let (sender, receiver) = UnboundedChannelReceiver::new();
         Self {
             next_blocks: Default::default(),
             prev_blocks: Default::default(),
@@ -88,6 +93,8 @@ impl Scheduler {
             start_handles: Default::default(),
             network: NetworkTopology::new(config.clone()),
             config,
+            block_structure_sender: sender,
+            block_structure_receiver: receiver,
         }
     }
 
@@ -130,7 +137,7 @@ impl Scheduler {
 
         for (coord, block) in blocks {
             // spawn the actual worker
-            let start_handle = spawn_worker(block);
+            let start_handle = spawn_worker(block, self.block_structure_sender.clone());
             self.start_handles.push((coord, start_handle));
         }
     }
@@ -169,6 +176,17 @@ impl Scheduler {
             handle.starter.send(metadata).unwrap();
             join.push(handle.join_handle);
         }
+
+        // While the other workers are working on the computation, the main thread is building the
+        // dot diagram of the job graph. This computation should be pretty fast.
+        drop(self.block_structure_sender);
+        let mut job_graph_generator = JobGraphGenerator::new();
+        while let Ok((coord, structure)) = self.block_structure_receiver.recv() {
+            job_graph_generator.add_block(coord.block_id, structure);
+        }
+        let job_graph = job_graph_generator.finalize();
+        debug!("Job graph in dot format:\n{}", job_graph);
+
         for handle in join {
             handle.join().unwrap();
         }

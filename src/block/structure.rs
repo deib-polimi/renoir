@@ -1,24 +1,50 @@
 use crate::block::NextStrategy;
 use crate::operator::Data;
 use crate::stream::BlockId;
+use std::fmt::{Display, Formatter};
 
-#[derive(Clone, Debug)]
+/// Wrapper type that contains a string representing the type.
+///
+/// The internal representation should not be considered unique nor exact. Its purpose is to be
+/// nice to look at.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DataType(String);
 
+/// The structural information about a block.
+///
+/// This contains the structural information about the block and the operators it contains.
 #[derive(Clone, Debug)]
 pub struct BlockStructure {
-    operators: Vec<OperatorStructure>,
+    /// The structural information about the operators inside the block.
+    ///
+    /// The first in the list is the start of the block, while the last is the operator that ends
+    /// the block.
+    pub operators: Vec<OperatorStructure>,
 }
 
+/// The structural information about an operator.
 #[derive(Clone, Debug)]
 pub struct OperatorStructure {
+    /// The title of the operator.
     pub title: String,
+    /// The kind of operator: `Operator`, `Source` or `Sink`.
     pub kind: OperatorKind,
+    /// The list of receivers this operator registers for the block.
+    ///
+    /// This does not contain the receiver from the previous operator in the block.
     pub receivers: Vec<OperatorReceiver>,
+    /// The list of connections this operator makes.
+    ///
+    /// This does not count the connection to the next operator in the block: that connection is
+    /// added automatically.
     pub connections: Vec<Connection>,
+    /// The type of the data that comes out of this operator.
     pub out_type: DataType,
 }
 
+/// The kind of operator: either `Operator`, `Source` or `Sink`.
+///
+/// This value can be used for customizing the look of the operator.
 #[derive(Clone, Debug)]
 pub enum OperatorKind {
     Operator,
@@ -26,32 +52,55 @@ pub enum OperatorKind {
     Source,
 }
 
+/// A receiver registered by an operator.
+///
+/// This receiver tells that an operator will receive some data from the network from the specified
+/// block. Inside a block there cannot be two operators that register a receiver from the same block
+/// id.
 #[derive(Clone, Debug)]
 pub struct OperatorReceiver {
+    /// The identifier of the block from which the data is arriving.
     pub previous_block_id: BlockId,
+    /// The type of the data coming from the channel.
     pub data_type: DataType,
 }
 
+/// A connection registered by an operator.
+///
+/// This tell that an operator will establish a connection with an external block. That block should
+/// have registered the corresponding receiver. The strategy can be used to customize the look of
+/// this connection.
 #[derive(Clone, Debug)]
 pub struct Connection {
+    /// The id of the block that this operator is connecting to.
     pub to_block_id: BlockId,
+    /// The type of data going in the channel.
     pub data_type: DataType,
+    /// The strategy used for sending the data in the channel.
     pub strategy: ConnectionStrategy,
 }
 
+/// The strategy used for sending the data in a channel.
 #[derive(Clone, Debug)]
 pub enum ConnectionStrategy {
+    /// The data will sent to the only replica possible. Refer to `NextStrategy::OnlyOne`.
     OnlyOne,
+    /// A random replica is chosen for sending the data.
     Random,
+    /// A key-based approach is used for choosing the next replica.
     GroupBy,
 }
 
 impl DataType {
+    /// Construct the `DataType` for the specified type.
     pub fn of<T: ?Sized>() -> Self {
         let type_name = std::any::type_name::<T>();
         Self(DataType::clean_str(type_name))
     }
 
+    /// Cleanup the type information returned by `std::any::type_name`. This will remove a lot of
+    /// unnecessary information from the type (like the path), keeping just the final name and the
+    /// type parameters.
     fn clean_str(s: &str) -> String {
         let mut result = "".to_string();
         let mut current_ident = "".to_string();
@@ -76,6 +125,12 @@ impl DataType {
             result += &current_ident;
         }
         result
+    }
+}
+
+impl Display for DataType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
