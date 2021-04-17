@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::block::{BlockStructure, DataType, OperatorKind};
+use crate::block::{BlockStructure, ConnectionStrategy, DataType, OperatorKind};
 use crate::stream::BlockId;
 
 /// This struct is able to track the block structure of all the blocks of the job graph for later
@@ -29,8 +29,13 @@ impl JobGraphGenerator {
 
     /// Finalize the generator and generate a string representation of the job graph in dot format.
     pub fn finalize(self) -> String {
+        let attributes = vec!["ranksep=0.1"];
         format!(
-            "digraph rstream2 {{\n{subgraphs}\n{connections}\n}}",
+            "digraph rstream2 {{\n{attributes}\n{subgraphs}\n{connections}\n}}",
+            attributes = attributes
+                .into_iter()
+                .map(|s| format!("  {};", s))
+                .join("\n"),
             subgraphs = self.gen_subgraphs(),
             connections = self.gen_connections()
         )
@@ -57,6 +62,8 @@ impl JobGraphGenerator {
         let attributes = vec![
             "style=filled".to_string(),
             "color=lightgrey".to_string(),
+            "labeljust=l".to_string(),
+            "edge[fontname=\"monospace\"]".to_string(),
             format!("label=\"Block {}\"", block_id),
         ];
         let mut nodes = vec![];
@@ -74,7 +81,10 @@ impl JobGraphGenerator {
             nodes.push(format!("{} [label=\"{}\",shape={}]", id, label, shape));
             if index < block.operators.len() - 1 {
                 let next = Self::operator_id(block_id, index + 1);
-                connections.push(format!("{} -> {} [label=\"{}\"]", id, next, typ));
+                connections.push(format!(
+                    "{} -> {} [label=\"    {}\",labeljust=l,labelfloat=true]",
+                    id, next, typ
+                ));
             }
         }
 
@@ -120,12 +130,22 @@ impl JobGraphGenerator {
                     } else {
                         (0, &connection.data_type)
                     };
+                    let style = match connection.strategy {
+                        ConnectionStrategy::OnlyOne => "dotted",
+                        ConnectionStrategy::Random => "solid",
+                        ConnectionStrategy::GroupBy => "dashed",
+                    };
+                    let sublabel = match connection.strategy {
+                        ConnectionStrategy::OnlyOne => "only-one",
+                        ConnectionStrategy::Random => "shuffle",
+                        ConnectionStrategy::GroupBy => "group-by",
+                    };
 
                     let from_id = Self::operator_id(from_block, from_index);
                     let to_id = Self::operator_id(to_block, to_index);
                     result.push(format!(
-                        "{} -> {} [label=\"{}\"]",
-                        from_id, to_id, data_type
+                        "{} -> {} [label=\"{}\\n{}\",labelfloat=true,style={}]",
+                        from_id, to_id, data_type, sublabel, style
                     ));
                 }
             }
