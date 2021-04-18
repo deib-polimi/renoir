@@ -21,6 +21,39 @@ pub fn replica_coord() -> Option<Coord> {
     COORD.with(|x| *x.borrow())
 }
 
+/// Call a function if this struct goes out of scope without calling `defuse`, including during a
+/// panic stack-unwinding.
+struct CatchPanic<F: FnOnce()> {
+    /// True if the function should be called.
+    primed: bool,
+    /// Function to call.
+    ///
+    /// The `Drop` implementation will move out the function.
+    handler: Option<F>,
+}
+
+impl<F: FnOnce()> CatchPanic<F> {
+    fn new(handler: F) -> Self {
+        Self {
+            primed: true,
+            handler: Some(handler),
+        }
+    }
+
+    /// Avoid calling the function on drop.
+    fn defuse(&mut self) {
+        self.primed = false;
+    }
+}
+
+impl<F: FnOnce()> Drop for CatchPanic<F> {
+    fn drop(&mut self) {
+        if self.primed {
+            (self.handler.take().unwrap())();
+        }
+    }
+}
+
 pub(crate) fn spawn_worker<Out: Data, OperatorChain>(
     block: InnerBlock<Out, OperatorChain>,
     structure_sender: UnboundedChannelSender<(Coord, BlockStructure)>,
@@ -63,8 +96,12 @@ fn worker<Out: Data, OperatorChain>(
     structure_sender.send((metadata.coord, structure)).unwrap();
     drop(structure_sender);
 
+    let mut catch_panic = CatchPanic::new(|| {
+        error!("Worker {} has crashed!", metadata.coord);
+    });
     while !matches!(block.operators.next(), StreamElement::End) {
         // nothing to do
     }
+    catch_panic.defuse();
     info!("Worker {} completed, exiting", metadata.coord);
 }
