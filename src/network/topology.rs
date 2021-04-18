@@ -282,16 +282,19 @@ impl NetworkTopology {
                             }
                         }
                     }
-                    let address = self.demultiplexer_addresses[&demux_coord].clone();
-                    let (demux, join_handle) =
-                        DemultiplexingReceiver::new(demux_coord, address, prev.len());
-                    self.join_handles.push(join_handle);
-                    demuxes.insert(demux_coord, demux);
+                    if !prev.is_empty() {
+                        let address = self.demultiplexer_addresses[&demux_coord].clone();
+                        let (demux, join_handle) =
+                            DemultiplexingReceiver::new(demux_coord, address, prev.len());
+                        self.join_handles.push(join_handle);
+                        demuxes.insert(demux_coord, demux);
+                    } else {
+                        debug!("Demultiplexer of {} is useless since it has no previous remote block, ignoring...", demux_coord);
+                    }
                 }
-                demuxes
-                    .get_mut(&demux_coord)
-                    .unwrap()
-                    .register(receiver_endpoint, local_sender.inner().unwrap().clone());
+                if let Some(demux) = demuxes.get_mut(&demux_coord) {
+                    demux.register(receiver_endpoint, local_sender.inner().unwrap().clone())
+                };
             }
         }
         self.receivers

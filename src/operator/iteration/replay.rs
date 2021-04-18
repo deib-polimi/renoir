@@ -3,35 +3,16 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
 
 use lazy_init::Lazy;
-use serde::{Deserialize, Serialize};
 
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure};
-use crate::channel::{BoundedChannelReceiver, BoundedChannelSender};
 use crate::environment::StreamEnvironmentInner;
-use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
-use crate::operator::source::ChannelSource;
-use crate::operator::{Data, EndBlock, IterationStateHandle, Operator, StreamElement};
+use crate::network::{Coord, NetworkMessage, NetworkSender, ReceiverEndpoint};
+use crate::operator::source::Source;
+use crate::operator::{Data, EndBlock, IterationStateHandle, Operator, StartBlock, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
 
-/// The capacity of the local channel that sends the final state to the output block.
-const OUTPUT_CHANNEL_CAPACITY: usize = 2;
-
-/// Message exchanged between `Replay` and `ReplayEndBlock` signaling the delta updates and the
-/// information for the next iteration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(bound(deserialize = ""))]
-enum DeltaUpdateMessage<DeltaUpdate: Data, State: Data> {
-    /// This variant is sent from a `ReplayEndBlock` to the `Replay` leader with the local state
-    /// reduced.
-    DeltaUpdate(DeltaUpdate),
-    /// This variant is sent from the `Replay` leader to the `Replay` followers after an iteration
-    /// completes.
-    ///
-    /// The first field is `true` if the next iteration should be executed, the second field is the
-    /// new global state.
-    NextIteration(bool, State),
-}
+type NewIterationState<State> = (bool, State);
 
 /// This is the first operator of the chain of blocks inside an iteration.
 ///
@@ -50,7 +31,7 @@ enum DeltaUpdateMessage<DeltaUpdate: Data, State: Data> {
 /// If a new iteration should start, the initial dataset is replayed.
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
-pub struct Replay<Out: Data, DeltaUpdate: Data, State: Data, OperatorChain>
+pub struct Replay<Out: Data, State: Data, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -59,43 +40,13 @@ where
 
     /// The chain of previous operators where the dataset to replay is read from.
     prev: OperatorChain,
-    /// A receiver from which the `Replay` will receive the `DeltaUpdateMessage`.
-    ///
-    /// If this `Replay` is a leader this will receive from all the `ReplayEndBlock`. If this is a
-    /// follower, this will receive from the leader.
-    ///
-    /// This will be set inside `setup`, when this block won't be cloned anymore. Cloning with
-    /// `None` is therefore safe.
-    #[derivative(Clone(clone_with = "clone_with_none"))]
-    feedback: Option<NetworkReceiver<NetworkMessage<DeltaUpdateMessage<DeltaUpdate, State>>>>,
-    /// The id of the block where `ReplayEndBlock` is.
-    ///
-    /// This is a shared reference because when this block is constructed the tail of the iteration
-    /// (i.e. the `ReplayEndBlock`) is not constructed yet. Therefore we cannot predict how many
-    /// blocks there will be in between, and therefore we cannot know the block id.
-    ///
-    /// After constructing the entire iteration this shared variable will be set. This will happen
-    /// before the call to `setup`.
-    feedback_block_id: Arc<AtomicUsize>,
-    /// If this `Replay` is the leader, this will contain the senders to all the following `Replay`
-    /// blocks.
-    ///
-    /// It is used to send the `DeltaUpdateMessage::NextIteration` messages.
-    senders: Vec<NetworkSender<NetworkMessage<DeltaUpdateMessage<DeltaUpdate, State>>>>,
-    /// The sender used to send the final state to the output block.
-    output_sender: BoundedChannelSender<StreamElement<State>>,
-    /// The identifier of the block where the final state should be sent to.
-    output_block_id: BlockId,
 
+    /// Receiver of the new state from the leader.
+    new_state_receiver: StartBlock<NewIterationState<State>>,
     /// The content of the stream to replay.
     content: Vec<StreamElement<Out>>,
     /// The index inside `content` of the first message to be sent.
     content_index: usize,
-
-    /// The index of the current iteration (0-based).
-    iteration_index: usize,
-    /// The maximum number of iterations to perform.
-    num_iterations: usize,
 
     /// Whether the input stream has ended or not.
     ///
@@ -104,19 +55,13 @@ where
     /// returned, allowing for nested iterations.
     has_ended: Option<StreamElement<Out>>,
 
-    /// Whether this `Replay` is the leader.
-    is_leader: bool,
     /// Whether this `Replay` is the _local_ leader.
     ///
     /// The local leader is the one that sets the iteration state for all the local replicas.
     is_local_leader: bool,
-    /// The number of replicas of this block.
-    num_replicas: usize,
     /// The number of replicas of this block on this host.
     num_local_replicas: usize,
 
-    /// The current global state of the iteration.
-    state: Option<State>,
     /// A reference to the state of the iteration that is visible to the loop operators.
     state_ref: IterationStateHandle<State>,
 
@@ -126,6 +71,44 @@ where
     /// wait until at least until `setup` when we know how many replicas are present in the current
     /// host.
     state_barrier: Arc<Lazy<Barrier>>,
+}
+
+#[derive(Derivative)]
+#[derivative(Clone, Debug)]
+struct ReplayLeader<DeltaUpdate: Data, State: Data> {
+    /// The coordinates of this block.
+    coord: Coord,
+
+    /// The index of the current iteration (0-based).
+    iteration_index: usize,
+    /// The maximum number of iterations to perform.
+    num_iterations: usize,
+
+    /// The current global state of the iteration.
+    ///
+    /// It's an `Options` because the block needs to take ownership of it for processing it. It will
+    /// be `None` only during that time frame.
+    state: Option<State>,
+
+    /// The receiver from the `ReplayEndBlock`s at the end of the loop.
+    ///
+    /// This will be set inside `setup` when we will know the id of that block.
+    delta_update_receiver: Option<StartBlock<DeltaUpdate>>,
+    /// The number of replicas of `ReplayEndBlock`.
+    num_receivers: usize,
+    /// The id of the block where `ReplayEndBlock` is.
+    ///
+    /// This is a shared reference because when this block is constructed the tail of the iteration
+    /// (i.e. the `ReplayEndBlock`) is not constructed yet. Therefore we cannot predict how many
+    /// blocks there will be in between, and therefore we cannot know the block id.
+    ///
+    /// After constructing the entire iteration this shared variable will be set. This will happen
+    /// before the call to `setup`.
+    feedback_block_id: Arc<AtomicUsize>,
+    /// The senders to the `Replay` block for the information about the new iteration.
+    new_state_senders: Vec<NetworkSender<NetworkMessage<NewIterationState<State>>>>,
+    /// Whether `next` should emit a `IterEnd` in the next call.
+    emit_end_iter: bool,
 
     /// The function that combines the global state with a delta update.
     #[derivative(Debug = "ignore")]
@@ -133,10 +116,6 @@ where
     /// A function that, given the global state, checks whether the iteration should continue.
     #[derivative(Debug = "ignore")]
     loop_condition: Arc<dyn Fn(&mut State) -> bool + Send + Sync>,
-}
-
-fn clone_with_none<T>(_: &Option<T>) -> Option<T> {
-    None
 }
 
 /// Similar to `EndBlock`, but tied specifically for the `Replay` iterations.
@@ -147,9 +126,9 @@ fn clone_with_none<T>(_: &Option<T>) -> Option<T> {
 /// `EndBlock` cannot be used here since special care should be taken when the input stream is
 /// empty.
 #[derive(Debug, Clone)]
-struct ReplayEndBlock<DeltaUpdate: Data, State: Data, OperatorChain>
+struct ReplayEndBlock<DeltaUpdate: Data, OperatorChain>
 where
-    OperatorChain: Operator<DeltaUpdateMessage<DeltaUpdate, State>>,
+    OperatorChain: Operator<DeltaUpdate>,
 {
     /// The chain of previous operators.
     ///
@@ -160,69 +139,74 @@ where
     /// If two `IterEnd` are received in a row it means that the local reduction didn't happen since
     /// no item was present in the stream. A delta update should be sent to the leader nevertheless.
     has_received_item: bool,
-    /// The block id of the block containing the `Replay` operator.
-    replay_block_id: BlockId,
-    /// The sender that points to the `Replay` leader for sending the
-    /// `DeltaUpdateMessage::DeltaUpdate` messages.
-    sender: Option<NetworkSender<NetworkMessage<DeltaUpdateMessage<DeltaUpdate, State>>>>,
+    /// The block id of the block containing the `ReplayLeader` operator.
+    leader_block_id: BlockId,
+    /// The sender that points to the `Replay` leader for sending the `DeltaUpdate` messages.
+    sender: Option<NetworkSender<NetworkMessage<DeltaUpdate>>>,
 }
 
-impl<DeltaUpdate: Data, State: Data, OperatorChain>
-    ReplayEndBlock<DeltaUpdate, State, OperatorChain>
+impl<DeltaUpdate: Data, OperatorChain> ReplayEndBlock<DeltaUpdate, OperatorChain>
 where
-    OperatorChain: Operator<DeltaUpdateMessage<DeltaUpdate, State>>,
+    OperatorChain: Operator<DeltaUpdate>,
 {
-    fn new(prev: OperatorChain, replay_block_id: BlockId) -> Self {
+    fn new(prev: OperatorChain, leader_block_id: BlockId) -> Self {
         Self {
             prev,
             has_received_item: false,
-            replay_block_id,
+            leader_block_id,
             sender: None,
         }
     }
 }
 
-impl<Out: Data, DeltaUpdate: Data, State: Data, OperatorChain>
-    Replay<Out, DeltaUpdate, State, OperatorChain>
-where
-    OperatorChain: Operator<Out>,
-{
-    #[allow(clippy::too_many_arguments)]
+impl<DeltaUpdate: Data, State: Data> ReplayLeader<DeltaUpdate, State> {
     fn new(
-        prev: OperatorChain,
         initial_state: State,
-        state_ref: IterationStateHandle<State>,
         num_iterations: usize,
         global_fold: impl Fn(State, DeltaUpdate) -> State + Send + Sync + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
         feedback_block_id: Arc<AtomicUsize>,
-        output_sender: BoundedChannelSender<StreamElement<State>>,
-        output_block_id: BlockId,
+    ) -> Self {
+        Self {
+            // these fields will be set inside the `setup` method
+            delta_update_receiver: None,
+            new_state_senders: Default::default(),
+            coord: Coord::new(0, 0, 0),
+            num_receivers: 0,
+
+            num_iterations,
+            iteration_index: 0,
+            state: Some(initial_state),
+            feedback_block_id,
+            emit_end_iter: false,
+            global_fold: Arc::new(global_fold),
+            loop_condition: Arc::new(loop_condition),
+        }
+    }
+}
+
+impl<Out: Data, State: Data, OperatorChain> Replay<Out, State, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn new(
+        prev: OperatorChain,
+        state_ref: IterationStateHandle<State>,
+        leader_block_id: BlockId,
     ) -> Self {
         Self {
             // these fields will be set inside the `setup` method
             coord: Coord::new(0, 0, 0),
-            feedback: None,
-            senders: Default::default(),
-            is_leader: false,
             is_local_leader: false,
-            num_replicas: 0,
             num_local_replicas: 0,
 
             prev,
-            feedback_block_id,
-            output_block_id,
-            output_sender,
+            new_state_receiver: StartBlock::new(leader_block_id),
             content: Default::default(),
             content_index: 0,
-            iteration_index: 0,
-            num_iterations,
             has_ended: None,
-            state: Some(initial_state),
             state_ref,
             state_barrier: Arc::new(Lazy::new()),
-            global_fold: Arc::new(global_fold),
-            loop_condition: Arc::new(loop_condition),
         }
     }
 }
@@ -247,7 +231,7 @@ where
     ) -> Stream<State, impl Operator<State>>
     where
         Body: Fn(
-            Stream<Out, Replay<Out, DeltaUpdate, State, OperatorChain>>,
+            Stream<Out, Replay<Out, State, OperatorChain>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,
         OperatorChain2: Operator<Out> + Send + 'static,
@@ -260,97 +244,74 @@ where
         // store a fake value inside this and as soon as we know it we set it to the right value.
         let feedback_block_id = Arc::new(AtomicUsize::new(0));
 
-        let (output_sender, output_receiver) = BoundedChannelReceiver::new(OUTPUT_CHANNEL_CAPACITY);
-        let output_stream =
-            StreamEnvironmentInner::stream(env, ChannelSource::new(output_receiver));
-
-        let iter_start = self.add_operator(|prev| {
-            Replay::new(
-                prev,
+        let output_stream = StreamEnvironmentInner::stream(
+            env,
+            ReplayLeader::new(
                 initial_state,
-                state,
                 num_iterations,
-                Box::new(global_fold),
-                Box::new(loop_condition),
+                global_fold,
+                loop_condition,
                 feedback_block_id.clone(),
-                output_sender,
-                output_stream.block.id,
-            )
-        });
-        let iter_in_id = iter_start.block.id;
+            ),
+        );
+        let leader_block_id = output_stream.block.id;
+
+        let iter_start = self.add_operator(|prev| Replay::new(prev, state, leader_block_id));
+        let replay_block_id = iter_start.block.id;
 
         let iter_end = body(iter_start, state_clone)
             .key_by(|_| ())
             .fold(DeltaUpdate::default(), local_fold)
             .unkey()
-            .map(|(_, x)| DeltaUpdateMessage::<DeltaUpdate, State>::DeltaUpdate(x));
+            .map(|(_, delta_update)| delta_update);
 
-        /// Close the loop by connecting the provided stream to the block containing the `Replay`
-        /// operator.
-        fn close_loop<
-            State: Data,
-            OperatorChain: Operator<DeltaUpdateMessage<DeltaUpdate, State>> + Send + 'static,
-            DeltaUpdate: Data + Default,
-        >(
-            stream: Stream<DeltaUpdateMessage<DeltaUpdate, State>, OperatorChain>,
-            replay_block_id: BlockId,
-        ) -> BlockId {
-            let iter_end = stream.add_operator(|prev| ReplayEndBlock::new(prev, replay_block_id));
-            let replay_end_block_id = iter_end.block.id;
+        let iter_end = iter_end.add_operator(|prev| ReplayEndBlock::new(prev, leader_block_id));
+        let replay_end_block_id = iter_end.block.id;
 
-            let mut env = iter_end.env.borrow_mut();
-            let scheduler = env.scheduler_mut();
-            scheduler.add_block(iter_end.block);
-            // connect the ReplayEndBlock to the Replay
-            scheduler.connect_blocks(
-                replay_end_block_id,
-                replay_block_id,
-                TypeId::of::<DeltaUpdateMessage<DeltaUpdate, State>>(),
-            );
-            // the Replay block needs a self-loop
-            scheduler.connect_blocks(
-                replay_block_id,
-                replay_block_id,
-                TypeId::of::<DeltaUpdateMessage<DeltaUpdate, State>>(),
-            );
-            replay_end_block_id
-        }
-
-        // The body didn't create any new block, we need to make a new block and separate Replay
-        // from ReplayEndBlock to avoid nasty deadlocks in the leader worker.
-        // If there are more replicas than the capacity of the local channel for the feedback it's
-        // possible that the leader's call to send from ReplayEndBlock would block finding the
-        // channel full. But if that block is the same as the leader's Replay, a deadlock occurs
-        // since that channel cannot be consumed.
-        let replay_end_block_id = if iter_end.block.id == iter_in_id {
-            close_loop(
-                iter_end.add_block(EndBlock::new, NextStrategy::OnlyOne),
-                iter_in_id,
-            )
-        } else {
-            close_loop(iter_end, iter_in_id)
-        };
+        let mut env = iter_end.env.borrow_mut();
+        let scheduler = env.scheduler_mut();
+        scheduler.add_block(iter_end.block);
+        // connect the ReplayEndBlock to the ReplayLeader
+        scheduler.connect_blocks(
+            replay_end_block_id,
+            leader_block_id,
+            TypeId::of::<DeltaUpdate>(),
+        );
+        scheduler.connect_blocks(
+            leader_block_id,
+            replay_block_id,
+            TypeId::of::<NewIterationState<State>>(),
+        );
+        drop(env);
 
         // store the id of the block containing the ReplayEndBlock
         feedback_block_id.store(replay_end_block_id, Ordering::Release);
 
         // TODO: check parallelism and make sure the blocks are spawned on the same replicas
 
-        output_stream
+        // FIXME: this add_block is here just to make sure that the NextStrategy of output_stream
+        //        is not changed by the following operators. This because the next strategy affects
+        //        the connections made by the scheduler and if accidentally set to OnlyOne will
+        //        break the connections.
+        output_stream.add_block(EndBlock::new, NextStrategy::Random)
     }
 }
 
-impl<DeltaUpdate: Data, State: Data, OperatorChain> Operator<()>
-    for ReplayEndBlock<DeltaUpdate, State, OperatorChain>
+impl<DeltaUpdate: Data, OperatorChain> Operator<()> for ReplayEndBlock<DeltaUpdate, OperatorChain>
 where
     DeltaUpdate: Default,
-    OperatorChain: Operator<DeltaUpdateMessage<DeltaUpdate, State>>,
+    OperatorChain: Operator<DeltaUpdate>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let mut network = metadata.network.lock().unwrap();
 
-        let replicas = network.replicas(self.replay_block_id);
-        let leader = select_leader(&replicas);
+        let replicas = network.replicas(self.leader_block_id);
+        assert_eq!(
+            replicas.len(),
+            1,
+            "The ReplayLeader block should not be replicated"
+        );
+        let leader = replicas.into_iter().next().unwrap();
         debug!("ReplayEndBlock {} has {} as leader", metadata.coord, leader);
 
         let sender = network.get_sender(ReceiverEndpoint::new(leader, metadata.coord.block_id));
@@ -374,17 +335,22 @@ where
                 // the iteration inside this replica. Nevertheless the DeltaUpdate must be sent to
                 // the leader.
                 if !self.has_received_item {
-                    let update = DeltaUpdateMessage::DeltaUpdate(Default::default());
-                    self.sender
-                        .as_ref()
-                        .unwrap()
-                        .send(vec![StreamElement::Item(update)])
-                        .unwrap();
+                    let update = Default::default();
+                    let sender = self.sender.as_ref().unwrap();
+                    sender.send(vec![StreamElement::Item(update)]).unwrap();
                 }
                 self.has_received_item = false;
                 StreamElement::IterEnd
             }
-            StreamElement::FlushBatch | StreamElement::End => elem.map(|_| unreachable!()),
+            StreamElement::End => {
+                self.sender
+                    .as_ref()
+                    .unwrap()
+                    .send(vec![StreamElement::End])
+                    .unwrap();
+                StreamElement::End
+            }
+            StreamElement::FlushBatch => elem.map(|_| unreachable!()),
             _ => unreachable!(),
         }
     }
@@ -393,56 +359,137 @@ where
         format!(
             "{} -> ReplayEndBlock<{}>",
             self.prev.to_string(),
-            std::any::type_name::<DeltaUpdateMessage<DeltaUpdate, State>>()
+            std::any::type_name::<DeltaUpdate>()
         )
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator =
-            OperatorStructure::new::<DeltaUpdateMessage<DeltaUpdate, State>, _>("ReplayEndBlock");
-        operator
-            .connections
-            .push(Connection::new::<DeltaUpdateMessage<DeltaUpdate, State>>(
-                self.replay_block_id,
-                &NextStrategy::OnlyOne,
-            ));
+        let mut operator = OperatorStructure::new::<DeltaUpdate, _>("ReplayEndBlock");
+        operator.connections.push(Connection::new::<DeltaUpdate>(
+            self.leader_block_id,
+            &NextStrategy::OnlyOne,
+        ));
         self.prev.structure().add_operator(operator)
     }
 }
 
-impl<Out: Data, DeltaUpdate: Data, State: Data, OperatorChain> Operator<Out>
-    for Replay<Out, DeltaUpdate, State, OperatorChain>
+impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdate, State> {
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        let mut network = metadata.network.lock().unwrap();
+        self.coord = metadata.coord;
+        self.new_state_senders = network
+            .get_senders(metadata.coord)
+            .into_iter()
+            .map(|(_, s)| s)
+            .collect();
+        drop(network);
+
+        // at this point the id of the block with ReplayEndBlock must be known
+        let feedback_block_id = self.feedback_block_id.load(Ordering::Acquire);
+        // get the receiver for the delta updates
+        let mut delta_update_receiver = StartBlock::new(feedback_block_id);
+        delta_update_receiver.setup(metadata);
+        self.num_receivers = delta_update_receiver.num_prev();
+        self.delta_update_receiver = Some(delta_update_receiver);
+    }
+
+    fn next(&mut self) -> StreamElement<State> {
+        if self.emit_end_iter {
+            self.emit_end_iter = false;
+            return StreamElement::IterEnd;
+        }
+        loop {
+            debug!(
+                "Leader {} is waiting for {} delta updates",
+                self.coord, self.num_receivers
+            );
+            let mut missing_delta_updates = self.num_receivers;
+            while missing_delta_updates > 0 {
+                let update = self.delta_update_receiver.as_mut().unwrap().next();
+                match update {
+                    StreamElement::Item(delta_update) => {
+                        missing_delta_updates -= 1;
+                        debug!(
+                            "Replay leader at {} received a delta update, {} missing",
+                            self.coord, missing_delta_updates
+                        );
+                        self.state =
+                            Some((self.global_fold)(self.state.take().unwrap(), delta_update));
+                    }
+                    StreamElement::End => {
+                        debug!("ReplayLeader {} received End", self.coord);
+                        return StreamElement::End;
+                    }
+                    StreamElement::IterEnd => {}
+                    StreamElement::FlushBatch => {}
+                    _ => unreachable!(
+                        "ReplayLeader received an invalid message: {}",
+                        update.variant()
+                    ),
+                }
+            }
+            // the loop condition may change the state
+            let mut should_continue = (self.loop_condition)(self.state.as_mut().unwrap());
+            debug!(
+                "Replay leader at {} checked loop condition and resulted in {}",
+                self.coord, should_continue
+            );
+            self.iteration_index += 1;
+            if self.iteration_index >= self.num_iterations {
+                debug!("Replay leader at {} reached iteration limit", self.coord);
+                should_continue = false;
+            }
+
+            let new_state_message = (should_continue, self.state.clone().unwrap());
+            for sender in &self.new_state_senders {
+                sender
+                    .send(vec![StreamElement::Item(new_state_message.clone())])
+                    .unwrap();
+            }
+
+            if !should_continue {
+                self.emit_end_iter = true;
+                self.iteration_index = 0;
+                let state = self.state.clone().unwrap();
+                return StreamElement::Item(state);
+            }
+        }
+    }
+
+    fn to_string(&self) -> String {
+        format!("ReplayLeader<{}>", std::any::type_name::<State>())
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<State, _>("ReplayLeader");
+        operator
+            .connections
+            .push(Connection::new::<NewIterationState<State>>(
+                self.new_state_senders[0].receiver_endpoint.coord.block_id,
+                &NextStrategy::OnlyOne,
+            ));
+        self.delta_update_receiver
+            .as_ref()
+            .unwrap()
+            .structure()
+            .add_operator(operator)
+    }
+}
+
+impl<DeltaUpdate: Data, State: Data> Source<State> for ReplayLeader<DeltaUpdate, State> {
+    fn get_max_parallelism(&self) -> Option<usize> {
+        Some(1)
+    }
+}
+
+impl<Out: Data, State: Data, OperatorChain> Operator<Out> for Replay<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata.clone());
+        self.new_state_receiver.setup(metadata.clone());
 
-        let leader = select_leader(&metadata.replicas);
-        debug!("Replay block {} has {} as leader", metadata.coord, leader);
-        self.is_leader = leader == metadata.coord;
-
-        let mut network = metadata.network.lock().unwrap();
-        if self.is_leader {
-            for replica in &metadata.replicas {
-                // the leader won't send the message back to itself
-                if *replica == metadata.coord {
-                    continue;
-                }
-                let endpoint = ReceiverEndpoint::new(*replica, metadata.coord.block_id);
-                self.senders.push(network.get_sender(endpoint));
-            }
-            // at this point the id of the block with ReplayEndBlock must be known
-            let feedback_block_id = self.feedback_block_id.load(Ordering::Acquire);
-            // the leader receives the messages from the ReplayEndBlocks
-            self.feedback = Some(
-                network.get_receiver(ReceiverEndpoint::new(metadata.coord, feedback_block_id)),
-            );
-        } else {
-            // the followers receive the messages from the leader
-            self.feedback =
-                Some(network.get_receiver(ReceiverEndpoint::new(metadata.coord, leader.block_id)));
-        }
         let local_replicas: Vec<_> = metadata
             .replicas
             .clone()
@@ -451,7 +498,6 @@ where
             .collect();
         self.is_local_leader = select_leader(&local_replicas) == metadata.coord;
         self.num_local_replicas = local_replicas.len();
-        self.num_replicas = metadata.replicas.len();
         self.coord = metadata.coord;
     }
 
@@ -494,75 +540,25 @@ where
             return item;
         }
 
-        debug!(
-            "Replay at {} has ended the iteration {}/{}",
-            self.coord, self.iteration_index, self.num_iterations
-        );
+        debug!("Replay at {} has ended the iteration", self.coord);
 
-        // this iteration has ended
-        let should_continue = if self.is_leader {
-            // extract the current state for the reduction, it will be put back after the fold
-            let mut state: State = self.state.take().expect("The state got lost");
-            debug!(
-                "Leader {} is waiting for {} delta updates",
-                self.coord, self.num_replicas
-            );
-            for i in 0..self.num_replicas {
-                let delta_update = loop {
-                    let mut batch = self.feedback.as_ref().unwrap().recv().unwrap();
-                    match batch.swap_remove(0) {
-                        StreamElement::Item(DeltaUpdateMessage::DeltaUpdate(item)) => break item,
-                        // the StartBlock may generate this messages, we should ignore them
-                        StreamElement::FlushBatch => continue,
-                        _ => unreachable!(
-                            "Leader received something other than an Item(DeltaUpdate) from the feedback"
-                        ),
-                    };
-                };
-                debug!(
-                    "Replay leader at {} received {}/{} delta updates",
-                    self.coord,
-                    i + 1,
-                    self.num_replicas
-                );
-                state = (self.global_fold)(state, delta_update);
+        // this iteration has ended, wait here for the leader
+        let (should_continue, new_state) = loop {
+            let message = self.new_state_receiver.next();
+            match message {
+                StreamElement::Item((should_continue, new_state)) => {
+                    break (should_continue, new_state);
+                }
+                StreamElement::FlushBatch => {}
+                StreamElement::IterEnd => {}
+                StreamElement::End => {
+                    return StreamElement::End;
+                }
+                _ => unreachable!(
+                    "Replay received invalid message from ReplayLeader: {}",
+                    message.variant()
+                ),
             }
-            // the loop condition may change the state
-            let should_continue = (self.loop_condition)(&mut state);
-            debug!(
-                "Replay leader at {} checked loop condition and resulted in {}",
-                self.coord, should_continue
-            );
-
-            let new_state_message = DeltaUpdateMessage::<DeltaUpdate, State>::NextIteration(
-                should_continue,
-                state.clone(),
-            );
-            self.state = Some(state);
-            for sender in &self.senders {
-                sender
-                    .send(vec![StreamElement::Item(new_state_message.clone())])
-                    .unwrap();
-            }
-            should_continue
-        } else {
-            let (should_continue, new_state) = loop {
-                let mut batch = self.feedback.as_ref().unwrap().recv().unwrap();
-                match batch.swap_remove(0) {
-                    StreamElement::Item(DeltaUpdateMessage::NextIteration(
-                        should_continue,
-                        new_state,
-                    )) => break (should_continue, new_state),
-                    elem => {
-                        unreachable!(
-                            "Leader sent something other than an Item(NextIteration): {}",
-                            elem.variant()
-                        )
-                    }
-                };
-            };
-            self.state = Some(new_state);
-            should_continue
         };
 
         // update the state only once per host
@@ -571,7 +567,7 @@ where
             // finished and empty. This means that no calls to `.get` are possible until one Replay
             // block chooses to start. This cannot happen due to the barrier below.
             unsafe {
-                self.state_ref.set(self.state.clone().unwrap());
+                self.state_ref.set(new_state);
             }
         }
         // make sure that the state is set before any replica on this host is able to start again,
@@ -581,22 +577,12 @@ where
             .wait();
 
         self.content_index = 0;
-        self.iteration_index += 1;
 
         // the loop has ended
-        if !should_continue || self.iteration_index >= self.num_iterations {
+        if !should_continue {
+            debug!("Replay block at {} ended the iteration", self.coord);
             // cleanup so that if this is a nested iteration next time we'll be good to start again
             self.content.clear();
-            self.iteration_index = 0;
-            // send the output state to the output block if this Replay is the leader
-            if self.is_leader {
-                self.output_sender
-                    .send(StreamElement::Item(self.state.clone().unwrap()))
-                    .unwrap();
-                self.output_sender
-                    .send(self.has_ended.clone().unwrap().map(|_| unreachable!()))
-                    .unwrap();
-            }
             return self.has_ended.take().unwrap();
         }
 
@@ -615,25 +601,11 @@ where
 
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<Out, _>("Replay");
-        // feedback from ReplayEndBlock
-        operator.receivers.push(OperatorReceiver::new::<
-            DeltaUpdateMessage<DeltaUpdate, State>,
-        >(self.feedback_block_id.load(Ordering::Acquire)));
-        // self loop
-        operator.receivers.push(OperatorReceiver::new::<
-            DeltaUpdateMessage<DeltaUpdate, State>,
-        >(self.coord.block_id));
         operator
-            .connections
-            .push(Connection::new::<DeltaUpdateMessage<DeltaUpdate, State>>(
-                self.coord.block_id,
-                &NextStrategy::OnlyOne,
+            .receivers
+            .push(OperatorReceiver::new::<NewIterationState<State>>(
+                self.new_state_receiver.prev()[0],
             ));
-        // output
-        operator.connections.push(Connection::new::<State>(
-            self.output_block_id,
-            &NextStrategy::OnlyOne,
-        ));
         self.prev.structure().add_operator(operator)
     }
 }

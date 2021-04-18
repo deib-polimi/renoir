@@ -96,8 +96,8 @@ impl<In: Data> DemultiplexingReceiver<In> {
             .map(|a| a.to_string())
             .unwrap_or_else(|_| "unknown".to_string());
         info!(
-            "Remote receiver at {} is ready to accept connections to {}",
-            coord, address
+            "Remote receiver at {} is ready to accept {} connections to {}",
+            coord, num_clients, address
         );
 
         let (message_sender, message_receiver) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);

@@ -58,6 +58,7 @@ hashbrown = "0.11"
 # used for csv file source
 csv = "1.1"
 
+# Lazy with support for delayed and synchronized initialization
 lazy-init = "0.5"
 
 [dev-dependencies]
@@ -92,7 +93,6 @@ harness = false
 [[bench]]
 name = "recv_vs_select"
 harness = false
-
 
 [profile.release]
 debug = true

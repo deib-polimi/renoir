@@ -89,10 +89,6 @@ fn worker<Out: Data, OperatorChain>(
     block.operators.setup(metadata.clone());
 
     let structure = block.operators.structure();
-    debug!(
-        "Block {} has this structure:\n{:#?}",
-        metadata.coord, structure
-    );
     structure_sender.send((metadata.coord, structure)).unwrap();
     drop(structure_sender);
 

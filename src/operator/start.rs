@@ -15,8 +15,8 @@ pub struct StartBlock<Out: Data> {
     receivers: Vec<NetworkReceiver<NetworkMessage<Out>>>,
     buffer: VecDeque<StreamElement<Out>>,
     missing_ends: usize,
+    missing_iter_ends: usize,
     num_prev: usize,
-    is_iter_end: bool,
     /// The last call to next caused a timeout, so a FlushBatch has been emitted. In this case this
     /// field is set to true to avoid flooding with FlushBatch.
     already_timed_out: bool,
@@ -31,8 +31,8 @@ impl<Out: Data> StartBlock<Out> {
             receivers: Default::default(),
             buffer: Default::default(),
             missing_ends: Default::default(),
+            missing_iter_ends: Default::default(),
             num_prev: Default::default(),
-            is_iter_end: Default::default(),
             already_timed_out: Default::default(),
             prev_block_ids: vec![prev_block_id],
         }
@@ -44,11 +44,23 @@ impl<Out: Data> StartBlock<Out> {
             receivers: Default::default(),
             buffer: Default::default(),
             missing_ends: Default::default(),
+            missing_iter_ends: Default::default(),
             num_prev: Default::default(),
-            is_iter_end: Default::default(),
             already_timed_out: Default::default(),
             prev_block_ids,
         }
+    }
+
+    /// The number of blocks that will send data to this block.
+    ///
+    /// This returns a meaningful value only after calling `setup`.
+    pub(crate) fn num_prev(&self) -> usize {
+        self.num_prev
+    }
+
+    /// The list of previous blocks.
+    pub(crate) fn prev(&self) -> &[BlockId] {
+        &self.prev_block_ids
     }
 }
 
@@ -68,14 +80,15 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                     continue;
                 }
                 if prev.block_id == prev_block_id {
-                    self.missing_ends += 1;
                     self.num_prev += 1;
                 }
             }
         }
+        self.missing_ends = self.num_prev;
+        self.missing_iter_ends = self.num_prev;
         info!(
-            "StartBlock {} initialized, {:?} are the previous blocks, a total of {} previous replicas",
-            metadata.coord, self.prev_block_ids, self.num_prev
+            "StartBlock {} of {} initialized, {:?} are the previous blocks, a total of {} previous replicas",
+            metadata.coord, std::any::type_name::<Out>(), self.prev_block_ids, self.num_prev
         );
         self.metadata = Some(metadata);
     }
@@ -84,15 +97,13 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
         let metadata = self.metadata.as_ref().unwrap();
         // all the previous blocks sent an end: we're done
         if self.missing_ends == 0 {
-            return if self.is_iter_end {
-                info!("StartBlock for {} has ended an iteration", metadata.coord);
-                self.is_iter_end = false;
-                self.missing_ends = self.num_prev;
-                StreamElement::IterEnd
-            } else {
-                info!("StartBlock for {} has ended", metadata.coord);
-                StreamElement::End
-            };
+            info!("StartBlock for {} has ended", metadata.coord);
+            return StreamElement::End;
+        }
+        if self.missing_iter_ends == 0 {
+            info!("StartBlock for {} has ended an iteration", metadata.coord);
+            self.missing_iter_ends = self.num_prev;
+            return StreamElement::IterEnd;
         }
         if self.buffer.is_empty() {
             let max_delay = metadata.batch_mode.max_delay();
@@ -124,17 +135,15 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
             .pop_front()
             .expect("Previous block sent an empty message");
         if matches!(message, StreamElement::IterEnd) {
-            self.missing_ends -= 1;
-            self.is_iter_end = true;
+            self.missing_iter_ends -= 1;
             debug!(
                 "{}/{:?} received an IterEnd, {} more to come",
-                metadata.coord, self.prev_block_ids, self.missing_ends
+                metadata.coord, self.prev_block_ids, self.missing_iter_ends
             );
             return self.next();
         }
         if matches!(message, StreamElement::End) {
             self.missing_ends -= 1;
-            self.is_iter_end = false;
             debug!(
                 "{}/{:?} received an end, {} more to come",
                 metadata.coord, self.prev_block_ids, self.missing_ends
