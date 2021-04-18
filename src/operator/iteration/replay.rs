@@ -1,7 +1,8 @@
 use std::any::TypeId;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Barrier};
 
+use lazy_init::Lazy;
 use serde::{Deserialize, Serialize};
 
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure};
@@ -105,13 +106,26 @@ where
 
     /// Whether this `Replay` is the leader.
     is_leader: bool,
+    /// Whether this `Replay` is the _local_ leader.
+    ///
+    /// The local leader is the one that sets the iteration state for all the local replicas.
+    is_local_leader: bool,
     /// The number of replicas of this block.
     num_replicas: usize,
+    /// The number of replicas of this block on this host.
+    num_local_replicas: usize,
 
     /// The current global state of the iteration.
     state: Option<State>,
     /// A reference to the state of the iteration that is visible to the loop operators.
     state_ref: IterationStateHandle<State>,
+
+    /// A barrier for synchronizing all the local replicas before updating the state.
+    ///
+    /// This is a `Lazy` because at construction time we don't know the barrier size, we need to
+    /// wait until at least until `setup` when we know how many replicas are present in the current
+    /// host.
+    state_barrier: Arc<Lazy<Barrier>>,
 
     /// The function that combines the global state with a delta update.
     #[derivative(Debug = "ignore")]
@@ -191,7 +205,9 @@ where
             feedback: None,
             senders: Default::default(),
             is_leader: false,
+            is_local_leader: false,
             num_replicas: 0,
+            num_local_replicas: 0,
 
             prev,
             feedback_block_id,
@@ -204,6 +220,7 @@ where
             has_ended: None,
             state: Some(initial_state),
             state_ref,
+            state_barrier: Arc::new(Lazy::new()),
             global_fold: Arc::new(global_fold),
             loop_condition: Arc::new(loop_condition),
         }
@@ -426,6 +443,14 @@ where
             self.feedback =
                 Some(network.get_receiver(ReceiverEndpoint::new(metadata.coord, leader.block_id)));
         }
+        let local_replicas: Vec<_> = metadata
+            .replicas
+            .clone()
+            .into_iter()
+            .filter(|r| r.host_id == metadata.coord.host_id)
+            .collect();
+        self.is_local_leader = select_leader(&local_replicas) == metadata.coord;
+        self.num_local_replicas = local_replicas.len();
         self.num_replicas = metadata.replicas.len();
         self.coord = metadata.coord;
     }
@@ -504,7 +529,6 @@ where
             }
             // the loop condition may change the state
             let should_continue = (self.loop_condition)(&mut state);
-            self.state_ref.set(state.clone());
             debug!(
                 "Replay leader at {} checked loop condition and resulted in {}",
                 self.coord, should_continue
@@ -537,10 +561,24 @@ where
                     }
                 };
             };
-            self.state_ref.set(new_state.clone());
             self.state = Some(new_state);
             should_continue
         };
+
+        // update the state only once per host
+        if self.is_local_leader {
+            // SAFETY: at this point we are sure that all the operators inside the loop have
+            // finished and empty. This means that no calls to `.get` are possible until one Replay
+            // block chooses to start. This cannot happen due to the barrier below.
+            unsafe {
+                self.state_ref.set(self.state.clone().unwrap());
+            }
+        }
+        // make sure that the state is set before any replica on this host is able to start again,
+        // reading the old state
+        self.state_barrier
+            .get_or_create(|| Barrier::new(self.num_local_replicas))
+            .wait();
 
         self.content_index = 0;
         self.iteration_index += 1;
@@ -622,7 +660,7 @@ mod tests {
             .replay(
                 n_iter,
                 1,
-                |s, state| s.map(move |x| x * state.get()),
+                |s, state| s.map(move |x| x * *state.get()),
                 |delta: u64, x| delta + x,
                 |old_state, delta| old_state + delta,
                 |state| {
@@ -662,7 +700,7 @@ mod tests {
             .replay(
                 n_iter,
                 1,
-                |s, state| s.map(move |x| x * state.get()).shuffle(),
+                |s, state| s.map(move |x| x * *state.get()).shuffle(),
                 |delta: u64, x| delta + x,
                 |old_state, delta| old_state + delta,
                 |state| {

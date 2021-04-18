@@ -58,6 +58,8 @@ hashbrown = "0.11"
 # used for csv file source
 csv = "1.1"
 
+lazy-init = "0.5"
+
 [dev-dependencies]
 # for the tests
 tempfile = "3.2"
