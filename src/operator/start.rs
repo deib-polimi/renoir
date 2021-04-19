@@ -117,7 +117,9 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                             // next time we wait indefinitely without the timeout since the batch is
                             // currently empty
                             self.already_timed_out = true;
-                            vec![StreamElement::FlushBatch]
+                            // this is a fake batch, and its sender is meaningless and will be
+                            // forget immediately
+                            NetworkMessage::new(vec![StreamElement::FlushBatch], Default::default())
                         }
                     }
                 }
@@ -128,7 +130,8 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                         .expect("One of the receivers failed")
                 }
             };
-            self.buffer = buf.into();
+            // FIXME: here it's a good place for checking the sender for the watermarks
+            self.buffer = buf.batch().into();
         }
         let message = self
             .buffer

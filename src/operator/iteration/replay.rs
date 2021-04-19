@@ -143,6 +143,8 @@ where
     leader_block_id: BlockId,
     /// The sender that points to the `Replay` leader for sending the `DeltaUpdate` messages.
     sender: Option<NetworkSender<NetworkMessage<DeltaUpdate>>>,
+    /// The coordinates of this block.
+    coord: Coord,
 }
 
 impl<DeltaUpdate: Data, OperatorChain> ReplayEndBlock<DeltaUpdate, OperatorChain>
@@ -155,6 +157,7 @@ where
             has_received_item: false,
             leader_block_id,
             sender: None,
+            coord: Default::default(),
         }
     }
 }
@@ -319,6 +322,7 @@ where
 
         drop(network);
 
+        self.coord = metadata.coord;
         self.prev.setup(metadata);
     }
 
@@ -326,7 +330,8 @@ where
         let elem = self.prev.next();
         match &elem {
             StreamElement::Item(_) => {
-                self.sender.as_ref().unwrap().send(vec![elem]).unwrap();
+                let message = NetworkMessage::new(vec![elem], self.coord);
+                self.sender.as_ref().unwrap().send(message).unwrap();
                 self.has_received_item = true;
                 StreamElement::Item(())
             }
@@ -336,18 +341,17 @@ where
                 // the leader.
                 if !self.has_received_item {
                     let update = Default::default();
+                    let message =
+                        NetworkMessage::new(vec![StreamElement::Item(update)], self.coord);
                     let sender = self.sender.as_ref().unwrap();
-                    sender.send(vec![StreamElement::Item(update)]).unwrap();
+                    sender.send(message).unwrap();
                 }
                 self.has_received_item = false;
                 StreamElement::IterEnd
             }
             StreamElement::End => {
-                self.sender
-                    .as_ref()
-                    .unwrap()
-                    .send(vec![StreamElement::End])
-                    .unwrap();
+                let message = NetworkMessage::new(vec![StreamElement::End], self.coord);
+                self.sender.as_ref().unwrap().send(message).unwrap();
                 StreamElement::End
             }
             StreamElement::FlushBatch => elem.map(|_| unreachable!()),
@@ -442,9 +446,11 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdat
 
             let new_state_message = (should_continue, self.state.clone().unwrap());
             for sender in &self.new_state_senders {
-                sender
-                    .send(vec![StreamElement::Item(new_state_message.clone())])
-                    .unwrap();
+                let message = NetworkMessage::new(
+                    vec![StreamElement::Item(new_state_message.clone())],
+                    self.coord,
+                );
+                sender.send(message).unwrap();
             }
 
             if !should_continue {

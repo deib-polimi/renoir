@@ -450,6 +450,10 @@ mod tests {
 
     use super::*;
 
+    fn build_message<T>(t: T) -> NetworkMessage<T> {
+        NetworkMessage::new(vec![StreamElement::Item(t)], Coord::default())
+    }
+
     #[test]
     fn test_local_topology() {
         let config = EnvironmentConfig::local(4);
@@ -475,27 +479,30 @@ mod tests {
 
         let tx1 = topology.get_senders::<i32>(sender1);
         assert_eq!(tx1.len(), 1);
-        tx1[&endpoint1]
-            .send(vec![StreamElement::Item(123i32)])
-            .unwrap();
+        tx1[&endpoint1].send(build_message(123i32)).unwrap();
 
         let tx2 = topology.get_senders::<u64>(sender2);
         assert_eq!(tx2.len(), 2);
-        tx2[&endpoint2]
-            .send(vec![StreamElement::Item(666u64)])
-            .unwrap();
-        tx2[&endpoint3]
-            .send(vec![StreamElement::Item(42u64)])
-            .unwrap();
+        tx2[&endpoint2].send(build_message(666u64)).unwrap();
+        tx2[&endpoint3].send(build_message(42u64)).unwrap();
 
         let rx1 = topology.get_receiver::<i32>(endpoint1);
-        assert_eq!(rx1.recv().unwrap(), vec![StreamElement::Item(123i32)]);
+        assert_eq!(
+            rx1.recv().unwrap().batch(),
+            vec![StreamElement::Item(123i32)]
+        );
 
         let rx2 = topology.get_receiver::<u64>(endpoint2);
-        assert_eq!(rx2.recv().unwrap(), vec![StreamElement::Item(666u64)]);
+        assert_eq!(
+            rx2.recv().unwrap().batch(),
+            vec![StreamElement::Item(666u64)]
+        );
 
         let rx3 = topology.get_receiver::<u64>(endpoint3);
-        assert_eq!(rx3.recv().unwrap(), vec![StreamElement::Item(42u64)]);
+        assert_eq!(
+            rx3.recv().unwrap().batch(),
+            vec![StreamElement::Item(42u64)]
+        );
     }
 
     #[test]
@@ -546,39 +553,27 @@ mod tests {
             if s1.host_id == host {
                 let tx1 = topology.get_senders::<i32>(s1);
                 assert_eq!(tx1.len(), 1);
-                tx1[&endpoint1]
-                    .send(vec![StreamElement::Item(123i32)])
-                    .unwrap();
+                tx1[&endpoint1].send(build_message(123i32)).unwrap();
             }
 
             if s2.host_id == host {
                 let tx2 = topology.get_senders::<i32>(s2);
                 assert_eq!(tx2.len(), 1);
-                tx2[&endpoint1]
-                    .send(vec![StreamElement::Item(456i32)])
-                    .unwrap();
+                tx2[&endpoint1].send(build_message(456i32)).unwrap();
             }
 
             if s3.host_id == host {
                 let tx3 = topology.get_senders::<u64>(s3);
                 assert_eq!(tx3.len(), 2);
-                tx3[&endpoint2]
-                    .send(vec![StreamElement::Item(666u64)])
-                    .unwrap();
-                tx3[&endpoint3]
-                    .send(vec![StreamElement::Item(42u64)])
-                    .unwrap();
+                tx3[&endpoint2].send(build_message(666u64)).unwrap();
+                tx3[&endpoint3].send(build_message(42u64)).unwrap();
             }
 
             if s4.host_id == host {
                 let tx4 = topology.get_senders::<u64>(s4);
                 assert_eq!(tx4.len(), 2);
-                tx4[&endpoint2]
-                    .send(vec![StreamElement::Item(111u64)])
-                    .unwrap();
-                tx4[&endpoint3]
-                    .send(vec![StreamElement::Item(4242u64)])
-                    .unwrap();
+                tx4[&endpoint2].send(build_message(111u64)).unwrap();
+                tx4[&endpoint3].send(build_message(4242u64)).unwrap();
             }
 
             let mut join_handles = vec![];
@@ -638,7 +633,7 @@ mod tests {
         expected: Vec<T>,
     ) {
         let res = (0..expected.len())
-            .map(|_| receiver.recv().unwrap())
+            .map(|_| receiver.recv().unwrap().batch())
             .flatten()
             .sorted()
             .collect_vec();
@@ -669,15 +664,21 @@ mod tests {
         let endpoint2 = ReceiverEndpoint::new(receiver2, 0);
 
         let tx1 = topology.get_sender::<i32>(endpoint1);
-        tx1.send(vec![StreamElement::Item(123i32)]).unwrap();
+        tx1.send(build_message(123i32)).unwrap();
 
         let tx2 = topology.get_sender::<u64>(endpoint2);
-        tx2.send(vec![StreamElement::Item(666u64)]).unwrap();
+        tx2.send(build_message(666u64)).unwrap();
 
         let rx1 = topology.get_receiver::<i32>(endpoint1);
-        assert_eq!(rx1.recv().unwrap(), vec![StreamElement::Item(123i32)]);
+        assert_eq!(
+            rx1.recv().unwrap().batch(),
+            vec![StreamElement::Item(123i32)]
+        );
 
         let rx2 = topology.get_receiver::<u64>(endpoint2);
-        assert_eq!(rx2.recv().unwrap(), vec![StreamElement::Item(666u64)]);
+        assert_eq!(
+            rx2.recv().unwrap().batch(),
+            vec![StreamElement::Item(666u64)]
+        );
     }
 }

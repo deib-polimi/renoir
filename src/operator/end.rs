@@ -60,7 +60,7 @@ where
             .group_senders(&senders, Some(metadata.coord.block_id));
         self.senders = senders
             .into_iter()
-            .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode)))
+            .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode, metadata.coord)))
             .collect();
         self.metadata = Some(metadata);
     }

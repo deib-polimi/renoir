@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 
-use crate::network::{NetworkMessage, NetworkSender};
+use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::{Data, StreamElement};
 
 /// Which policy to use for batching the messages before sending them.
@@ -26,15 +26,22 @@ pub(crate) struct Batcher<Out: Data> {
     buffer: Vec<StreamElement<Out>>,
     /// Time of the last flush of the buffer.    
     last_send: Instant,
+    /// The coordinate of this block, used for marking the sender of the batch.
+    coord: Coord,
 }
 
 impl<Out: Data> Batcher<Out> {
-    pub(crate) fn new(remote_sender: NetworkSender<NetworkMessage<Out>>, mode: BatchMode) -> Self {
+    pub(crate) fn new(
+        remote_sender: NetworkSender<NetworkMessage<Out>>,
+        mode: BatchMode,
+        coord: Coord,
+    ) -> Self {
         Self {
             remote_sender,
             mode,
             buffer: Default::default(),
             last_send: Instant::now(),
+            coord,
         }
     }
 
@@ -57,7 +64,8 @@ impl<Out: Data> Batcher<Out> {
         if !self.buffer.is_empty() {
             let mut batch = Vec::with_capacity(self.mode.max_capacity());
             std::mem::swap(&mut self.buffer, &mut batch);
-            self.remote_sender.send(batch).unwrap();
+            let message = NetworkMessage::new(batch, self.coord);
+            self.remote_sender.send(message).unwrap();
             self.last_send = Instant::now();
         }
     }
@@ -66,7 +74,8 @@ impl<Out: Data> Batcher<Out> {
     pub(crate) fn end(self) {
         // Send the remaining messages
         if !self.buffer.is_empty() {
-            self.remote_sender.send(self.buffer).unwrap();
+            let message = NetworkMessage::new(self.buffer, self.coord);
+            self.remote_sender.send(message).unwrap();
         }
     }
 }

@@ -1,5 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
+use serde::{Deserialize, Serialize};
+
 pub use receiver::*;
 pub use sender::*;
 pub(crate) use topology::*;
@@ -18,7 +20,13 @@ mod topology;
 /// A batch of elements to send.
 pub(crate) type Batch<T> = Vec<StreamElement<T>>;
 /// What is sent from a replica to the next.
-pub(crate) type NetworkMessage<T> = Batch<T>;
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) struct NetworkMessage<T> {
+    /// The list of messages inside the batch,
+    batch: Batch<T>,
+    /// The coordinates of the block that sent this message.
+    sender: Coord,
+}
 
 /// Coordinates that identify a block inside the network.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -30,7 +38,9 @@ pub struct BlockCoord {
 }
 
 /// Coordinates that identify a replica inside the network.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, Default, Deserialize, Serialize,
+)]
 pub struct Coord {
     /// The identifier of the block the replicas works on.
     pub block_id: BlockId,
@@ -63,6 +73,22 @@ pub struct DemuxCoord {
     pub coord: BlockCoord,
     /// The id of the previous block in the job graph.
     pub prev_block_id: BlockId,
+}
+
+impl<T> NetworkMessage<T> {
+    pub fn new(batch: Batch<T>, sender: Coord) -> Self {
+        Self { batch, sender }
+    }
+
+    /// Take ownership of the messages.
+    pub fn batch(self) -> Batch<T> {
+        self.batch
+    }
+
+    /// The coordinates of the sending block.
+    pub fn sender(&self) -> Coord {
+        self.sender
+    }
 }
 
 impl Coord {
