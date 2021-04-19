@@ -2,10 +2,79 @@ use std::any::TypeId;
 use std::collections::VecDeque;
 
 use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
-use crate::network::{NetworkMessage, NetworkReceiver, ReceiverEndpoint};
-use crate::operator::{Data, Operator, StreamElement};
+use crate::network::{Coord, NetworkMessage, NetworkReceiver, ReceiverEndpoint};
+use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
+use itertools::Itertools;
+
+#[derive(Clone, Debug, Default)]
+/// Handle watermarks coming from multiple replicas.
+/// A watermark with timestamp `ts` is safe to be passed downstream if and only if,
+/// for every previous replica, a watermark with timestamp greater or equal to `ts`
+/// has already been received
+struct WatermarkFrontier {
+    /// Watermark with largest timestamp received, for each replica
+    largest_watermark: Vec<Option<Timestamp>>,
+    /// List of previous replicas
+    prev_replicas: Vec<Coord>,
+}
+
+impl WatermarkFrontier {
+    fn new(prev_replicas: Vec<Coord>) -> Self {
+        Self {
+            largest_watermark: vec![None; prev_replicas.len()],
+            prev_replicas,
+        }
+    }
+
+    /// Return the current maximum safe timestamp
+    fn get_frontier(&self) -> Option<Timestamp> {
+        // if at least one replica has not sent a watermark yet, return None
+        let missing_watermarks = self.largest_watermark.iter().any(|x| x.is_none());
+        if missing_watermarks {
+            None
+        } else {
+            // the current frontier is the minimum watermark received
+            Some(
+                self.largest_watermark
+                    .iter()
+                    .map(|x| x.unwrap())
+                    .min()
+                    .unwrap(),
+            )
+        }
+    }
+
+    /// Update the frontier, return `Some(ts)` if timestamp `ts` is now safe
+    fn update(&mut self, coord: Coord, ts: Timestamp) -> Option<Timestamp> {
+        let old_frontier = self.get_frontier();
+
+        // find position of the replica in the list of replicas
+        let replica_idx = self
+            .prev_replicas
+            .iter()
+            .find_position(|&&prev| prev == coord)
+            .unwrap()
+            .0;
+
+        // update watermark of the replica
+        self.largest_watermark[replica_idx] =
+            Some(self.largest_watermark[replica_idx].map_or(ts, |w| w.max(ts)));
+
+        // get new frontier
+        match self.get_frontier() {
+            Some(new_frontier) => match old_frontier {
+                // if the old frontier is equal to the current one,
+                // the watermark has already been sent
+                Some(old_frontier) if new_frontier == old_frontier => None,
+                // the frontier has been updated, send the watermark downstream
+                _ => Some(new_frontier),
+            },
+            None => None,
+        }
+    }
+}
 
 #[derive(Debug, Derivative)]
 #[derivative(Clone)]
@@ -16,12 +85,13 @@ pub struct StartBlock<Out: Data> {
     buffer: VecDeque<StreamElement<Out>>,
     missing_ends: usize,
     missing_iter_ends: usize,
-    num_prev: usize,
+    prev_replicas: Vec<Coord>,
     /// The last call to next caused a timeout, so a FlushBatch has been emitted. In this case this
     /// field is set to true to avoid flooding with FlushBatch.
     already_timed_out: bool,
     /// The id of the previous blocks in the job graph.
     prev_block_ids: Vec<BlockId>,
+    watermark_frontier: WatermarkFrontier,
 }
 
 impl<Out: Data> StartBlock<Out> {
@@ -32,9 +102,10 @@ impl<Out: Data> StartBlock<Out> {
             buffer: Default::default(),
             missing_ends: Default::default(),
             missing_iter_ends: Default::default(),
-            num_prev: Default::default(),
+            prev_replicas: Default::default(),
             already_timed_out: Default::default(),
             prev_block_ids: vec![prev_block_id],
+            watermark_frontier: Default::default(),
         }
     }
 
@@ -45,9 +116,10 @@ impl<Out: Data> StartBlock<Out> {
             buffer: Default::default(),
             missing_ends: Default::default(),
             missing_iter_ends: Default::default(),
-            num_prev: Default::default(),
+            prev_replicas: Default::default(),
             already_timed_out: Default::default(),
             prev_block_ids,
+            watermark_frontier: Default::default(),
         }
     }
 
@@ -55,7 +127,7 @@ impl<Out: Data> StartBlock<Out> {
     ///
     /// This returns a meaningful value only after calling `setup`.
     pub(crate) fn num_prev(&self) -> usize {
-        self.num_prev
+        self.prev_replicas.len()
     }
 
     /// The list of previous blocks.
@@ -80,15 +152,17 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                     continue;
                 }
                 if prev.block_id == prev_block_id {
-                    self.num_prev += 1;
+                    self.prev_replicas.push(prev);
                 }
             }
         }
-        self.missing_ends = self.num_prev;
-        self.missing_iter_ends = self.num_prev;
+        self.missing_ends = self.num_prev();
+        self.missing_iter_ends = self.num_prev();
+        self.watermark_frontier = WatermarkFrontier::new(self.prev_replicas.clone());
+
         info!(
             "StartBlock {} of {} initialized, {:?} are the previous blocks, a total of {} previous replicas",
-            metadata.coord, std::any::type_name::<Out>(), self.prev_block_ids, self.num_prev
+            metadata.coord, std::any::type_name::<Out>(), self.prev_block_ids, self.num_prev()
         );
         self.metadata = Some(metadata);
     }
@@ -102,10 +176,10 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
         }
         if self.missing_iter_ends == 0 {
             info!("StartBlock for {} has ended an iteration", metadata.coord);
-            self.missing_iter_ends = self.num_prev;
+            self.missing_iter_ends = self.num_prev();
             return StreamElement::IterEnd;
         }
-        if self.buffer.is_empty() {
+        while self.buffer.is_empty() {
             let max_delay = metadata.batch_mode.max_delay();
             let buf = match (self.already_timed_out, max_delay) {
                 // check the timeout only if there is one and the last time we didn't timed out
@@ -130,9 +204,28 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                         .expect("One of the receivers failed")
                 }
             };
-            // FIXME: here it's a good place for checking the sender for the watermarks
-            self.buffer = buf.batch().into();
+
+            let sender = buf.sender();
+            let batch = buf.batch();
+
+            // use watermarks to update the frontier
+            let watermark_frontier = &mut self.watermark_frontier;
+            self.buffer = batch
+                .into_iter()
+                .map(|item| match item {
+                    StreamElement::Watermark(ts) => {
+                        // update the frontier and return a watermark if necessary
+                        watermark_frontier
+                            .update(sender, ts)
+                            .map(StreamElement::Watermark)
+                    }
+                    _ => Some(item),
+                })
+                .filter(|x| x.is_some())
+                .map(Option::unwrap)
+                .collect();
         }
+
         let message = self
             .buffer
             .pop_front()
