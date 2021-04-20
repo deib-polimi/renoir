@@ -45,6 +45,7 @@ jobs:
           RSTREAM_TEST_LOCAL_CORES: 1,2,4,8
           RSTREAM_TEST_REMOTE_HOSTS: 1,2,4
           RSTREAM_TEST_REMOTE_CORES: 1,2,4,8
+          RSTREAM_TEST_TIMEOUT: 10
         with:
           command: test
           args: --all

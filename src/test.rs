@@ -11,6 +11,8 @@ use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use itertools::{process_results, Itertools};
 use std::str::FromStr;
+use std::sync::mpsc::RecvTimeoutError;
+use std::time::Duration;
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;
@@ -56,19 +58,38 @@ impl TestHelper {
     }
 
     /// Crate an environment with the specified config and run the test build by `body`.
-    pub fn env_with_config<F>(config: EnvironmentConfig, body: F)
-    where
-        F: Fn(StreamEnvironment),
-    {
-        let env = StreamEnvironment::new(config);
-        body(env);
+    pub fn env_with_config(
+        config: EnvironmentConfig,
+        body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>,
+    ) {
+        let timeout_sec = Self::parse_int_from_env("RSTREAM_TEST_TIMEOUT").unwrap_or(10);
+        let timeout = Duration::from_secs(timeout_sec);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let worker = std::thread::Builder::new()
+            .name("Worker".into())
+            .spawn(move || {
+                let env = StreamEnvironment::new(config);
+                body(env);
+                sender.send(()).unwrap();
+            })
+            .unwrap();
+        match receiver.recv_timeout(timeout) {
+            Ok(_) => {}
+            Err(RecvTimeoutError::Timeout) => {
+                panic!(
+                    "Worker thread didn't complete before the timeout of {:?}",
+                    timeout
+                );
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                panic!("Worker thread has panicked!");
+            }
+        }
+        worker.join().expect("Worker thread has panicked!");
     }
 
     /// Run the test body under a local environment.
-    pub fn local_env<F>(body: F, num_cores: usize)
-    where
-        F: Fn(StreamEnvironment),
-    {
+    pub fn local_env(body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>, num_cores: usize) {
         Self::setup();
         let config = EnvironmentConfig::local(num_cores);
         debug!("Running test with env: {:?}", config);
@@ -106,7 +127,7 @@ impl TestHelper {
             join_handles.push(
                 std::thread::Builder::new()
                     .name(format!("Test host{}", host_id))
-                    .spawn(move || Self::env_with_config(config, &*body))
+                    .spawn(move || Self::env_with_config(config, body))
                     .unwrap(),
             )
         }
@@ -122,18 +143,18 @@ impl TestHelper {
     where
         F: Fn(StreamEnvironment) + Send + Sync + 'static,
     {
+        let body = Arc::new(body);
+
         let local_cores =
             Self::parse_list_from_env("RSTREAM_TEST_LOCAL_CORES").unwrap_or_else(|| vec![4]);
         for num_cores in local_cores {
-            Self::local_env(&body, num_cores);
+            Self::local_env(body.clone(), num_cores);
         }
 
         let remote_hosts =
             Self::parse_list_from_env("RSTREAM_TEST_REMOTE_HOSTS").unwrap_or_else(|| vec![4]);
         let remote_cores =
             Self::parse_list_from_env("RSTREAM_TEST_REMOTE_CORES").unwrap_or_else(|| vec![4]);
-
-        let body = Arc::new(body);
         for num_hosts in remote_hosts {
             for &num_cores in &remote_cores {
                 Self::remote_env(body.clone(), num_hosts, num_cores);
@@ -148,6 +169,11 @@ impl TestHelper {
         let content = std::env::var(var_name).ok()?;
         let values = content.split(',').map(|s| usize::from_str(s)).collect_vec();
         process_results(values.into_iter(), |values| values.collect_vec()).ok()
+    }
+
+    fn parse_int_from_env(var_name: &str) -> Option<u64> {
+        let content = std::env::var(var_name).ok()?;
+        u64::from_str(&content).ok()
     }
 }
 
