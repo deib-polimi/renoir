@@ -63,10 +63,8 @@ where
     /// `get_operator` is a function that is given the previous chain of operators and should return
     /// the new chain of operators. The new chain cannot be simply passed as argument since it is
     /// required to do a partial move of the `InnerBlock` structure.
-    pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
-        self,
-        get_operator: GetOp,
-    ) -> Stream<NewOut, Op>
+    #[doc(hidden)]
+    pub fn add_operator<NewOut: Data, Op, GetOp>(self, get_operator: GetOp) -> Stream<NewOut, Op>
     where
         Op: Operator<NewOut> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
