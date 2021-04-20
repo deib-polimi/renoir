@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
-
-use rand::Rng;
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
@@ -8,9 +9,16 @@ use crate::environment::StreamEnvironment;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use std::marker::PhantomData;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+
+/// Port from which the integration tests start allocating sockets for the remote runtime.
+const TEST_BASE_PORT: u16 = 17666;
+/// How many ports to allocate for each host.
+const PORTS_PER_HOST: u16 = 100;
+
+lazy_static! {
+    /// The first available port for the next host.
+    static ref PORT_INDEX: AtomicU16 = AtomicU16::new(TEST_BASE_PORT);
+}
 
 /// Helper functions for running the integration tests.
 ///
@@ -55,31 +63,29 @@ impl TestHelper {
     }
 
     /// Run the test body under a local environment.
-    pub fn local_env<F>(body: F)
+    pub fn local_env<F>(body: F, num_cores: usize)
     where
         F: Fn(StreamEnvironment),
     {
         Self::setup();
-        let config = EnvironmentConfig::local(4);
+        let config = EnvironmentConfig::local(num_cores);
         debug!("Running test with env: {:?}", config);
         Self::env_with_config(config, body)
     }
 
     /// Run the test body under a simulated remote environment.
-    pub fn remote_env<F>(body: F)
+    pub fn remote_env<F>(body: F, num_hosts: usize, cores_per_host: usize)
     where
         F: Fn(StreamEnvironment) + Send + Sync + 'static,
     {
         Self::setup();
-        let num_hosts = 4;
         let mut hosts = vec![];
         for _ in 0..num_hosts {
-            let base_port = rand::thread_rng().gen_range(16384..65000);
-            let num_cores = 2;
+            let base_port = PORT_INDEX.fetch_add(PORTS_PER_HOST, Ordering::SeqCst);
             hosts.push(RemoteHostConfig {
                 address: "localhost".to_string(),
                 base_port,
-                num_cores,
+                num_cores: cores_per_host,
                 ssh: Default::default(),
                 perf_path: None,
             });
@@ -114,8 +120,8 @@ impl TestHelper {
     where
         F: Fn(StreamEnvironment) + Send + Sync + 'static,
     {
-        Self::local_env(&body);
-        Self::remote_env(body);
+        Self::local_env(&body, 4);
+        Self::remote_env(body, 4, 4);
     }
 }
 
