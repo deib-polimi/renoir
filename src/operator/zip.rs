@@ -55,7 +55,11 @@ impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
                 match self.prev1.next() {
                     StreamElement::Watermark(ts) => self.watermarks1.push_back(ts),
                     StreamElement::FlushBatch => return StreamElement::FlushBatch,
-                    StreamElement::End => return StreamElement::End,
+                    StreamElement::End => {
+                        // consume the other stream
+                        while !matches!(self.prev2.next(), StreamElement::End) {}
+                        return StreamElement::End;
+                    }
                     item => break item,
                 }
             }
@@ -68,7 +72,11 @@ impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
                     self.item1_stash = Some(item1);
                     return StreamElement::FlushBatch;
                 }
-                StreamElement::End => return StreamElement::End,
+                StreamElement::End => {
+                    // consume the other stream
+                    while !matches!(self.prev1.next(), StreamElement::End) {}
+                    return StreamElement::End;
+                }
                 item => break item,
             }
         };
@@ -114,31 +122,9 @@ where
     where
         OperatorChain2: Operator<Out2> + Send + 'static,
     {
-        self.add_y_connection(oth, Zip::new)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::source;
-    use itertools::Itertools;
-
-    #[test]
-    fn test_zip() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let items1 = 0..10u8;
-        let items2 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-
-        let source1 = source::IteratorSource::new(items1.clone());
-        let source2 = source::IteratorSource::new(items2.clone().into_iter());
-        let stream1 = env.stream(source1);
-        let stream2 = env.stream(source2);
-        let res = stream1.zip(stream2).collect_vec();
-        env.execute();
-        let res = res.get().unwrap();
-        let expected = items1.zip(items2.into_iter()).collect_vec();
-        assert_eq!(res, expected);
+        let mut new_stream = self.add_y_connection(oth, Zip::new);
+        // if the zip operator is partitioned there could be some loss of data
+        new_stream.block.scheduler_requirements.max_parallelism(1);
+        new_stream
     }
 }
