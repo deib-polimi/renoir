@@ -48,7 +48,7 @@ jobs:
           RSTREAM_TEST_TIMEOUT: 10
         with:
           command: test
-          args: --all
+          args: --all --no-fail-fast
 
   rustfmt:
     name: Format
