@@ -26,6 +26,24 @@ where
     make_iter: Arc<dyn Fn(Out) -> IterOut + Send + Sync>,
 }
 
+impl<Out: Data, IterOut, NewOut: Data, PreviousOperators>
+    Flatten<Out, IterOut, NewOut, PreviousOperators>
+where
+    IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
+    PreviousOperators: Operator<Out> + Send,
+{
+    fn new<F>(prev: PreviousOperators, make_iter: F) -> Self
+    where
+        F: Fn(Out) -> IterOut + Send + Sync + 'static,
+    {
+        Self {
+            prev,
+            buffer: Default::default(),
+            make_iter: Arc::new(make_iter),
+        }
+    }
+}
+
 impl<Out: Data, IterOut, NewOut: Data, PreviousOperators> Operator<NewOut>
     for Flatten<Out, IterOut, NewOut, PreviousOperators>
 where
@@ -80,12 +98,7 @@ where
     OperatorChain: Operator<Out> + Send + 'static,
 {
     pub fn flatten(self) -> Stream<NewOut, impl Operator<NewOut>> {
-        self.add_operator(|prev| Flatten {
-            prev,
-            buffer: Default::default(),
-            // just convert `Out` to an `Iterator<Item = NewOut>`
-            make_iter: Arc::new(|x| x.into_iter()),
-        })
+        self.add_operator(|prev| Flatten::new(prev, |x| x.into_iter()))
     }
 }
 
@@ -115,13 +128,7 @@ where
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
     pub fn flatten(self) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
-        self.add_operator(|prev| Flatten {
-            prev,
-            buffer: Default::default(),
-            // convert a `KeyValue<Key, Out>` to an `Interator<Item = KeyValue<Key, NewOut>>`
-            // repeat is used to have the same key for every value of type NewOut
-            make_iter: Arc::new(move |(k, x)| repeat(k).zip(x.into_iter())),
-        })
+        self.add_operator(|prev| Flatten::new(prev, |(k, x)| repeat(k).zip(x.into_iter())))
     }
 }
 
@@ -144,82 +151,65 @@ where
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::source;
+    use crate::operator::flatten::Flatten;
+    use crate::operator::{Operator, StreamElement};
+    use crate::test::FakeOperator;
+    use std::time::Duration;
 
     #[test]
-    fn flatten_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(
+    fn test_flatten_no_timestamps() {
+        let fake_operator = FakeOperator::new(
             vec![
                 vec![],
-                vec![1u8, 2, 3],
-                vec![4, 5],
+                vec![0, 1, 2, 3],
                 vec![],
-                vec![6, 7, 8],
+                vec![4],
+                vec![5, 6, 7],
                 vec![],
             ]
             .into_iter(),
         );
-        let res = env.stream(source).flatten().collect_vec();
-        env.execute();
-        assert_eq!(res.get().unwrap(), (1..=8).collect_vec());
+        let mut flatten = Flatten::new(fake_operator, |x| x.into_iter());
+        for i in 0..=7 {
+            assert_eq!(flatten.next(), StreamElement::Item(i));
+        }
+        assert_eq!(flatten.next(), StreamElement::End);
     }
 
     #[test]
-    fn flatten_keyed_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .group_by(|v| v % 2)
-            .map(|(_k, v)| vec![v, v, v])
-            .flatten()
-            .unkey()
-            .collect_vec();
-        env.execute();
-        let expected = (0..10u8)
-            .flat_map(|x| vec![(x % 2, x), (x % 2, x), (x % 2, x)])
-            .sorted()
-            .collect_vec();
-        let res = res.get().unwrap().into_iter().sorted().collect_vec();
-        assert_eq!(expected, res);
-    }
+    fn test_flatten_timestamped() {
+        let mut fake_operator = FakeOperator::empty();
+        fake_operator.push(StreamElement::Timestamped(vec![], Duration::from_secs(0)));
+        fake_operator.push(StreamElement::Timestamped(
+            vec![1, 2, 3],
+            Duration::from_secs(1),
+        ));
+        fake_operator.push(StreamElement::Timestamped(vec![4], Duration::from_secs(2)));
+        fake_operator.push(StreamElement::Timestamped(vec![], Duration::from_secs(3)));
+        fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
 
-    #[test]
-    fn flat_map_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .flat_map(|x| vec![x, 10 * x, 20 * x])
-            .collect_vec();
-        env.execute();
-        let expected = (0..10u8)
-            .flat_map(|x| vec![x, 10 * x, 20 * x])
-            .collect_vec();
-        assert_eq!(res.get().unwrap(), expected);
-    }
+        let mut flatten = Flatten::new(fake_operator, |x| x.into_iter());
 
-    #[test]
-    fn flat_map_keyed_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .group_by(|v| v % 2)
-            .flat_map(|(_k, v)| vec![v, v, v])
-            .unkey()
-            .collect_vec();
-        env.execute();
-        let expected = (0..10u8)
-            .flat_map(|x| vec![(x % 2, x), (x % 2, x), (x % 2, x)])
-            .sorted()
-            .collect_vec();
-        let res = res.get().unwrap().into_iter().sorted().collect_vec();
-        assert_eq!(expected, res);
+        assert_eq!(
+            flatten.next(),
+            StreamElement::Timestamped(1, Duration::from_secs(1))
+        );
+        assert_eq!(
+            flatten.next(),
+            StreamElement::Timestamped(2, Duration::from_secs(1))
+        );
+        assert_eq!(
+            flatten.next(),
+            StreamElement::Timestamped(3, Duration::from_secs(1))
+        );
+        assert_eq!(
+            flatten.next(),
+            StreamElement::Timestamped(4, Duration::from_secs(2))
+        );
+        assert_eq!(
+            flatten.next(),
+            StreamElement::Watermark(Duration::from_secs(4))
+        );
+        assert_eq!(flatten.next(), StreamElement::End);
     }
 }
