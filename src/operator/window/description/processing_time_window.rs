@@ -1,26 +1,31 @@
+use std::collections::VecDeque;
+use std::time::{Duration, UNIX_EPOCH};
+
 use crate::operator::window::time_window::TimeWindowGenerator;
 use crate::operator::{
     Data, DataKey, StreamElement, Timestamp, Window, WindowDescription, WindowGenerator,
 };
-use std::collections::VecDeque;
-use std::time::{Duration, UNIX_EPOCH};
 
 #[derive(Clone, Debug)]
-pub struct SlidingProcessingTimeWindow {
+pub struct ProcessingTimeWindow {
     size: Duration,
     step: Duration,
 }
 
-impl SlidingProcessingTimeWindow {
-    pub fn new(size: Duration, step: Duration) -> Self {
+impl ProcessingTimeWindow {
+    pub fn sliding(size: Duration, step: Duration) -> Self {
         assert!(step <= size);
         assert_ne!(size, Duration::new(0, 0));
         assert_ne!(step, Duration::new(0, 0));
         Self { size, step }
     }
+
+    pub fn tumbling(size: Duration) -> Self {
+        Self::sliding(size, size)
+    }
 }
 
-impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SlidingProcessingTimeWindow {
+impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for ProcessingTimeWindow {
     type Generator = ProcessingTimeWindowGenerator<Key, Out>;
 
     fn new_generator(&self) -> Self::Generator {
@@ -35,36 +40,10 @@ impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SlidingProcessingT
         )
     }
 }
-#[derive(Clone, Debug)]
-pub struct TumblingProcessingTimeWindow {
-    size: Duration,
-}
 
-impl TumblingProcessingTimeWindow {
-    pub fn new(size: Duration) -> Self {
-        assert_ne!(size, Duration::new(0, 0));
-        Self { size }
-    }
-}
-
-impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for TumblingProcessingTimeWindow {
-    type Generator = ProcessingTimeWindowGenerator<Key, Out>;
-
-    fn new_generator(&self) -> Self::Generator {
-        Self::Generator::new(self.size, self.size)
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "TumblingProcessingTimeWindow[size={}]",
-            self.size.as_secs_f64(),
-        )
-    }
-}
-
-#[derive(Clone)]
 /// Wrapper of `TimeWindowGenerator` that converts every `StreamElement::Item` into
 /// a `StreamElement::Timestamped`.
+#[derive(Clone)]
 pub struct ProcessingTimeWindowGenerator<Key: DataKey, Out: Data> {
     last_timestamp: Option<Timestamp>,
     generator: TimeWindowGenerator<Key, Out>,
@@ -124,10 +103,11 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out>
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
-    use crate::operator::{source, TumblingProcessingTimeWindow};
-    use std::time::Duration;
+    use crate::operator::{source, ProcessingTimeWindow};
 
     #[test]
     fn tumbling_processing_time() {
@@ -137,9 +117,7 @@ mod tests {
         let res = env
             .stream(source)
             .group_by(|x| x % 2)
-            .window(TumblingProcessingTimeWindow::new(Duration::from_micros(
-                200,
-            )))
+            .window(ProcessingTimeWindow::tumbling(Duration::from_micros(200)))
             .fold(0, |acc, x| acc + x)
             .unkey()
             .map(|(_, x)| x)

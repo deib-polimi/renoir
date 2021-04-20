@@ -65,7 +65,7 @@ where
 mod tests {
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
-    use crate::operator::{source, Timestamp, TumblingEventTimeWindow};
+    use crate::operator::{source, EventTimeWindow, Timestamp};
 
     #[test]
     fn window_join() {
@@ -100,10 +100,7 @@ mod tests {
             .map(|(_, x)| ('a'..'z').nth(x.into()).unwrap());
 
         let res = stream1
-            .window_join(
-                stream2,
-                TumblingEventTimeWindow::new(Timestamp::from_secs(3)),
-            )
+            .window_join(stream2, EventTimeWindow::tumbling(Timestamp::from_secs(3)))
             .unkey()
             .collect_vec();
         env.execute();

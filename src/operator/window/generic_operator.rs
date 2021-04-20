@@ -8,6 +8,9 @@ use crate::operator::{
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyValue;
 
+/// This operator abstracts the window logic as an operator and delegates to the
+/// `KeyedWindowManager` and a `ProcessFunc` the job of building and processing the windows,
+/// respectively.
 #[derive(Clone)]
 pub(crate) struct GenericWindowOperator<
     Key: DataKey,
@@ -21,10 +24,17 @@ pub(crate) struct GenericWindowOperator<
     WindowDescr: WindowDescription<Key, Out> + Clone,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
-    name: String,
-    manager: KeyedWindowManager<Key, Out, WindowDescr>,
-    process_func: ProcessFunc,
+    /// The previous operators in the chain.
     prev: OperatorChain,
+    /// The name of the actual operator that this one abstracts.
+    ///
+    /// It is used only for tracing purposes.
+    name: String,
+    /// The manager that will build the windows.
+    manager: KeyedWindowManager<Key, Out, WindowDescr>,
+    /// The processing function that, given a window, produces an output element.
+    process_func: ProcessFunc,
+    /// A buffer for storing ready items.
     buffer: VecDeque<StreamElement<KeyValue<Key, NewOut>>>,
 }
 

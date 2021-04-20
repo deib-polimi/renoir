@@ -1,32 +1,29 @@
 use std::collections::VecDeque;
 
-pub use count_window::*;
-pub use event_time_window::*;
-pub use processing_time_window::*;
-
-use crate::operator::{Data, DataKey, Operator, Reorder, StreamElement, Timestamp};
-use crate::stream::{KeyValue, KeyedStream, WindowedStream};
 use hashbrown::hash_map::IterMut;
 use hashbrown::HashMap;
 
-mod count_window;
-mod event_time_window;
-mod first;
-mod fold;
+pub use aggregator::*;
+pub use description::*;
+
+use crate::operator::{Data, DataKey, Operator, Reorder, StreamElement, Timestamp};
+use crate::stream::{KeyValue, KeyedStream, WindowedStream};
+use std::fmt::{Display, Formatter};
+
+mod aggregator;
+mod description;
 mod generic_operator;
 mod join;
-mod max;
-mod min;
-mod processing_time_window;
-mod sum;
 mod time_window;
 
 /// A WindowDescription describes how a window behaves.
 pub trait WindowDescription<Key: DataKey, Out: Data>: Send {
     /// The type of the window generator of this window.
     type Generator: WindowGenerator<Key, Out> + Clone + 'static;
+
     /// Construct a new window generator, ready to handle elements.
     fn new_generator(&self) -> Self::Generator;
+
     fn to_string(&self) -> String;
 }
 
@@ -43,13 +40,21 @@ pub trait WindowGenerator<Key: DataKey, Out: Data>: Send {
     fn buffer(&self) -> &VecDeque<Out>;
 }
 
+/// A window is a collection of elements and may be associated with a timestamp.
 pub struct Window<'a, Key: DataKey, Out: Data> {
+    /// A reference to the generator that produced this window.
+    ///
+    /// This will be used for fetching the window elements and for advancing the window when this
+    /// is dropped.
     gen: &'a mut dyn WindowGenerator<Key, Out>,
+    /// The number of elements of this window.
     size: usize,
+    /// If this window contains elements with a timestamp, a timestamp for this window is built.
     timestamp: Option<Timestamp>,
 }
 
 impl<'a, Key: DataKey, Out: Data> Window<'a, Key, Out> {
+    /// An iterator to the elements of the window.
     fn items(&self) -> impl Iterator<Item = &Out> {
         self.gen.buffer().iter().take(self.size)
     }
@@ -62,8 +67,17 @@ impl<'a, Key: DataKey, Out: Data> Drop for Window<'a, Key, Out> {
 }
 
 /// Wrapper used to return either a single or multiple `WindowGenerator`.
+///
+/// This is the type returned by `KeyedWindowManager::add`. Adding an item into the window may
+/// produce different outcomes based on the item's type.
 enum ManagerAddIterator<'a, Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>> {
+    /// The item triggered just one key, so only the generator of that key is returned.
+    ///
+    /// This is the typical case for `Item` and `Timestamped`.
     Single(Option<(&'a Key, &'a mut WindowDescr::Generator)>),
+    /// The item involed all the keys, so all the generators are returned.
+    ///
+    /// This happens for watermarks or stream ending, when all the keys may advance the window.
     All(IterMut<'a, Key, WindowDescr::Generator>),
 }
 
@@ -83,8 +97,13 @@ impl<'a, Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>> Iter
 /// Manager of multiple `WindowGenerator`, one for each key of the stream.
 #[derive(Clone)]
 struct KeyedWindowManager<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>> {
+    /// The description that is used for generating the windows.
     descr: WindowDescr,
+    /// The set of all the generators, indexed by key.
     generators: HashMap<Key, WindowDescr::Generator>,
+    /// The list of additional items to return downstream.
+    ///
+    /// This list will include the watermarks, End, and other non-data items.
     extra_items: VecDeque<StreamElement<KeyValue<Key, Out>>>,
 }
 
@@ -99,6 +118,10 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
         }
     }
 
+    /// Add a `StreamElement` to this window manager.
+    ///
+    /// The returned value contains the set of all the involved window generators. The caller should
+    /// process all the windows returned from each generator.
     fn add(
         &mut self,
         el: StreamElement<KeyValue<Key, Out>>,
@@ -138,15 +161,18 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
         }
     }
 
-    /// Return extra elements that should be forwarded downstream
+    /// Return extra elements that should be forwarded downstream.
     fn next_extra_elements(&mut self) -> Option<StreamElement<KeyValue<Key, Out>>> {
         self.extra_items.pop_front()
     }
+}
 
-    // TODO: maybe switch to Display
-    #[allow(clippy::inherent_to_string)]
-    fn to_string(&self) -> String {
-        format!(
+impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>> Display
+    for KeyedWindowManager<Key, Out, WindowDescr>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
             "KeyedWindowManager<({}, {}), {}>",
             std::any::type_name::<Key>(),
             std::any::type_name::<Out>(),

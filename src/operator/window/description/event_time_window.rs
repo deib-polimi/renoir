@@ -1,24 +1,28 @@
-use crate::operator::{Data, DataKey, WindowDescription};
-
-use crate::operator::window::time_window::TimeWindowGenerator;
 use std::time::Duration;
 
+use crate::operator::window::time_window::TimeWindowGenerator;
+use crate::operator::{Data, DataKey, WindowDescription};
+
 #[derive(Clone, Debug)]
-pub struct SlidingEventTimeWindow {
+pub struct EventTimeWindow {
     size: Duration,
     step: Duration,
 }
 
-impl SlidingEventTimeWindow {
-    pub fn new(size: Duration, step: Duration) -> Self {
+impl EventTimeWindow {
+    pub fn sliding(size: Duration, step: Duration) -> Self {
         assert!(step <= size);
         assert_ne!(size, Duration::new(0, 0));
         assert_ne!(step, Duration::new(0, 0));
         Self { size, step }
     }
+
+    pub fn tumbling(size: Duration) -> Self {
+        Self::sliding(size, size)
+    }
 }
 
-impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SlidingEventTimeWindow {
+impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for EventTimeWindow {
     type Generator = EventTimeWindowGenerator<Key, Out>;
 
     fn new_generator(&self) -> Self::Generator {
@@ -33,39 +37,17 @@ impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SlidingEventTimeWi
         )
     }
 }
-#[derive(Clone, Debug)]
-pub struct TumblingEventTimeWindow {
-    size: Duration,
-}
-
-impl TumblingEventTimeWindow {
-    pub fn new(size: Duration) -> Self {
-        assert_ne!(size, Duration::new(0, 0));
-        Self { size }
-    }
-}
-
-impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for TumblingEventTimeWindow {
-    type Generator = EventTimeWindowGenerator<Key, Out>;
-
-    fn new_generator(&self) -> Self::Generator {
-        Self::Generator::new(self.size, self.size)
-    }
-
-    fn to_string(&self) -> String {
-        format!("TumblingEventTimeWindow[size={}]", self.size.as_secs_f64(),)
-    }
-}
 
 pub type EventTimeWindowGenerator<Key, Out> = TimeWindowGenerator<Key, Out>;
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
-    use crate::operator::window::SlidingEventTimeWindow;
-    use crate::operator::{source, Timestamp, TumblingEventTimeWindow};
-    use std::time::Duration;
+    use crate::operator::window::EventTimeWindow;
+    use crate::operator::{source, Timestamp};
 
     #[test]
     fn sliding_event_time() {
@@ -84,7 +66,7 @@ mod tests {
         let res = env
             .stream(source)
             .group_by(|x| x % 2)
-            .window(SlidingEventTimeWindow::new(
+            .window(EventTimeWindow::sliding(
                 Duration::from_secs(3),
                 Duration::from_millis(2500),
             ))
@@ -121,7 +103,7 @@ mod tests {
         let res = env
             .stream(source)
             .group_by(|x| x % 2)
-            .window(TumblingEventTimeWindow::new(Duration::from_secs(3)))
+            .window(EventTimeWindow::tumbling(Duration::from_secs(3)))
             .first()
             .unkey()
             .map(|(_, x)| x)

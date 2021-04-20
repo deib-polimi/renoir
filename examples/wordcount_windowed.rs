@@ -24,7 +24,7 @@ fn main() {
         .batch_mode(BatchMode::adaptive(1000, Duration::from_millis(100)))
         .flat_map(move |line| tokenizer.tokenize(line))
         .group_by(|word| word.clone())
-        .window(CountWindow::new(10, 5))
+        .window(CountWindow::sliding(10, 5))
         .fold(0, |count, _word| count + 1)
         .for_each(|_, _| {});
     let start = Instant::now();

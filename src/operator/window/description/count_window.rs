@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
+use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 
 use crate::operator::window::{Window, WindowDescription, WindowGenerator};
 use crate::operator::{Data, DataKey, StreamElement, Timestamp};
 use crate::stream::KeyValue;
-use std::marker::PhantomData;
 
 #[derive(Clone, Debug)]
 pub struct CountWindow {
@@ -13,11 +13,15 @@ pub struct CountWindow {
 }
 
 impl CountWindow {
-    pub fn new(size: usize, step: usize) -> Self {
+    pub fn sliding(size: usize, step: usize) -> Self {
         Self {
             size: NonZeroUsize::new(size).expect("CountWindow size must be positive"),
             step: NonZeroUsize::new(step).expect("CountWindow size must be positive"),
         }
+    }
+
+    pub fn tumbling(size: usize) -> Self {
+        CountWindow::sliding(size, size)
     }
 }
 
@@ -118,12 +122,13 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
 
 #[cfg(test)]
 mod tests {
-    use crate::operator::{CountWindow, StreamElement, WindowDescription, WindowGenerator};
     use std::time::Duration;
+
+    use crate::operator::{CountWindow, StreamElement, WindowDescription, WindowGenerator};
 
     #[test]
     fn count_window_watermark() {
-        let descr = CountWindow::new(3, 2);
+        let descr = CountWindow::sliding(3, 2);
         let mut generator = descr.new_generator();
 
         generator.add(StreamElement::Timestamped((0, 1), Duration::from_secs(1)));
@@ -143,7 +148,7 @@ mod tests {
 
     #[test]
     fn count_window_timestamp() {
-        let descr = CountWindow::new(3, 2);
+        let descr = CountWindow::sliding(3, 2);
         let mut generator = descr.new_generator();
 
         generator.add(StreamElement::Timestamped((0, 1), Duration::from_secs(1)));

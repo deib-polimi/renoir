@@ -74,7 +74,7 @@ impl TestHelper {
         let num_hosts = 4;
         let mut hosts = vec![];
         for _ in 0..num_hosts {
-            let base_port = rand::thread_rng().gen_range(16384..=65535);
+            let base_port = rand::thread_rng().gen_range(16384..65000);
             let num_cores = 2;
             hosts.push(RemoteHostConfig {
                 address: "localhost".to_string(),

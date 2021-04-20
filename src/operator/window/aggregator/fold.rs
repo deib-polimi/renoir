@@ -2,19 +2,30 @@ use crate::operator::window::generic_operator::GenericWindowOperator;
 use crate::operator::{Data, DataKey, Operator, WindowDescription};
 use crate::stream::{KeyValue, KeyedStream, WindowedStream};
 
-impl<Key: DataKey, Out: Data + Ord, WindowDescr, OperatorChain>
+impl<Key: DataKey, Out: Data, WindowDescr, OperatorChain>
     WindowedStream<Key, Out, OperatorChain, WindowDescr>
 where
     WindowDescr: WindowDescription<Key, Out> + Clone + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub fn max(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
+    pub fn fold<NewOut: Data, F>(
+        self,
+        init: NewOut,
+        fold: F,
+    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    where
+        F: Fn(NewOut, &Out) -> NewOut + Clone + 'static,
+    {
         let stream = self.inner;
         let descr = self.descr;
 
         stream.add_operator(|prev| {
-            GenericWindowOperator::new("Max", prev, descr, |window| {
-                window.items().max().unwrap().clone()
+            GenericWindowOperator::new("Fold", prev, descr, move |window| {
+                let mut res = init.clone();
+                for value in window.items() {
+                    res = (fold)(res, value);
+                }
+                res
             })
         })
     }
@@ -27,20 +38,27 @@ mod tests {
     use crate::operator::{source, CountWindow};
 
     #[test]
-    fn test_max_window() {
+    fn test_fold_window() {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(vec![2, 3, 0, 1, 7, 4, 5, 2, 6].into_iter());
+        let source = source::IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
             .group_by(|x| x % 2)
-            .window(CountWindow::new(3, 2))
-            .max()
+            .window(CountWindow::sliding(3, 2))
+            .fold(0, |acc, x| acc + x)
             .unkey()
             .map(|(_, x)| x)
             .collect_vec();
         env.execute();
         let mut res = res.get().unwrap();
         res.sort_unstable();
-        assert_eq!(res, vec![4, 6, 6, 7, 7]);
+        // Windows
+        // [0, 2, 4] -> 6
+        // [4, 6, 8] -> 18
+        // [8] -> 8
+        // [1, 3, 5] -> 9
+        // [5, 7, 9] -> 21
+        // [9] -> 9
+        assert_eq!(res, vec![6, 8, 9, 9, 18, 21]);
     }
 }

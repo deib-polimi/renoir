@@ -3,8 +3,8 @@ use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::time::Duration;
 
-#[derive(Clone)]
 /// This generator is used for event time and processing time windows.
+#[derive(Clone)]
 pub struct TimeWindowGenerator<Key: DataKey, Out: Data> {
     size: Duration,
     step: Duration,
