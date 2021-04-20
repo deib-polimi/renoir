@@ -16,6 +16,21 @@ where
     f: Arc<dyn Fn(Out) -> NewOut + Send + Sync>,
 }
 
+impl<Out: Data, NewOut: Data, PreviousOperators> Map<Out, NewOut, PreviousOperators>
+where
+    PreviousOperators: Operator<Out>,
+{
+    fn new<F>(prev: PreviousOperators, f: F) -> Self
+    where
+        F: Fn(Out) -> NewOut + Send + Sync + 'static,
+    {
+        Self {
+            prev,
+            f: Arc::new(f),
+        }
+    }
+}
+
 impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
     for Map<Out, NewOut, PreviousOperators>
 where
@@ -53,10 +68,7 @@ where
     where
         F: Fn(Out) -> NewOut + Send + Sync + 'static,
     {
-        self.add_operator(|prev| Map {
-            prev,
-            f: Arc::new(f),
-        })
+        self.add_operator(|prev| Map::new(prev, f))
     }
 }
 
@@ -71,12 +83,11 @@ where
     where
         F: Fn(KeyValue<&Key, Out>) -> NewOut + Send + Sync + 'static,
     {
-        self.add_operator(|prev| Map {
-            prev,
-            f: Arc::new(move |(k, v)| {
+        self.add_operator(|prev| {
+            Map::new(prev, move |(k, v)| {
                 let mapped_value = f((&k, v));
                 (k, mapped_value)
-            }),
+            })
         })
     }
 }
@@ -85,42 +96,37 @@ where
 mod tests {
     use std::str::FromStr;
 
-    use itertools::Itertools;
-
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::source;
+    use crate::operator::{Map, Operator, StreamElement};
+    use crate::test::FakeOperator;
+    use std::time::Duration;
 
     #[test]
     fn map_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .map(|n| n.to_string())
-            .map(|n| n + "000")
-            .map(|n| u32::from_str(&n).unwrap())
-            .collect_vec();
-        env.execute();
-        let res = res.get().unwrap();
-        let expected = (0..10u32).map(|n| 1000 * n).collect_vec();
-        assert_eq!(res, expected);
-    }
+        let mut fake_operator = FakeOperator::new(0..10u8);
+        for i in 0..10 {
+            fake_operator.push(StreamElement::Timestamped(i, Duration::from_secs(i as u64)));
+        }
+        fake_operator.push(StreamElement::Watermark(Duration::from_secs(100)));
 
-    #[test]
-    fn map_keyed_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .group_by(|n| n % 2)
-            .map(|(k, v)| 100 * k + v)
-            .unkey()
-            .map(|(_k, v)| v)
-            .collect_vec();
-        env.execute();
-        let res = res.get().unwrap().into_iter().sorted().collect_vec();
-        let expected = (0..10u8).map(|n| (n % 2) * 100 + n).sorted().collect_vec();
-        assert_eq!(res, expected);
+        let map = Map::new(fake_operator, |x| x.to_string());
+        let map = Map::new(map, |x| x + "000");
+        let mut map = Map::new(map, |x| u32::from_str(&x).unwrap());
+
+        for i in 0..10 {
+            let elem = map.next();
+            assert_eq!(elem, StreamElement::Item(i * 1000));
+        }
+        for i in 0..10 {
+            let elem = map.next();
+            assert_eq!(
+                elem,
+                StreamElement::Timestamped(i * 1000, Duration::from_secs(i as u64))
+            );
+        }
+        assert_eq!(
+            map.next(),
+            StreamElement::Watermark(Duration::from_secs(100))
+        );
+        assert_eq!(map.next(), StreamElement::End);
     }
 }
