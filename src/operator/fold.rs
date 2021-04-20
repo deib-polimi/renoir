@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::block::{BlockStructure, NextStrategy, OperatorStructure};
-use crate::operator::{Data, EndBlock, Operator, StreamElement, Timestamp};
+use crate::block::{BlockStructure, OperatorStructure};
+use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
@@ -128,10 +128,8 @@ where
     where
         F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
     {
-        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::OnlyOne);
-        // FIXME: when implementing Stream::max_parallelism use that here
-        new_stream.block.scheduler_requirements.max_parallelism(1);
-        new_stream.add_operator(|prev| Fold::new(prev, init, f))
+        self.max_parallelism(1)
+            .add_operator(|prev| Fold::new(prev, init, f))
     }
 
     pub fn fold_assoc<NewOut: Data, Local, Global>(
@@ -144,15 +142,9 @@ where
         Local: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
         Global: Fn(NewOut, NewOut) -> NewOut + Send + Sync + 'static,
     {
-        // Local fold
-        let mut second_part = self
-            .add_operator(|prev| Fold::new(prev, init.clone(), local))
-            .add_block(EndBlock::new, NextStrategy::OnlyOne);
-
-        // Global fold (which is done on only one node)
-        // FIXME: when implementing Stream::max_parallelism use that here
-        second_part.block.scheduler_requirements.max_parallelism(1);
-        second_part.add_operator(|prev| Fold::new(prev, init, global))
+        self.add_operator(|prev| Fold::new(prev, init.clone(), local))
+            .max_parallelism(1)
+            .add_operator(|prev| Fold::new(prev, init, global))
     }
 }
 

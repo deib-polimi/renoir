@@ -1,6 +1,6 @@
-use crate::block::{BlockStructure, NextStrategy, OperatorKind, OperatorStructure};
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
-use crate::operator::{Data, EndBlock, Operator, StreamElement};
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
@@ -74,10 +74,7 @@ where
 {
     pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {
         let output = StreamOutputRef::default();
-        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::OnlyOne);
-        // FIXME: when implementing Stream::max_parallelism use that here
-        new_stream.block.scheduler_requirements.max_parallelism(1);
-        new_stream
+        self.max_parallelism(1)
             .add_operator(|prev| CollectVecSink {
                 prev,
                 result: Some(Vec::new()),
