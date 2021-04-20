@@ -100,32 +100,3 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out>
         self.generator.buffer()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::time::Duration;
-
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::{source, ProcessingTimeWindow};
-
-    #[test]
-    fn tumbling_processing_time() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(1..=1000);
-
-        let res = env
-            .stream(source)
-            .group_by(|x| x % 2)
-            .window(ProcessingTimeWindow::tumbling(Duration::from_micros(200)))
-            .fold(0, |acc, x| acc + x)
-            .unkey()
-            .map(|(_, x)| x)
-            .collect_vec();
-        env.execute();
-
-        let res = res.get().unwrap();
-        let sum: i32 = res.into_iter().sum();
-        assert_eq!(sum, (1..=1000).sum::<i32>());
-    }
-}

@@ -44,79 +44,65 @@ pub type EventTimeWindowGenerator<Key, Out> = TimeWindowGenerator<Key, Out>;
 mod tests {
     use std::time::Duration;
 
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
+    use itertools::Itertools;
+
     use crate::operator::window::EventTimeWindow;
-    use crate::operator::{source, Timestamp};
+    use crate::operator::{StreamElement, Timestamp, WindowDescription, WindowGenerator};
 
     #[test]
     fn sliding_event_time() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::EventTimeIteratorSource::new(
-            (0..10).map(|x| (x, Timestamp::from_secs(x))),
-            |x, ts| {
-                if x % 2 == 1 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            },
-        );
+        let descr = EventTimeWindow::sliding(Duration::from_secs(3), Duration::from_millis(2500));
+        let mut generator = descr.new_generator();
 
-        let res = env
-            .stream(source)
-            .group_by(|x| x % 2)
-            .window(EventTimeWindow::sliding(
-                Duration::from_secs(3),
-                Duration::from_millis(2500),
-            ))
-            .first()
-            .unkey()
-            .map(|(_, x)| x)
-            .collect_vec();
-        env.execute();
+        // current window [0, 3)
+        generator.add(StreamElement::Timestamped((0, 0), Timestamp::from_secs(0)));
+        assert!(generator.next_window().is_none());
+        generator.add(StreamElement::Timestamped((0, 1), Timestamp::from_secs(1)));
+        assert!(generator.next_window().is_none());
+        generator.add(StreamElement::Timestamped((0, 2), Timestamp::from_secs(2)));
+        assert!(generator.next_window().is_none());
+        // this closes the window
+        generator.add(StreamElement::Timestamped((0, 3), Timestamp::from_secs(3)));
 
-        let mut res = res.get().unwrap();
-        // Windows and elements
-        // 0.0 -> 3.0  [0, 2] and [1]
-        // 2.5 -> 5.5  [4] and [3, 5]
-        // 5.0 -> 8.0  [6] and [5, 7]
-        // 7.5 -> 10.5 [8] and [9]
-        res.sort_unstable();
-        assert_eq!(res, vec![0, 1, 3, 4, 5, 6, 8, 9]);
-    }
+        let window = generator.next_window().unwrap();
+        assert_eq!(window.timestamp, Some(Timestamp::from_secs(3)));
+        let items = window.items().copied().collect_vec();
+        assert_eq!(items, vec![0, 1, 2]);
+        drop(window);
 
-    #[test]
-    fn tumbling_event_time() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::EventTimeIteratorSource::new(
-            (0..10).map(|x| (x, Timestamp::from_secs(x))),
-            |x, ts| {
-                if x % 2 == 1 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            },
-        );
+        // current window [2.5, 5.5)
+        generator.add(StreamElement::Watermark(Timestamp::from_secs(5)));
+        assert!(generator.next_window().is_none());
+        // this closes the window
+        generator.add(StreamElement::Watermark(Timestamp::from_secs(6)));
 
-        let res = env
-            .stream(source)
-            .group_by(|x| x % 2)
-            .window(EventTimeWindow::tumbling(Duration::from_secs(3)))
-            .first()
-            .unkey()
-            .map(|(_, x)| x)
-            .collect_vec();
-        env.execute();
+        let window = generator.next_window().unwrap();
+        assert_eq!(window.timestamp, Some(Timestamp::from_millis(5500)));
+        let items = window.items().copied().collect_vec();
+        assert_eq!(items, vec![3]);
+        drop(window);
 
-        let mut res = res.get().unwrap();
-        // Windows and elements
-        // 0.0 -> 3.0  [0, 2] and [1]
-        // 3.0 -> 6.0  [4] and [3, 5]
-        // 6.0 -> 9.0  [6, 8] and [7]
-        // 9.0 -> 12.0 [] and [9]
-        res.sort_unstable();
-        assert_eq!(res, vec![0, 1, 3, 4, 6, 7, 9]);
+        // current window [7.5, 10.5)
+        generator.add(StreamElement::Timestamped(
+            (0, 10),
+            Timestamp::from_secs(10),
+        ));
+        assert!(generator.next_window().is_none());
+        generator.add(StreamElement::End);
+
+        let window = generator.next_window().unwrap();
+        assert_eq!(window.timestamp, Some(Timestamp::from_millis(10500)));
+        let items = window.items().copied().collect_vec();
+        assert_eq!(items, vec![10]);
+        drop(window);
+
+        // current window [10, 13)
+        let window = generator.next_window().unwrap();
+        assert_eq!(window.timestamp, Some(Timestamp::from_secs(13)));
+        let items = window.items().copied().collect_vec();
+        assert_eq!(items, vec![10]);
+        drop(window);
+
+        assert!(generator.next_window().is_none());
     }
 }
