@@ -36,30 +36,3 @@ where
         KeyedStream(new_stream)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use itertools::Itertools;
-
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::source;
-
-    #[test]
-    fn group_by_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..100u8);
-        let res = env
-            .stream(source)
-            .group_by(|&n| n.to_string().chars().next().unwrap())
-            .unkey()
-            .collect_vec();
-        env.execute();
-        let res = res.get().unwrap().into_iter().sorted().collect_vec();
-        let expected = (0..100u8)
-            .map(|n| (n.to_string().chars().next().unwrap(), n))
-            .sorted()
-            .collect_vec();
-        assert_eq!(res, expected);
-    }
-}
