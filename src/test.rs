@@ -9,6 +9,8 @@ use crate::environment::StreamEnvironment;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
+use itertools::{process_results, Itertools};
+use std::str::FromStr;
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;
@@ -74,10 +76,11 @@ impl TestHelper {
     }
 
     /// Run the test body under a simulated remote environment.
-    pub fn remote_env<F>(body: F, num_hosts: usize, cores_per_host: usize)
-    where
-        F: Fn(StreamEnvironment) + Send + Sync + 'static,
-    {
+    pub fn remote_env(
+        body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>,
+        num_hosts: usize,
+        cores_per_host: usize,
+    ) {
         Self::setup();
         let mut hosts = vec![];
         for _ in 0..num_hosts {
@@ -94,7 +97,6 @@ impl TestHelper {
         debug!("Running with remote configuration: {:?}", runtime);
 
         let mut join_handles = vec![];
-        let body = Arc::new(body);
         for host_id in 0..num_hosts {
             let config = EnvironmentConfig {
                 runtime: runtime.clone(),
@@ -120,8 +122,32 @@ impl TestHelper {
     where
         F: Fn(StreamEnvironment) + Send + Sync + 'static,
     {
-        Self::local_env(&body, 4);
-        Self::remote_env(body, 4, 4);
+        let local_cores =
+            Self::parse_list_from_env("RSTREAM_TEST_LOCAL_CORES").unwrap_or_else(|| vec![4]);
+        for num_cores in local_cores {
+            Self::local_env(&body, num_cores);
+        }
+
+        let remote_hosts =
+            Self::parse_list_from_env("RSTREAM_TEST_REMOTE_HOSTS").unwrap_or_else(|| vec![4]);
+        let remote_cores =
+            Self::parse_list_from_env("RSTREAM_TEST_REMOTE_CORES").unwrap_or_else(|| vec![4]);
+
+        let body = Arc::new(body);
+        for num_hosts in remote_hosts {
+            for &num_cores in &remote_cores {
+                Self::remote_env(body.clone(), num_hosts, num_cores);
+            }
+        }
+    }
+
+    /// Parse a list of arguments from an environment variable.
+    ///
+    /// The list should be comma separated without spaces.
+    fn parse_list_from_env(var_name: &str) -> Option<Vec<usize>> {
+        let content = std::env::var(var_name).ok()?;
+        let values = content.split(',').map(|s| usize::from_str(s)).collect_vec();
+        process_results(values.into_iter(), |values| values.collect_vec()).ok()
     }
 }
 
