@@ -14,6 +14,7 @@ mod event_time_window;
 mod first;
 mod fold;
 mod generic_operator;
+mod join;
 mod max;
 mod min;
 mod processing_time_window;
@@ -21,7 +22,7 @@ mod sum;
 mod time_window;
 
 /// A WindowDescription describes how a window behaves.
-pub trait WindowDescription<Key: DataKey, Out: Data> {
+pub trait WindowDescription<Key: DataKey, Out: Data>: Send {
     /// The type of the window generator of this window.
     type Generator: WindowGenerator<Key, Out> + Clone + 'static;
     /// Construct a new window generator, ready to handle elements.
@@ -30,7 +31,7 @@ pub trait WindowDescription<Key: DataKey, Out: Data> {
 }
 
 /// A WindowGenerator handles the generation of windows for a given key.
-pub trait WindowGenerator<Key: DataKey, Out: Data> {
+pub trait WindowGenerator<Key: DataKey, Out: Data>: Send {
     /// Handle a new element of the stream.
     fn add(&mut self, item: StreamElement<KeyValue<Key, Out>>);
     /// If a window is ready, return it so that it can be processed.
