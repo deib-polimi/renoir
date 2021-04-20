@@ -1,8 +1,9 @@
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
 
 #[derive(Clone)]
 struct HeapElement<Out> {
@@ -117,49 +118,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{BlockStructure, OperatorStructure};
-    use crate::operator::reorder::Reorder;
-    use crate::operator::{Data, Operator, StreamElement};
-    use crate::scheduler::ExecutionMetadata;
-    use std::collections::VecDeque;
     use std::time::Duration;
 
-    #[derive(Clone)]
-    struct FakeOperator<Out: Data> {
-        buffer: VecDeque<StreamElement<Out>>,
-    }
-
-    impl<Out: Data> FakeOperator<Out> {
-        fn new() -> Self {
-            Self {
-                buffer: Default::default(),
-            }
-        }
-
-        fn push(&mut self, el: StreamElement<Out>) {
-            self.buffer.push_back(el);
-        }
-    }
-
-    impl<Out: Data> Operator<Out> for FakeOperator<Out> {
-        fn setup(&mut self, _metadata: ExecutionMetadata) {}
-
-        fn next(&mut self) -> StreamElement<Out> {
-            self.buffer.pop_front().unwrap()
-        }
-
-        fn to_string(&self) -> String {
-            format!("FakeOperator<{}>", std::any::type_name::<Out>())
-        }
-
-        fn structure(&self) -> BlockStructure {
-            BlockStructure::default().add_operator(OperatorStructure::new::<Out, _>("FakeOperator"))
-        }
-    }
+    use crate::operator::reorder::Reorder;
+    use crate::operator::{Operator, StreamElement};
+    use crate::test::FakeOperator;
 
     #[test]
     fn reorder() {
-        let mut fake = FakeOperator::new();
+        let mut fake = FakeOperator::empty();
         for i in &[1, 3, 2] {
             fake.push(StreamElement::Timestamped(*i, Duration::new(*i, 0)));
         }
