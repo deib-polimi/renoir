@@ -54,7 +54,10 @@ where
 
 impl TestHelper {
     fn setup() {
-        let _ = env_logger::try_init();
+        let _ = env_logger::Builder::new()
+            .filter(None, log::LevelFilter::Debug)
+            .is_test(true)
+            .try_init();
     }
 
     /// Crate an environment with the specified config and run the test build by `body`.
