@@ -1,5 +1,5 @@
-use crate::operator::{Data, Operator, StartBlock};
-use crate::stream::Stream;
+use crate::operator::{Data, DataKey, Operator, StartBlock};
+use crate::stream::{KeyValue, KeyedStream, Stream};
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -13,6 +13,24 @@ where
         OperatorChain2: Operator<Out> + Send + 'static,
     {
         self.add_y_connection(oth, |id1, id2| StartBlock::concat(vec![id1, id2]))
+    }
+}
+
+impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+where
+    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+{
+    pub fn concat<OperatorChain2>(
+        self,
+        oth: KeyedStream<Key, Out, OperatorChain2>,
+    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    where
+        OperatorChain2: Operator<KeyValue<Key, Out>> + Send + 'static,
+    {
+        KeyedStream(
+            self.0
+                .add_y_connection(oth.0, |id1, id2| StartBlock::concat(vec![id1, id2])),
+        )
     }
 }
 
@@ -182,5 +200,30 @@ mod tests {
         env.execute();
         let res = res.get().unwrap();
         assert_eq!(res.len(), 20);
+    }
+
+    #[test]
+    fn concat_keyed_stream() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source1 = source::IteratorSource::new(0..100u64);
+        let source2 = source::IteratorSource::new(100..200u64);
+
+        let stream1 = env.stream(source1).group_by(|x| x % 3);
+        let stream2 = env.stream(source2).group_by(|x| x % 3);
+
+        let res = stream1
+            .concat(stream2)
+            .reduce(|x, y| x + y)
+            .unkey()
+            .collect_vec();
+        env.execute();
+
+        let mut res = res.get().unwrap();
+        res.sort_unstable();
+
+        let expected = (0..3)
+            .map(|k| (k, (0..200).filter(|x| x % 3 == k).sum()))
+            .collect_vec();
+        assert_eq!(res, expected);
     }
 }
