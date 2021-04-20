@@ -158,81 +158,60 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
 
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::source;
+    use crate::operator::fold::Fold;
+    use crate::operator::{Operator, StreamElement};
+    use crate::test::FakeOperator;
 
     #[test]
-    fn fold_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .fold("".to_string(), |s, n| s + &n.to_string())
-            .collect_vec();
-        env.execute();
-        let res = res.get().unwrap();
-        assert_eq!(res.len(), 1);
-        assert_eq!(res[0], "0123456789");
+    fn test_fold_without_timestamps() {
+        let fake_operator = FakeOperator::new(0..10u8);
+        let mut fold = Fold::new(fake_operator, 0, |a, b| a + b);
+
+        assert_eq!(fold.next(), StreamElement::Item((0..10u8).sum()));
+        assert_eq!(fold.next(), StreamElement::End);
     }
 
     #[test]
-    fn fold_assoc_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .fold_assoc("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
-            .collect_vec();
-        env.execute();
-        let res = res.get().unwrap();
-        assert_eq!(res.len(), 1);
-        assert_eq!(res[0], "0123456789");
+    fn test_fold_timestamped() {
+        let mut fake_operator = FakeOperator::empty();
+        fake_operator.push(StreamElement::Timestamped(0, Duration::from_secs(1)));
+        fake_operator.push(StreamElement::Timestamped(1, Duration::from_secs(2)));
+        fake_operator.push(StreamElement::Timestamped(2, Duration::from_secs(3)));
+        fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
+
+        let mut fold = Fold::new(fake_operator, 0, |a, b| a + b);
+
+        assert_eq!(
+            fold.next(),
+            StreamElement::Timestamped(0 + 1 + 2, Duration::from_secs(3))
+        );
+        assert_eq!(
+            fold.next(),
+            StreamElement::Watermark(Duration::from_secs(4))
+        );
+        assert_eq!(fold.next(), StreamElement::End);
     }
 
     #[test]
-    fn fold_shuffled_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .shuffle()
-            .fold(Vec::new(), |mut v, n| {
-                v.push(n);
-                v
-            })
-            .collect_vec();
-        env.execute();
-        let mut res = res.get().unwrap();
-        assert_eq!(res.len(), 1);
-        res[0].sort_unstable();
-        assert_eq!(res[0], (0..10u8).into_iter().collect::<Vec<_>>());
-    }
+    fn test_fold_iter_end() {
+        let mut fake_operator = FakeOperator::empty();
+        fake_operator.push(StreamElement::Item(0));
+        fake_operator.push(StreamElement::Item(1));
+        fake_operator.push(StreamElement::Item(2));
+        fake_operator.push(StreamElement::IterEnd);
+        fake_operator.push(StreamElement::Item(3));
+        fake_operator.push(StreamElement::Item(4));
+        fake_operator.push(StreamElement::Item(5));
+        fake_operator.push(StreamElement::IterEnd);
 
-    #[test]
-    fn fold_assoc_shuffled_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .shuffle()
-            .fold_assoc(
-                Vec::new(),
-                |mut v, n| {
-                    v.push(n);
-                    v
-                },
-                |mut v1, mut v2| {
-                    v2.append(&mut v1);
-                    v2
-                },
-            )
-            .collect_vec();
-        env.execute();
-        let mut res = res.get().unwrap();
-        assert_eq!(res.len(), 1);
-        res[0].sort_unstable();
-        assert_eq!(res[0], (0..10u8).into_iter().collect::<Vec<_>>());
+        let mut fold = Fold::new(fake_operator, 0, |a, b| a + b);
+
+        assert_eq!(fold.next(), StreamElement::Item(0 + 1 + 2));
+        assert_eq!(fold.next(), StreamElement::IterEnd);
+        assert_eq!(fold.next(), StreamElement::Item(3 + 4 + 5));
+        assert_eq!(fold.next(), StreamElement::IterEnd);
+        assert_eq!(fold.next(), StreamElement::End);
     }
 }
