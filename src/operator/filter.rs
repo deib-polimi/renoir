@@ -15,6 +15,20 @@ where
     _out: PhantomData<Out>,
 }
 
+impl<Out: Data, PreviousOperator, Predicate> Filter<Out, PreviousOperator, Predicate>
+where
+    Predicate: Fn(&Out) -> bool + Clone + 'static,
+    PreviousOperator: Operator<Out> + Send + 'static,
+{
+    fn new(prev: PreviousOperator, predicate: Predicate) -> Self {
+        Self {
+            prev,
+            predicate,
+            _out: Default::default(),
+        }
+    }
+}
+
 impl<Out: Data, PreviousOperator, Predicate> Operator<Out>
     for Filter<Out, PreviousOperator, Predicate>
 where
@@ -58,11 +72,7 @@ where
     where
         Predicate: Fn(&Out) -> bool + Clone + 'static,
     {
-        self.add_operator(|prev| Filter {
-            prev,
-            predicate,
-            _out: PhantomData,
-        })
+        self.add_operator(|prev| Filter::new(prev, predicate))
     }
 }
 
@@ -77,46 +87,26 @@ where
     where
         Predicate: Fn(&KeyValue<Key, Out>) -> bool + Clone + 'static,
     {
-        self.add_operator(|prev| Filter {
-            prev,
-            predicate,
-            _out: PhantomData,
-        })
+        self.add_operator(|prev| Filter::new(prev, predicate))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::source;
+    use crate::operator::filter::Filter;
+    use crate::operator::{Operator, StreamElement};
+    use crate::test::FakeOperator;
 
     #[test]
-    fn filter_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env.stream(source).filter(|x| x % 2 == 1).collect_vec();
-        env.execute();
-        let res = res.get().unwrap();
-        assert_eq!(res, &[1, 3, 5, 7, 9]);
-    }
+    fn test_filter() {
+        let fake_operator = FakeOperator::new(0..10u8);
+        let mut filter = Filter::new(fake_operator, |n| n % 2 == 0);
 
-    #[test]
-    fn filter_keyed_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .group_by(|n| n % 2)
-            .filter(|(_key, x)| *x < 6)
-            .unkey()
-            .map(|(_k, v)| v)
-            .collect_vec();
-        env.execute();
-        let mut res = res.get().unwrap();
-        res.sort_unstable();
-        assert_eq!(res, (0..6u8).collect_vec());
+        assert_eq!(filter.next(), StreamElement::Item(0));
+        assert_eq!(filter.next(), StreamElement::Item(2));
+        assert_eq!(filter.next(), StreamElement::Item(4));
+        assert_eq!(filter.next(), StreamElement::Item(6));
+        assert_eq!(filter.next(), StreamElement::Item(8));
+        assert_eq!(filter.next(), StreamElement::End);
     }
 }
