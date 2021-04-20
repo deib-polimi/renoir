@@ -216,104 +216,85 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::source;
+    use crate::operator::keyed_fold::KeyedFold;
+    use crate::operator::{Operator, StreamElement};
+    use crate::test::FakeOperator;
+    use itertools::Itertools;
+    use std::time::Duration;
 
     #[test]
-    fn group_by_fold_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .group_by_fold(
-                |n| n % 2,
-                "".to_string(),
-                |s, n| s + &n.to_string(),
-                |s1, s2| s1 + &s2,
-            )
-            .unkey()
-            .collect_vec();
-        env.execute();
-        let mut res = res.get().unwrap();
-        res.sort();
-        assert_eq!(res.len(), 2);
-        assert_eq!(res[0].1, "02468");
-        assert_eq!(res[1].1, "13579");
-    }
+    fn test_keyed_fold_no_timestamp() {
+        let data = (0..10u8).map(|x| (x % 2, x)).collect_vec();
+        let fake_operator = FakeOperator::new(data.clone().into_iter());
+        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| a + b);
 
-    #[test]
-    fn fold_keyed_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .group_by(|n| n % 2)
-            .fold("".to_string(), |s, n| s + &n.to_string())
-            .unkey()
-            .collect_vec();
-        env.execute();
-        let mut res = res.get().unwrap();
-        res.sort();
-        assert_eq!(res.len(), 2);
-        assert_eq!(res[0].1, "02468");
-        assert_eq!(res[1].1, "13579");
-    }
+        let mut res = vec![];
+        for _ in 0..2 {
+            let item = keyed_fold.next();
+            match item {
+                StreamElement::Item(x) => res.push(x),
+                other => panic!("Expecting StreamElement::Item, got {}", other.variant()),
+            }
+        }
 
-    #[test]
-    fn group_by_fold_shuffled_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .shuffle()
-            .group_by_fold(
-                |n| n % 2,
-                Vec::new(),
-                |mut v, n| {
-                    v.push(n);
-                    v
-                },
-                |mut v1, mut v2| {
-                    v1.append(&mut v2);
-                    v1
-                },
-            )
-            .unkey()
-            .collect_vec();
-        env.execute();
-
-        let mut res = res.get().unwrap();
-        res.sort_unstable();
-        res[0].1.sort_unstable();
-        res[1].1.sort_unstable();
-        assert_eq!(res.len(), 2);
-        assert_eq!(res[0].1, &[0, 2, 4, 6, 8]);
-        assert_eq!(res[1].1, &[1, 3, 5, 7, 9]);
-    }
-
-    #[test]
-    fn fold_shuffled_keyed_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .shuffle()
-            .group_by(|n| n % 2)
-            .fold(Vec::new(), |mut v, n| {
-                v.push(n);
-                v
-            })
-            .unkey()
-            .collect_vec();
-        env.execute();
-        let mut res = res.get().unwrap();
+        assert_eq!(keyed_fold.next(), StreamElement::End);
 
         res.sort_unstable();
-        res[0].1.sort_unstable();
-        res[1].1.sort_unstable();
-        assert_eq!(res.len(), 2);
-        assert_eq!(res[0].1, &[0, 2, 4, 6, 8]);
-        assert_eq!(res[1].1, &[1, 3, 5, 7, 9]);
+        assert_eq!(res[0].1, 0 + 2 + 4 + 6 + 8);
+        assert_eq!(res[1].1, 1 + 3 + 5 + 7 + 9);
+    }
+
+    #[test]
+    fn test_keyed_fold_timestamp() {
+        let mut fake_operator = FakeOperator::empty();
+        fake_operator.push(StreamElement::Timestamped((0, 0), Duration::from_secs(1)));
+        fake_operator.push(StreamElement::Timestamped((1, 1), Duration::from_secs(2)));
+        fake_operator.push(StreamElement::Timestamped((0, 2), Duration::from_secs(3)));
+        fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
+
+        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| a + b);
+
+        let mut res = vec![];
+        for _ in 0..2 {
+            let item = keyed_fold.next();
+            match item {
+                StreamElement::Timestamped(x, ts) => res.push((x, ts)),
+                other => panic!(
+                    "Expecting StreamElement::Timestamped, got {}",
+                    other.variant()
+                ),
+            }
+        }
+
+        assert_eq!(
+            keyed_fold.next(),
+            StreamElement::Watermark(Duration::from_secs(4))
+        );
+        assert_eq!(keyed_fold.next(), StreamElement::End);
+
+        res.sort_unstable();
+        assert_eq!(res[0].0 .1, 0 + 2);
+        assert_eq!(res[0].1, Duration::from_secs(3));
+        assert_eq!(res[1].0 .1, 1);
+        assert_eq!(res[1].1, Duration::from_secs(2));
+    }
+
+    #[test]
+    fn test_keyed_fold_end_iter() {
+        let mut fake_operator = FakeOperator::empty();
+        fake_operator.push(StreamElement::Item((0, 0)));
+        fake_operator.push(StreamElement::Item((0, 2)));
+        fake_operator.push(StreamElement::IterEnd);
+        fake_operator.push(StreamElement::Item((1, 1)));
+        fake_operator.push(StreamElement::Item((1, 3)));
+        fake_operator.push(StreamElement::IterEnd);
+
+        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| a + b);
+
+        assert_eq!(keyed_fold.next(), StreamElement::Item((0, 0 + 2)));
+        assert_eq!(keyed_fold.next(), StreamElement::IterEnd);
+        assert_eq!(keyed_fold.next(), StreamElement::Item((1, 1 + 3)));
+        assert_eq!(keyed_fold.next(), StreamElement::IterEnd);
+        assert_eq!(keyed_fold.next(), StreamElement::End);
     }
 }
