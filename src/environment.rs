@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Once;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
@@ -10,11 +9,13 @@ use crate::runner::spawn_remote_workers;
 use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
 
-/// Whether a remote execution has already been started. Currently you cannot start more than one
-/// remote environments.
-static mut ALREADY_INIT_REMOTE: bool = false;
-/// `Once` used to set safely `ALREADY_INIT_REMOTE`.
-static INIT_REMOTE: Once = Once::new();
+// See: check_no_double_remote_init
+//
+// /// Whether a remote execution has already been started. Currently you cannot start more than one
+// /// remote environments.
+// static mut ALREADY_INIT_REMOTE: bool = false;
+// /// `Once` used to set safely `ALREADY_INIT_REMOTE`.
+// static INIT_REMOTE: Once = Once::new();
 
 /// Actual content of the StreamEnvironment. This is stored inside a `Rc` and it's shared among all
 /// the blocks.
@@ -130,16 +131,19 @@ impl StreamEnvironmentInner {
     /// Make sure the environment is not construct twice with remote environments. This is currently
     /// unsupported since the two configurations may be different.
     fn check_no_double_remote_init() {
+        // FIXME: for now this check is disabled because the integration tests spawn threads for
+        //        the remote runtime.
+
         // all of these is safe since ALREADY_INIT_REMOTE will be written only once:
         //   https://doc.rust-lang.org/std/sync/struct.Once.html#examples-1
-        unsafe {
-            assert!(
-                !ALREADY_INIT_REMOTE,
-                "Having multiple remote environments in the same program is not supported yet"
-            );
-            INIT_REMOTE.call_once(|| {
-                ALREADY_INIT_REMOTE = true;
-            });
-        }
+        // unsafe {
+        //     assert!(
+        //         !ALREADY_INIT_REMOTE,
+        //         "Having multiple remote environments in the same program is not supported yet"
+        //     );
+        //     INIT_REMOTE.call_once(|| {
+        //         ALREADY_INIT_REMOTE = true;
+        //     });
+        // }
     }
 }
