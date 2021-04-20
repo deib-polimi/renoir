@@ -223,9 +223,10 @@ mod tests {
     use std::time::Duration;
 
     #[test]
+    #[allow(clippy::identity_op)]
     fn test_keyed_fold_no_timestamp() {
         let data = (0..10u8).map(|x| (x % 2, x)).collect_vec();
-        let fake_operator = FakeOperator::new(data.clone().into_iter());
+        let fake_operator = FakeOperator::new(data.into_iter());
         let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| a + b);
 
         let mut res = vec![];
@@ -245,6 +246,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::identity_op)]
     fn test_keyed_fold_timestamp() {
         let mut fake_operator = FakeOperator::empty();
         fake_operator.push(StreamElement::Timestamped((0, 0), Duration::from_secs(1)));
@@ -280,6 +282,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::identity_op)]
     fn test_keyed_fold_end_iter() {
         let mut fake_operator = FakeOperator::empty();
         fake_operator.push(StreamElement::Item((0, 0)));
