@@ -19,28 +19,3 @@ where
         })
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::{source, CountWindow};
-
-    #[test]
-    fn test_sum_window() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .group_by(|x| x % 2)
-            .window(CountWindow::sliding(3, 2))
-            .sum()
-            .unkey()
-            .map(|(_, x)| x)
-            .collect_vec();
-        env.execute();
-        let mut res = res.get().unwrap();
-        res.sort_unstable();
-        assert_eq!(res, vec![6, 8, 9, 9, 18, 21]);
-    }
-}
