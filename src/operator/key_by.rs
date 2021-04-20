@@ -1,9 +1,10 @@
+use std::sync::Arc;
+
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Keyer};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use std::sync::Arc;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
@@ -80,38 +81,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
+    use std::sync::Arc;
 
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
-    use crate::operator::source;
-
-    #[test]
-    fn key_by_stream() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..10u8);
-        let res = env.stream(source).key_by(|&n| n).unkey().collect_vec();
-        env.execute();
-        let res = res.get().unwrap().into_iter().sorted().collect_vec();
-        let expected = (0..10u8).map(|n| (n, n)).collect_vec();
-        assert_eq!(res, expected);
-    }
+    use crate::operator::{KeyBy, Operator, StreamElement};
+    use crate::test::FakeOperator;
 
     #[test]
-    fn key_by_stream2() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-        let source = source::IteratorSource::new(0..100u8);
-        let res = env
-            .stream(source)
-            .key_by(|&n| n.to_string().chars().next().unwrap())
-            .unkey()
-            .collect_vec();
-        env.execute();
-        let res = res.get().unwrap().into_iter().sorted().collect_vec();
-        let expected = (0..100u8)
-            .map(|n| (n.to_string().chars().next().unwrap(), n))
-            .sorted()
-            .collect_vec();
-        assert_eq!(res, expected);
+    fn test_key_by() {
+        let fake_operator = FakeOperator::new(0..10u8);
+        let mut key_by = KeyBy::new(fake_operator, Arc::new(|&n| n));
+
+        for i in 0..10u8 {
+            match key_by.next() {
+                StreamElement::Item((a, b)) => {
+                    assert_eq!(a, i);
+                    assert_eq!(b, i);
+                }
+                item => panic!("Expected StreamElement::Item, got {}", item.variant()),
+            }
+        }
+        assert_eq!(key_by.next(), StreamElement::End);
     }
 }
