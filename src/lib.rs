@@ -14,4 +14,6 @@ pub mod operator;
 pub mod runner;
 pub mod scheduler;
 pub mod stream;
+#[doc(hidden)]
+pub mod test;
 pub mod worker;
