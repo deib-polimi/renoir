@@ -70,6 +70,14 @@ impl StreamEnvironment {
         info!("Starting execution of {} blocks", env.block_count);
         env.scheduler.take().unwrap().start();
     }
+
+    /// Get the total number of processing cores in the cluster.
+    pub fn parallelism(&self) -> usize {
+        match &self.inner.borrow().config.runtime {
+            ExecutionRuntime::Local(local) => local.num_cores,
+            ExecutionRuntime::Remote(remote) => remote.hosts.iter().map(|h| h.num_cores).sum(),
+        }
+    }
 }
 
 impl StreamEnvironmentInner {
