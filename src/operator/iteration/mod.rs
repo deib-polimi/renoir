@@ -4,7 +4,15 @@ use std::sync::Arc;
 
 pub use replay::*;
 
+mod iteration_end;
+mod leader;
 mod replay;
+
+/// The information about the new state of an iteration:
+///
+/// - a boolean indicating if a new iteration should start
+/// - the new state for the next iteration
+pub(crate) type NewIterationState<State> = (bool, State);
 
 /// A shared reference to the state of an iteration,
 ///
