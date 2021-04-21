@@ -1,14 +1,17 @@
-use itertools::Itertools;
-use rstream::block::BatchMode;
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
-use rstream::operator::sink::StreamOutput;
-use rstream::operator::source;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Instant;
+
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
+
+use rstream::block::BatchMode;
+use rstream::config::EnvironmentConfig;
+use rstream::environment::StreamEnvironment;
+use rstream::operator::sink::StreamOutput;
+use rstream::operator::{source, Operator};
+use rstream::stream::Stream;
 
 const DAYS_BEFORE: [u16; 13] = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 
@@ -47,13 +50,10 @@ impl Accident {
     }
 }
 
-fn query1<P: Into<PathBuf>>(
-    env: &mut StreamEnvironment,
-    path: P,
+fn query1_with_source(
+    source: Stream<Accident, impl Operator<Accident> + Send + 'static>,
 ) -> StreamOutput<Vec<(Week, u32)>> {
-    let source = source::CsvSource::<Accident>::new(path, true);
-    env.stream(source)
-        .batch_mode(BatchMode::fixed(1000))
+    source
         // map to the week with 1 if it was lethal, 0 otherwise
         .map(|a| (a.week(), (a.killed > 0) as u32))
         .group_by_fold(
@@ -64,6 +64,15 @@ fn query1<P: Into<PathBuf>>(
         )
         .unkey()
         .collect_vec()
+}
+
+fn query1<P: Into<PathBuf>>(
+    env: &mut StreamEnvironment,
+    path: P,
+) -> StreamOutput<Vec<(Week, u32)>> {
+    let source = source::CsvSource::<Accident>::new(path, true);
+    let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
+    query1_with_source(source)
 }
 
 #[allow(clippy::print_literal)]
@@ -102,13 +111,10 @@ fn print_query1(res: Vec<(Week, u32)>) {
     }
 }
 
-fn query2<P: Into<PathBuf>>(
-    env: &mut StreamEnvironment,
-    path: P,
+fn query2_with_source(
+    source: Stream<Accident, impl Operator<Accident> + Send + 'static>,
 ) -> StreamOutput<Vec<(String, i32, u32)>> {
-    let source = source::CsvSource::<Accident>::new(path, true);
-    env.stream(source)
-        .batch_mode(BatchMode::fixed(1000))
+    source
         // extract (factor, num accidents, num kills)
         .flat_map(|a| {
             vec![
@@ -136,6 +142,15 @@ fn query2<P: Into<PathBuf>>(
         .collect_vec()
 }
 
+fn query2<P: Into<PathBuf>>(
+    env: &mut StreamEnvironment,
+    path: P,
+) -> StreamOutput<Vec<(String, i32, u32)>> {
+    let source = source::CsvSource::<Accident>::new(path, true);
+    let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
+    query2_with_source(source)
+}
+
 #[allow(clippy::print_literal)]
 fn print_query2(res: Vec<(String, i32, u32)>) {
     println!(
@@ -161,16 +176,13 @@ fn print_query2(res: Vec<(String, i32, u32)>) {
 }
 
 #[allow(clippy::type_complexity)]
-fn query3<P: Into<PathBuf>>(
-    env: &mut StreamEnvironment,
-    path: P,
+fn query3_with_source(
+    source: Stream<Accident, impl Operator<Accident> + Send + 'static>,
 ) -> (
     StreamOutput<Vec<(String, Week, i32, u32)>>,
     StreamOutput<Vec<((String, u16), (i32, u32, f64))>>,
 ) {
-    let source = source::CsvSource::<Accident>::new(path, true);
-    let mut splitted = env
-        .stream(source)
+    let mut splitted = source
         .batch_mode(BatchMode::fixed(1000))
         // extract borough, week, num accidents, num lethal
         .map(|a| (a.borough.clone(), a.week(), 1, (a.killed > 0) as u32))
@@ -205,6 +217,18 @@ fn query3<P: Into<PathBuf>>(
         .collect_vec();
 
     (res, avg_per_week)
+}
+
+fn query3<P: Into<PathBuf>>(
+    env: &mut StreamEnvironment,
+    path: P,
+) -> (
+    StreamOutput<Vec<(String, Week, i32, u32)>>,
+    StreamOutput<Vec<((String, u16), (i32, u32, f64))>>,
+) {
+    let source = source::CsvSource::<Accident>::new(path, true);
+    let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
+    query3_with_source(source)
 }
 
 #[allow(clippy::print_literal, clippy::type_complexity)]
@@ -263,16 +287,45 @@ fn print_query3(
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();
-    if args.len() != 1 {
-        panic!("Pass the dataset path as argument");
+    if args.len() != 2 {
+        panic!(
+            "Usage: {} dataset share_source",
+            std::env::args().next().unwrap()
+        );
     }
     let path = &args[0];
+    let share_source = &args[1];
+    let share_source = match share_source.as_str() {
+        "true" => true,
+        "false" => false,
+        _ => panic!(
+            "share_source must be either `true` or `false`, not `{}`",
+            share_source
+        ),
+    };
 
     let mut env = StreamEnvironment::new(config);
     env.spawn_remote_workers();
-    let query1 = query1(&mut env, path);
-    let query2 = query2(&mut env, path);
-    let query3 = query3(&mut env, path);
+
+    let (query1, query2, query3) = if share_source {
+        let source = source::CsvSource::<Accident>::new(path, true);
+        let mut splits = env
+            .stream(source)
+            .batch_mode(BatchMode::fixed(1000))
+            .split(3)
+            .into_iter();
+        (
+            query1_with_source(splits.next().unwrap()),
+            query2_with_source(splits.next().unwrap()),
+            query3_with_source(splits.next().unwrap()),
+        )
+    } else {
+        (
+            query1(&mut env, path),
+            query2(&mut env, path),
+            query3(&mut env, path),
+        )
+    };
 
     let start = Instant::now();
     env.execute();
