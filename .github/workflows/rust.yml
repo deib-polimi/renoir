@@ -12,8 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-        with:
-          submodules: recursive
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -31,24 +29,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-        with:
-          submodules: recursive
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
         timeout-minutes: 20
-        env:
-          RSTREAM_TEST_LOCAL_CORES: 1,2,4,8
-          RSTREAM_TEST_REMOTE_HOSTS: 1,2,4
-          RSTREAM_TEST_REMOTE_CORES: 1,2,4,8
-          RSTREAM_TEST_TIMEOUT: 10
-        with:
-          command: test
-          args: --all --no-fail-fast
+        run: |
+          ./tools/run_tests.sh --all --no-fail-fast
 
   rustfmt:
     name: Format
