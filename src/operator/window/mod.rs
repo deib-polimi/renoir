@@ -105,6 +105,8 @@ struct KeyedWindowManager<Key: DataKey, Out: Data, WindowDescr: WindowDescriptio
     ///
     /// This list will include the `Watermark`s, `Terminate`, and other non-data items.
     extra_items: VecDeque<StreamElement<KeyValue<Key, Out>>>,
+    /// Whether the content of `generators` should be dropped.
+    should_reset: bool,
 }
 
 impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
@@ -115,6 +117,7 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
             descr,
             generators: Default::default(),
             extra_items: Default::default(),
+            should_reset: false,
         }
     }
 
@@ -126,6 +129,13 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
         &mut self,
         el: StreamElement<KeyValue<Key, Out>>,
     ) -> impl Iterator<Item = (&Key, &mut WindowDescr::Generator)> {
+        if self.should_reset {
+            assert!(
+                self.extra_items.is_empty(),
+                "resetting would lose extra items"
+            );
+            self.generators.clear();
+        }
         match &el {
             StreamElement::Item((k, _)) | StreamElement::Timestamped((k, _), _) => {
                 let key = k.clone();
@@ -143,9 +153,9 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
                 );
             }
 
-            StreamElement::Terminate
-            | StreamElement::FlushAndRestart
-            | StreamElement::Watermark(_) => {
+            StreamElement::FlushAndRestart | StreamElement::Watermark(_) => {
+                // This is a flush, so all the generators should be dropped.
+                self.should_reset = matches!(el, StreamElement::FlushAndRestart);
                 // Pass the element to every window generator
                 for (_key, gen) in self.generators.iter_mut() {
                     gen.add(el.clone());
@@ -159,6 +169,9 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
             }
             StreamElement::FlushBatch => {
                 unreachable!("KeyedWindowManager does not handle FlushBatch")
+            }
+            StreamElement::Terminate => {
+                unreachable!("KeyedWindowManager does not handle Terminate")
             }
         }
     }

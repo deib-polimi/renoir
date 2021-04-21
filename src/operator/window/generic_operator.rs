@@ -80,9 +80,9 @@ where
             }
 
             let item = self.prev.next();
-            // the manager is not interested in FlushBatch
-            if matches!(item, StreamElement::FlushBatch) {
-                return StreamElement::FlushBatch;
+            // the manager is not interested in FlushBatch and Terminate
+            if matches!(item, StreamElement::FlushBatch | StreamElement::Terminate) {
+                return item.map(|_| unreachable!());
             }
 
             for (key, window_gen) in self.manager.add(item) {
@@ -98,15 +98,16 @@ where
 
             while let Some(el) = self.manager.next_extra_elements() {
                 self.buffer.push_back(match el {
-                    StreamElement::Item(_) => {
-                        unreachable!("Items cannot be returned as extra elements")
-                    }
-                    StreamElement::Timestamped(_, _) => {
-                        unreachable!("Timestamped items cannot be returned as extra elements")
+                    StreamElement::Item(_)
+                    | StreamElement::Timestamped(_, _)
+                    | StreamElement::FlushBatch
+                    | StreamElement::Terminate => {
+                        unreachable!(
+                            "StreamElement::{} cannot be returned as extra elements",
+                            el.variant()
+                        );
                     }
                     StreamElement::Watermark(ts) => StreamElement::Watermark(ts),
-                    StreamElement::FlushBatch => StreamElement::FlushBatch,
-                    StreamElement::Terminate => StreamElement::Terminate,
                     StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
                 });
             }

@@ -70,13 +70,11 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for TimeWindowGenerator<
                 assert!(ts >= self.last_seen);
                 self.last_seen = ts;
             }
-            StreamElement::FlushBatch => unreachable!("Windows do not handle FlushBatch"),
-            StreamElement::Terminate => {
+            StreamElement::FlushAndRestart => {
                 self.last_seen = Timestamp::new(u64::MAX, 0);
             }
-            StreamElement::FlushAndRestart => {
-                unimplemented!("Time windows are not yet supported inside an iteration (and probably never will)")
-            }
+            StreamElement::FlushBatch => unreachable!("Windows do not handle FlushBatch"),
+            StreamElement::Terminate => unreachable!("Windows do not handle Terminate"),
         }
     }
 

@@ -11,6 +11,7 @@ where
 {
     #[derivative(Debug = "ignore")]
     inner: It,
+    terminated: bool,
 }
 
 impl<Out: Data, It> IteratorSource<Out, It>
@@ -18,7 +19,10 @@ where
     It: Iterator<Item = Out> + Send + 'static,
 {
     pub fn new(inner: It) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            terminated: false,
+        }
     }
 }
 
@@ -38,10 +42,16 @@ where
     fn setup(&mut self, _metadata: ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {
+        if self.terminated {
+            return StreamElement::Terminate;
+        }
         // TODO: with adaptive batching this does not work since it never emits FlushBatch messages
         match self.inner.next() {
             Some(t) => StreamElement::Item(t),
-            None => StreamElement::Terminate,
+            None => {
+                self.terminated = true;
+                StreamElement::FlushAndRestart
+            }
         }
     }
 

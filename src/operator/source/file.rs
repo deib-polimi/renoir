@@ -16,6 +16,7 @@ pub struct FileSource {
     reader: Option<BufReader<File>>,
     current: usize,
     end: usize,
+    terminated: bool,
 }
 
 impl FileSource {
@@ -28,6 +29,7 @@ impl FileSource {
             reader: Default::default(),
             current: 0,
             end: 0,
+            terminated: false,
         }
     }
 }
@@ -76,6 +78,9 @@ impl Operator<String> for FileSource {
     }
 
     fn next(&mut self) -> StreamElement<String> {
+        if self.terminated {
+            return StreamElement::Terminate;
+        }
         let element = if self.current <= self.end {
             let mut line = String::new();
             match self
@@ -88,11 +93,15 @@ impl Operator<String> for FileSource {
                     self.current += len;
                     StreamElement::Item(line)
                 }
-                Ok(_) => StreamElement::Terminate,
+                Ok(_) => {
+                    self.terminated = true;
+                    StreamElement::FlushAndRestart
+                }
                 Err(e) => panic!("Error while reading file: {:?}", e),
             }
         } else {
-            StreamElement::Terminate
+            self.terminated = true;
+            StreamElement::FlushAndRestart
         };
 
         element
@@ -120,6 +129,7 @@ impl Clone for FileSource {
             reader: None,
             current: 0,
             end: 0,
+            terminated: false,
         }
     }
 }

@@ -6,11 +6,15 @@ use crate::scheduler::ExecutionMetadata;
 
 pub struct ChannelSource<Out: Data> {
     receiver: BoundedChannelReceiver<StreamElement<Out>>,
+    terminated: bool,
 }
 
 impl<Out: Data> ChannelSource<Out> {
     pub fn new(receiver: BoundedChannelReceiver<StreamElement<Out>>) -> Self {
-        Self { receiver }
+        Self {
+            receiver,
+            terminated: false,
+        }
     }
 }
 
@@ -24,10 +28,14 @@ impl<Out: Data> Operator<Out> for ChannelSource<Out> {
     fn setup(&mut self, _metadata: ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {
+        if self.terminated {
+            return StreamElement::Terminate;
+        }
         if let Ok(elem) = self.receiver.recv() {
             elem
         } else {
-            StreamElement::Terminate
+            self.terminated = true;
+            StreamElement::FlushAndRestart
         }
     }
 

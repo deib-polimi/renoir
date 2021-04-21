@@ -16,19 +16,6 @@ type NewIterationState<State> = (bool, State);
 
 /// This is the first operator of the chain of blocks inside an iteration.
 ///
-/// This operator can work in two modes:
-///
-/// - the leader (i.e. the replica selected via `select_leader`) will perform the global reduction
-///   synchronizing all the replicas of the iteration. After computing the new global state it will
-///   send it to all the followers signaling the start of the next iteration.
-/// - the followers after an iteration completes wait for the new state from the leader and later
-///   start the new iteration.
-///
-/// FIXME
-/// In both cases this operator reads from its predecessor the dataset till the end is reached
-/// (either `End` or `IterEnd` is received). When the dataset ends it sends `IterEnd` inside the
-/// loop and, according to the role, checks whether the next iteration should start again.
-///
 /// If a new iteration should start, the initial dataset is replayed.
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
@@ -50,12 +37,7 @@ where
     content_index: usize,
 
     /// Whether the input stream has ended or not.
-    ///
-    /// FIXME:
-    /// This will be `None` if items are still expected to arrive from `prev`. When `End` or
-    /// `IterEnd` has been received it is stored here. When all the iterations end, this will be
-    /// returned, allowing for nested iterations.
-    has_ended: Option<StreamElement<Out>>,
+    has_input_ended: bool,
 
     /// Whether this `Replay` is the _local_ leader.
     ///
@@ -109,8 +91,8 @@ struct ReplayLeader<DeltaUpdate: Data, State: Data> {
     feedback_block_id: Arc<AtomicUsize>,
     /// The senders to the `Replay` block for the information about the new iteration.
     new_state_senders: Vec<NetworkSender<NetworkMessage<NewIterationState<State>>>>,
-    /// Whether `next` should emit a `IterEnd` in the next call.
-    emit_end_iter: bool,
+    /// Whether `next` should emit a `FlushAndRestart` in the next call.
+    emit_flush_and_restart: bool,
 
     /// The function that combines the global state with a delta update.
     #[derivative(Debug = "ignore")]
@@ -144,7 +126,7 @@ where
     /// The block id of the block containing the `ReplayLeader` operator.
     leader_block_id: BlockId,
     /// The sender that points to the `Replay` leader for sending the `DeltaUpdate` messages.
-    sender: Option<NetworkSender<NetworkMessage<DeltaUpdate>>>,
+    leader_sender: Option<NetworkSender<NetworkMessage<DeltaUpdate>>>,
     /// The coordinates of this block.
     coord: Coord,
 }
@@ -158,7 +140,7 @@ where
             prev,
             has_received_item: false,
             leader_block_id,
-            sender: None,
+            leader_sender: None,
             coord: Default::default(),
         }
     }
@@ -183,7 +165,7 @@ impl<DeltaUpdate: Data, State: Data> ReplayLeader<DeltaUpdate, State> {
             iteration_index: 0,
             state: Some(initial_state),
             feedback_block_id,
-            emit_end_iter: false,
+            emit_flush_and_restart: false,
             global_fold: Arc::new(global_fold),
             loop_condition: Arc::new(loop_condition),
         }
@@ -209,7 +191,7 @@ where
             new_state_receiver: StartBlock::new(leader_block_id),
             content: Default::default(),
             content_index: 0,
-            has_ended: None,
+            has_input_ended: false,
             state_ref,
             state_barrier: Arc::new(Lazy::new()),
         }
@@ -320,7 +302,7 @@ where
         debug!("ReplayEndBlock {} has {} as leader", metadata.coord, leader);
 
         let sender = network.get_sender(ReceiverEndpoint::new(leader, metadata.coord.block_id));
-        self.sender = Some(sender);
+        self.leader_sender = Some(sender);
 
         drop(network);
 
@@ -333,19 +315,19 @@ where
         match &elem {
             StreamElement::Item(_) => {
                 let message = NetworkMessage::new(vec![elem], self.coord);
-                self.sender.as_ref().unwrap().send(message).unwrap();
+                self.leader_sender.as_ref().unwrap().send(message).unwrap();
                 self.has_received_item = true;
                 StreamElement::Item(())
             }
             StreamElement::FlushAndRestart => {
-                // If two IterEnd has been received in a row it means that no message went through
-                // the iteration inside this replica. Nevertheless the DeltaUpdate must be sent to
-                // the leader.
+                // If two FlushAndRestart have been received in a row it means that no message went
+                // through the iteration inside this replica. Nevertheless the DeltaUpdate must be
+                // sent to the leader.
                 if !self.has_received_item {
                     let update = Default::default();
                     let message =
                         NetworkMessage::new(vec![StreamElement::Item(update)], self.coord);
-                    let sender = self.sender.as_ref().unwrap();
+                    let sender = self.leader_sender.as_ref().unwrap();
                     sender.send(message).unwrap();
                 }
                 self.has_received_item = false;
@@ -353,7 +335,7 @@ where
             }
             StreamElement::Terminate => {
                 let message = NetworkMessage::new(vec![StreamElement::Terminate], self.coord);
-                self.sender.as_ref().unwrap().send(message).unwrap();
+                self.leader_sender.as_ref().unwrap().send(message).unwrap();
                 StreamElement::Terminate
             }
             StreamElement::FlushBatch => elem.map(|_| unreachable!()),
@@ -400,8 +382,8 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdat
     }
 
     fn next(&mut self) -> StreamElement<State> {
-        if self.emit_end_iter {
-            self.emit_end_iter = false;
+        if self.emit_flush_and_restart {
+            self.emit_flush_and_restart = false;
             return StreamElement::FlushAndRestart;
         }
         loop {
@@ -423,7 +405,7 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdat
                             Some((self.global_fold)(self.state.take().unwrap(), delta_update));
                     }
                     StreamElement::Terminate => {
-                        debug!("ReplayLeader {} received End", self.coord);
+                        debug!("ReplayLeader {} received Terminate", self.coord);
                         return StreamElement::Terminate;
                     }
                     StreamElement::FlushAndRestart => {}
@@ -456,7 +438,7 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdat
             }
 
             if !should_continue {
-                self.emit_end_iter = true;
+                self.emit_flush_and_restart = true;
                 self.iteration_index = 0;
                 let state = self.state.clone().unwrap();
                 return StreamElement::Item(state);
@@ -510,18 +492,17 @@ where
     }
 
     fn next(&mut self) -> StreamElement<Out> {
-        // input has not ended yet
-        if self.has_ended.is_none() {
+        if !self.has_input_ended {
             let item = self.prev.next();
 
             return match &item {
-                StreamElement::Terminate | StreamElement::FlushAndRestart => {
+                StreamElement::FlushAndRestart => {
                     debug!(
                         "Replay at {} received all the input: {} elements total",
                         self.coord,
                         self.content.len()
                     );
-                    self.has_ended = Some(item);
+                    self.has_input_ended = true;
                     self.content.push(StreamElement::FlushAndRestart);
                     // the first iteration has already happened
                     self.content_index = self.content.len();
@@ -536,6 +517,10 @@ where
                 }
                 // messages to forward without replaying
                 StreamElement::FlushBatch => item,
+                StreamElement::Terminate => {
+                    debug!("Replay at {} is terminating", self.coord);
+                    item
+                }
             };
         }
 
@@ -559,9 +544,6 @@ where
                 }
                 StreamElement::FlushBatch => {}
                 StreamElement::FlushAndRestart => {}
-                StreamElement::Terminate => {
-                    return StreamElement::Terminate;
-                }
                 _ => unreachable!(
                     "Replay received invalid message from ReplayLeader: {}",
                     message.variant()
@@ -591,7 +573,8 @@ where
             debug!("Replay block at {} ended the iteration", self.coord);
             // cleanup so that if this is a nested iteration next time we'll be good to start again
             self.content.clear();
-            return self.has_ended.take().unwrap();
+            self.has_input_ended = false;
+            return self.next();
         }
 
         // This iteration has ended but IterEnd has already been sent. To avoid sending twice the

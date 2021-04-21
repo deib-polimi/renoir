@@ -1,5 +1,5 @@
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::operator::source::Source;
+use crate::operator::source::{IteratorSource, Source};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 
@@ -11,7 +11,7 @@ where
     WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
 {
     #[derivative(Debug = "ignore")]
-    inner: It,
+    prev: IteratorSource<(Out, Timestamp), It>,
     #[derivative(Debug = "ignore")]
     watermark_gen: WatermarkGen,
     pending_watermark: Option<Timestamp>,
@@ -24,7 +24,7 @@ where
 {
     pub fn new(inner: It, watermark_gen: WatermarkGen) -> Self {
         Self {
-            inner,
+            prev: IteratorSource::new(inner),
             watermark_gen,
             pending_watermark: None,
         }
@@ -46,20 +46,25 @@ where
     It: Iterator<Item = (Out, Timestamp)> + Send + 'static,
     WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
 {
-    fn setup(&mut self, _metadata: ExecutionMetadata) {}
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
+    }
 
     fn next(&mut self) -> StreamElement<Out> {
         if let Some(ts) = self.pending_watermark.take() {
             return StreamElement::Watermark(ts);
         }
 
-        // TODO: with adaptive batching this does not work since it never emits FlushBatch messages
-        match self.inner.next() {
-            Some((item, ts)) => {
+        let item = self.prev.next();
+        match item {
+            StreamElement::Item((item, ts)) => {
                 self.pending_watermark = (self.watermark_gen)(&item, &ts);
                 StreamElement::Timestamped(item, ts)
             }
-            None => StreamElement::Terminate,
+            StreamElement::FlushBatch
+            | StreamElement::Terminate
+            | StreamElement::FlushAndRestart => item.map(|_| unreachable!()),
+            _ => unreachable!("EventTimeIteratorSource received invalid variant"),
         }
     }
 

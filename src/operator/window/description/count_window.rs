@@ -73,13 +73,11 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
                 self.timestamp_buffer.push_back(ts);
             }
             StreamElement::Watermark(ts) => self.last_watermark = Some(ts),
-            StreamElement::FlushBatch => unreachable!("Windows do not handle FlushBatch"),
-            StreamElement::Terminate => {
+            StreamElement::FlushAndRestart => {
                 self.received_end = true;
             }
-            StreamElement::FlushAndRestart => {
-                todo!("Count windows inside an iteration are not supported yet");
-            }
+            StreamElement::FlushBatch => unreachable!("Windows do not handle FlushBatch"),
+            StreamElement::Terminate => unreachable!("Windows do not handle Terminate"),
         }
     }
 
@@ -137,7 +135,7 @@ mod tests {
         assert!(generator.next_window().is_none());
         generator.add(StreamElement::Watermark(Duration::from_secs(4)));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Terminate);
+        generator.add(StreamElement::FlushAndRestart);
         let window = generator.next_window().unwrap();
         assert_eq!(
             window.timestamp,

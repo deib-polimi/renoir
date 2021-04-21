@@ -83,8 +83,8 @@ pub struct StartBlock<Out: Data> {
     #[derivative(Clone(clone_with = "clone_empty"))]
     receivers: Vec<NetworkReceiver<NetworkMessage<Out>>>,
     buffer: VecDeque<StreamElement<Out>>,
-    missing_ends: usize,
-    missing_iter_ends: usize,
+    missing_terminate: usize,
+    missing_flush_and_restart: usize,
     prev_replicas: Vec<Coord>,
     /// The last call to next caused a timeout, so a FlushBatch has been emitted. In this case this
     /// field is set to true to avoid flooding with FlushBatch.
@@ -100,8 +100,8 @@ impl<Out: Data> StartBlock<Out> {
             metadata: Default::default(),
             receivers: Default::default(),
             buffer: Default::default(),
-            missing_ends: Default::default(),
-            missing_iter_ends: Default::default(),
+            missing_terminate: Default::default(),
+            missing_flush_and_restart: Default::default(),
             prev_replicas: Default::default(),
             already_timed_out: Default::default(),
             prev_block_ids: vec![prev_block_id],
@@ -114,8 +114,8 @@ impl<Out: Data> StartBlock<Out> {
             metadata: Default::default(),
             receivers: Default::default(),
             buffer: Default::default(),
-            missing_ends: Default::default(),
-            missing_iter_ends: Default::default(),
+            missing_terminate: Default::default(),
+            missing_flush_and_restart: Default::default(),
             prev_replicas: Default::default(),
             already_timed_out: Default::default(),
             prev_block_ids,
@@ -156,8 +156,8 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                 }
             }
         }
-        self.missing_ends = self.num_prev();
-        self.missing_iter_ends = self.num_prev();
+        self.missing_terminate = self.num_prev();
+        self.missing_flush_and_restart = self.num_prev();
         self.watermark_frontier = WatermarkFrontier::new(self.prev_replicas.clone());
 
         info!(
@@ -170,13 +170,17 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
     fn next(&mut self) -> StreamElement<Out> {
         let metadata = self.metadata.as_ref().unwrap();
         // all the previous blocks sent an end: we're done
-        if self.missing_ends == 0 {
+        if self.missing_terminate == 0 {
             info!("StartBlock for {} has ended", metadata.coord);
             return StreamElement::Terminate;
         }
-        if self.missing_iter_ends == 0 {
-            info!("StartBlock for {} has ended an iteration", metadata.coord);
-            self.missing_iter_ends = self.num_prev();
+        if self.missing_flush_and_restart == 0 {
+            info!(
+                "StartBlock for {} is emitting flush and restart",
+                metadata.coord
+            );
+            self.missing_flush_and_restart = self.num_prev();
+            self.watermark_frontier = WatermarkFrontier::new(self.prev_replicas.clone());
             return StreamElement::FlushAndRestart;
         }
         while self.buffer.is_empty() {
@@ -231,18 +235,18 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
             .pop_front()
             .expect("Previous block sent an empty message");
         if matches!(message, StreamElement::FlushAndRestart) {
-            self.missing_iter_ends -= 1;
+            self.missing_flush_and_restart -= 1;
             debug!(
                 "{}/{:?} received an FlushAndRestart, {} more to come",
-                metadata.coord, self.prev_block_ids, self.missing_iter_ends
+                metadata.coord, self.prev_block_ids, self.missing_flush_and_restart
             );
             return self.next();
         }
         if matches!(message, StreamElement::Terminate) {
-            self.missing_ends -= 1;
+            self.missing_terminate -= 1;
             debug!(
-                "{}/{:?} received an end, {} more to come",
-                metadata.coord, self.prev_block_ids, self.missing_ends
+                "{}/{:?} received a Terminate, {} more to come",
+                metadata.coord, self.prev_block_ids, self.missing_terminate
             );
             return self.next();
         }

@@ -88,7 +88,7 @@ mod tests {
             Timestamp::from_secs(10),
         ));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Terminate);
+        generator.add(StreamElement::FlushAndRestart);
 
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Timestamp::from_millis(10500)));

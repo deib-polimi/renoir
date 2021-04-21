@@ -55,6 +55,11 @@ impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
                 match self.prev1.next() {
                     StreamElement::Watermark(ts) => self.watermarks1.push_back(ts),
                     StreamElement::FlushBatch => return StreamElement::FlushBatch,
+                    StreamElement::FlushAndRestart => {
+                        // consume the other stream
+                        while !matches!(self.prev2.next(), StreamElement::FlushAndRestart) {}
+                        return StreamElement::FlushAndRestart;
+                    }
                     StreamElement::Terminate => {
                         // consume the other stream
                         while !matches!(self.prev2.next(), StreamElement::Terminate) {}
@@ -71,6 +76,11 @@ impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
                     // make sure not to lose item1
                     self.item1_stash = Some(item1);
                     return StreamElement::FlushBatch;
+                }
+                StreamElement::FlushAndRestart => {
+                    // consume the other stream
+                    while !matches!(self.prev1.next(), StreamElement::FlushAndRestart) {}
+                    return StreamElement::FlushAndRestart;
                 }
                 StreamElement::Terminate => {
                     // consume the other stream

@@ -33,6 +33,7 @@ pub struct CsvSource<Out: Data> {
     path: PathBuf,
     csv_reader: Option<Reader<LimitedReader<BufReader<File>>>>,
     has_headers: bool,
+    terminated: bool,
     _out: PhantomData<Out>,
 }
 
@@ -42,6 +43,7 @@ impl<Out: Data> CsvSource<Out> {
             path: path.into(),
             csv_reader: None,
             has_headers,
+            terminated: false,
             _out: PhantomData,
         }
     }
@@ -142,14 +144,20 @@ impl<Out: Data> Operator<Out> for CsvSource<Out> {
     }
 
     fn next(&mut self) -> StreamElement<Out> {
+        if self.terminated {
+            return StreamElement::Terminate;
+        }
         let csv_reader = self
             .csv_reader
             .as_mut()
             .expect("CsvSource was not initialized");
 
         match csv_reader.deserialize::<Out>().next() {
-            None => StreamElement::Terminate,
             Some(item) => StreamElement::Item(item.unwrap()),
+            None => {
+                self.terminated = true;
+                StreamElement::FlushAndRestart
+            }
         }
     }
 
@@ -174,6 +182,7 @@ impl<Out: Data> Clone for CsvSource<Out> {
             path: self.path.clone(),
             csv_reader: None,
             has_headers: self.has_headers,
+            terminated: false,
             _out: PhantomData,
         }
     }
