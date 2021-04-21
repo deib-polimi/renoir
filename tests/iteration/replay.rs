@@ -1,3 +1,4 @@
+use rstream::operator::sink::StreamOutput;
 use rstream::operator::source::IteratorSource;
 use rstream::test::TestHelper;
 
@@ -80,5 +81,133 @@ fn test_replay_with_shuffle() {
 
             assert_eq!(res, state);
         }
+    });
+}
+
+fn check_nested_result(res: StreamOutput<Vec<u64>>) {
+    if let Some(res) = res.get() {
+        assert_eq!(res.len(), 1);
+        let res = res.into_iter().next().unwrap();
+
+        let mut expected = 0u64;
+        for _ in 0..2 {
+            for _ in 0..2 {
+                let mut inner = 0;
+                for i in 0..10 {
+                    inner += i;
+                }
+                expected += inner;
+            }
+        }
+
+        assert_eq!(res, expected);
+    }
+}
+
+#[test]
+fn test_replay_nested_no_shuffle() {
+    TestHelper::local_remote_env(|mut env| {
+        let source = IteratorSource::new(0..10u64);
+        let stream = env.stream(source).replay(
+            2,
+            0,
+            |s, _| {
+                s.replay(
+                    2,
+                    0,
+                    |s, _| s.reduce(|x, y| x + y),
+                    |update: u64, ele| update + ele,
+                    |state, update| state + update,
+                    |&mut _state| true,
+                )
+            },
+            |update: u64, ele| update + ele,
+            |state, update| state + update,
+            |&mut _state| true,
+        );
+        let res = stream.collect_vec();
+        env.execute();
+        check_nested_result(res);
+    });
+}
+
+#[test]
+fn test_replay_nested_shuffle_inner() {
+    TestHelper::local_remote_env(|mut env| {
+        let source = IteratorSource::new(0..10u64);
+        let stream = env.stream(source).replay(
+            2,
+            0,
+            |s, _| {
+                s.shuffle().replay(
+                    2,
+                    0,
+                    |s, _| s.reduce(|x, y| x + y),
+                    |update: u64, ele| update + ele,
+                    |state, update| state + update,
+                    |&mut _state| true,
+                )
+            },
+            |update: u64, ele| update + ele,
+            |state, update| state + update,
+            |&mut _state| true,
+        );
+        let res = stream.collect_vec();
+        env.execute();
+        check_nested_result(res);
+    });
+}
+
+#[test]
+fn test_replay_nested_shuffle_outer() {
+    TestHelper::local_remote_env(|mut env| {
+        let source = IteratorSource::new(0..10u64);
+        let stream = env.stream(source).shuffle().replay(
+            2,
+            0,
+            |s, _| {
+                s.replay(
+                    2,
+                    0,
+                    |s, _| s.reduce(|x, y| x + y),
+                    |update: u64, ele| update + ele,
+                    |state, update| state + update,
+                    |&mut _state| true,
+                )
+            },
+            |update: u64, ele| update + ele,
+            |state, update| state + update,
+            |&mut _state| true,
+        );
+        let res = stream.collect_vec();
+        env.execute();
+        check_nested_result(res);
+    });
+}
+
+#[test]
+fn test_replay_nested_shuffle_both() {
+    TestHelper::local_remote_env(|mut env| {
+        let source = IteratorSource::new(0..10u64);
+        let stream = env.stream(source).shuffle().replay(
+            2,
+            0,
+            |s, _| {
+                s.shuffle().replay(
+                    2,
+                    0,
+                    |s, _| s.reduce(|x, y| x + y),
+                    |update: u64, ele| update + ele,
+                    |state, update| state + update,
+                    |&mut _state| true,
+                )
+            },
+            |update: u64, ele| update + ele,
+            |state, update| state + update,
+            |&mut _state| true,
+        );
+        let res = stream.collect_vec();
+        env.execute();
+        check_nested_result(res);
     });
 }

@@ -73,6 +73,10 @@ struct ReplayLeader<DeltaUpdate: Data, State: Data> {
     /// It's an `Options` because the block needs to take ownership of it for processing it. It will
     /// be `None` only during that time frame.
     state: Option<State>,
+    /// The initial value of the global state of the iteration.
+    ///
+    /// Will be used for resetting the global state after all the iterations complete.
+    initial_state: State,
 
     /// The receiver from the `ReplayEndBlock`s at the end of the loop.
     ///
@@ -163,7 +167,8 @@ impl<DeltaUpdate: Data, State: Data> ReplayLeader<DeltaUpdate, State> {
 
             num_iterations,
             iteration_index: 0,
-            state: Some(initial_state),
+            state: Some(initial_state.clone()),
+            initial_state,
             feedback_block_id,
             emit_flush_and_restart: false,
             global_fold: Arc::new(global_fold),
@@ -428,6 +433,15 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdat
                 should_continue = false;
             }
 
+            let to_return = if !should_continue {
+                // reset the global state at the end of the iteration
+                let to_return = self.state.take();
+                self.state = Some(self.initial_state.clone());
+                to_return
+            } else {
+                None
+            };
+
             let new_state_message = (should_continue, self.state.clone().unwrap());
             for sender in &self.new_state_senders {
                 let message = NetworkMessage::new(
@@ -437,10 +451,10 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdat
                 sender.send(message).unwrap();
             }
 
-            if !should_continue {
+            if let Some(state) = to_return {
+                assert!(!should_continue);
                 self.emit_flush_and_restart = true;
                 self.iteration_index = 0;
-                let state = self.state.clone().unwrap();
                 return StreamElement::Item(state);
             }
         }
