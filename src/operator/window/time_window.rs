@@ -71,10 +71,10 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for TimeWindowGenerator<
                 self.last_seen = ts;
             }
             StreamElement::FlushBatch => unreachable!("Windows do not handle FlushBatch"),
-            StreamElement::End => {
+            StreamElement::Terminate => {
                 self.last_seen = Timestamp::new(u64::MAX, 0);
             }
-            StreamElement::IterEnd => {
+            StreamElement::FlushAndRestart => {
                 unimplemented!("Time windows are not yet supported inside an iteration (and probably never will)")
             }
         }

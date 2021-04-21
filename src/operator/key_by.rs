@@ -42,8 +42,8 @@ where
                 StreamElement::Timestamped(((self.keyer)(&t), t), ts)
             }
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
-            StreamElement::End => StreamElement::End,
-            StreamElement::IterEnd => StreamElement::IterEnd,
+            StreamElement::Terminate => StreamElement::Terminate,
+            StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
             StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
     }
@@ -100,6 +100,6 @@ mod tests {
                 item => panic!("Expected StreamElement::Item, got {}", item.variant()),
             }
         }
-        assert_eq!(key_by.next(), StreamElement::End);
+        assert_eq!(key_by.next(), StreamElement::Terminate);
     }
 }

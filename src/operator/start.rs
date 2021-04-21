@@ -172,12 +172,12 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
         // all the previous blocks sent an end: we're done
         if self.missing_ends == 0 {
             info!("StartBlock for {} has ended", metadata.coord);
-            return StreamElement::End;
+            return StreamElement::Terminate;
         }
         if self.missing_iter_ends == 0 {
             info!("StartBlock for {} has ended an iteration", metadata.coord);
             self.missing_iter_ends = self.num_prev();
-            return StreamElement::IterEnd;
+            return StreamElement::FlushAndRestart;
         }
         while self.buffer.is_empty() {
             let max_delay = metadata.batch_mode.max_delay();
@@ -230,15 +230,15 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
             .buffer
             .pop_front()
             .expect("Previous block sent an empty message");
-        if matches!(message, StreamElement::IterEnd) {
+        if matches!(message, StreamElement::FlushAndRestart) {
             self.missing_iter_ends -= 1;
             debug!(
-                "{}/{:?} received an IterEnd, {} more to come",
+                "{}/{:?} received an FlushAndRestart, {} more to come",
                 metadata.coord, self.prev_block_ids, self.missing_iter_ends
             );
             return self.next();
         }
-        if matches!(message, StreamElement::End) {
+        if matches!(message, StreamElement::Terminate) {
             self.missing_ends -= 1;
             debug!(
                 "{}/{:?} received an end, {} more to come",

@@ -107,6 +107,6 @@ mod tests {
         assert_eq!(filter.next(), StreamElement::Item(4));
         assert_eq!(filter.next(), StreamElement::Item(6));
         assert_eq!(filter.next(), StreamElement::Item(8));
-        assert_eq!(filter.next(), StreamElement::End);
+        assert_eq!(filter.next(), StreamElement::Terminate);
     }
 }

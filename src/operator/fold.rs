@@ -54,8 +54,8 @@ where
     fn next(&mut self) -> StreamElement<NewOut> {
         while !self.received_end {
             match self.prev.next() {
-                StreamElement::End => self.received_end = true,
-                StreamElement::IterEnd => {
+                StreamElement::Terminate => self.received_end = true,
+                StreamElement::FlushAndRestart => {
                     self.received_end = true;
                     self.received_end_iter = true;
                 }
@@ -98,10 +98,10 @@ where
         if self.received_end_iter {
             self.received_end_iter = false;
             self.received_end = false;
-            return StreamElement::IterEnd;
+            return StreamElement::FlushAndRestart;
         }
 
-        StreamElement::End
+        StreamElement::Terminate
     }
 
     fn to_string(&self) -> String {
@@ -162,7 +162,7 @@ mod tests {
         let mut fold = Fold::new(fake_operator, 0, |a, b| a + b);
 
         assert_eq!(fold.next(), StreamElement::Item((0..10u8).sum()));
-        assert_eq!(fold.next(), StreamElement::End);
+        assert_eq!(fold.next(), StreamElement::Terminate);
     }
 
     #[test]
@@ -184,7 +184,7 @@ mod tests {
             fold.next(),
             StreamElement::Watermark(Duration::from_secs(4))
         );
-        assert_eq!(fold.next(), StreamElement::End);
+        assert_eq!(fold.next(), StreamElement::Terminate);
     }
 
     #[test]
@@ -194,18 +194,18 @@ mod tests {
         fake_operator.push(StreamElement::Item(0));
         fake_operator.push(StreamElement::Item(1));
         fake_operator.push(StreamElement::Item(2));
-        fake_operator.push(StreamElement::IterEnd);
+        fake_operator.push(StreamElement::FlushAndRestart);
         fake_operator.push(StreamElement::Item(3));
         fake_operator.push(StreamElement::Item(4));
         fake_operator.push(StreamElement::Item(5));
-        fake_operator.push(StreamElement::IterEnd);
+        fake_operator.push(StreamElement::FlushAndRestart);
 
         let mut fold = Fold::new(fake_operator, 0, |a, b| a + b);
 
         assert_eq!(fold.next(), StreamElement::Item(0 + 1 + 2));
-        assert_eq!(fold.next(), StreamElement::IterEnd);
+        assert_eq!(fold.next(), StreamElement::FlushAndRestart);
         assert_eq!(fold.next(), StreamElement::Item(3 + 4 + 5));
-        assert_eq!(fold.next(), StreamElement::IterEnd);
-        assert_eq!(fold.next(), StreamElement::End);
+        assert_eq!(fold.next(), StreamElement::FlushAndRestart);
+        assert_eq!(fold.next(), StreamElement::Terminate);
     }
 }

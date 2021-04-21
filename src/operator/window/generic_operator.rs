@@ -106,8 +106,8 @@ where
                     }
                     StreamElement::Watermark(ts) => StreamElement::Watermark(ts),
                     StreamElement::FlushBatch => StreamElement::FlushBatch,
-                    StreamElement::End => StreamElement::End,
-                    StreamElement::IterEnd => StreamElement::IterEnd,
+                    StreamElement::Terminate => StreamElement::Terminate,
+                    StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
                 });
             }
         }

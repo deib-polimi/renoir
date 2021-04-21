@@ -76,8 +76,8 @@ where
                 }
                 StreamElement::Watermark(ts) => self.last_watermark = Some(ts),
                 StreamElement::FlushBatch => return StreamElement::FlushBatch,
-                StreamElement::End => self.received_end = true,
-                StreamElement::IterEnd => {
+                StreamElement::Terminate => self.received_end = true,
+                StreamElement::FlushAndRestart => {
                     unimplemented!("Reorder is not yet supported inside an iteration (and probably never will)")
                 }
             }
@@ -96,7 +96,7 @@ where
             match self.buffer.pop() {
                 // pop remaining elements in the heap
                 Some(element) => StreamElement::Timestamped(element.item, element.timestamp),
-                None => StreamElement::End,
+                None => StreamElement::Terminate,
             }
         }
     }
@@ -134,7 +134,7 @@ mod tests {
         for i in &[6, 4, 5] {
             fake.push(StreamElement::Timestamped(*i, Duration::new(*i, 0)));
         }
-        fake.push(StreamElement::End);
+        fake.push(StreamElement::Terminate);
 
         let mut reorder = Reorder::new(fake);
 
@@ -151,6 +151,6 @@ mod tests {
             }
         }
 
-        assert_eq!(reorder.next(), StreamElement::End);
+        assert_eq!(reorder.next(), StreamElement::Terminate);
     }
 }

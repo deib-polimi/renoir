@@ -103,7 +103,7 @@ struct KeyedWindowManager<Key: DataKey, Out: Data, WindowDescr: WindowDescriptio
     generators: HashMap<Key, WindowDescr::Generator>,
     /// The list of additional items to return downstream.
     ///
-    /// This list will include the watermarks, End, and other non-data items.
+    /// This list will include the `Watermark`s, `Terminate`, and other non-data items.
     extra_items: VecDeque<StreamElement<KeyValue<Key, Out>>>,
 }
 
@@ -143,7 +143,9 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
                 );
             }
 
-            StreamElement::End | StreamElement::IterEnd | StreamElement::Watermark(_) => {
+            StreamElement::Terminate
+            | StreamElement::FlushAndRestart
+            | StreamElement::Watermark(_) => {
                 // Pass the element to every window generator
                 for (_key, gen) in self.generators.iter_mut() {
                     gen.add(el.clone());

@@ -66,8 +66,8 @@ where
                         .collect()
                 }
                 StreamElement::Watermark(ts) => return StreamElement::Watermark(ts),
-                StreamElement::End => return StreamElement::End,
-                StreamElement::IterEnd => return StreamElement::IterEnd,
+                StreamElement::Terminate => return StreamElement::Terminate,
+                StreamElement::FlushAndRestart => return StreamElement::FlushAndRestart,
                 StreamElement::FlushBatch => return StreamElement::FlushBatch,
             }
         }
@@ -173,7 +173,7 @@ mod tests {
         for i in 0..=7 {
             assert_eq!(flatten.next(), StreamElement::Item(i));
         }
-        assert_eq!(flatten.next(), StreamElement::End);
+        assert_eq!(flatten.next(), StreamElement::Terminate);
     }
 
     #[test]
@@ -210,6 +210,6 @@ mod tests {
             flatten.next(),
             StreamElement::Watermark(Duration::from_secs(4))
         );
-        assert_eq!(flatten.next(), StreamElement::End);
+        assert_eq!(flatten.next(), StreamElement::Terminate);
     }
 }

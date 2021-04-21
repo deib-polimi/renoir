@@ -32,9 +32,9 @@ where
                 StreamElement::Item(())
             }
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
-            StreamElement::End => StreamElement::End,
+            StreamElement::Terminate => StreamElement::Terminate,
             StreamElement::FlushBatch => StreamElement::FlushBatch,
-            StreamElement::IterEnd => StreamElement::IterEnd,
+            StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
         }
     }
 

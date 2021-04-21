@@ -91,8 +91,8 @@ where
     fn next(&mut self) -> StreamElement<KeyValue<Key, NewOut>> {
         while !self.received_end {
             match self.prev.next() {
-                StreamElement::End => self.received_end = true,
-                StreamElement::IterEnd => {
+                StreamElement::Terminate => self.received_end = true,
+                StreamElement::FlushAndRestart => {
                     self.received_end = true;
                     self.received_end_iter = true;
                 }
@@ -134,10 +134,10 @@ where
         if self.received_end_iter {
             self.received_end_iter = false;
             self.received_end = false;
-            return StreamElement::IterEnd;
+            return StreamElement::FlushAndRestart;
         }
 
-        StreamElement::End
+        StreamElement::Terminate
     }
 
     fn to_string(&self) -> String {
@@ -238,7 +238,7 @@ mod tests {
             }
         }
 
-        assert_eq!(keyed_fold.next(), StreamElement::End);
+        assert_eq!(keyed_fold.next(), StreamElement::Terminate);
 
         res.sort_unstable();
         assert_eq!(res[0].1, 0 + 2 + 4 + 6 + 8);
@@ -272,7 +272,7 @@ mod tests {
             keyed_fold.next(),
             StreamElement::Watermark(Duration::from_secs(4))
         );
-        assert_eq!(keyed_fold.next(), StreamElement::End);
+        assert_eq!(keyed_fold.next(), StreamElement::Terminate);
 
         res.sort_unstable();
         assert_eq!(res[0].0 .1, 0 + 2);
@@ -287,17 +287,17 @@ mod tests {
         let mut fake_operator = FakeOperator::empty();
         fake_operator.push(StreamElement::Item((0, 0)));
         fake_operator.push(StreamElement::Item((0, 2)));
-        fake_operator.push(StreamElement::IterEnd);
+        fake_operator.push(StreamElement::FlushAndRestart);
         fake_operator.push(StreamElement::Item((1, 1)));
         fake_operator.push(StreamElement::Item((1, 3)));
-        fake_operator.push(StreamElement::IterEnd);
+        fake_operator.push(StreamElement::FlushAndRestart);
 
         let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| a + b);
 
         assert_eq!(keyed_fold.next(), StreamElement::Item((0, 0 + 2)));
-        assert_eq!(keyed_fold.next(), StreamElement::IterEnd);
+        assert_eq!(keyed_fold.next(), StreamElement::FlushAndRestart);
         assert_eq!(keyed_fold.next(), StreamElement::Item((1, 1 + 3)));
-        assert_eq!(keyed_fold.next(), StreamElement::IterEnd);
-        assert_eq!(keyed_fold.next(), StreamElement::End);
+        assert_eq!(keyed_fold.next(), StreamElement::FlushAndRestart);
+        assert_eq!(keyed_fold.next(), StreamElement::Terminate);
     }
 }

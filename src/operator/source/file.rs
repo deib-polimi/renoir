@@ -88,11 +88,11 @@ impl Operator<String> for FileSource {
                     self.current += len;
                     StreamElement::Item(line)
                 }
-                Ok(_) => StreamElement::End,
+                Ok(_) => StreamElement::Terminate,
                 Err(e) => panic!("Error while reading file: {:?}", e),
             }
         } else {
-            StreamElement::End
+            StreamElement::Terminate
         };
 
         element

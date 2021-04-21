@@ -208,7 +208,7 @@ impl<Out: Data> Operator<Out> for FakeOperator<Out> {
         if let Some(item) = self.buffer.pop_front() {
             item
         } else {
-            StreamElement::End
+            StreamElement::Terminate
         }
     }
 

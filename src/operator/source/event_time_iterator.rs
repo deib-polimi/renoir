@@ -59,7 +59,7 @@ where
                 self.pending_watermark = (self.watermark_gen)(&item, &ts);
                 StreamElement::Timestamped(item, ts)
             }
-            None => StreamElement::End,
+            None => StreamElement::Terminate,
         }
     }
 

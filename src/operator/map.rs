@@ -127,6 +127,6 @@ mod tests {
             map.next(),
             StreamElement::Watermark(Duration::from_secs(100))
         );
-        assert_eq!(map.next(), StreamElement::End);
+        assert_eq!(map.next(), StreamElement::Terminate);
     }
 }

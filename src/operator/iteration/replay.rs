@@ -24,6 +24,7 @@ type NewIterationState<State> = (bool, State);
 /// - the followers after an iteration completes wait for the new state from the leader and later
 ///   start the new iteration.
 ///
+/// FIXME
 /// In both cases this operator reads from its predecessor the dataset till the end is reached
 /// (either `End` or `IterEnd` is received). When the dataset ends it sends `IterEnd` inside the
 /// loop and, according to the role, checks whether the next iteration should start again.
@@ -50,6 +51,7 @@ where
 
     /// Whether the input stream has ended or not.
     ///
+    /// FIXME:
     /// This will be `None` if items are still expected to arrive from `prev`. When `End` or
     /// `IterEnd` has been received it is stored here. When all the iterations end, this will be
     /// returned, allowing for nested iterations.
@@ -335,7 +337,7 @@ where
                 self.has_received_item = true;
                 StreamElement::Item(())
             }
-            StreamElement::IterEnd => {
+            StreamElement::FlushAndRestart => {
                 // If two IterEnd has been received in a row it means that no message went through
                 // the iteration inside this replica. Nevertheless the DeltaUpdate must be sent to
                 // the leader.
@@ -347,12 +349,12 @@ where
                     sender.send(message).unwrap();
                 }
                 self.has_received_item = false;
-                StreamElement::IterEnd
+                StreamElement::FlushAndRestart
             }
-            StreamElement::End => {
-                let message = NetworkMessage::new(vec![StreamElement::End], self.coord);
+            StreamElement::Terminate => {
+                let message = NetworkMessage::new(vec![StreamElement::Terminate], self.coord);
                 self.sender.as_ref().unwrap().send(message).unwrap();
-                StreamElement::End
+                StreamElement::Terminate
             }
             StreamElement::FlushBatch => elem.map(|_| unreachable!()),
             _ => unreachable!(),
@@ -400,7 +402,7 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdat
     fn next(&mut self) -> StreamElement<State> {
         if self.emit_end_iter {
             self.emit_end_iter = false;
-            return StreamElement::IterEnd;
+            return StreamElement::FlushAndRestart;
         }
         loop {
             debug!(
@@ -420,11 +422,11 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for ReplayLeader<DeltaUpdat
                         self.state =
                             Some((self.global_fold)(self.state.take().unwrap(), delta_update));
                     }
-                    StreamElement::End => {
+                    StreamElement::Terminate => {
                         debug!("ReplayLeader {} received End", self.coord);
-                        return StreamElement::End;
+                        return StreamElement::Terminate;
                     }
-                    StreamElement::IterEnd => {}
+                    StreamElement::FlushAndRestart => {}
                     StreamElement::FlushBatch => {}
                     _ => unreachable!(
                         "ReplayLeader received an invalid message: {}",
@@ -513,17 +515,17 @@ where
             let item = self.prev.next();
 
             return match &item {
-                StreamElement::End | StreamElement::IterEnd => {
+                StreamElement::Terminate | StreamElement::FlushAndRestart => {
                     debug!(
                         "Replay at {} received all the input: {} elements total",
                         self.coord,
                         self.content.len()
                     );
                     self.has_ended = Some(item);
-                    self.content.push(StreamElement::IterEnd);
+                    self.content.push(StreamElement::FlushAndRestart);
                     // the first iteration has already happened
                     self.content_index = self.content.len();
-                    StreamElement::IterEnd
+                    StreamElement::FlushAndRestart
                 }
                 // messages to save for the replay
                 StreamElement::Item(_)
@@ -556,9 +558,9 @@ where
                     break (should_continue, new_state);
                 }
                 StreamElement::FlushBatch => {}
-                StreamElement::IterEnd => {}
-                StreamElement::End => {
-                    return StreamElement::End;
+                StreamElement::FlushAndRestart => {}
+                StreamElement::Terminate => {
+                    return StreamElement::Terminate;
                 }
                 _ => unreachable!(
                     "Replay received invalid message from ReplayLeader: {}",

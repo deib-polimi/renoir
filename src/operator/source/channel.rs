@@ -27,7 +27,7 @@ impl<Out: Data> Operator<Out> for ChannelSource<Out> {
         if let Ok(elem) = self.receiver.recv() {
             elem
         } else {
-            StreamElement::End
+            StreamElement::Terminate
         }
     }
 

@@ -41,7 +41,7 @@ where
         // TODO: with adaptive batching this does not work since it never emits FlushBatch messages
         match self.inner.next() {
             Some(t) => StreamElement::Item(t),
-            None => StreamElement::End,
+            None => StreamElement::Terminate,
         }
     }
 

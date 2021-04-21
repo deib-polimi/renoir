@@ -95,7 +95,7 @@ fn worker<Out: Data, OperatorChain>(
     let mut catch_panic = CatchPanic::new(|| {
         error!("Worker {} has crashed!", metadata.coord);
     });
-    while !matches!(block.operators.next(), StreamElement::End) {
+    while !matches!(block.operators.next(), StreamElement::Terminate) {
         // nothing to do
     }
     catch_panic.defuse();

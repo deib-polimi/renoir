@@ -69,13 +69,15 @@ where
         let message = self.prev.next();
         let to_return = message.take();
         match &message {
-            StreamElement::Watermark(_) | StreamElement::End | StreamElement::IterEnd => {
+            StreamElement::Watermark(_)
+            | StreamElement::Terminate
+            | StreamElement::FlushAndRestart => {
                 for senders in self.sender_groups.iter() {
                     for &sender in senders.0.iter() {
                         let sender = self.senders.get_mut(&sender).unwrap();
                         sender.enqueue(message.clone());
                         // make sure to flush at the end of each iteration
-                        if matches!(message, StreamElement::IterEnd) {
+                        if matches!(message, StreamElement::FlushAndRestart) {
                             sender.flush();
                         }
                     }
@@ -107,10 +109,10 @@ where
             }
         };
 
-        if matches!(to_return, StreamElement::End) {
+        if matches!(to_return, StreamElement::Terminate) {
             let metadata = self.metadata.as_ref().unwrap();
             debug!(
-                "EndBlock at {} received End, closing {} channels",
+                "EndBlock at {} received Terminate, closing {} channels",
                 metadata.coord,
                 self.senders.len()
             );

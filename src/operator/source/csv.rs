@@ -148,7 +148,7 @@ impl<Out: Data> Operator<Out> for CsvSource<Out> {
             .expect("CsvSource was not initialized");
 
         match csv_reader.deserialize::<Out>().next() {
-            None => StreamElement::End,
+            None => StreamElement::Terminate,
             Some(item) => StreamElement::Item(item.unwrap()),
         }
     }
