@@ -6,6 +6,7 @@ use crate::block::{
 use crate::network::ReceiverEndpoint;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
+use crate::stream::BlockId;
 
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
@@ -20,6 +21,8 @@ where
     sender_groups: Vec<SenderList>,
     #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
     senders: HashMap<ReceiverEndpoint, Batcher<Out>>,
+    feedback_id: Option<BlockId>,
+    ignore_block_ids: Vec<BlockId>,
 }
 
 impl<Out: Data, OperatorChain> EndBlock<Out, OperatorChain>
@@ -38,7 +41,21 @@ where
             batch_mode,
             sender_groups: Default::default(),
             senders: Default::default(),
+            feedback_id: None,
+            ignore_block_ids: Default::default(),
         }
+    }
+
+    /// Mark this `EndBlock` as the end of a feedback loop.
+    ///
+    /// This will avoid this block from sending `Terminate` in the feedback loop, the destination
+    /// should be already gone.
+    pub(crate) fn mark_feedback(&mut self, block_id: BlockId) {
+        self.feedback_id = Some(block_id);
+    }
+
+    pub(crate) fn ignore_destination(&mut self, block_id: BlockId) {
+        self.ignore_block_ids.push(block_id);
     }
 }
 
@@ -50,11 +67,12 @@ where
         self.prev.setup(metadata.clone());
 
         let senders = metadata.network.lock().unwrap().get_senders(metadata.coord);
-        // Group the senders based on the strategy. Ignore all the senders to this very block.
-        // This is needed by the iterations and maybe more complex operators: self-loops inside the
-        // job graph are used for sending messages between replicas of the same block. In this case
-        // the EndBlock should ignore those destinations and those channels must be manually managed
-        // by the operators that use them.
+        // remove the ignored destinations
+        let senders = senders
+            .into_iter()
+            .filter(|(endpoint, _)| !self.ignore_block_ids.contains(&endpoint.coord.block_id))
+            .collect();
+        // group the senders based on the strategy
         self.sender_groups = self
             .next_strategy
             .group_senders(&senders, Some(metadata.coord.block_id));
@@ -74,6 +92,14 @@ where
             | StreamElement::FlushAndRestart => {
                 for senders in self.sender_groups.iter() {
                     for &sender in senders.0.iter() {
+                        // if this block is the end of the feedback loop it should not forward
+                        // `Terminate` since the destination is before us in the termination chain,
+                        // and therefore has already left
+                        if matches!(message, StreamElement::Terminate)
+                            && Some(sender.coord.block_id) == self.feedback_id
+                        {
+                            continue;
+                        }
                         let sender = self.senders.get_mut(&sender).unwrap();
                         sender.enqueue(message.clone());
                         // make sure to flush at the end of each iteration
