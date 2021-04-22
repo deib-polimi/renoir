@@ -9,12 +9,12 @@ use anyhow::Result;
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
 use crossbeam_channel::{
     bounded, select, unbounded, Receiver, RecvError as ExtRecvError,
-    RecvTimeoutError as ExtRecvTimeoutError, Select, Sender,
+    RecvTimeoutError as ExtRecvTimeoutError, Select, Sender, TryRecvError as ExtTryRecvError,
 };
 #[cfg(all(not(feature = "crossbeam"), feature = "flume"))]
 use flume::{
     bounded, unbounded, Receiver, RecvError as ExtRecvError,
-    RecvTimeoutError as ExtRecvTimeoutError, Sender,
+    RecvTimeoutError as ExtRecvTimeoutError, Sender, TryRecvError as ExtTryRecvError,
 };
 
 pub trait ChannelItem: Send + Sync + 'static {}
@@ -22,6 +22,7 @@ impl<T: Send + Sync + 'static> ChannelItem for T {}
 
 pub type RecvError = ExtRecvError;
 pub type RecvTimeoutError = ExtRecvTimeoutError;
+pub type TryRecvError = ExtTryRecvError;
 
 /// An _either_ type with the result of a select on 2 channels.
 #[allow(dead_code)] // TODO: remove once joins are implemented
@@ -224,6 +225,12 @@ impl<T: ChannelItem> BoundedChannelReceiver<T> {
     #[inline]
     pub fn recv(&self) -> Result<T, RecvError> {
         self.0.recv()
+    }
+
+    /// Like `recv`, but without blocking.
+    #[inline]
+    pub fn try_recv(&self) -> Result<T, TryRecvError> {
+        self.0.try_recv()
     }
 
     /// Block until a message is present in the channel and return it when ready.

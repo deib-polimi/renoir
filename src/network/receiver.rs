@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 
 use crate::channel::{
     BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectAnyResult, SelectResult,
+    TryRecvError,
 };
 use crate::network::{NetworkSender, ReceiverEndpoint};
 use crate::operator::Data;
@@ -64,6 +65,12 @@ impl<In: Data> NetworkReceiver<In> {
                 e
             )
         })
+    }
+
+    /// Receive a message from any sender without blocking.
+    #[allow(dead_code)]
+    pub fn try_recv(&self) -> Result<In, TryRecvError> {
+        self.receiver.try_recv()
     }
 
     /// Receive a message from any sender with a timeout.
