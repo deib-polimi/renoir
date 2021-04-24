@@ -219,6 +219,7 @@ fn query3_with_source(
     (res, avg_per_week)
 }
 
+#[allow(clippy::type_complexity)]
 fn query3<P: Into<PathBuf>>(
     env: &mut StreamEnvironment,
     path: P,
