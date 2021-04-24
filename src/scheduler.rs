@@ -68,7 +68,7 @@ pub(crate) struct Scheduler {
     /// The configuration of the environment.
     config: EnvironmentConfig,
     /// Adjacency list of the job graph.
-    next_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>>,
+    next_blocks: HashMap<BlockId, Vec<(BlockId, TypeId, bool)>>,
     /// Reverse adjacency list of the job graph.
     prev_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>>,
     /// Information about the blocks known to the scheduler.
@@ -145,7 +145,20 @@ impl Scheduler {
     /// Connect a pair of blocks inside the job graph.
     pub(crate) fn connect_blocks(&mut self, from: BlockId, to: BlockId, typ: TypeId) {
         info!("Connecting blocks: {} -> {}", from, to);
-        self.next_blocks.entry(from).or_default().push((to, typ));
+        self.next_blocks
+            .entry(from)
+            .or_default()
+            .push((to, typ, false));
+        self.prev_blocks.entry(to).or_default().push((from, typ));
+    }
+
+    /// Connect a pair of blocks inside the job graph, marking the connection as fragile.
+    pub(crate) fn connect_blocks_fragile(&mut self, from: BlockId, to: BlockId, typ: TypeId) {
+        info!("Connecting blocks: {} -> {} (fragile)", from, to);
+        self.next_blocks
+            .entry(from)
+            .or_default()
+            .push((to, typ, true));
         self.prev_blocks.entry(to).or_default().push((from, typ));
     }
 
@@ -203,22 +216,22 @@ impl Scheduler {
     fn build_execution_graph(&mut self) {
         for (from_block_id, next) in self.next_blocks.iter() {
             let from = &self.block_info[from_block_id];
-            for &(to_block_id, typ) in next.iter() {
+            for &(to_block_id, typ, fragile) in next.iter() {
                 let to = &self.block_info[&to_block_id];
                 // for each pair (from -> to) inside the job graph, connect all the corresponding
                 // jobs of the execution graph
                 for &from_coord in from.replicas.values().flatten() {
                     let to: Vec<_> = to.replicas.values().flatten().collect();
                     for &to_coord in &to {
-                        if from.is_only_one_strategy {
+                        if from.is_only_one_strategy || fragile {
                             if to.len() == 1
                                 || (to_coord.host_id == from_coord.host_id
                                     && to_coord.replica_id == from_coord.replica_id)
                             {
-                                self.network.connect(from_coord, *to_coord, typ);
+                                self.network.connect(from_coord, *to_coord, typ, fragile);
                             }
                         } else {
-                            self.network.connect(from_coord, *to_coord, typ);
+                            self.network.connect(from_coord, *to_coord, typ, fragile);
                         }
                     }
                 }
@@ -231,7 +244,11 @@ impl Scheduler {
         for block_id in 0..self.block_info.len() {
             topology += &format!("\n  {}: {}", block_id, self.block_info[&block_id].repr);
             if let Some(next) = &self.next_blocks.get(&block_id) {
-                let sorted = next.iter().map(|(x, _)| x).sorted().collect_vec();
+                let sorted = next
+                    .iter()
+                    .map(|(x, _, fragile)| format!("{}{}", x, if *fragile { "*" } else { "" }))
+                    .sorted()
+                    .collect_vec();
                 topology += &format!("\n    -> {:?}", sorted);
             }
         }

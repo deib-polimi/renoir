@@ -95,7 +95,7 @@ pub(crate) struct NetworkTopology {
     multiplexers: SendMap,
 
     /// The adjacency list of the execution graph.
-    next: HashMap<(Coord, TypeId), Vec<Coord>>,
+    next: HashMap<(Coord, TypeId), Vec<(Coord, bool)>>,
     /// The inverse adjacency list of the execution graph.
     prev: HashMap<Coord, Vec<(Coord, TypeId)>>,
     /// The metadata about all the registered senders.
@@ -172,9 +172,13 @@ impl NetworkTopology {
             Some(next) => {
                 let next = next.clone();
                 next.iter()
-                    .map(|&c| {
-                        let receiver_endpoint = ReceiverEndpoint::new(c, coord.block_id);
-                        (receiver_endpoint, self.get_sender(receiver_endpoint))
+                    .filter_map(|&(c, fragile)| {
+                        if fragile {
+                            None
+                        } else {
+                            let receiver_endpoint = ReceiverEndpoint::new(c, coord.block_id);
+                            Some((receiver_endpoint, self.get_sender(receiver_endpoint)))
+                        }
                     })
                     .collect()
             }
@@ -276,7 +280,7 @@ impl NetworkTopology {
                         if typ != TypeId::of::<T>() {
                             continue;
                         }
-                        for &to in to {
+                        for &(to, _fragile) in to {
                             if demux_coord.includes_channel(from, to) {
                                 prev.insert(BlockCoord::from(from));
                             }
@@ -337,7 +341,10 @@ impl NetworkTopology {
     /// prepare any sender/receiver for that channel.
     ///
     /// This will not actually bind/connect sockets, it will just mark them as bindable/connectable.
-    pub fn connect(&mut self, from: Coord, to: Coord, typ: TypeId) {
+    ///
+    /// If `fragile` is set to `true`, this connection won't be available with `get_senders` but
+    /// only with `get_sender`.
+    pub fn connect(&mut self, from: Coord, to: Coord, typ: TypeId, fragile: bool) {
         let host_id = self.config.host_id.unwrap();
         let from_remote = from.host_id != host_id;
         let to_remote = to.host_id != host_id;
@@ -346,7 +353,10 @@ impl NetworkTopology {
             "New connection: {} (remote={}) -> {} (remote={})",
             from, from_remote, to, to_remote
         );
-        self.next.entry((from, typ)).or_default().push(to);
+        self.next
+            .entry((from, typ))
+            .or_default()
+            .push((to, fragile));
         self.prev.entry(to).or_default().push((from, typ));
 
         // save the replicas
@@ -409,7 +419,7 @@ impl NetworkTopology {
         };
         let mut coords = HashSet::new();
         for (&(from, _typ), to) in self.next.iter() {
-            for &to in to {
+            for &(to, _fragile) in to {
                 let coord = DemuxCoord::new(from, to);
                 coords.insert(coord);
             }
@@ -432,8 +442,8 @@ impl NetworkTopology {
         let mut topology = "Execution graph:".to_owned();
         for ((coord, _typ), next) in self.next.iter().sorted() {
             topology += &format!("\n  {}:", coord);
-            for next in next.iter().sorted() {
-                topology += &format!(" {}", next);
+            for (next, fragile) in next.iter().sorted() {
+                topology += &format!(" {}{}", next, if *fragile { "*" } else { "" });
             }
         }
         debug!("{}", topology);
@@ -468,9 +478,9 @@ mod tests {
         let receiver1 = Coord::new(2, 0, 0);
         let receiver2 = Coord::new(3, 0, 0);
 
-        topology.connect(sender1, receiver1, TypeId::of::<i32>());
-        topology.connect(sender2, receiver1, TypeId::of::<u64>());
-        topology.connect(sender2, receiver2, TypeId::of::<u64>());
+        topology.connect(sender1, receiver1, TypeId::of::<i32>(), false);
+        topology.connect(sender2, receiver1, TypeId::of::<u64>(), false);
+        topology.connect(sender2, receiver2, TypeId::of::<u64>(), false);
         topology.finalize_topology();
 
         let endpoint1 = ReceiverEndpoint::new(receiver1, 0);
@@ -538,12 +548,12 @@ mod tests {
             let r1 = Coord::new(2, 1, 0);
             let r2 = Coord::new(2, 1, 1);
 
-            topology.connect(s1, r1, TypeId::of::<i32>());
-            topology.connect(s2, r1, TypeId::of::<i32>());
-            topology.connect(s3, r1, TypeId::of::<u64>());
-            topology.connect(s4, r1, TypeId::of::<u64>());
-            topology.connect(s3, r2, TypeId::of::<u64>());
-            topology.connect(s4, r2, TypeId::of::<u64>());
+            topology.connect(s1, r1, TypeId::of::<i32>(), false);
+            topology.connect(s2, r1, TypeId::of::<i32>(), false);
+            topology.connect(s3, r1, TypeId::of::<u64>(), false);
+            topology.connect(s4, r1, TypeId::of::<u64>(), false);
+            topology.connect(s3, r2, TypeId::of::<u64>(), false);
+            topology.connect(s4, r2, TypeId::of::<u64>(), false);
             topology.finalize_topology();
 
             let endpoint1 = ReceiverEndpoint::new(r1, 0);
@@ -656,8 +666,8 @@ mod tests {
         let receiver1 = Coord::new(1, 0, 0);
         let receiver2 = Coord::new(2, 0, 0);
 
-        topology.connect(sender1, receiver1, TypeId::of::<i32>());
-        topology.connect(sender2, receiver2, TypeId::of::<u64>());
+        topology.connect(sender1, receiver1, TypeId::of::<i32>(), false);
+        topology.connect(sender2, receiver2, TypeId::of::<u64>(), false);
         topology.finalize_topology();
 
         let endpoint1 = ReceiverEndpoint::new(receiver1, 0);

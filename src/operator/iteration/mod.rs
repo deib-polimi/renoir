@@ -2,8 +2,10 @@ use std::cell::UnsafeCell;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Condvar, Mutex};
 
+pub use iterate::*;
 pub use replay::*;
 
+mod iterate;
 mod iteration_end;
 mod leader;
 mod replay;
@@ -138,6 +140,7 @@ impl<T> Debug for IterationStateHandle<T> {
 ///
 /// This means that locking and unlocking the state increments the generation by 2.
 #[derive(Debug, Default)]
+#[allow(clippy::mutex_atomic)]
 pub struct IterationStateLock {
     /// The index of the generation.
     generation: Mutex<usize>,
@@ -145,6 +148,7 @@ pub struct IterationStateLock {
     cond_var: Condvar,
 }
 
+#[allow(clippy::mutex_atomic)]
 impl IterationStateLock {
     /// Lock the state.
     ///
@@ -168,7 +172,7 @@ impl IterationStateLock {
 
     /// Block the thread if the current generation of the lock is lower that the requested one.
     pub fn wait_for_update(&self, generation: usize) {
-        let _ = self
+        let _gen = self
             .cond_var
             .wait_while(self.generation.lock().unwrap(), |r| *r < generation)
             .unwrap();
