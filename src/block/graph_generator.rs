@@ -71,7 +71,7 @@ impl JobGraphGenerator {
 
         for (index, operator) in block.operators.iter().enumerate() {
             let id = Self::operator_id(block_id, index);
-            let label = &operator.title; // TODO: escape
+            let label = format!("{}\\l{}", operator.title, operator.subtitle); // TODO: escape
             let shape = match operator.kind {
                 OperatorKind::Operator => "box",
                 OperatorKind::Sink => "house",

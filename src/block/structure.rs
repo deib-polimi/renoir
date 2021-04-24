@@ -27,6 +27,8 @@ pub struct BlockStructure {
 pub struct OperatorStructure {
     /// The title of the operator.
     pub title: String,
+    /// The subtitle of the operator.
+    pub subtitle: String,
     /// The kind of operator: `Operator`, `Source` or `Sink`.
     pub kind: OperatorKind,
     /// The list of receivers this operator registers for the block.
@@ -145,6 +147,7 @@ impl OperatorStructure {
     pub fn new<Out: ?Sized, S: Into<String>>(title: S) -> Self {
         Self {
             title: title.into(),
+            subtitle: "".into(),
             kind: OperatorKind::Operator,
             receivers: Default::default(),
             connections: Default::default(),
