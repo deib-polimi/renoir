@@ -176,6 +176,9 @@ impl TestHelper {
     /// The list should be comma separated without spaces.
     fn parse_list_from_env(var_name: &str) -> Option<Vec<usize>> {
         let content = std::env::var(var_name).ok()?;
+        if content.is_empty() {
+            return Some(Vec::new());
+        }
         let values = content.split(',').map(|s| usize::from_str(s)).collect_vec();
         process_results(values.into_iter(), |values| values.collect_vec()).ok()
     }

@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 pub use batcher::BatchMode;
 pub(crate) use batcher::*;
@@ -7,7 +8,7 @@ pub(crate) use graph_generator::*;
 pub(crate) use next_strategy::*;
 pub(crate) use structure::*;
 
-use crate::operator::{Data, Operator};
+use crate::operator::{Data, IterationStateLock, Operator};
 use crate::stream::BlockId;
 
 mod batcher;
@@ -33,6 +34,9 @@ where
     pub(crate) operators: OperatorChain,
     /// The batch mode of this block.
     pub(crate) batch_mode: BatchMode,
+    /// This block may be inside a number of iteration loops, this stack keeps track of the state
+    /// lock for each of them.
+    pub(crate) iteration_state_lock_stack: Vec<Arc<IterationStateLock>>,
     /// Whether this block has `NextStrategy::OnlyOne`.
     pub(crate) is_only_one_strategy: bool,
     /// The set of requirements that the block imposes on the scheduler.
@@ -55,11 +59,17 @@ impl<Out: Data, OperatorChain> InnerBlock<Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
-    pub fn new(id: BlockId, operators: OperatorChain, batch_mode: BatchMode) -> Self {
+    pub fn new(
+        id: BlockId,
+        operators: OperatorChain,
+        batch_mode: BatchMode,
+        iteration_state_lock_stack: Vec<Arc<IterationStateLock>>,
+    ) -> Self {
         Self {
             id,
             operators,
             batch_mode,
+            iteration_state_lock_stack,
             is_only_one_strategy: false,
             scheduler_requirements: Default::default(),
             _out_type: Default::default(),

@@ -1,10 +1,13 @@
 use std::any::TypeId;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
+
+use itertools::Itertools;
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy};
 use crate::environment::StreamEnvironmentInner;
-use crate::operator::{Data, EndBlock, Operator, WindowDescription};
+use crate::operator::{Data, EndBlock, IterationStateLock, Operator, WindowDescription};
 use crate::operator::{DataKey, StartBlock};
 
 /// Identifier of a block in the job graph.
@@ -88,6 +91,7 @@ where
                 id: self.block.id,
                 operators: get_operator(self.block.operators),
                 batch_mode: self.block.batch_mode,
+                iteration_state_lock_stack: self.block.iteration_state_lock_stack,
                 is_only_one_strategy: false,
                 scheduler_requirements: self.block.scheduler_requirements,
                 _out_type: Default::default(),
@@ -114,6 +118,7 @@ where
         GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
     {
         let batch_mode = self.block.batch_mode;
+        let state_lock = self.block.iteration_state_lock_stack.clone();
         let mut old_stream =
             self.add_operator(|prev| get_end_operator(prev, next_strategy.clone(), batch_mode));
         old_stream.block.is_only_one_strategy = matches!(next_strategy, NextStrategy::OnlyOne);
@@ -124,8 +129,10 @@ where
         scheduler.add_block(old_stream.block);
         scheduler.connect_blocks(old_id, new_id, TypeId::of::<Out>());
         drop(env);
+
+        let start_block = StartBlock::new(old_id, state_lock.last().cloned());
         Stream {
-            block: InnerBlock::new(new_id, StartBlock::new(old_id), batch_mode),
+            block: InnerBlock::new(new_id, start_block, batch_mode, state_lock),
             env: old_stream.env,
         }
     }
@@ -151,7 +158,7 @@ where
         OperatorChain2: Operator<Out2> + Send + 'static,
         NewOut: Data,
         StartOperator: Operator<NewOut>,
-        GetStartOp: Fn(BlockId, BlockId) -> StartOperator,
+        GetStartOp: Fn(BlockId, BlockId, Option<Arc<IterationStateLock>>) -> StartOperator,
     {
         let batch_mode = self.block.batch_mode;
         let scheduler_requirements1 = self.block.scheduler_requirements.clone();
@@ -166,6 +173,14 @@ where
                 scheduler_requirements2.max_parallelism
             );
         }
+        let state_lock1 = &self.block.iteration_state_lock_stack;
+        let state_lock2 = &oth.block.iteration_state_lock_stack;
+        if state_lock1.iter().map(|s| Arc::as_ptr(s)).collect_vec()
+            != state_lock2.iter().map(|s| Arc::as_ptr(s)).collect_vec()
+        {
+            panic!("The state locks of the 2 blocks coming inside a Y connection must be equal");
+        }
+        let state_lock = state_lock1.clone();
 
         // close previous blocks
         let mut old_stream1 =
@@ -189,7 +204,12 @@ where
         drop(env);
 
         let mut new_stream = Stream {
-            block: InnerBlock::new(new_id, get_start_operator(old_id1, old_id2), batch_mode),
+            block: InnerBlock::new(
+                new_id,
+                get_start_operator(old_id1, old_id2, state_lock.last().cloned()),
+                batch_mode,
+                state_lock,
+            ),
             env: old_stream1.env,
         };
         // make sure the new block has the same parallelism of the previous one

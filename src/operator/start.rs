@@ -1,12 +1,15 @@
 use std::any::TypeId;
 use std::collections::VecDeque;
+use std::sync::Arc;
+
+use itertools::Itertools;
 
 use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, ReceiverEndpoint};
-use crate::operator::{Data, Operator, StreamElement, Timestamp};
+use crate::operator::source::Source;
+use crate::operator::{Data, IterationStateLock, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
-use itertools::Itertools;
 
 #[derive(Clone, Debug, Default)]
 /// Handle watermarks coming from multiple replicas.
@@ -85,6 +88,7 @@ pub struct StartBlock<Out: Data> {
     buffer: VecDeque<StreamElement<Out>>,
     missing_terminate: usize,
     missing_flush_and_restart: usize,
+    wait_for_state: bool,
     prev_replicas: Vec<Coord>,
     /// The last call to next caused a timeout, so a FlushBatch has been emitted. In this case this
     /// field is set to true to avoid flooding with FlushBatch.
@@ -92,34 +96,46 @@ pub struct StartBlock<Out: Data> {
     /// The id of the previous blocks in the job graph.
     prev_block_ids: Vec<BlockId>,
     watermark_frontier: WatermarkFrontier,
+
+    state_lock: Option<Arc<IterationStateLock>>,
+    state_generation: usize,
 }
 
 impl<Out: Data> StartBlock<Out> {
-    pub(crate) fn new(prev_block_id: BlockId) -> Self {
+    pub(crate) fn new(prev_block_id: BlockId, state_lock: Option<Arc<IterationStateLock>>) -> Self {
         Self {
             metadata: Default::default(),
             receivers: Default::default(),
             buffer: Default::default(),
             missing_terminate: Default::default(),
             missing_flush_and_restart: Default::default(),
+            wait_for_state: Default::default(),
             prev_replicas: Default::default(),
             already_timed_out: Default::default(),
             prev_block_ids: vec![prev_block_id],
             watermark_frontier: Default::default(),
+            state_lock,
+            state_generation: Default::default(),
         }
     }
 
-    pub(crate) fn concat(prev_block_ids: Vec<BlockId>) -> Self {
+    pub(crate) fn concat(
+        prev_block_ids: Vec<BlockId>,
+        state_lock: Option<Arc<IterationStateLock>>,
+    ) -> Self {
         Self {
             metadata: Default::default(),
             receivers: Default::default(),
             buffer: Default::default(),
             missing_terminate: Default::default(),
             missing_flush_and_restart: Default::default(),
+            wait_for_state: Default::default(),
             prev_replicas: Default::default(),
             already_timed_out: Default::default(),
             prev_block_ids,
             watermark_frontier: Default::default(),
+            state_lock,
+            state_generation: Default::default(),
         }
     }
 
@@ -181,6 +197,9 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
             );
             self.missing_flush_and_restart = self.num_prev();
             self.watermark_frontier = WatermarkFrontier::new(self.prev_replicas.clone());
+            // this iteration has ended, before starting the next one wait for the state update
+            self.wait_for_state = true;
+            self.state_generation += 2;
             return StreamElement::FlushAndRestart;
         }
         while self.buffer.is_empty() {
@@ -216,7 +235,7 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
             let watermark_frontier = &mut self.watermark_frontier;
             self.buffer = batch
                 .into_iter()
-                .map(|item| match item {
+                .filter_map(|item| match item {
                     StreamElement::Watermark(ts) => {
                         // update the frontier and return a watermark if necessary
                         watermark_frontier
@@ -225,8 +244,6 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
                     }
                     _ => Some(item),
                 })
-                .filter(|x| x.is_some())
-                .map(Option::unwrap)
                 .collect();
         }
 
@@ -250,6 +267,14 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
             );
             return self.next();
         }
+        // the previous iteration has ended, this message refers to the new iteration: we need to be
+        // sure the state is set before we let this message pass
+        if self.wait_for_state {
+            if let Some(lock) = self.state_lock.as_ref() {
+                lock.wait_for_update(self.state_generation);
+            }
+            self.wait_for_state = false;
+        }
         message
     }
 
@@ -259,6 +284,9 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
 
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<Out, _>("StartBlock");
+        if self.state_lock.is_some() {
+            operator.subtitle = "has lock".to_string();
+        }
         for &block_id in &self.prev_block_ids {
             operator
                 .receivers
@@ -270,4 +298,10 @@ impl<Out: Data> Operator<Out> for StartBlock<Out> {
 
 fn clone_empty<T>(_: &[T]) -> Vec<T> {
     Vec::new()
+}
+
+impl<Out: Data> Source<Out> for StartBlock<Out> {
+    fn get_max_parallelism(&self) -> Option<usize> {
+        None
+    }
 }

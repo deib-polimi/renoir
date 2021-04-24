@@ -10,7 +10,8 @@ use crate::network::Coord;
 use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::{
-    Data, EndBlock, IterationStateHandle, NewIterationState, Operator, StartBlock, StreamElement,
+    Data, EndBlock, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
+    StartBlock, StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
@@ -18,8 +19,7 @@ use crate::stream::{BlockId, Stream};
 /// This is the first operator of the chain of blocks inside an iteration.
 ///
 /// If a new iteration should start, the initial dataset is replayed.
-#[derive(Derivative)]
-#[derivative(Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Replay<Out: Data, State: Data, OperatorChain>
 where
     OperatorChain: Operator<Out>,
@@ -56,6 +56,8 @@ where
     /// wait until at least until `setup` when we know how many replicas are present in the current
     /// host.
     state_barrier: Arc<Lazy<Barrier>>,
+    /// The lock for the state of this iteration.
+    state_lock: Arc<IterationStateLock>,
 }
 
 impl<Out: Data, State: Data, OperatorChain> Replay<Out, State, OperatorChain>
@@ -66,6 +68,7 @@ where
         prev: OperatorChain,
         state_ref: IterationStateHandle<State>,
         leader_block_id: BlockId,
+        state_lock: Arc<IterationStateLock>,
     ) -> Self {
         Self {
             // these fields will be set inside the `setup` method
@@ -74,12 +77,13 @@ where
             num_local_replicas: 0,
 
             prev,
-            new_state_receiver: StartBlock::new(leader_block_id),
+            new_state_receiver: StartBlock::new(leader_block_id, None),
             content: Default::default(),
             content_index: 0,
             has_input_ended: false,
             state_ref,
-            state_barrier: Arc::new(Lazy::new()),
+            state_barrier: Default::default(),
+            state_lock,
         }
     }
 }
@@ -109,6 +113,13 @@ where
         ) -> Stream<Out, OperatorChain2>,
         OperatorChain2: Operator<Out> + Send + 'static,
     {
+        // this is required because if the iteration block is not present on all the hosts, the ones
+        // without it won't receive the state updates.
+        assert!(
+            self.block.scheduler_requirements.max_parallelism.is_none(),
+            "Cannot have an iteration block with limited parallelism"
+        );
+
         let state = IterationStateHandle::new(initial_state.clone());
         let state_clone = state.clone();
         let env = self.env.clone();
@@ -117,7 +128,7 @@ where
         // store a fake value inside this and as soon as we know it we set it to the right value.
         let feedback_block_id = Arc::new(AtomicUsize::new(0));
 
-        let output_stream = StreamEnvironmentInner::stream(
+        let mut output_stream = StreamEnvironmentInner::stream(
             env,
             IterationLeader::new(
                 initial_state,
@@ -128,15 +139,24 @@ where
             ),
         );
         let leader_block_id = output_stream.block.id;
+        // the output stream is outside this loop, so it doesn't have the lock for this state
+        output_stream.block.iteration_state_lock_stack =
+            self.block.iteration_state_lock_stack.clone();
 
-        let iter_start = self.add_operator(|prev| Replay::new(prev, state, leader_block_id));
+        // the lock for synchronizing the access to the state of this iteration
+        let state_lock = Arc::new(IterationStateLock::default());
+
+        let mut iter_start =
+            self.add_operator(|prev| Replay::new(prev, state, leader_block_id, state_lock.clone()));
         let replay_block_id = iter_start.block.id;
 
-        let iter_end = body(iter_start, state_clone)
+        iter_start.block.iteration_state_lock_stack.push(state_lock);
+        let mut iter_end = body(iter_start, state_clone)
             .key_by(|_| ())
             .fold(DeltaUpdate::default(), local_fold)
             .unkey()
             .map(|(_, delta_update)| delta_update);
+        iter_end.block.iteration_state_lock_stack.pop().unwrap();
 
         let iter_end = iter_end.add_operator(|prev| IterationEndBlock::new(prev, leader_block_id));
         let iteration_end_block_id = iter_end.block.id;
@@ -204,6 +224,8 @@ where
                     self.content.push(StreamElement::FlushAndRestart);
                     // the first iteration has already happened
                     self.content_index = self.content.len();
+                    // since this moment accessing the state for the next iteration must wait
+                    self.state_lock.lock();
                     StreamElement::FlushAndRestart
                 }
                 // messages to save for the replay
@@ -228,10 +250,16 @@ where
         if self.content_index < self.content.len() {
             let item = self.content.get(self.content_index).unwrap().clone();
             self.content_index += 1;
+            if matches!(item, StreamElement::FlushAndRestart) {
+                // since this moment accessing the state for the next iteration must wait
+                self.state_lock.lock();
+            }
             return item;
         }
 
         debug!("Replay at {} has ended the iteration", self.coord);
+
+        self.content_index = 0;
 
         // this iteration has ended, wait here for the leader
         let (should_continue, new_state) = loop {
@@ -264,7 +292,10 @@ where
             .get_or_create(|| Barrier::new(self.num_local_replicas))
             .wait();
 
-        self.content_index = 0;
+        if self.is_local_leader {
+            // now the state has been set, accessing it is safe again
+            self.state_lock.unlock();
+        }
 
         // the loop has ended
         if !should_continue {
@@ -272,11 +303,10 @@ where
             // cleanup so that if this is a nested iteration next time we'll be good to start again
             self.content.clear();
             self.has_input_ended = false;
-            return self.next();
         }
 
-        // This iteration has ended but IterEnd has already been sent. To avoid sending twice the
-        // IterEnd recurse.
+        // This iteration has ended but FlushAndRestart has already been sent. To avoid sending
+        // twice the FlushAndRestart recurse.
         self.next()
     }
 

@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
-use crate::operator::{Data, Operator, StartBlock, StreamElement, Timestamp};
+use crate::operator::{Data, IterationStateLock, Operator, StartBlock, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
 
@@ -17,12 +18,16 @@ pub struct Zip<Out1: Data, Out2: Data> {
 }
 
 impl<Out1: Data, Out2: Data> Zip<Out1, Out2> {
-    fn new(prev_block_id1: BlockId, prev_block_id2: BlockId) -> Self {
+    fn new(
+        prev_block_id1: BlockId,
+        prev_block_id2: BlockId,
+        state_lock: Option<Arc<IterationStateLock>>,
+    ) -> Self {
         Self {
             prev_block_id1,
             prev_block_id2,
-            prev1: StartBlock::new(prev_block_id1),
-            prev2: StartBlock::new(prev_block_id2),
+            prev1: StartBlock::new(prev_block_id1, state_lock.clone()),
+            prev2: StartBlock::new(prev_block_id2, state_lock),
             watermarks1: Default::default(),
             watermarks2: Default::default(),
             item1_stash: None,

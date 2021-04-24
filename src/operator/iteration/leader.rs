@@ -107,7 +107,7 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for IterationLeader<DeltaUp
         // at this point the id of the block with IterationEndBlock must be known
         let feedback_block_id = self.feedback_block_id.load(Ordering::Acquire);
         // get the receiver for the delta updates
-        let mut delta_update_receiver = StartBlock::new(feedback_block_id);
+        let mut delta_update_receiver = StartBlock::new(feedback_block_id, None);
         delta_update_receiver.setup(metadata);
         self.num_receivers = delta_update_receiver.num_prev();
         self.delta_update_receiver = Some(delta_update_receiver);

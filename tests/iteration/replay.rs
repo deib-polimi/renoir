@@ -46,7 +46,7 @@ fn test_replay_no_blocks_in_between() {
 #[test]
 fn test_replay_with_shuffle() {
     TestHelper::local_remote_env(|mut env| {
-        let n = 5u64;
+        let n = 20u64;
         let n_iter = 5;
 
         let source = IteratorSource::new(0..n);
@@ -58,7 +58,7 @@ fn test_replay_with_shuffle() {
             .replay(
                 n_iter,
                 1,
-                |s, state| s.map(move |x| x * *state.get()).shuffle(),
+                |s, state| s.shuffle().map(move |x| x * *state.get()),
                 |delta: u64, x| delta + x,
                 |old_state, delta| old_state + delta,
                 |state| {
@@ -108,7 +108,7 @@ fn check_nested_result(res: StreamOutput<Vec<u64>>) {
 fn test_replay_nested_no_shuffle() {
     TestHelper::local_remote_env(|mut env| {
         let source = IteratorSource::new(0..10u64);
-        let stream = env.stream(source).replay(
+        let stream = env.stream(source).shuffle().replay(
             2,
             0,
             |s, _| {
@@ -135,14 +135,14 @@ fn test_replay_nested_no_shuffle() {
 fn test_replay_nested_shuffle_inner() {
     TestHelper::local_remote_env(|mut env| {
         let source = IteratorSource::new(0..10u64);
-        let stream = env.stream(source).replay(
+        let stream = env.stream(source).shuffle().replay(
             2,
             0,
             |s, _| {
-                s.shuffle().replay(
+                s.replay(
                     2,
                     0,
-                    |s, _| s.reduce(|x, y| x + y),
+                    |s, _| s.shuffle().reduce(|x, y| x + y),
                     |update: u64, ele| update + ele,
                     |state, update| state + update,
                     |&mut _state| true,
@@ -166,7 +166,7 @@ fn test_replay_nested_shuffle_outer() {
             2,
             0,
             |s, _| {
-                s.replay(
+                s.shuffle().replay(
                     2,
                     0,
                     |s, _| s.reduce(|x, y| x + y),
@@ -196,7 +196,7 @@ fn test_replay_nested_shuffle_both() {
                 s.shuffle().replay(
                     2,
                     0,
-                    |s, _| s.reduce(|x, y| x + y),
+                    |s, _| s.shuffle().reduce(|x, y| x + y),
                     |update: u64, ele| update + ele,
                     |state, update| state + update,
                     |&mut _state| true,

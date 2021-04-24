@@ -12,7 +12,9 @@ where
     where
         OperatorChain2: Operator<Out> + Send + 'static,
     {
-        self.add_y_connection(oth, |id1, id2| StartBlock::concat(vec![id1, id2]))
+        self.add_y_connection(oth, |id1, id2, state_lock| {
+            StartBlock::concat(vec![id1, id2], state_lock)
+        })
     }
 }
 
