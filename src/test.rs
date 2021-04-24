@@ -21,7 +21,7 @@ const PORTS_PER_HOST: u16 = 100;
 
 lazy_static! {
     /// The first available port for the next host.
-    static ref PORT_INDEX: AtomicU16 = AtomicU16::new(TEST_BASE_PORT);
+    static ref PORT_OFFSET: AtomicU16 = AtomicU16::new(0);
 }
 
 /// Helper functions for running the integration tests.
@@ -108,7 +108,13 @@ impl TestHelper {
         Self::setup();
         let mut hosts = vec![];
         for _ in 0..num_hosts {
-            let base_port = PORT_INDEX.fetch_add(PORTS_PER_HOST, Ordering::SeqCst);
+            // When using directly the `AtomicU16` counter to assign ports, when the counter
+            // overflows some tests try to bind very small ports, failing.
+            // Instead, we use the counter to encode the offset from `TEST_BASE_PORT`.
+            // We ignore the most significant bit of `PORT_OFFSET`, so that `PORT_OFFSET` is always
+            // in the range 0..2^15.
+            let base_port =
+                TEST_BASE_PORT + (PORT_OFFSET.fetch_add(PORTS_PER_HOST, Ordering::SeqCst) & 0x7fff);
             hosts.push(RemoteHostConfig {
                 address: "localhost".to_string(),
                 base_port,
