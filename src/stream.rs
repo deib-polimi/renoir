@@ -44,7 +44,21 @@ pub struct KeyedStream<Key: DataKey, Out: Data, OperatorChain>(
 where
     OperatorChain: Operator<KeyValue<Key, Out>>;
 
-pub struct WindowedStream<Key: DataKey, Out: Data, OperatorChain, WinDescr>
+/// A `WindowedStream` is a data stream where elements are divided in multiple groups called
+/// windows. Internally, a `WindowedStream` is just a `KeyedWindowedStream` where each element is
+/// assigned to the same key `()`.
+pub struct WindowedStream<Out: Data, OperatorChain, WinDescr>
+where
+    OperatorChain: Operator<KeyValue<(), Out>>,
+    WinDescr: WindowDescription<(), Out>,
+{
+    pub(crate) inner: KeyedWindowedStream<(), Out, OperatorChain, WinDescr>,
+}
+
+/// A `KeyedWindowedStream` is a data stream partitioned by `Key`, where elements of each partition
+/// are divided in groups called windows.
+/// Windows are handled independently for each partition of the stream.
+pub struct KeyedWindowedStream<Key: DataKey, Out: Data, OperatorChain, WinDescr>
 where
     OperatorChain: Operator<KeyValue<Key, Out>>,
     WinDescr: WindowDescription<Key, Out>,
