@@ -68,7 +68,8 @@ impl StreamEnvironment {
     pub fn execute(self) {
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);
-        env.scheduler.take().unwrap().start();
+        let scheduler = env.scheduler.take().unwrap();
+        scheduler.start(env.block_count);
     }
 
     /// Get the total number of processing cores in the cluster.

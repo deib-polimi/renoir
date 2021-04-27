@@ -163,9 +163,18 @@ impl Scheduler {
     }
 
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) fn start(mut self) {
+    pub(crate) fn start(mut self, num_blocks: usize) {
         info!("Starting scheduler: {:#?}", self.config);
         self.log_topology();
+
+        assert_eq!(
+            self.block_info.len(),
+            num_blocks,
+            "Some streams do not have a sink attached: {} streams created, but only {} registered",
+            num_blocks,
+            self.block_info.len(),
+        );
+
         self.build_execution_graph();
         self.network.finalize_topology();
         self.network.log_topology();
@@ -241,8 +250,8 @@ impl Scheduler {
 
     fn log_topology(&self) {
         let mut topology = "Job graph:".to_string();
-        for block_id in 0..self.block_info.len() {
-            topology += &format!("\n  {}: {}", block_id, self.block_info[&block_id].repr);
+        for (block_id, block) in self.block_info.iter() {
+            topology += &format!("\n  {}: {}", block_id, block.repr);
             if let Some(next) = &self.next_blocks.get(&block_id) {
                 let sorted = next
                     .iter()
@@ -254,13 +263,9 @@ impl Scheduler {
         }
         debug!("{}", topology);
         let mut assignments = "Replicas:".to_string();
-        for block_id in 0..self.block_info.len() {
+        for (block_id, block) in self.block_info.iter() {
             assignments += &format!("\n  {}:", block_id);
-            let replicas = self.block_info[&block_id]
-                .replicas
-                .values()
-                .flatten()
-                .sorted();
+            let replicas = block.replicas.values().flatten().sorted();
             for &coord in replicas {
                 assignments += &format!(" {}", coord);
             }
@@ -384,5 +389,30 @@ impl SchedulerBlockInfo {
     /// The list of replicas of the block inside a given host.
     fn replicas(&self, host_id: HostId) -> Vec<Coord> {
         self.replicas.get(&host_id).cloned().unwrap_or_default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::EnvironmentConfig;
+    use crate::environment::StreamEnvironment;
+    use crate::operator::source::IteratorSource;
+
+    #[test]
+    #[should_panic(expected = "Some streams do not have a sink attached")]
+    fn test_scheduler_panic_on_missing_sink() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = IteratorSource::new(vec![1, 2, 3].into_iter());
+        let _stream = env.stream(source);
+        env.execute();
+    }
+
+    #[test]
+    #[should_panic(expected = "Some streams do not have a sink attached")]
+    fn test_scheduler_panic_on_missing_sink_shuffle() {
+        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let source = IteratorSource::new(vec![1, 2, 3].into_iter());
+        let _stream = env.stream(source).shuffle();
+        env.execute();
     }
 }
