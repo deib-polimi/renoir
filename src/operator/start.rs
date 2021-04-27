@@ -145,11 +145,6 @@ impl<Out: Data> StartBlock<Out> {
     pub(crate) fn num_prev(&self) -> usize {
         self.prev_replicas.len()
     }
-
-    /// The list of previous blocks.
-    pub(crate) fn prev(&self) -> &[BlockId] {
-        &self.prev_block_ids
-    }
 }
 
 impl<Out: Data> Operator<Out> for StartBlock<Out> {

@@ -1,14 +1,13 @@
 use std::any::TypeId;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Barrier};
-
-use lazy_init::Lazy;
+use std::sync::Arc;
 
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure};
 use crate::environment::StreamEnvironmentInner;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
 use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
+use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::{
     Data, EndBlock, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
     StartBlock, StreamElement,
@@ -36,8 +35,9 @@ where
     /// The chain of previous operators where the initial dataset is read from.
     prev: OperatorChain,
 
-    /// Receiver of the new state from the leader.
-    new_state_receiver: StartBlock<NewIterationState<State>>,
+    /// Helper structure that manages the iteration's state.
+    state: IterationStateHandler<State>,
+
     /// The receiver of the data coming from the previous iteration of the loop.
     #[derivative(Clone(clone_with = "clone_with_default"))]
     feedback_receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
@@ -57,25 +57,6 @@ where
 
     /// Whether the input stream has ended or not.
     has_input_ended: bool,
-
-    /// Whether this `Replay` is the _local_ leader.
-    ///
-    /// The local leader is the one that sets the iteration state for all the local replicas.
-    is_local_leader: bool,
-    /// The number of replicas of this block on this host.
-    num_local_replicas: usize,
-
-    /// A reference to the state of the iteration that is visible to the loop operators.
-    state_ref: IterationStateHandle<State>,
-
-    /// A barrier for synchronizing all the local replicas before updating the state.
-    ///
-    /// This is a `Lazy` because at construction time we don't know the barrier size, we need to
-    /// wait until at least until `setup` when we know how many replicas are present in the current
-    /// host.
-    state_barrier: Arc<Lazy<Barrier>>,
-    /// The lock for the state of this iteration.
-    state_lock: Arc<IterationStateLock>,
 }
 
 impl<Out: Data, State: Data, OperatorChain> Iterate<Out, State, OperatorChain>
@@ -93,29 +74,19 @@ where
         Self {
             // these fields will be set inside the `setup` method
             coord: Coord::new(0, 0, 0),
-            is_local_leader: false,
-            num_local_replicas: 0,
             feedback_receiver: None,
             feedback_end_block_id,
             output_sender: None,
             output_block_id,
 
             prev,
-            new_state_receiver: StartBlock::new(leader_block_id, None),
             content: Default::default(),
             content_index: 0,
             next_content: Default::default(),
             has_input_ended: false,
-            state_ref,
-            state_barrier: Arc::new(Lazy::new()),
-            state_lock,
+            state: IterationStateHandler::new(leader_block_id, state_ref, state_lock),
         }
     }
-}
-
-/// Given a list of replicas, deterministically select a leader between them.
-fn select_leader(replicas: &[Coord]) -> Coord {
-    *replicas.iter().min().unwrap()
 }
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
@@ -293,8 +264,7 @@ where
     OperatorChain: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata.clone());
-        self.new_state_receiver.setup(metadata.clone());
+        self.coord = metadata.coord;
 
         let mut network = metadata.network.lock().unwrap();
         let feedback_end_block_id = self.feedback_end_block_id.load(Ordering::Acquire);
@@ -313,15 +283,8 @@ where
         self.output_sender = Some(network.get_sender(output_endpoint));
         drop(network);
 
-        let local_replicas: Vec<_> = metadata
-            .replicas
-            .clone()
-            .into_iter()
-            .filter(|r| r.host_id == metadata.coord.host_id)
-            .collect();
-        self.is_local_leader = select_leader(&local_replicas) == metadata.coord;
-        self.num_local_replicas = local_replicas.len();
-        self.coord = metadata.coord;
+        self.prev.setup(metadata.clone());
+        self.state.setup(metadata.clone());
     }
 
     fn next(&mut self) -> StreamElement<Out> {
@@ -341,7 +304,7 @@ where
                     );
                     self.has_input_ended = true;
                     // since this moment accessing the state for the next iteration must wait
-                    self.state_lock.lock();
+                    self.state.lock();
                     StreamElement::FlushAndRestart
                 }
                 StreamElement::Item(_)
@@ -359,7 +322,7 @@ where
             let item = self.content.pop_front().unwrap();
             if matches!(item, StreamElement::FlushAndRestart) {
                 // since this moment accessing the state for the next iteration must wait
-                self.state_lock.lock();
+                self.state.lock();
             }
             return item;
         }
@@ -381,40 +344,7 @@ where
         std::mem::swap(&mut self.content, &mut self.next_content);
 
         // this iteration has ended, wait here for the leader
-        let (should_continue, new_state) = loop {
-            let message = self.new_state_receiver.next();
-            match message {
-                StreamElement::Item((should_continue, new_state)) => {
-                    break (should_continue, new_state);
-                }
-                StreamElement::FlushBatch => {}
-                StreamElement::FlushAndRestart => {}
-                _ => unreachable!(
-                    "Iterate received invalid message from IterationLeader: {}",
-                    message.variant()
-                ),
-            }
-        };
-
-        // update the state only once per host
-        if self.is_local_leader {
-            // SAFETY: at this point we are sure that all the operators inside the loop have
-            // finished and empty. This means that no calls to `.get` are possible until one Replay
-            // block chooses to start. This cannot happen due to the barrier below.
-            unsafe {
-                self.state_ref.set(new_state);
-            }
-        }
-        // make sure that the state is set before any replica on this host is able to start again,
-        // reading the old state
-        self.state_barrier
-            .get_or_create(|| Barrier::new(self.num_local_replicas))
-            .wait();
-
-        if self.is_local_leader {
-            // now the state has been set, accessing it is safe again
-            self.state_lock.unlock();
-        }
+        let should_continue = self.state.wait_leader();
 
         if !should_continue {
             debug!(
@@ -447,7 +377,7 @@ where
         operator
             .receivers
             .push(OperatorReceiver::new::<NewIterationState<State>>(
-                self.new_state_receiver.prev()[0],
+                self.state.leader_block_id,
             ));
         operator.receivers.push(OperatorReceiver::new::<Out>(
             self.feedback_end_block_id.load(Ordering::Acquire),

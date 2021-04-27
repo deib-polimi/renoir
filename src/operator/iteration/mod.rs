@@ -9,6 +9,7 @@ mod iterate;
 mod iteration_end;
 mod leader;
 mod replay;
+mod state_handler;
 
 /// The information about the new state of an iteration:
 ///
