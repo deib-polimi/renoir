@@ -28,7 +28,7 @@ where
     /// The block id of the block containing the `IterationLeader` operator.
     leader_block_id: BlockId,
     /// The sender that points to the `IterationLeader` for sending the `DeltaUpdate` messages.
-    leader_sender: Option<NetworkSender<NetworkMessage<DeltaUpdate>>>,
+    leader_sender: Option<NetworkSender<DeltaUpdate>>,
     /// The coordinates of this block.
     coord: Coord,
 }

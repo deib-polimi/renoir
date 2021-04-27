@@ -40,11 +40,11 @@ where
 
     /// The receiver of the data coming from the previous iteration of the loop.
     #[derivative(Clone(clone_with = "clone_with_default"))]
-    feedback_receiver: Option<NetworkReceiver<NetworkMessage<Out>>>,
+    feedback_receiver: Option<NetworkReceiver<Out>>,
     /// The id of the block that handles the feedback connection.
     feedback_end_block_id: Arc<AtomicUsize>,
     /// The sender that will feed the data to the output of the iteration.
-    output_sender: Option<NetworkSender<NetworkMessage<Out>>>,
+    output_sender: Option<NetworkSender<Out>>,
     /// The id of the block where the output of the iteration comes out.
     output_block_id: Arc<AtomicUsize>,
 

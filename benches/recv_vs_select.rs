@@ -1,5 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use rstream::network::{Coord, NetworkReceiver, ReceiverEndpoint};
+
+use rstream::network::{Coord, NetworkMessage, NetworkReceiver, ReceiverEndpoint};
+use rstream::operator::StreamElement;
 
 const CHANNEL_CAPACITY: usize = 10;
 
@@ -65,7 +67,12 @@ fn run(size: usize, body: impl FnOnce(NetworkReceiver<usize>)) {
         .name("recv producer".to_string())
         .spawn(move || {
             for i in 0..size {
-                sender.send(i).unwrap();
+                sender
+                    .send(NetworkMessage::new(
+                        vec![StreamElement::Item(i)],
+                        Coord::default(),
+                    ))
+                    .unwrap();
             }
         })
         .unwrap();

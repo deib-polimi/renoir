@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use rand::{thread_rng, Rng};
 
-use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
+use crate::network::{NetworkSender, ReceiverEndpoint};
 use crate::operator::Data;
 use crate::stream::BlockId;
 
@@ -40,7 +40,7 @@ impl<Out: Data> NextStrategy<Out> {
     /// If `ignore_block` is specified, no senders to the specified block will be returned.
     pub fn group_senders(
         &self,
-        senders: &HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<Out>>>,
+        senders: &HashMap<ReceiverEndpoint, NetworkSender<Out>>,
         ignore_block: Option<BlockId>,
     ) -> Vec<SenderList> {
         let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();

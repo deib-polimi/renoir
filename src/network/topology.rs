@@ -10,7 +10,7 @@ use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::demultiplexer::DemultiplexingReceiver;
 use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{
-    BlockCoord, Coord, DemuxCoord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint,
+    BlockCoord, Coord, DemuxCoord, NetworkReceiver, NetworkSender, ReceiverEndpoint,
 };
 use crate::operator::Data;
 use crate::scheduler::HostId;
@@ -20,28 +20,28 @@ use crate::stream::BlockId;
 struct ReceiverKey<In: Data>(PhantomData<In>);
 
 impl<In: Data> Key for ReceiverKey<In> {
-    type Value = HashMap<ReceiverEndpoint, NetworkReceiver<NetworkMessage<In>>>;
+    type Value = HashMap<ReceiverEndpoint, NetworkReceiver<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `NetworkSender`s.
 struct SenderKey<In: Data>(PhantomData<In>);
 
 impl<In: Data> Key for SenderKey<In> {
-    type Value = HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<In>>>;
+    type Value = HashMap<ReceiverEndpoint, NetworkSender<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `DemultiplexingReceiver`s.
 struct DemultiplexingReceiverKey<In: Data>(PhantomData<In>);
 
 impl<In: Data> Key for DemultiplexingReceiverKey<In> {
-    type Value = HashMap<DemuxCoord, DemultiplexingReceiver<NetworkMessage<In>>>;
+    type Value = HashMap<DemuxCoord, DemultiplexingReceiver<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `MultiplexingSender`s.
 struct MultiplexingSenderKey<In: Data>(PhantomData<In>);
 
 impl<In: Data> Key for MultiplexingSenderKey<In> {
-    type Value = HashMap<DemuxCoord, MultiplexingSender<NetworkMessage<In>>>;
+    type Value = HashMap<DemuxCoord, MultiplexingSender<In>>;
 }
 
 /// Metadata about a registered sender.
@@ -165,7 +165,7 @@ impl NetworkTopology {
     pub fn get_senders<T: Data>(
         &mut self,
         coord: Coord,
-    ) -> HashMap<ReceiverEndpoint, NetworkSender<NetworkMessage<T>>> {
+    ) -> HashMap<ReceiverEndpoint, NetworkSender<T>> {
         let typ = TypeId::of::<T>();
         match self.next.get(&(coord, typ)) {
             None => Default::default(),
@@ -187,10 +187,7 @@ impl NetworkTopology {
 
     /// Get the sender associated with a given receiver endpoint. This may register a new channel if
     /// it was not registered before.
-    pub fn get_sender<T: Data>(
-        &mut self,
-        receiver_endpoint: ReceiverEndpoint,
-    ) -> NetworkSender<NetworkMessage<T>> {
+    pub fn get_sender<T: Data>(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<T> {
         if !self.senders.contains::<SenderKey<T>>() {
             self.senders.insert::<SenderKey<T>>(Default::default());
         }
@@ -213,7 +210,7 @@ impl NetworkTopology {
     pub fn get_receiver<T: Data>(
         &mut self,
         receiver_endpoint: ReceiverEndpoint,
-    ) -> NetworkReceiver<NetworkMessage<T>> {
+    ) -> NetworkReceiver<T> {
         if self.used_receivers.contains(&receiver_endpoint) {
             panic!(
                 "The receiver for {} has already been got",
@@ -254,7 +251,7 @@ impl NetworkTopology {
             .unwrap_or_else(|| panic!("Channel for endpoint {} not registered", receiver_endpoint));
 
         // create the receiver part of the channel
-        let mut receiver = NetworkReceiver::<NetworkMessage<T>>::new(receiver_endpoint);
+        let mut receiver = NetworkReceiver::<T>::new(receiver_endpoint);
         let local_sender = receiver.sender().unwrap();
 
         // if the receiver is local and the runtime is remote, register it to the demultiplexer
@@ -455,6 +452,7 @@ mod tests {
     use std::fmt::Debug;
     use std::io::Write;
 
+    use crate::network::NetworkMessage;
     use crate::operator::StreamElement;
     use crate::scheduler::HostId;
 
@@ -638,10 +636,7 @@ mod tests {
         join1.join().unwrap();
     }
 
-    fn receiver<T: Data + Ord + Debug>(
-        receiver: NetworkReceiver<NetworkMessage<T>>,
-        expected: Vec<T>,
-    ) {
+    fn receiver<T: Data + Ord + Debug>(receiver: NetworkReceiver<T>, expected: Vec<T>) {
         let res = (0..expected.len())
             .map(|_| receiver.recv().unwrap().batch())
             .flatten()

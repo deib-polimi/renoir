@@ -84,7 +84,7 @@ impl WatermarkFrontier {
 pub struct StartBlock<Out: Data> {
     metadata: Option<ExecutionMetadata>,
     #[derivative(Clone(clone_with = "clone_empty"))]
-    receivers: Vec<NetworkReceiver<NetworkMessage<Out>>>,
+    receivers: Vec<NetworkReceiver<Out>>,
     buffer: VecDeque<StreamElement<Out>>,
     missing_terminate: usize,
     missing_flush_and_restart: usize,

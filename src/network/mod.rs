@@ -18,10 +18,10 @@ mod sender;
 mod topology;
 
 /// A batch of elements to send.
-pub(crate) type Batch<T> = Vec<StreamElement<T>>;
+pub type Batch<T> = Vec<StreamElement<T>>;
 /// What is sent from a replica to the next.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
-pub(crate) struct NetworkMessage<T> {
+pub struct NetworkMessage<T> {
     /// The list of messages inside the batch,
     batch: Batch<T>,
     /// The coordinates of the block that sent this message.

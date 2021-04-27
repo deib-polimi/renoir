@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 
 use crate::channel::BoundedChannelSender;
 use crate::network::multiplexer::MultiplexingSender;
-use crate::network::ReceiverEndpoint;
+use crate::network::{NetworkMessage, ReceiverEndpoint};
 use crate::operator::Data;
 
 /// The sender part of a connection between two replicas.
@@ -25,14 +25,17 @@ pub struct NetworkSender<Out: Data> {
 #[derive(Clone)]
 pub(crate) enum NetworkSenderImpl<Out: Data> {
     /// The channel is local, use an in-memory channel.
-    Local(BoundedChannelSender<Out>),
+    Local(BoundedChannelSender<NetworkMessage<Out>>),
     /// The channel is remote, use the multiplexer.
     Remote(MultiplexingSender<Out>),
 }
 
 impl<Out: Data> NetworkSender<Out> {
     /// Create a new local sender that sends the data directly to the recipient.
-    pub fn local(receiver_endpoint: ReceiverEndpoint, sender: BoundedChannelSender<Out>) -> Self {
+    pub fn local(
+        receiver_endpoint: ReceiverEndpoint,
+        sender: BoundedChannelSender<NetworkMessage<Out>>,
+    ) -> Self {
         Self {
             receiver_endpoint,
             sender: NetworkSenderImpl::Local(sender),
@@ -48,7 +51,7 @@ impl<Out: Data> NetworkSender<Out> {
     }
 
     /// Send a message to a replica.
-    pub fn send(&self, item: Out) -> Result<()> {
+    pub fn send(&self, item: NetworkMessage<Out>) -> Result<()> {
         match &self.sender {
             NetworkSenderImpl::Local(sender) => sender.send(item).map_err(|e| {
                 anyhow!(
@@ -62,7 +65,7 @@ impl<Out: Data> NetworkSender<Out> {
     }
 
     /// Get the inner sender if the channel is local.
-    pub fn inner(&self) -> Option<&BoundedChannelSender<Out>> {
+    pub fn inner(&self) -> Option<&BoundedChannelSender<NetworkMessage<Out>>> {
         match &self.sender {
             NetworkSenderImpl::Local(inner) => Some(inner),
             NetworkSenderImpl::Remote(_) => None,

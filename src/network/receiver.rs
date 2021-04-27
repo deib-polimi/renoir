@@ -6,7 +6,7 @@ use crate::channel::{
     BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectAnyResult, SelectResult,
     TryRecvError,
 };
-use crate::network::{NetworkSender, ReceiverEndpoint};
+use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::Data;
 
 /// The capacity of the in-buffer.
@@ -28,10 +28,10 @@ pub struct NetworkReceiver<In: Data> {
     pub receiver_endpoint: ReceiverEndpoint,
     /// The actual receiver where the users of this struct will wait upon.
     #[derivative(Debug = "ignore")]
-    receiver: BoundedChannelReceiver<In>,
+    receiver: BoundedChannelReceiver<NetworkMessage<In>>,
     /// The sender associated with `self.receiver`.
     #[derivative(Debug = "ignore")]
-    local_sender: Option<BoundedChannelSender<In>>,
+    local_sender: Option<BoundedChannelSender<NetworkMessage<In>>>,
 }
 
 impl<In: Data> NetworkReceiver<In> {
@@ -57,7 +57,7 @@ impl<In: Data> NetworkReceiver<In> {
 
     /// Receive a message from any sender.
     #[allow(dead_code)]
-    pub fn recv(&self) -> Result<In> {
+    pub fn recv(&self) -> Result<NetworkMessage<In>> {
         self.receiver.recv().map_err(|e| {
             anyhow!(
                 "Failed to receive from channel at {:?}: {:?}",
@@ -69,13 +69,13 @@ impl<In: Data> NetworkReceiver<In> {
 
     /// Receive a message from any sender without blocking.
     #[allow(dead_code)]
-    pub fn try_recv(&self) -> Result<In, TryRecvError> {
+    pub fn try_recv(&self) -> Result<NetworkMessage<In>, TryRecvError> {
         self.receiver.try_recv()
     }
 
     /// Receive a message from any sender with a timeout.
     #[allow(dead_code)]
-    pub fn recv_timeout(&self, timeout: Duration) -> Result<In, RecvTimeoutError> {
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<NetworkMessage<In>, RecvTimeoutError> {
         self.receiver.recv_timeout(timeout)
     }
 
@@ -85,7 +85,10 @@ impl<In: Data> NetworkReceiver<In> {
     /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
     /// fairness property.
     #[allow(dead_code)] // TODO: remove once joins are implemented
-    pub fn select<In2: Data>(&self, other: &NetworkReceiver<In2>) -> SelectResult<In, In2> {
+    pub fn select<In2: Data>(
+        &self,
+        other: &NetworkReceiver<In2>,
+    ) -> SelectResult<NetworkMessage<In>, NetworkMessage<In2>> {
         self.receiver.select(&other.receiver)
     }
 
@@ -95,12 +98,12 @@ impl<In: Data> NetworkReceiver<In> {
         &self,
         other: &NetworkReceiver<In2>,
         timeout: Duration,
-    ) -> Result<SelectResult<In, In2>, RecvTimeoutError> {
+    ) -> Result<SelectResult<NetworkMessage<In>, NetworkMessage<In2>>, RecvTimeoutError> {
         self.receiver.select_timeout(&other.receiver, timeout)
     }
 
     /// Same as `select`, but takes multiple receivers to select from.
-    pub fn select_any(receivers: &[NetworkReceiver<In>]) -> SelectAnyResult<In> {
+    pub fn select_any(receivers: &[NetworkReceiver<In>]) -> SelectAnyResult<NetworkMessage<In>> {
         BoundedChannelReceiver::select_any(receivers.iter().map(|r| &r.receiver))
     }
 
@@ -108,7 +111,7 @@ impl<In: Data> NetworkReceiver<In> {
     pub fn select_any_timeout(
         receivers: &[NetworkReceiver<In>],
         timeout: Duration,
-    ) -> Result<SelectAnyResult<In>, RecvTimeoutError> {
+    ) -> Result<SelectAnyResult<NetworkMessage<In>>, RecvTimeoutError> {
         BoundedChannelReceiver::select_any_timeout(receivers.iter().map(|r| &r.receiver), timeout)
     }
 }

@@ -19,7 +19,7 @@ pub enum BatchMode {
 /// Internally it spawns a new task to handle the timeouts and join it at the end.
 pub(crate) struct Batcher<Out: Data> {
     /// Sender used to communicate with the other replicas
-    remote_sender: NetworkSender<NetworkMessage<Out>>,
+    remote_sender: NetworkSender<Out>,
     /// Batching mode used by the batcher
     mode: BatchMode,
     /// Buffer used to keep messages ready to be sent
@@ -31,11 +31,7 @@ pub(crate) struct Batcher<Out: Data> {
 }
 
 impl<Out: Data> Batcher<Out> {
-    pub(crate) fn new(
-        remote_sender: NetworkSender<NetworkMessage<Out>>,
-        mode: BatchMode,
-        coord: Coord,
-    ) -> Self {
+    pub(crate) fn new(remote_sender: NetworkSender<Out>, mode: BatchMode, coord: Coord) -> Self {
         Self {
             remote_sender,
             mode,

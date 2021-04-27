@@ -9,7 +9,7 @@ use crate::channel::{
     BoundedChannelReceiver, BoundedChannelSender, UnboundedChannelReceiver, UnboundedChannelSender,
 };
 use crate::network::remote::{deserialize, remote_recv, SerializedMessage, CHANNEL_CAPACITY};
-use crate::network::{DemuxCoord, ReceiverEndpoint};
+use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::Data;
 
 /// Like `NetworkReceiver`, but this should be used in a multiplexed channel (i.e. a remote one).
@@ -24,7 +24,8 @@ pub(crate) struct DemultiplexingReceiver<In: Data> {
     /// The coordinate of this demultiplexer.
     coord: DemuxCoord,
     /// Tell the demultiplexer that a new receiver is present,
-    register_receiver: UnboundedChannelSender<(ReceiverEndpoint, BoundedChannelSender<In>)>,
+    register_receiver:
+        UnboundedChannelSender<(ReceiverEndpoint, BoundedChannelSender<NetworkMessage<In>>)>,
 }
 
 impl<In: Data> DemultiplexingReceiver<In> {
@@ -57,7 +58,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
     pub fn register(
         &mut self,
         receiver_endpoint: ReceiverEndpoint,
-        local_sender: BoundedChannelSender<In>,
+        local_sender: BoundedChannelSender<NetworkMessage<In>>,
     ) {
         debug!(
             "Registering {} to the demultiplexer of {}",
@@ -72,7 +73,10 @@ impl<In: Data> DemultiplexingReceiver<In> {
     fn bind_remote(
         coord: DemuxCoord,
         address: (String, u16),
-        register_receiver: UnboundedChannelReceiver<(ReceiverEndpoint, BoundedChannelSender<In>)>,
+        register_receiver: UnboundedChannelReceiver<(
+            ReceiverEndpoint,
+            BoundedChannelSender<NetworkMessage<In>>,
+        )>,
         num_clients: usize,
     ) {
         let address = (address.0.as_ref(), address.1);
@@ -152,7 +156,10 @@ impl<In: Data> DemultiplexingReceiver<In> {
     fn demultiplexer_thread(
         coord: DemuxCoord,
         message_receiver: BoundedChannelReceiver<(ReceiverEndpoint, SerializedMessage)>,
-        register_receiver: UnboundedChannelReceiver<(ReceiverEndpoint, BoundedChannelSender<In>)>,
+        register_receiver: UnboundedChannelReceiver<(
+            ReceiverEndpoint,
+            BoundedChannelSender<NetworkMessage<In>>,
+        )>,
     ) {
         debug!("Starting demultiplexer for {}", coord);
         let mut known_receivers = HashMap::new();
@@ -163,7 +170,7 @@ impl<In: Data> DemultiplexingReceiver<In> {
                 let (dest, sender) = register_receiver.recv().unwrap();
                 known_receivers.insert(dest, sender);
             }
-            let message = deserialize::<In>(message).unwrap();
+            let message = deserialize::<NetworkMessage<In>>(message).unwrap();
             if let Err(e) = known_receivers[&dest].send(message) {
                 warn!("Failed to send message to {}: {:?}", dest, e);
             }

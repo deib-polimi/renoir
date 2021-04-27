@@ -54,7 +54,7 @@ pub struct IterationLeader<DeltaUpdate: Data, State: Data> {
     /// before the call to `setup`.
     feedback_block_id: Arc<AtomicUsize>,
     /// The senders to the start block of the iteration for the information about the new iteration.
-    new_state_senders: Vec<NetworkSender<NetworkMessage<NewIterationState<State>>>>,
+    new_state_senders: Vec<NetworkSender<NewIterationState<State>>>,
     /// Whether `next` should emit a `FlushAndRestart` in the next call.
     emit_flush_and_restart: bool,
 

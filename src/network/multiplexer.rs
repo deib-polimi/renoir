@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 
 use crate::channel::{BoundedChannelReceiver, BoundedChannelSender};
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
-use crate::network::{DemuxCoord, ReceiverEndpoint};
+use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::Data;
 
 /// Maximum number of attempts to make for connecting to a remote host.
@@ -26,7 +26,7 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 #[derive(Debug, Clone)]
 pub struct MultiplexingSender<Out: Data> {
     /// The internal sender that points to the actual multiplexed channel.
-    sender: BoundedChannelSender<(ReceiverEndpoint, Out)>,
+    sender: BoundedChannelSender<(ReceiverEndpoint, NetworkMessage<Out>)>,
 }
 
 impl<Out: Data> MultiplexingSender<Out> {
@@ -45,7 +45,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     /// Send a message to the channel.
     ///
     /// Unlikely the normal channels, the destination is required since the channel is multiplexed.
-    pub fn send(&self, destination: ReceiverEndpoint, message: Out) -> Result<()> {
+    pub fn send(&self, destination: ReceiverEndpoint, message: NetworkMessage<Out>) -> Result<()> {
         self.sender
             .send((destination, message))
             .map_err(|e| anyhow!("Failed to send to channel to {}: {:?}", destination, e))
@@ -60,7 +60,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     fn connect_remote(
         coord: DemuxCoord,
         address: (String, u16),
-        local_receiver: BoundedChannelReceiver<(ReceiverEndpoint, Out)>,
+        local_receiver: BoundedChannelReceiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
     ) {
         let socket_addrs: Vec<_> = address
             .to_socket_addrs()
@@ -113,7 +113,7 @@ impl<Out: Data> MultiplexingSender<Out> {
     /// replica.
     fn handle_remote_connection(
         coord: DemuxCoord,
-        local_receiver: BoundedChannelReceiver<(ReceiverEndpoint, Out)>,
+        local_receiver: BoundedChannelReceiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
         mut stream: TcpStream,
     ) {
         let address = stream
