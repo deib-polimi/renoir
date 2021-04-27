@@ -7,8 +7,9 @@ use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, With
 use bincode::{DefaultOptions, Options};
 use serde::{Deserialize, Serialize};
 
-use crate::network::{Coord, DemuxCoord, ReceiverEndpoint};
+use crate::network::{Coord, DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::Data;
+use crate::profiler::{get_profiler, Profiler};
 use crate::scheduler::ReplicaId;
 use crate::stream::BlockId;
 
@@ -44,7 +45,11 @@ struct MessageHeader {
 /// The network protocol works as follow:
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
-pub(crate) fn remote_send<T: Data>(what: T, dest: ReceiverEndpoint, stream: &mut TcpStream) {
+pub(crate) fn remote_send<T: Data>(
+    what: NetworkMessage<T>,
+    dest: ReceiverEndpoint,
+    stream: &mut TcpStream,
+) {
     let address = stream
         .peer_addr()
         .map(|a| a.to_string())
@@ -77,6 +82,12 @@ pub(crate) fn remote_send<T: Data>(what: T, dest: ReceiverEndpoint, stream: &mut
             e
         )
     });
+
+    get_profiler().net_bytes_out(
+        what.sender,
+        dest.coord,
+        serialized_header.len() + serialized.len(),
+    );
 }
 
 /// Receive a message from the remote channel. Returns `None` if there was a failure receiving the
@@ -91,9 +102,7 @@ pub(crate) fn remote_recv(
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    let header_size = HEADER_CONFIG
-        .serialized_size(&MessageHeader::default())
-        .unwrap() as usize;
+    let header_size = header_size();
     let mut header = vec![0u8; header_size];
     match stream.read_exact(&mut header) {
         Ok(_) => {}
@@ -125,4 +134,10 @@ pub(crate) fn remote_recv(
 /// Try to deserialize a serialized message.
 pub(crate) fn deserialize<T: Data>(message: SerializedMessage) -> Result<T> {
     Ok(MESSAGE_CONFIG.deserialize(&message)?)
+}
+
+pub(crate) fn header_size() -> usize {
+    HEADER_CONFIG
+        .serialized_size(&MessageHeader::default())
+        .unwrap() as usize
 }

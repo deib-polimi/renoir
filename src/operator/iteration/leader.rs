@@ -5,6 +5,7 @@ use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::source::Source;
 use crate::operator::{Data, NewIterationState, Operator, StartBlock, StreamElement};
+use crate::profiler::{get_profiler, Profiler};
 use crate::scheduler::ExecutionMetadata;
 
 /// The leader block of an iteration.
@@ -159,6 +160,8 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for IterationLeader<DeltaUp
                 debug!("IterationLeader at {} reached iteration limit", self.coord);
                 should_continue = false;
             }
+
+            get_profiler().iteration_boundary(self.coord.block_id);
 
             let to_return = if !should_continue {
                 // reset the global state at the end of the iteration

@@ -10,6 +10,7 @@ use crate::channel::{BoundedChannelSender, UnboundedChannelReceiver, UnboundedCh
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
+use crate::profiler::wait_profiler;
 use crate::stream::BlockId;
 use crate::worker::spawn_worker;
 
@@ -213,6 +214,8 @@ impl Scheduler {
             handle.join().unwrap();
         }
         network.lock().unwrap().stop_and_wait();
+
+        wait_profiler();
     }
 
     /// Get the ids of the previous blocks of a given block in the job graph

@@ -4,6 +4,7 @@ use crate::channel::BoundedChannelSender;
 use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{NetworkMessage, ReceiverEndpoint};
 use crate::operator::Data;
+use crate::profiler::{get_profiler, Profiler};
 
 /// The sender part of a connection between two replicas.
 ///
@@ -51,16 +52,21 @@ impl<Out: Data> NetworkSender<Out> {
     }
 
     /// Send a message to a replica.
-    pub fn send(&self, item: NetworkMessage<Out>) -> Result<()> {
+    pub fn send(&self, message: NetworkMessage<Out>) -> Result<()> {
+        get_profiler().items_out(
+            message.sender,
+            self.receiver_endpoint.coord,
+            message.num_items(),
+        );
         match &self.sender {
-            NetworkSenderImpl::Local(sender) => sender.send(item).map_err(|e| {
+            NetworkSenderImpl::Local(sender) => sender.send(message).map_err(|e| {
                 anyhow!(
                     "Failed to send to channel to {:?}: {:?}",
                     self.receiver_endpoint,
                     e
                 )
             }),
-            NetworkSenderImpl::Remote(sender) => sender.send(self.receiver_endpoint, item),
+            NetworkSenderImpl::Remote(sender) => sender.send(self.receiver_endpoint, message),
         }
     }
 

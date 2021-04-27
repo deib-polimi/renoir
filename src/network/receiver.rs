@@ -3,11 +3,11 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 
 use crate::channel::{
-    BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectAnyResult, SelectResult,
-    TryRecvError,
+    BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectAnyResult, TryRecvError,
 };
 use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::Data;
+use crate::profiler::{get_profiler, Profiler};
 
 /// The capacity of the in-buffer.
 const CHANNEL_CAPACITY: usize = 10;
@@ -55,56 +55,50 @@ impl<In: Data> NetworkReceiver<In> {
             .map(|sender| NetworkSender::local(self.receiver_endpoint, sender))
     }
 
+    #[inline]
+    fn profile_message<E>(
+        &self,
+        message: Result<NetworkMessage<In>, E>,
+    ) -> Result<NetworkMessage<In>, E> {
+        message.map(|message| {
+            get_profiler().items_in(
+                message.sender,
+                self.receiver_endpoint.coord,
+                message.num_items(),
+            );
+            message
+        })
+    }
+
     /// Receive a message from any sender.
     #[allow(dead_code)]
     pub fn recv(&self) -> Result<NetworkMessage<In>> {
-        self.receiver.recv().map_err(|e| {
+        self.profile_message(self.receiver.recv().map_err(|e| {
             anyhow!(
                 "Failed to receive from channel at {:?}: {:?}",
                 self.receiver_endpoint,
                 e
             )
-        })
+        }))
     }
 
     /// Receive a message from any sender without blocking.
     #[allow(dead_code)]
     pub fn try_recv(&self) -> Result<NetworkMessage<In>, TryRecvError> {
-        self.receiver.try_recv()
+        self.profile_message(self.receiver.try_recv())
     }
 
     /// Receive a message from any sender with a timeout.
     #[allow(dead_code)]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<NetworkMessage<In>, RecvTimeoutError> {
-        self.receiver.recv_timeout(timeout)
-    }
-
-    /// Receive a message from any sender of this receiver of the other provided receiver.
-    ///
-    /// The first message of the two is returned. If both receivers are ready one of them is chosen
-    /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
-    /// fairness property.
-    #[allow(dead_code)] // TODO: remove once joins are implemented
-    pub fn select<In2: Data>(
-        &self,
-        other: &NetworkReceiver<In2>,
-    ) -> SelectResult<NetworkMessage<In>, NetworkMessage<In2>> {
-        self.receiver.select(&other.receiver)
-    }
-
-    /// Same as `select`, with a timeout.
-    #[allow(dead_code)] // TODO: remove once joins are implemented
-    pub fn select_timeout<In2: Data>(
-        &self,
-        other: &NetworkReceiver<In2>,
-        timeout: Duration,
-    ) -> Result<SelectResult<NetworkMessage<In>, NetworkMessage<In2>>, RecvTimeoutError> {
-        self.receiver.select_timeout(&other.receiver, timeout)
+        self.profile_message(self.receiver.recv_timeout(timeout))
     }
 
     /// Same as `select`, but takes multiple receivers to select from.
     pub fn select_any(receivers: &[NetworkReceiver<In>]) -> SelectAnyResult<NetworkMessage<In>> {
-        BoundedChannelReceiver::select_any(receivers.iter().map(|r| &r.receiver))
+        let mut res = BoundedChannelReceiver::select_any(receivers.iter().map(|r| &r.receiver));
+        res.result = receivers[res.index].profile_message(res.result);
+        res
     }
 
     /// Same as `select_timeout`, but takes multiple receivers to select from.
@@ -113,5 +107,9 @@ impl<In: Data> NetworkReceiver<In> {
         timeout: Duration,
     ) -> Result<SelectAnyResult<NetworkMessage<In>>, RecvTimeoutError> {
         BoundedChannelReceiver::select_any_timeout(receivers.iter().map(|r| &r.receiver), timeout)
+            .map(|mut res| {
+                res.result = receivers[res.index].profile_message(res.result);
+                res
+            })
     }
 }

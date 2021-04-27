@@ -89,6 +89,11 @@ impl<T> NetworkMessage<T> {
     pub fn sender(&self) -> Coord {
         self.sender
     }
+
+    /// The number of items in the batch.
+    pub fn num_items(&self) -> usize {
+        self.batch.len()
+    }
 }
 
 impl Coord {

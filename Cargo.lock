@@ -818,6 +818,7 @@ dependencies = [
  "rand",
  "regex",
  "serde",
+ "serde_json",
  "serde_yaml",
  "shell-escape",
  "ssh2",

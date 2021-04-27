@@ -8,9 +8,12 @@ use derivative::Derivative;
 use crate::channel::{
     BoundedChannelReceiver, BoundedChannelSender, UnboundedChannelReceiver, UnboundedChannelSender,
 };
-use crate::network::remote::{deserialize, remote_recv, SerializedMessage, CHANNEL_CAPACITY};
+use crate::network::remote::{
+    deserialize, header_size, remote_recv, SerializedMessage, CHANNEL_CAPACITY,
+};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::Data;
+use crate::profiler::{get_profiler, Profiler};
 
 /// Like `NetworkReceiver`, but this should be used in a multiplexed channel (i.e. a remote one).
 ///
@@ -170,7 +173,9 @@ impl<In: Data> DemultiplexingReceiver<In> {
                 let (dest, sender) = register_receiver.recv().unwrap();
                 known_receivers.insert(dest, sender);
             }
+            let message_len = message.len();
             let message = deserialize::<NetworkMessage<In>>(message).unwrap();
+            get_profiler().net_bytes_in(message.sender, dest.coord, header_size() + message_len);
             if let Err(e) = known_receivers[&dest].send(message) {
                 warn!("Failed to send message to {}: {:?}", dest, e);
             }

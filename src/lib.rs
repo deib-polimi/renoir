@@ -11,6 +11,7 @@ pub mod config;
 pub mod environment;
 pub mod network;
 pub mod operator;
+mod profiler;
 pub mod runner;
 pub mod scheduler;
 pub mod stream;
