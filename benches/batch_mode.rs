@@ -16,7 +16,7 @@ fn batch_mode(batch_mode: BatchMode, dataset: &'static [u32]) {
     let stream = env
         .stream(source)
         .batch_mode(batch_mode)
-        .fold(0u32, |a, b| a.wrapping_add(b));
+        .fold(0u32, |a, b| *a = a.wrapping_add(b));
     let _result = stream.collect_vec();
     env.execute();
 }

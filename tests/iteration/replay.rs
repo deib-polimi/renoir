@@ -115,7 +115,7 @@ fn test_replay_nested_no_shuffle() {
                 s.replay(
                     2,
                     0,
-                    |s, _| s.reduce(|x, y| x + y),
+                    |s, _| s.reduce(|x, y| *x += y),
                     |update: u64, ele| update + ele,
                     |state, update| state + update,
                     |&mut _state| true,
@@ -142,7 +142,7 @@ fn test_replay_nested_shuffle_inner() {
                 s.replay(
                     2,
                     0,
-                    |s, _| s.shuffle().reduce(|x, y| x + y),
+                    |s, _| s.shuffle().reduce(|x, y| *x += y),
                     |update: u64, ele| update + ele,
                     |state, update| state + update,
                     |&mut _state| true,
@@ -169,7 +169,7 @@ fn test_replay_nested_shuffle_outer() {
                 s.shuffle().replay(
                     2,
                     0,
-                    |s, _| s.reduce(|x, y| x + y),
+                    |s, _| s.reduce(|x, y| *x += y),
                     |update: u64, ele| update + ele,
                     |state, update| state + update,
                     |&mut _state| true,
@@ -196,7 +196,7 @@ fn test_replay_nested_shuffle_both() {
                 s.shuffle().replay(
                     2,
                     0,
-                    |s, _| s.shuffle().reduce(|x, y| x + y),
+                    |s, _| s.shuffle().reduce(|x, y| *x += y),
                     |update: u64, ele| update + ele,
                     |state, update| state + update,
                     |&mut _state| true,

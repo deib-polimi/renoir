@@ -13,7 +13,7 @@ where
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
-    fold: Arc<dyn Fn(NewOut, Out) -> NewOut + Send + Sync>,
+    fold: Arc<dyn Fn(&mut NewOut, Out) + Send + Sync>,
     init: NewOut,
     accumulator: Option<NewOut>,
     timestamp: Option<Timestamp>,
@@ -27,7 +27,7 @@ impl<Out: Data, NewOut: Data, PreviousOperators: Operator<Out>>
 {
     fn new<F>(prev: PreviousOperators, init: NewOut, fold: F) -> Self
     where
-        F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
+        F: Fn(&mut NewOut, Out) + Send + Sync + 'static,
     {
         Fold {
             prev,
@@ -63,17 +63,17 @@ where
                     self.max_watermark = Some(self.max_watermark.unwrap_or(ts).max(ts))
                 }
                 StreamElement::Item(item) => {
-                    self.accumulator = Some((self.fold)(
-                        self.accumulator.take().unwrap_or_else(|| self.init.clone()),
-                        item,
-                    ));
+                    if self.accumulator.is_none() {
+                        self.accumulator = Some(self.init.clone());
+                    }
+                    (self.fold)(self.accumulator.as_mut().unwrap(), item);
                 }
                 StreamElement::Timestamped(item, ts) => {
                     self.timestamp = Some(self.timestamp.unwrap_or(ts).max(ts));
-                    self.accumulator = Some((self.fold)(
-                        self.accumulator.take().unwrap_or_else(|| self.init.clone()),
-                        item,
-                    ));
+                    if self.accumulator.is_none() {
+                        self.accumulator = Some(self.init.clone());
+                    }
+                    (self.fold)(self.accumulator.as_mut().unwrap(), item);
                 }
                 // this block wont sent anything until the stream ends
                 StreamElement::FlushBatch => {}
@@ -126,7 +126,7 @@ where
 {
     pub fn fold<NewOut: Data, F>(self, init: NewOut, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
+        F: Fn(&mut NewOut, Out) + Send + Sync + 'static,
     {
         self.max_parallelism(1)
             .add_operator(|prev| Fold::new(prev, init, f))
@@ -139,8 +139,8 @@ where
         global: Global,
     ) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        Local: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
-        Global: Fn(NewOut, NewOut) -> NewOut + Send + Sync + 'static,
+        Local: Fn(&mut NewOut, Out) + Send + Sync + 'static,
+        Global: Fn(&mut NewOut, NewOut) + Send + Sync + 'static,
     {
         self.add_operator(|prev| Fold::new(prev, init.clone(), local))
             .max_parallelism(1)
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_fold_without_timestamps() {
         let fake_operator = FakeOperator::new(0..10u8);
-        let mut fold = Fold::new(fake_operator, 0, |a, b| a + b);
+        let mut fold = Fold::new(fake_operator, 0, |a, b| *a += b);
 
         assert_eq!(fold.next(), StreamElement::Item((0..10u8).sum()));
         assert_eq!(fold.next(), StreamElement::Terminate);
@@ -174,7 +174,7 @@ mod tests {
         fake_operator.push(StreamElement::Timestamped(2, Duration::from_secs(3)));
         fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
 
-        let mut fold = Fold::new(fake_operator, 0, |a, b| a + b);
+        let mut fold = Fold::new(fake_operator, 0, |a, b| *a += b);
 
         assert_eq!(
             fold.next(),
@@ -200,7 +200,7 @@ mod tests {
         fake_operator.push(StreamElement::Item(5));
         fake_operator.push(StreamElement::FlushAndRestart);
 
-        let mut fold = Fold::new(fake_operator, 0, |a, b| a + b);
+        let mut fold = Fold::new(fake_operator, 0, |a, b| *a += b);
 
         assert_eq!(fold.next(), StreamElement::Item(0 + 1 + 2));
         assert_eq!(fold.next(), StreamElement::FlushAndRestart);

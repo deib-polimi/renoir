@@ -8,7 +8,7 @@ fn fold_stream() {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
-            .fold("".to_string(), |s, n| s + &n.to_string())
+            .fold("".to_string(), |s, n| *s += &n.to_string())
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {
@@ -24,7 +24,11 @@ fn fold_assoc_stream() {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
-            .fold_assoc("".to_string(), |s, n| s + &n.to_string(), |s1, s2| s1 + &s2)
+            .fold_assoc(
+                "".to_string(),
+                |s, n| *s += &n.to_string(),
+                |s1, s2| *s1 += &s2,
+            )
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {
@@ -41,10 +45,7 @@ fn fold_shuffled_stream() {
         let res = env
             .stream(source)
             .shuffle()
-            .fold(Vec::new(), |mut v, n| {
-                v.push(n);
-                v
-            })
+            .fold(Vec::new(), |v, n| v.push(n))
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -64,14 +65,8 @@ fn fold_assoc_shuffled_stream() {
             .shuffle()
             .fold_assoc(
                 Vec::new(),
-                |mut v, n| {
-                    v.push(n);
-                    v
-                },
-                |mut v1, mut v2| {
-                    v2.append(&mut v1);
-                    v2
-                },
+                |v, n| v.push(n),
+                |v1, mut v2| v1.append(&mut v2),
             )
             .collect_vec();
         env.execute();
