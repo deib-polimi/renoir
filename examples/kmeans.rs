@@ -1,12 +1,14 @@
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
-use rstream::operator::source;
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, Div};
+use std::ops::{Add, AddAssign, Div};
 use std::time::Instant;
+
+use serde::{Deserialize, Serialize};
+
+use rstream::config::EnvironmentConfig;
+use rstream::environment::StreamEnvironment;
+use rstream::operator::source;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 struct Point {
@@ -33,6 +35,13 @@ impl Add for Point {
             x: self.x + other.x,
             y: self.y + other.y,
         }
+    }
+}
+
+impl AddAssign for Point {
+    fn add_assign(&mut self, other: Self) {
+        self.x += other.x;
+        self.y += other.y;
     }
 }
 
@@ -152,23 +161,22 @@ fn main() {
                 s.map(move |point| (point, select_nearest(point, &state.get().centroids), 1))
                     .group_by_reduce(
                         |(_p, c, _n)| *c,
-                        |(p1, c, n1), (p2, _, n2)| (p1 + p2, c, n1 + n2),
+                        |(p1, _, n1), (p2, _, n2)| {
+                            *p1 += p2;
+                            *n1 += n2;
+                        },
                     )
                     .unkey()
                     .map(|(_, (p, _, n))| p / n)
             },
-            |mut update: Vec<Point>, p| {
-                update.push(p);
-                update
-            },
-            move |mut state, mut update| {
+            |update: &mut Vec<Point>, p| update.push(p),
+            move |state, mut update| {
                 if state.finished_update {
                     state.finished_update = false;
                     state.old_centroids.clear();
                     state.old_centroids.append(&mut state.centroids);
                 }
                 state.centroids.append(&mut update);
-                state
             },
             |state| {
                 state.finished_update = true;

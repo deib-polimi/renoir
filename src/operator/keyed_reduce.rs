@@ -1,6 +1,7 @@
+use std::sync::Arc;
+
 use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use std::sync::Arc;
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -13,7 +14,7 @@ where
     ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
-        F: Fn(Out, Out) -> Out + Send + Sync + 'static,
+        F: Fn(&mut Out, Out) + Send + Sync + 'static,
     {
         // FIXME: remove Arc if reduce function will be Clone
         let f = Arc::new(f);
@@ -23,14 +24,14 @@ where
             keyer,
             None,
             move |acc, value| match acc {
-                None => Some(value),
-                Some(acc) => Some(f(acc, value)),
+                None => *acc = Some(value),
+                Some(acc) => f(acc, value),
             },
             move |acc1, acc2| match acc1 {
-                None => acc2,
+                None => *acc1 = acc2,
                 Some(acc1) => match acc2 {
-                    None => Some(acc1),
-                    Some(acc2) => Some(f2(acc1, acc2)),
+                    None => {}
+                    Some(acc2) => f2(acc1, acc2),
                 },
             },
         )
@@ -44,11 +45,11 @@ where
 {
     pub fn reduce<F>(self, f: F) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        F: Fn(Out, Out) -> Out + Send + Sync + 'static,
+        F: Fn(&mut Out, Out) + Send + Sync + 'static,
     {
         self.fold(None, move |acc, value| match acc {
-            None => Some(value),
-            Some(acc) => Some(f(acc, value)),
+            None => *acc = Some(value),
+            Some(acc) => f(acc, value),
         })
         .map(|(_, value)| value.unwrap())
     }

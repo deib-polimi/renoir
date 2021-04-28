@@ -23,7 +23,7 @@ fn wordcount_fold(path: &Path) {
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
         .group_by(|word| word.clone())
-        .fold(0, |count, _word| count + 1)
+        .fold(0, |count, _word| *count += 1)
         .unkey();
     let _result = stream.collect_vec();
     env.execute();
@@ -41,8 +41,8 @@ fn wordcount_fold_assoc(path: &Path) {
         .group_by_fold(
             |w| w.clone(),
             0,
-            |count, _word| count + 1,
-            |count1, count2| count1 + count2,
+            |count, _word| *count += 1,
+            |count1, count2| *count1 += count2,
         )
         .unkey();
     let _result = stream.collect_vec();
@@ -60,7 +60,7 @@ fn wordcount_reduce(path: &Path) {
         .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
         .group_by(|word| word.clone())
         .map(|(_, word)| (word, 1))
-        .reduce(|(w, c1), (_w, c2)| (w, c1 + c2))
+        .reduce(|(_w1, c1), (_w2, c2)| *c1 += c2)
         .unkey();
     let _result = stream.collect_vec();
     env.execute();
@@ -76,7 +76,7 @@ fn wordcount_reduce_assoc(path: &Path) {
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
         .map(|word| (word, 1))
-        .group_by_reduce(|w| w.clone(), |(w, c1), (_w, c2)| (w, c1 + c2))
+        .group_by_reduce(|w| w.clone(), |(_w1, c1), (_w, c2)| *c1 += c2)
         .unkey();
     let _result = stream.collect_vec();
     env.execute();

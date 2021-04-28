@@ -73,8 +73,8 @@ where
         num_iterations: usize,
         initial_state: State,
         body: Body,
-        local_fold: impl Fn(DeltaUpdate, Out) -> DeltaUpdate + Send + Sync + 'static,
-        global_fold: impl Fn(State, DeltaUpdate) -> State + Send + Sync + 'static,
+        local_fold: impl Fn(&mut DeltaUpdate, Out) + Send + Sync + 'static,
+        global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Sync + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
     ) -> Stream<State, impl Operator<State>>
     where

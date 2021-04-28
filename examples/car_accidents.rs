@@ -59,8 +59,8 @@ fn query1_with_source(
         .group_by_fold(
             |(week, _)| *week,
             0,
-            |k1, (_, k2)| k1 + k2,
-            |k1, k2| k1 + k2,
+            |k1, (_, k2)| *k1 += k2,
+            |k1, k2| *k1 += k2,
         )
         .unkey()
         .collect_vec()
@@ -134,8 +134,14 @@ fn query2_with_source(
         .group_by_fold(
             |(f, _, _)| f.clone(),
             (0, 0),
-            |(a1, k1), (_f, a2, k2)| (a1 + a2, k1 + k2),
-            |(a1, k1), (a2, k2)| (a1 + a2, k1 + k2),
+            |(a1, k1), (_f, a2, k2)| {
+                *a1 += a2;
+                *k1 += k2
+            },
+            |(a1, k1), (a2, k2)| {
+                *a1 += a2;
+                *k1 += k2
+            },
         )
         .unkey()
         .map(|(f, (a, k))| (f, a, k))
@@ -190,8 +196,14 @@ fn query3_with_source(
         .group_by_fold(
             |(borough, week, _, _)| (borough.clone(), *week),
             (0, 0),
-            |(a1, k1), (_, _, a2, k2)| (a1 + a2, k1 + k2),
-            |(a1, k1), (a2, k2)| (a1 + a2, k1 + k2),
+            |(a1, k1), (_, _, a2, k2)| {
+                *a1 += a2;
+                *k1 += k2;
+            },
+            |(a1, k1), (a2, k2)| {
+                *a1 += a2;
+                *k1 += k2
+            },
         )
         .unkey()
         .map(|((borough, week), (accidents, killed))| (borough, week, accidents, killed))
@@ -208,8 +220,14 @@ fn query3_with_source(
         .group_by_fold(
             |(b, w, _, _)| (b.clone(), *w),
             (0, 0),
-            |(a1, k1), (_, _, a2, k2)| (a1 + a2, k1 + k2),
-            |(a1, k1), (a2, k2)| (a1 + a2, k1 + k2),
+            |(a1, k1), (_, _, a2, k2)| {
+                *a1 += a2;
+                *k1 += k2;
+            },
+            |(a1, k1), (a2, k2)| {
+                *a1 += a2;
+                *k1 += k2
+            },
         )
         .unkey()
         // compute the average

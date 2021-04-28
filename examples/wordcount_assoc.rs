@@ -27,8 +27,8 @@ fn main() {
         .group_by_fold(
             |word| word.clone(),
             0,
-            |count, _word| count + 1,
-            |a, b| a + b,
+            |count, _word| *count += 1,
+            |a, b| *a += b,
         )
         .unkey();
     let result = stream.collect_vec();

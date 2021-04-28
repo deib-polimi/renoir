@@ -10,8 +10,8 @@ fn group_by_fold_stream() {
             .group_by_fold(
                 |n| n % 2,
                 "".to_string(),
-                |s, n| s + &n.to_string(),
-                |s1, s2| s1 + &s2,
+                |s, n| *s += &n.to_string(),
+                |s1, s2| *s1 += &s2,
             )
             .unkey()
             .collect_vec();
@@ -32,7 +32,7 @@ fn fold_keyed_stream() {
         let res = env
             .stream(source)
             .group_by(|n| n % 2)
-            .fold("".to_string(), |s, n| s + &n.to_string())
+            .fold("".to_string(), |s, n| *s += &n.to_string())
             .unkey()
             .collect_vec();
         env.execute();
@@ -55,14 +55,8 @@ fn group_by_fold_shuffled_stream() {
             .group_by_fold(
                 |n| n % 2,
                 Vec::new(),
-                |mut v, n| {
-                    v.push(n);
-                    v
-                },
-                |mut v1, mut v2| {
-                    v1.append(&mut v2);
-                    v1
-                },
+                |v, n| v.push(n),
+                |v1, mut v2| v1.append(&mut v2),
             )
             .unkey()
             .collect_vec();
@@ -86,10 +80,7 @@ fn fold_shuffled_keyed_stream() {
             .stream(source)
             .shuffle()
             .group_by(|n| n % 2)
-            .fold(Vec::new(), |mut v, n| {
-                v.push(n);
-                v
-            })
+            .fold(Vec::new(), |v, n| v.push(n))
             .unkey()
             .collect_vec();
         env.execute();

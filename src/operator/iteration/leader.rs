@@ -61,7 +61,7 @@ pub struct IterationLeader<DeltaUpdate: Data, State: Data> {
 
     /// The function that combines the global state with a delta update.
     #[derivative(Debug = "ignore")]
-    global_fold: Arc<dyn Fn(State, DeltaUpdate) -> State + Send + Sync>,
+    global_fold: Arc<dyn Fn(&mut State, DeltaUpdate) + Send + Sync>,
     /// A function that, given the global state, checks whether the iteration should continue.
     #[derivative(Debug = "ignore")]
     loop_condition: Arc<dyn Fn(&mut State) -> bool + Send + Sync>,
@@ -71,7 +71,7 @@ impl<DeltaUpdate: Data, State: Data> IterationLeader<DeltaUpdate, State> {
     pub fn new(
         initial_state: State,
         num_iterations: usize,
-        global_fold: impl Fn(State, DeltaUpdate) -> State + Send + Sync + 'static,
+        global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Sync + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
         feedback_block_id: Arc<AtomicUsize>,
     ) -> Self {
@@ -134,8 +134,7 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for IterationLeader<DeltaUp
                             "IterationLeader at {} received a delta update, {} missing",
                             self.coord, missing_delta_updates
                         );
-                        self.state =
-                            Some((self.global_fold)(self.state.take().unwrap(), delta_update));
+                        (self.global_fold)(self.state.as_mut().unwrap(), delta_update);
                     }
                     StreamElement::Terminate => {
                         debug!("IterationLeader {} received Terminate", self.coord);

@@ -1,10 +1,11 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
 use itertools::Itertools;
 
 use rstream::operator::source::{EventTimeIteratorSource, IteratorSource};
 use rstream::operator::Timestamp;
 use rstream::test::{TestHelper, WatermarkChecker};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
 #[test]
 fn concat_stream() {
@@ -122,7 +123,7 @@ fn concat_keyed_stream() {
 
         let res = stream1
             .concat(stream2)
-            .reduce(|x, y| x + y)
+            .reduce(|x, y| *x += y)
             .unkey()
             .collect_vec();
         env.execute();

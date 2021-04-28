@@ -1,4 +1,5 @@
 use itertools::Itertools;
+
 use rstream::operator::source::IteratorSource;
 use rstream::test::TestHelper;
 use rstream::worker::replica_coord;
@@ -47,8 +48,8 @@ fn test_iterate_no_blocks_in_between() {
                 n_iter,
                 0u64,
                 |s, state| s.map(move |x| x + *state.get()),
-                |delta: u64, x| delta + x,
-                |old_state, delta| old_state + delta,
+                |delta: &mut u64, x| *delta += x,
+                |old_state, delta| *old_state += delta,
                 |_state| true,
             );
         let state = state.collect_vec();
@@ -84,14 +85,14 @@ fn test_iterate_with_shuffle() {
                         x + state
                     })
                 },
-                |delta: u64, x| {
+                |delta: &mut u64, x| {
                     println!(
                         "XX: Local reduce at {}: {} + {}",
                         replica_coord().unwrap(),
                         delta,
                         x
                     );
-                    delta + x
+                    *delta += x
                 },
                 |old_state, delta| {
                     println!(
@@ -100,7 +101,7 @@ fn test_iterate_with_shuffle() {
                         old_state,
                         delta
                     );
-                    old_state + delta
+                    *old_state += delta
                 },
                 |state| {
                     println!("XX: End of iteration: state is {}", state);
@@ -126,8 +127,8 @@ fn test_iterate_primes() {
             n_iter,
             2,
             |s, state| s.filter(move |x| x == state.get() || x % state.get() != 0),
-            |delta: u64, _x| delta,
-            |old_state, _delta| old_state,
+            |_delta: &mut u64, _x| {},
+            |_old_state, _delta| {},
             |state| {
                 *state += 1;
                 true

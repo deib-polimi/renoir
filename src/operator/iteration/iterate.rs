@@ -1,4 +1,5 @@
 use std::any::TypeId;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -14,7 +15,6 @@ use crate::operator::{
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
-use std::collections::VecDeque;
 
 fn clone_with_default<T: Default>(_: &T) -> T {
     T::default()
@@ -98,8 +98,8 @@ where
         num_iterations: usize,
         initial_state: State,
         body: Body,
-        local_fold: impl Fn(DeltaUpdate, Out) -> DeltaUpdate + Send + Sync + 'static,
-        global_fold: impl Fn(State, DeltaUpdate) -> State + Send + Sync + 'static,
+        local_fold: impl Fn(&mut DeltaUpdate, Out) + Send + Sync + 'static,
+        global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Sync + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
     ) -> (
         Stream<State, impl Operator<State>>,

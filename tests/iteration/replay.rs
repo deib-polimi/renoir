@@ -18,8 +18,8 @@ fn test_replay_no_blocks_in_between() {
                 n_iter,
                 1,
                 |s, state| s.map(move |x| x * *state.get()),
-                |delta: u64, x| delta + x,
-                |old_state, delta| old_state + delta,
+                |delta: &mut u64, x| *delta += x,
+                |old_state, delta| *old_state += delta,
                 |state| {
                     *state -= 1;
                     true
@@ -59,8 +59,8 @@ fn test_replay_with_shuffle() {
                 n_iter,
                 1,
                 |s, state| s.shuffle().map(move |x| x * *state.get()),
-                |delta: u64, x| delta + x,
-                |old_state, delta| old_state + delta,
+                |delta: &mut u64, x| *delta += x,
+                |old_state, delta| *old_state += delta,
                 |state| {
                     *state -= 1;
                     true
@@ -116,13 +116,13 @@ fn test_replay_nested_no_shuffle() {
                     2,
                     0,
                     |s, _| s.reduce(|x, y| *x += y),
-                    |update: u64, ele| update + ele,
-                    |state, update| state + update,
+                    |update: &mut u64, ele| *update += ele,
+                    |state, update| *state += update,
                     |&mut _state| true,
                 )
             },
-            |update: u64, ele| update + ele,
-            |state, update| state + update,
+            |update: &mut u64, ele| *update += ele,
+            |state, update| *state += update,
             |&mut _state| true,
         );
         let res = stream.collect_vec();
@@ -143,13 +143,13 @@ fn test_replay_nested_shuffle_inner() {
                     2,
                     0,
                     |s, _| s.shuffle().reduce(|x, y| *x += y),
-                    |update: u64, ele| update + ele,
-                    |state, update| state + update,
+                    |update: &mut u64, ele| *update += ele,
+                    |state, update| *state += update,
                     |&mut _state| true,
                 )
             },
-            |update: u64, ele| update + ele,
-            |state, update| state + update,
+            |update: &mut u64, ele| *update += ele,
+            |state, update| *state += update,
             |&mut _state| true,
         );
         let res = stream.collect_vec();
@@ -170,13 +170,13 @@ fn test_replay_nested_shuffle_outer() {
                     2,
                     0,
                     |s, _| s.reduce(|x, y| *x += y),
-                    |update: u64, ele| update + ele,
-                    |state, update| state + update,
+                    |update: &mut u64, ele| *update += ele,
+                    |state, update| *state += update,
                     |&mut _state| true,
                 )
             },
-            |update: u64, ele| update + ele,
-            |state, update| state + update,
+            |update: &mut u64, ele| *update += ele,
+            |state, update| *state += update,
             |&mut _state| true,
         );
         let res = stream.collect_vec();
@@ -197,13 +197,13 @@ fn test_replay_nested_shuffle_both() {
                     2,
                     0,
                     |s, _| s.shuffle().reduce(|x, y| *x += y),
-                    |update: u64, ele| update + ele,
-                    |state, update| state + update,
+                    |update: &mut u64, ele| *update += ele,
+                    |state, update| *state += update,
                     |&mut _state| true,
                 )
             },
-            |update: u64, ele| update + ele,
-            |state, update| state + update,
+            |update: &mut u64, ele| *update += ele,
+            |state, update| *state += update,
             |&mut _state| true,
         );
         let res = stream.collect_vec();

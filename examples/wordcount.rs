@@ -25,7 +25,7 @@ fn main() {
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| tokenizer.tokenize(line))
         .group_by(|word| word.clone())
-        .fold(0, |count, _word| count + 1)
+        .fold(0, |count, _word| *count += 1)
         .unkey();
     let result = stream.collect_vec();
     let start = Instant::now();

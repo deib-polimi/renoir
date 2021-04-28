@@ -1,8 +1,7 @@
 use core::iter::Iterator;
-use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_map::{DefaultHasher, Entry};
 use std::collections::HashMap;
 use std::hash::Hasher;
-use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorStructure};
@@ -18,25 +17,13 @@ where
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
-    fold: Arc<dyn Fn(NewOut, Out) -> NewOut + Send + Sync>,
+    fold: Arc<dyn Fn(&mut NewOut, Out) + Send + Sync>,
     init: NewOut,
-    /// For each key store the corresponding partial accumulation.
-    ///
-    /// ## Safety
-    ///
-    /// This is a `MaybeUninit` for optimizing the accesses to the hashmap. Inside this hashmap
-    /// there could be uninitialized data only during the execution of a fold. After that the data
-    /// is immediately initialized back.
-    #[derivative(Clone(clone_with = "clone_with_default"))]
-    accumulators: HashMap<Key, MaybeUninit<NewOut>>,
+    accumulators: HashMap<Key, NewOut>,
     timestamps: HashMap<Key, Timestamp>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
     received_end_iter: bool,
-}
-
-fn clone_with_default<T: Default>(_: &T) -> T {
-    T::default()
 }
 
 impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators: Operator<KeyValue<Key, Out>>>
@@ -44,7 +31,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators: Operator<KeyValue
 {
     fn new<F>(prev: PreviousOperators, init: NewOut, fold: F) -> Self
     where
-        F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
+        F: Fn(&mut NewOut, Out) + Send + Sync + 'static,
     {
         KeyedFold {
             prev,
@@ -58,22 +45,16 @@ impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators: Operator<KeyValue
         }
     }
 
-    /// Process a new item, folding it and putting back the value inside the hashmap.
+    /// Process a new item, folding it with the accumulator inside the hashmap.
     fn process_item(&mut self, key: Key, value: Out) {
-        let acc = self.accumulators.get_mut(&key);
-        match acc {
-            Some(acc) => {
-                let mut temp = MaybeUninit::uninit();
-                std::mem::swap(acc, &mut temp);
-                // SAFETY: assuming fold doesn't panic, all the data inside the hashmap
-                // is initialized. The swapped uninitialized data won't ever be accessed
-                // since it's swapped back immediately after this.
-                temp = MaybeUninit::new((self.fold)(unsafe { temp.assume_init() }, value));
-                std::mem::swap(acc, &mut temp);
+        match self.accumulators.entry(key) {
+            Entry::Vacant(entry) => {
+                let mut acc = self.init.clone();
+                (self.fold)(&mut acc, value);
+                entry.insert(acc);
             }
-            None => {
-                self.accumulators
-                    .insert(key, MaybeUninit::new((self.fold)(self.init.clone(), value)));
+            Entry::Occupied(mut entry) => {
+                (self.fold)(entry.get_mut(), value);
             }
         }
     }
@@ -118,11 +99,9 @@ where
             let key = k.clone();
             let (key, value) = self.accumulators.remove_entry(&key).unwrap();
             return if let Some(ts) = self.timestamps.remove(&key) {
-                // SAFETY: inside the hashmap there is always initialized data
-                StreamElement::Timestamped((key, unsafe { value.assume_init() }), ts)
+                StreamElement::Timestamped((key, value), ts)
             } else {
-                // SAFETY: inside the hashmap there is always initialized data
-                StreamElement::Item((key, unsafe { value.assume_init() }))
+                StreamElement::Item((key, value))
             };
         }
 
@@ -171,8 +150,8 @@ where
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
         Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
-        Local: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
-        Global: Fn(NewOut, NewOut) -> NewOut + Send + Sync + 'static,
+        Local: Fn(&mut NewOut, Out) + Send + Sync + 'static,
+        Global: Fn(&mut NewOut, NewOut) + Send + Sync + 'static,
     {
         let keyer = Arc::new(keyer);
 
@@ -208,7 +187,7 @@ where
         f: F,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        F: Fn(NewOut, Out) -> NewOut + Send + Sync + 'static,
+        F: Fn(&mut NewOut, Out) + Send + Sync + 'static,
     {
         self.add_operator(|prev| KeyedFold::new(prev, init, f))
     }
@@ -216,18 +195,20 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use itertools::Itertools;
+
     use crate::operator::keyed_fold::KeyedFold;
     use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
-    use itertools::Itertools;
-    use std::time::Duration;
 
     #[test]
     #[allow(clippy::identity_op)]
     fn test_keyed_fold_no_timestamp() {
         let data = (0..10u8).map(|x| (x % 2, x)).collect_vec();
         let fake_operator = FakeOperator::new(data.into_iter());
-        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| a + b);
+        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| *a += b);
 
         let mut res = vec![];
         for _ in 0..2 {
@@ -254,7 +235,7 @@ mod tests {
         fake_operator.push(StreamElement::Timestamped((0, 2), Duration::from_secs(3)));
         fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
 
-        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| a + b);
+        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| *a += b);
 
         let mut res = vec![];
         for _ in 0..2 {
@@ -292,7 +273,7 @@ mod tests {
         fake_operator.push(StreamElement::Item((1, 3)));
         fake_operator.push(StreamElement::FlushAndRestart);
 
-        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| a + b);
+        let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| *a += b);
 
         assert_eq!(keyed_fold.next(), StreamElement::Item((0, 0 + 2)));
         assert_eq!(keyed_fold.next(), StreamElement::FlushAndRestart);
