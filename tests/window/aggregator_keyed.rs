@@ -41,7 +41,7 @@ fn test_fold_window_keyed() {
             .stream(source)
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
-            .fold(0, |acc, x| acc + x)
+            .fold(0, |acc, x| *acc += x)
             .unkey()
             .collect_vec();
         env.execute();

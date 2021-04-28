@@ -25,7 +25,7 @@ fn main() {
         .flat_map(move |line| tokenizer.tokenize(line))
         .group_by(|word| word.clone())
         .window(CountWindow::sliding(10, 5))
-        .fold(0, |count, _word| count + 1)
+        .fold(0, |count, _word| *count += 1)
         .for_each(|_, _| {});
     let start = Instant::now();
     env.execute();

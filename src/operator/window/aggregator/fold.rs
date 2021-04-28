@@ -14,7 +14,7 @@ where
         fold: F,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        F: Fn(NewOut, &Out) -> NewOut + Clone + Send + 'static,
+        F: Fn(&mut NewOut, &Out) + Clone + Send + 'static,
     {
         let stream = self.inner;
         let descr = self.descr;
@@ -23,7 +23,7 @@ where
             GenericWindowOperator::new("Fold", prev, descr, move |window| {
                 let mut res = init.clone();
                 for value in window.items() {
-                    res = (fold)(res, value);
+                    (fold)(&mut res, value);
                 }
                 res
             })
@@ -42,7 +42,7 @@ where
         fold: F,
     ) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        F: Fn(NewOut, &Out) -> NewOut + Clone + Send + 'static,
+        F: Fn(&mut NewOut, &Out) + Clone + Send + 'static,
     {
         self.inner.fold(init, fold).unkey().map(|(_, x)| x)
     }

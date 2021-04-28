@@ -36,7 +36,7 @@ fn test_fold_window() {
         let res = env
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
-            .fold(0, |acc, x| acc + x)
+            .fold(0, |acc, x| *acc += x)
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
