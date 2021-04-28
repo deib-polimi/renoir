@@ -6,6 +6,7 @@ pub use sum::*;
 
 mod first;
 mod fold;
+mod join;
 mod max;
 mod min;
 mod sum;

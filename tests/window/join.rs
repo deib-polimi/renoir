@@ -31,7 +31,8 @@ fn window_join() {
             .map(|(_, x)| ('a'..'z').nth(x as usize).unwrap());
 
         let res = stream1
-            .window_join(stream2, EventTimeWindow::tumbling(Timestamp::from_secs(3)))
+            .window(EventTimeWindow::tumbling(Timestamp::from_secs(3)))
+            .join(stream2)
             .unkey()
             .collect_vec();
         env.execute();

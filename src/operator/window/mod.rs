@@ -13,7 +13,6 @@ use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, Windowed
 mod aggregator;
 mod description;
 mod generic_operator;
-mod join;
 mod time_window;
 
 /// A WindowDescription describes how a window behaves.

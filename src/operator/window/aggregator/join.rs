@@ -1,5 +1,5 @@
 use crate::operator::{Data, DataKey, Operator, WindowDescription};
-use crate::stream::{KeyValue, KeyedStream};
+use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -8,26 +8,26 @@ pub enum JoinElement<A, B> {
     Right(B),
 }
 
-impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, Out2: Data, WindowDescr, OperatorChain>
+    KeyedWindowedStream<Key, Out, OperatorChain, JoinElement<Out, Out2>, WindowDescr>
 where
+    WindowDescr: WindowDescription<Key, JoinElement<Out, Out2>> + Clone + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub fn window_join<Out2: Data, OperatorChain2, WindowDescr>(
+    pub fn join<OperatorChain2>(
         self,
         right: KeyedStream<Key, Out2, OperatorChain2>,
-        descr: WindowDescr,
     ) -> KeyedStream<Key, (Out, Out2), impl Operator<KeyValue<Key, (Out, Out2)>>>
     where
-        WindowDescr: WindowDescription<Key, JoinElement<Out, Out2>> + Clone + 'static,
         OperatorChain2: Operator<KeyValue<Key, Out2>> + Send + 'static,
     {
         // map the left and right streams to the same type
-        let left = self.map(|(_, x)| JoinElement::<_, Out2>::Left(x));
-        let right = right.map(|(_, x)| JoinElement::<Out, _>::Right(x));
+        let left = self.inner.map(|(_, x)| JoinElement::Left(x));
+        let right = right.map(|(_, x)| JoinElement::Right(x));
 
         // concatenate the two streams and apply the window
         left.concat(right)
-            .window(descr)
+            .window(self.descr)
             .add_generic_window_operator("Join", move |window| {
                 // divide the elements coming from the left stream from the elements
                 // coming from the right stream
