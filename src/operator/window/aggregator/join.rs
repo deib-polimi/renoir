@@ -1,5 +1,5 @@
 use crate::operator::{Data, DataKey, Operator, WindowDescription};
-use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream};
+use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -52,5 +52,25 @@ where
                 res
             })
             .flatten()
+    }
+}
+
+impl<Out: Data, Out2: Data, WindowDescr, OperatorChain>
+    WindowedStream<Out, OperatorChain, JoinElement<Out, Out2>, WindowDescr>
+where
+    WindowDescr: WindowDescription<(), JoinElement<Out, Out2>> + Clone + 'static,
+    OperatorChain: Operator<KeyValue<(), Out>> + Send + 'static,
+{
+    pub fn join<OperatorChain2>(
+        self,
+        right: Stream<Out2, OperatorChain2>,
+    ) -> Stream<(Out, Out2), impl Operator<(Out, Out2)>>
+    where
+        OperatorChain2: Operator<Out2> + Send + 'static,
+    {
+        self.inner
+            .join(right.max_parallelism(1).key_by(|_| ()))
+            .unkey()
+            .map(|(_, x)| x)
     }
 }

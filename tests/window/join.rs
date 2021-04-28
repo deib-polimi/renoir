@@ -66,3 +66,56 @@ fn window_join() {
         }
     });
 }
+
+#[test]
+fn window_all_join() {
+    TestHelper::local_remote_env(|mut env| {
+        let source1 =
+            EventTimeIteratorSource::new((0..10).map(|x| (x, Timestamp::from_secs(x))), |x, ts| {
+                if x % 2 == 1 {
+                    Some(*ts)
+                } else {
+                    None
+                }
+            });
+
+        let source2 =
+            EventTimeIteratorSource::new((0..10).map(|x| (x, Timestamp::from_secs(x))), |x, ts| {
+                if x % 2 == 0 {
+                    Some(*ts)
+                } else {
+                    None
+                }
+            });
+
+        let stream1 = env.stream(source1).shuffle();
+        let stream2 = env
+            .stream(source2)
+            .shuffle()
+            .map(|x| ('a'..'z').nth(x as usize).unwrap());
+
+        let res = stream1
+            .window_all(EventTimeWindow::tumbling(Timestamp::from_secs(3)))
+            .join(stream2)
+            .collect_vec();
+        env.execute();
+
+        if let Some(mut res) = res.get() {
+            res.sort_unstable();
+
+            let windows = vec![vec![0, 1, 2], vec![3, 4, 5], vec![6, 7, 8], vec![9]];
+
+            let mut expected = Vec::new();
+            for window in windows.into_iter() {
+                for &x in window.iter() {
+                    for &y in window.iter() {
+                        expected.push((x, ('a'..'z').nth(y as usize).unwrap()));
+                    }
+                }
+            }
+            expected.sort_unstable();
+
+            assert_eq!(res, expected);
+        }
+    });
+}
