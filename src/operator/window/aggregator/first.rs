@@ -1,4 +1,3 @@
-use crate::operator::window::generic_operator::GenericWindowOperator;
 use crate::operator::{Data, DataKey, Operator, WindowDescription};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
@@ -10,14 +9,7 @@ where
 {
     /// For each window, return the first element.
     pub fn first(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        let stream = self.inner;
-        let descr = self.descr;
-
-        stream.add_operator(|prev| {
-            GenericWindowOperator::new("First", prev, descr, |window| {
-                window.items().next().unwrap().clone()
-            })
-        })
+        self.add_generic_window_operator("First", |window| window.items().next().unwrap().clone())
     }
 }
 

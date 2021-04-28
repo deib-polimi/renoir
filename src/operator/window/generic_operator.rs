@@ -3,10 +3,10 @@ use std::collections::VecDeque;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::window::KeyedWindowManager;
 use crate::operator::{
-    Data, DataKey, Operator, StreamElement, Window, WindowDescription, WindowGenerator,
+    Data, DataKey, Operator, Reorder, StreamElement, Window, WindowDescription, WindowGenerator,
 };
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::KeyValue;
+use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream};
 
 /// This operator abstracts the window logic as an operator and delegates to the
 /// `KeyedWindowManager` and a `ProcessFunc` the job of building and processing the windows,
@@ -130,5 +130,33 @@ where
             .add_operator(OperatorStructure::new::<KeyValue<Key, NewOut>, _>(
                 &self.name,
             ))
+    }
+}
+
+impl<Key: DataKey, Out: Data, WindowDescr, OperatorChain>
+    KeyedWindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
+where
+    WindowDescr: WindowDescription<Key, Out> + Clone + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+{
+    /// Add a new generic window operator to a `KeyedWindowedStream`,
+    /// after adding a Reorder operator.
+    /// This should be used by every custom window aggregator.
+    pub(crate) fn add_generic_window_operator<NewOut, S, F>(
+        self,
+        name: S,
+        process_func: F,
+    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    where
+        NewOut: Data,
+        S: Into<String>,
+        F: Fn(&Window<Key, Out>) -> NewOut + Clone + 'static,
+    {
+        let stream = self.inner;
+        let descr = self.descr;
+
+        stream
+            .add_operator(Reorder::new)
+            .add_operator(|prev| GenericWindowOperator::new(name.into(), prev, descr, process_func))
     }
 }

@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 pub use aggregator::*;
 pub use description::*;
 
-use crate::operator::{Data, DataKey, Operator, Reorder, StreamElement, Timestamp};
+use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
 mod aggregator;
@@ -205,7 +205,7 @@ where
         descr: WinDescr,
     ) -> KeyedWindowedStream<Key, Out, impl Operator<KeyValue<Key, Out>>, WinOut, WinDescr> {
         KeyedWindowedStream {
-            inner: self.add_operator(Reorder::new),
+            inner: self,
             descr,
             _win_out: Default::default(),
         }

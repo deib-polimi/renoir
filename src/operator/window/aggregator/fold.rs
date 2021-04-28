@@ -1,4 +1,3 @@
-use crate::operator::window::generic_operator::GenericWindowOperator;
 use crate::operator::{Data, DataKey, Operator, WindowDescription};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
@@ -16,17 +15,12 @@ where
     where
         F: Fn(&mut NewOut, &Out) + Clone + Send + 'static,
     {
-        let stream = self.inner;
-        let descr = self.descr;
-
-        stream.add_operator(|prev| {
-            GenericWindowOperator::new("Fold", prev, descr, move |window| {
-                let mut res = init.clone();
-                for value in window.items() {
-                    (fold)(&mut res, value);
-                }
-                res
-            })
+        self.add_generic_window_operator("Fold", move |window| {
+            let mut res = init.clone();
+            for value in window.items() {
+                (fold)(&mut res, value);
+            }
+            res
         })
     }
 }
