@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fmt::{Display, Formatter};
 
 use hashbrown::hash_map::IterMut;
 use hashbrown::HashMap;
@@ -8,7 +9,6 @@ pub use description::*;
 
 use crate::operator::{Data, DataKey, Operator, Reorder, StreamElement, Timestamp};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
-use std::fmt::{Display, Formatter};
 
 mod aggregator;
 mod description;
@@ -200,13 +200,14 @@ impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
 {
-    pub fn window<WinDescr: WindowDescription<Key, Out>>(
+    pub fn window<WinOut: Data, WinDescr: WindowDescription<Key, WinOut>>(
         self,
         descr: WinDescr,
-    ) -> KeyedWindowedStream<Key, Out, impl Operator<KeyValue<Key, Out>>, WinDescr> {
+    ) -> KeyedWindowedStream<Key, Out, impl Operator<KeyValue<Key, Out>>, WinOut, WinDescr> {
         KeyedWindowedStream {
             inner: self.add_operator(Reorder::new),
             descr,
+            _win_out: Default::default(),
         }
     }
 }
@@ -215,10 +216,10 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + Send + 'static,
 {
-    pub fn window_all<WinDescr: WindowDescription<(), Out>>(
+    pub fn window_all<WinOut: Data, WinDescr: WindowDescription<(), WinOut>>(
         self,
         descr: WinDescr,
-    ) -> WindowedStream<Out, impl Operator<KeyValue<(), Out>>, WinDescr> {
+    ) -> WindowedStream<Out, impl Operator<KeyValue<(), Out>>, WinOut, WinDescr> {
         // max_parallelism and key_by are used instead of group_by so that there is exactly one
         // replica, since window_all cannot be parallelized
         let stream = self.max_parallelism(1).key_by(|_| ()).window(descr);

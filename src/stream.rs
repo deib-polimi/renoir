@@ -9,6 +9,7 @@ use crate::block::{BatchMode, InnerBlock, NextStrategy};
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::{Data, EndBlock, IterationStateLock, Operator, WindowDescription};
 use crate::operator::{DataKey, StartBlock};
+use std::marker::PhantomData;
 
 /// Identifier of a block in the job graph.
 pub type BlockId = usize;
@@ -50,24 +51,25 @@ where
 /// A `WindowedStream` is a data stream where elements are divided in multiple groups called
 /// windows. Internally, a `WindowedStream` is just a `KeyedWindowedStream` where each element is
 /// assigned to the same key `()`.
-pub struct WindowedStream<Out: Data, OperatorChain, WinDescr>
+pub struct WindowedStream<Out: Data, OperatorChain, WinOut: Data, WinDescr>
 where
     OperatorChain: Operator<KeyValue<(), Out>>,
-    WinDescr: WindowDescription<(), Out>,
+    WinDescr: WindowDescription<(), WinOut>,
 {
-    pub(crate) inner: KeyedWindowedStream<(), Out, OperatorChain, WinDescr>,
+    pub(crate) inner: KeyedWindowedStream<(), Out, OperatorChain, WinOut, WinDescr>,
 }
 
 /// A `KeyedWindowedStream` is a data stream partitioned by `Key`, where elements of each partition
 /// are divided in groups called windows.
 /// Windows are handled independently for each partition of the stream.
-pub struct KeyedWindowedStream<Key: DataKey, Out: Data, OperatorChain, WinDescr>
+pub struct KeyedWindowedStream<Key: DataKey, Out: Data, OperatorChain, WinOut: Data, WinDescr>
 where
     OperatorChain: Operator<KeyValue<Key, Out>>,
-    WinDescr: WindowDescription<Key, Out>,
+    WinDescr: WindowDescription<Key, WinOut>,
 {
     pub(crate) inner: KeyedStream<Key, Out, OperatorChain>,
     pub(crate) descr: WinDescr,
+    pub(crate) _win_out: PhantomData<WinOut>,
 }
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>

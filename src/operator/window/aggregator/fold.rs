@@ -3,7 +3,7 @@ use crate::operator::{Data, DataKey, Operator, WindowDescription};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
 impl<Key: DataKey, Out: Data, WindowDescr, OperatorChain>
-    KeyedWindowedStream<Key, Out, OperatorChain, WindowDescr>
+    KeyedWindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<Key, Out> + Clone + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
@@ -31,7 +31,7 @@ where
     }
 }
 
-impl<Out: Data, WindowDescr, OperatorChain> WindowedStream<Out, OperatorChain, WindowDescr>
+impl<Out: Data, WindowDescr, OperatorChain> WindowedStream<Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<(), Out> + Clone + 'static,
     OperatorChain: Operator<KeyValue<(), Out>> + Send + 'static,
