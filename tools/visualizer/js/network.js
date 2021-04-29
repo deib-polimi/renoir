@@ -151,6 +151,69 @@ const drawNetwork = (nodes, links) => {
 
     groupLinks(links);
 
+    const assignInitialPositions = (node) => {
+        if (!node.children) return;
+        const adj = {};
+        for (const link of node.links) {
+            if (!(link.source in adj)) adj[link.source] = [];
+            adj[link.source].push(link.target);
+        }
+        const visited = {};
+        const order = [];
+        const dfs = (node) => {
+            if (node in visited) return;
+            visited[node] = true;
+            if (node in adj) {
+                for (const next of adj[node]) {
+                    dfs(next);
+                }
+            }
+            order.push(node);
+        }
+        const ranks = {};
+        for (const child of node.children) {
+            dfs(child.id);
+        }
+        for (const child of node.children) {
+            visited[child.id] = false;
+            ranks[child.id] = 0;
+        }
+        for (let i = order.length - 1; i >= 0; i--) {
+            const id = order[i];
+            if (id in adj) {
+                for (const next of adj[id]) {
+                    if (visited[next]) continue;
+                    ranks[next] = Math.max(ranks[next], ranks[id] + 1);
+                }
+            }
+            visited[id] = true;
+        }
+
+        const rankFreq = {};
+        const rankSpacingX = 400;
+        const rankSpacingY = 200;
+        const initialPosition = {};
+        for (let i = order.length - 1; i >= 0; i--) {
+            const id = order[i];
+            const rank = ranks[id];
+            const y = rankSpacingY * rank;
+            if (!(rank in rankFreq)) rankFreq[rank] = 0;
+            const x = rankSpacingX * rankFreq[rank];
+            rankFreq[rank]++;
+            initialPosition[id] = [x, y];
+        }
+
+        for (const child of node.children) {
+            const [x, y] = initialPosition[child.id];
+            child.x = x;
+            child.y = y;
+
+            assignInitialPositions(child);
+        }
+    };
+
+    assignInitialPositions(root);
+
     const contentId = "content";
 
     const container = document.getElementById(contentId);
