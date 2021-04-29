@@ -354,7 +354,7 @@ const drawNetwork = (nodes, links) => {
         });
 
         const links = node.links.map((link) => {
-            const {type, text, width} = link.link.data;
+            const {type, text, width, onclick} = link.link.data;
             const lineElem = parent
                 .append("line")
                 .attr("class", link.link.source + "_" + link.link.target)
@@ -369,6 +369,14 @@ const drawNetwork = (nodes, links) => {
                 .text(text || "");
             if (type === "dashed") {
                 lineElem.attr("stroke-dasharray", "4")
+            }
+            if (onclick) {
+                lineElem
+                    .style("cursor", "pointer")
+                    .on("click", () => onclick());
+                textElem
+                    .style("cursor", "pointer")
+                    .on("click", () => onclick());
             }
             return [lineElem, textElem];
         });
