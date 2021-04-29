@@ -1,0 +1,320 @@
+const drawNetwork = (nodes, links) => {
+    const nodeById = {};
+
+    const root = {
+        id: -1,
+        data: {},
+        children: nodes,
+        parent: null,
+    };
+
+    const dfs = (node, depth) => {
+        nodeById[node.id] = node;
+        node.depth = depth;
+        if (node.children) {
+            node.links = [];
+            for (const child of node.children) {
+                child.parent = node;
+                dfs(child, depth + 1);
+            }
+        }
+    };
+
+    dfs(root, 0);
+
+    // put each link in the lowest-common-ancestor of the 2 nodes
+    const groupLinks = (links) => {
+        for (const link of links) {
+            let source = nodeById[link.source];
+            let target = nodeById[link.target];
+
+            while (source.depth > target.depth) source = source.parent;
+            while (target.depth > source.depth) target = target.parent;
+
+            // link cannot point to a children
+            if (source.id === target.id) {
+                throw new Error("Invalid link from " + link.source + " to " + link.target);
+            }
+
+            while (source.parent.id !== target.parent.id) {
+                source = source.parent;
+                target = target.parent;
+            }
+
+            const parent = source.parent;
+            parent.links.push({
+                source: source.id,
+                target: target.id,
+                link: link,
+            });
+        }
+    };
+
+    groupLinks(links);
+
+    const contentId = "content";
+
+    const container = document.getElementById(contentId);
+    const svgWidth = container.clientWidth;
+    const svgHeight = container.clientHeight;
+    const nodeWidth = 100;
+    const nodeHeight = 40;
+
+    d3.select("#" + contentId).select("svg").remove();
+    const svg = d3.select("#" + contentId)
+        .append("svg")
+        .attr("width", svgWidth)
+        .attr("height", svgHeight);
+
+    const defs = svg.append("defs");
+    const arrowHead = defs
+        .append("marker")
+        .attr("id", "arrowhead")
+        .attr("markerWidth", "10")
+        .attr("markerHeight", "7")
+        .attr("refX", "7.14")
+        .attr("refY", "3.5")
+        .attr("orient", "auto")
+        .append("polygon")
+        .attr("points", "0 0, 10 3.5, 0 7");
+
+    const nodeSize = (node) => {
+        if (!node.children) return [
+            node.x, node.y, node.width, node.height,
+        ];
+
+        const padding = 10;
+        let left = 1e9;
+        let right = -1e9;
+        let top = 1e9;
+        let bottom = -1e9;
+        for (const child of node.children) {
+            const childLeft = child.x - child.width / 2;
+            const childRight = childLeft + child.width;
+            const childTop = child.y - child.height / 2;
+            const childBottom = childTop + child.height;
+
+            if (childLeft < left) left = childLeft;
+            if (childRight > right) right = childRight;
+            if (childTop < top) top = childTop;
+            if (childBottom > bottom) bottom = childBottom;
+        }
+        const width = right - left + 2 * padding;
+        const height = bottom - top + 2 * padding;
+        return [left - padding, top - padding, width, height];
+    };
+
+    function pointOnRect(x, y, minX, minY, maxX, maxY) {
+        const midX = (minX + maxX) / 2;
+        const midY = (minY + maxY) / 2;
+        // if (midX - x == 0) -> m == ±Inf -> minYx/maxYx == x (because value / ±Inf = ±0)
+        const m = (midY - y) / (midX - x);
+
+        if (x <= midX) { // check "left" side
+            const minXy = m * (minX - x) + y;
+            if (minY <= minXy && minXy <= maxY)
+                return [minX, minXy];
+        }
+
+        if (x >= midX) { // check "right" side
+            const maxXy = m * (maxX - x) + y;
+            if (minY <= maxXy && maxXy <= maxY)
+                return [maxX, maxXy];
+        }
+
+        if (y <= midY) { // check "top" side
+            const minYx = (minY - y) / m + x;
+            if (minX <= minYx && minYx <= maxX)
+                return [minYx, minY];
+        }
+
+        if (y >= midY) { // check "bottom" side
+            const maxYx = (maxY - y) / m + x;
+            if (minX <= maxYx && maxYx <= maxX)
+                return [maxYx, maxY];
+        }
+
+        // edge case when finding midpoint intersection: m = 0/0 = NaN
+        if (x === midX && y === midY) return [x, y];
+    }
+
+    const drawNode = (node, parent) => {
+        if (!node.children) {
+            node.width = nodeWidth;
+            node.height = nodeHeight;
+            const group = parent.append("g");
+            group
+                .append("rect")
+                .style("fill", "#dddddd")
+                .style("stroke", "blue")
+                .attr("x", -nodeWidth/2)
+                .attr("y", -nodeHeight/2)
+                .attr("width", nodeWidth)
+                .attr("height", nodeHeight);
+            if (node.data && node.data.text) {
+                group
+                    .append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dominant-baseline", "middle")
+                    .attr("font-size", "22")
+                    .text(node.data.text)
+            }
+            if (node.data && node.data.onclick) {
+                group.on("click", () => node.data.onclick());
+                group.style("cursor", "pointer");
+            }
+            return;
+        }
+
+        const innerRect = parent
+            .append("rect")
+            .attr("class", "node" + node.id)
+            .style("fill", "white")
+            .style("stroke", "blue");
+
+        const innerNodes = parent
+            .selectAll("g")
+            .data(node.children, (d) => d.id)
+            .enter()
+            .append("g")
+            .attr("id", (d) => "node" + d.id);
+
+        const innerText = parent
+            .append("text")
+            .attr("text-anchor", "start")
+            .attr("dominant-baseline", "middle")
+            .attr("font-size", "22")
+            .text(node.data.text);
+
+        innerNodes.each((inner, i, innerNodeElements) => {
+            const innerNodeElement = d3.select(innerNodeElements[i]);
+            drawNode(node.children[i], innerNodeElement);
+        });
+
+        const links = node.links.map((link) => {
+            const {type, text, width} = link.link.data;
+            const lineElem = parent
+                .append("line")
+                .attr("class", link.link.source + "_" + link.link.target)
+                .attr("stroke", "black")
+                .attr("stroke-width", width || 1)
+                .attr("marker-end", "url(#arrowhead)");
+            const textElem = parent
+                .append("text")
+                .attr("text-anchor", "start")
+                .attr("dominant-baseline", "middle")
+                .attr("font-size", "22")
+                .text(text || "");
+            if (type === "dashed") {
+                lineElem.attr("stroke-dasharray", "4")
+            }
+            return [lineElem, textElem];
+        });
+
+        const tick = () => {
+            innerNodes
+                .attr("transform", (d) => "translate(" + d.x + "," + d.y + ")");
+
+            if (node.parent) {
+                const [x, y, width, height] = nodeSize(node);
+                node.width = width;
+                node.height = height;
+                innerRect
+                    .attr("x", x)
+                    .attr("y", y)
+                    .attr("width", width)
+                    .attr("height", height);
+                innerText
+                    .attr("x", x+20)
+                    .attr("y", y-20)
+                    .attr("width", width)
+                    .attr("height", height);
+            }
+
+            links.forEach(([line, text], i) => {
+                const link = node.links[i];
+                const getCoord = (child) => {
+                    if (!child || child.id === node.id) {
+                        return [0, 0];
+                    }
+                    const [x, y] = getCoord(child.parent);
+                    return [x+child.x, y+child.y];
+                };
+                const source = nodeById[link.link.source];
+                const target = nodeById[link.link.target];
+                const [x1, y1] = getCoord(source);
+                const [x2, y2] = getCoord(target);
+
+                const rect1 = [x1-source.width/2, y1-source.height/2, x1+source.width/2, y1+source.height/2];
+                const rect2 = [x2-target.width/2, y2-target.height/2, x2+target.width/2, y2+target.height/2];
+                const [px1, py1] = pointOnRect(x2, y2, ...rect1);
+                const [px2, py2] = pointOnRect(x1, y1, ...rect2);
+
+                line
+                    .attr("x1", px1)
+                    .attr("y1", py1)
+                    .attr("x2", px2)
+                    .attr("y2", py2);
+                text
+                    .attr("x", (px1 + px2) / 2)
+                    .attr("y", (py1 + py2) / 2);
+            });
+        };
+
+        const simulation = d3.forceSimulation()
+            .force("link", d3.forceLink().id((d) => d.id).strength(0.005))
+            .force("charge", d3.forceManyBody().strength(-5))
+            .force("collide", d3.forceCollide().radius((d) => {
+                const [,, w, h] = nodeSize(d);
+                return Math.max(w, h)
+            }))
+            .force("center", d3.forceCenter(0, 0))
+            .alphaMin(0.1);
+
+        simulation.nodes(node.children).on("tick", tick);
+        simulation.force("link").links(node.links);
+        simulation.alpha(1).restart();
+
+        const drag = () => {
+            return d3.drag()
+                .on("start", (d) => {
+                    if (!d3.event.active) simulation.alpha(1).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                })
+                .on("drag", (d) => {
+                    d.fx = d3.event.x;
+                    d.fy = d3.event.y;
+                })
+                .on("end", (d) => {
+                    if (!d3.event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                });
+        }
+
+        innerNodes.call(drag());
+    };
+
+    const rootElem = svg
+        .append("g")
+        .attr("transform", "translate(" + svgWidth/2 + "," + svgHeight/2 + ")");
+    drawNode(root, rootElem);
+
+    const zoom = d3.zoom()
+        .scaleExtent([0.1, 10])
+        .translateExtent([[0,0], [0,0]])
+        .on("zoom", () => rootElem.attr("transform", d3.event.transform));
+    rootElem.call(zoom);
+
+    const resize = () => {
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        svg
+            .attr("width", width)
+            .attr("height", height);
+    }
+    window.addEventListener("resize", resize);
+
+    console.log("Root:", root);
+}

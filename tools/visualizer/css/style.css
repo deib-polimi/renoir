@@ -1,0 +1,47 @@
+body, html {
+    min-width: 100%;
+    min-height: 100%;
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    display: block;
+}
+#main {
+    height: 100%;
+    width: 100%;
+    display: grid;
+    grid-template-rows: 30px auto 200px;
+    grid-template-columns: auto 400px;
+    grid-template-areas:
+            "toolbar toolbar"
+            "network details"
+            "graph graph";
+}
+
+#toolbar {
+    grid-area: toolbar;
+    padding: 5px;
+    border-bottom: 1px solid;
+}
+#network {
+    grid-area: network;
+}
+#details {
+    grid-area: details;
+    padding: 0 20px;
+    border-left: 1px solid;
+}
+#graph {
+    grid-area: graph;
+    border-top: 1px solid;
+}
+
+.svg-container {
+    width: 100%;
+    height: 100%;
+}
+.svg-content {
+    width: 100%;
+    height: 100%;
+}
