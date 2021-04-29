@@ -58,7 +58,6 @@ const buildJobGraph = (structures) => {
         const [coord, structure] = entry;
         byBlockId[coord["block_id"]] = structure;
     }
-    console.log("byBlockId", byBlockId)
     const nodes = [];
     const links = [];
     const receivers = {};
@@ -119,7 +118,6 @@ const buildJobGraph = (structures) => {
         });
     }
 
-    console.log(receivers);
     return [nodes, links];
 };
 
