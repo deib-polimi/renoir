@@ -10,14 +10,21 @@ class TimeSeries {
         this.total += value;
     }
 
+    asList() {
+        const res = Object.entries(this.data);
+        return res
+            .sort(([a,], [b,]) => a - b)
+            .map(([t, v]) => [+t, +v]);
+    }
+
     static merge(a, b) {
         const result = new TimeSeries();
         for (const [bucket, value] of Object.entries(a.data)) {
-            result[bucket] += value;
+            result.data[bucket] = value;
         }
         for (const [bucket, value] of Object.entries(b.data)) {
-            if (!(bucket in result)) result[bucket] = 0;
-            result[bucket] += value;
+            if (!(bucket in result.data)) result.data[bucket] = 0;
+            result.data[bucket] += value;
         }
         result.total = a.total + b.total;
         return result;

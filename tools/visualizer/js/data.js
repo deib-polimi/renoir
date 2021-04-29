@@ -1,11 +1,23 @@
 const detailsContent = $("#details-content");
 
 const processData = (structures, profilers) => {
-    console.log(structures, profilers);
+    resetGraph();
     const profiler = new Profiler(profilers);
     const [nodes, links] = buildJobGraph(structures, profiler);
     drawNetwork(nodes, links);
 };
+
+const formatBytes = (bytes) => {
+    const fmt = d3.format('.1f');
+    if (bytes < 1024) return `${fmt(bytes)}B`;
+    if (bytes < 1024*1024) return `${fmt(bytes / 1024)}KiB`;
+    if (bytes < 1024*1024*1024) return `${fmt(bytes / 1024 / 1024)}MiB`;
+    return `${fmt(bytes / 1024 / 1024 / 1024)}GiB`;
+};
+
+const formatNumber = (num) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
 const drawOperatorDetails = (block_id, operator, replicas, linkMetrics) => {
     detailsContent.html("");
@@ -44,19 +56,38 @@ const drawOperatorDetails = (block_id, operator, replicas, linkMetrics) => {
     if (operator.connections.length > 0) {
         const list = $("<ul>");
         for (const connection of operator.connections) {
+            const to_block_id = connection.to_block_id;
             const li = $("<li>")
-                .append("Block " + connection.to_block_id + " sending ")
+                .append("Block " + to_block_id + " sending ")
                 .append($("<code>").text(connection.data_type))
                 .append(" with strategy ")
                 .append($("<code>").text(connection.strategy));
             const key = ChannelMetric.blockPairKey(block_id, connection.to_block_id);
             if (key in linkMetrics.items_out) {
+                const drawMessages = () => {
+                    drawGraph(linkMetrics.items_out[key].series, `Items/s in ${block_id} → ${to_block_id}`, (v) => formatNumber(v));
+                };
+                const drawNetworkMessages = () => {
+                    drawGraph(linkMetrics.net_messages_out[key].series, `Network messages/s in ${block_id} → ${to_block_id}`);
+                };
+                const drawNetworkBytes = () => {
+                    drawGraph(linkMetrics.net_bytes_out[key].series, `Network bytes/s in ${block_id} → ${to_block_id}`, (v) => formatBytes(v)+"/s");
+                };
                 const total = linkMetrics.items_out[key].series.total;
-                li.append(`: ${total} items sent`);
+                li.append(": ")
+                    .append($("<a>").attr("href", "#").on("click", () => drawMessages()).text(`${formatNumber(total)} items sent`));
+
+                drawMessages();
                 if (key in linkMetrics.net_messages_out) {
                     const numMex = linkMetrics.net_messages_out[key].series.total;
                     const bytes = linkMetrics.net_bytes_out[key].series.total;
-                    li.append(` (in ${numMex} messages, ${bytes} bytes)`)
+                    li
+                        .append(" (in ")
+                        .append($("<a>").attr("href", "#").on("click", () => drawNetworkMessages()).text(`${numMex} messages`))
+                        .append(", for a ")
+                        .append($("<a>").attr("href", "#").on("click", () => drawNetworkBytes()).text(`total of ${formatBytes(bytes)}`))
+                        .append(")");
+
                 }
             }
             list.append(li);
@@ -68,17 +99,36 @@ const drawOperatorDetails = (block_id, operator, replicas, linkMetrics) => {
     if (operator.receivers.length > 0) {
         const list = $("<ul>");
         for (const receiver of operator.receivers) {
+            const from_block_id = receiver.previous_block_id;
             const li = $("<li>")
-                .append("Block " + receiver.previous_block_id + " receiving ")
+                .append("Block " + from_block_id + " receiving ")
                 .append($("<code>").text(receiver.data_type));
             const key = ChannelMetric.blockPairKey(receiver.previous_block_id, block_id);
             if (key in linkMetrics.items_in) {
+                const drawMessages = () => {
+                    drawGraph(linkMetrics.items_in[key].series, `Items/s in ${from_block_id} → ${block_id}`, (v) => formatNumber(v));
+                };
+                const drawNetworkMessages = () => {
+                    drawGraph(linkMetrics.net_messages_in[key].series, `Network messages/s in ${from_block_id} → ${block_id}`);
+                };
+                const drawNetworkBytes = () => {
+                    drawGraph(linkMetrics.net_bytes_in[key].series, `Network bytes/s in ${from_block_id} → ${block_id}`, (v) => formatBytes(v)+"/s");
+                };
                 const total = linkMetrics.items_in[key].series.total;
-                li.append(`: ${total} items received`);
+                li.append(": ")
+                    .append($("<a>").attr("href", "#").on("click", () => drawMessages()).text(`${formatNumber(total)} items received`));
+
+                drawMessages();
                 if (key in linkMetrics.net_messages_in) {
                     const numMex = linkMetrics.net_messages_in[key].series.total;
                     const bytes = linkMetrics.net_bytes_in[key].series.total;
-                    li.append(` (in ${numMex} messages, ${bytes} bytes)`)
+                    li
+                        .append(" (in ")
+                        .append($("<a>").attr("href", "#").on("click", () => drawNetworkMessages()).text(`${numMex} messages`))
+                        .append(", for a ")
+                        .append($("<a>").attr("href", "#").on("click", () => drawNetworkBytes()).text(`total of ${formatBytes(bytes)}`))
+                        .append(")");
+
                 }
             }
             list.append(li);
@@ -112,9 +162,19 @@ const drawLinkDetails = (from_block_id, connection, linkMetrics) => {
     if (metricsKey in linkMetrics.net_messages_in) {
         const message = linkMetrics.net_messages_in[metricsKey].series.total;
         const bytes = linkMetrics.net_bytes_in[metricsKey].series.total;
+        const drawNetworkMessages = () => {
+            drawGraph(linkMetrics.net_messages_in[metricsKey].series, `Network messages/s in ${from_block_id} → ${to_block_id}`);
+        };
+        const drawNetworkBytes = () => {
+            drawGraph(linkMetrics.net_bytes_in[metricsKey].series, `Network bytes/s in ${from_block_id} → ${to_block_id}`, (v) => formatBytes(v)+"/s");
+        };
         detailsContent.append($("<p>")
             .append($("<strong>").text("Traffic: "))
-            .append(`${message} messages, with a total of ${bytes} bytes (${bytes/message} bytes/message)`))
+            .append($("<a>").attr("href", "#").on("click", () => drawNetworkMessages()).text(`${message} messages`))
+            .append(", for a ")
+            .append($("<a>").attr("href", "#").on("click", () => drawNetworkBytes()).text(`total of ${formatBytes(bytes)}`))
+            .append(` (${formatBytes(bytes/message)}/message)`));
+        drawNetworkBytes();
     }
 }
 

@@ -214,7 +214,7 @@ const drawNetwork = (nodes, links) => {
 
     assignInitialPositions(root);
 
-    const contentId = "content";
+    const contentId = "network-content";
 
     const container = document.getElementById(contentId);
     const svgWidth = container.clientWidth;
@@ -229,7 +229,7 @@ const drawNetwork = (nodes, links) => {
         .attr("height", svgHeight);
 
     const defs = svg.append("defs");
-    const arrowHead = defs
+    defs
         .append("marker")
         .attr("id", "arrowhead")
         .attr("markerWidth", "10")
@@ -468,16 +468,16 @@ const drawNetwork = (nodes, links) => {
         innerNodes.call(drag());
     };
 
-    const rootElem = svg
+    const rootElem = svg.append("g");
+    const contentElem = rootElem
         .append("g")
         .attr("transform", "translate(" + svgWidth/2 + "," + svgHeight/2 + ")");
-    drawNode(root, rootElem);
+    drawNode(root, contentElem);
 
     const zoom = d3.zoom()
         .scaleExtent([0.1, 10])
-        .translateExtent([[0,0], [0,0]])
         .on("zoom", () => rootElem.attr("transform", d3.event.transform));
-    rootElem.call(zoom);
+    svg.call(zoom);
 
     const resize = () => {
         const width = container.clientWidth;
@@ -487,6 +487,4 @@ const drawNetwork = (nodes, links) => {
             .attr("height", height);
     }
     window.addEventListener("resize", resize);
-
-    console.log("Root:", root);
 }

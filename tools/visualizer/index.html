@@ -4,6 +4,7 @@
     <script src="https://d3js.org/d3.v4.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
+    <title>rstream2 visualizer</title>
     <link rel="stylesheet" type="text/css" href="./css/style.css">
 </head>
 <body>
@@ -14,21 +15,22 @@
         </div>
         <div id="network">
             <div class="svg-container">
-                <div id="content" class="svg-content"></div>
+                <div id="network-content" class="svg-content"></div>
             </div>
         </div>
         <div id="details">
             <h2>Details</h2>
-            <div id="details-content">
-
-            </div>
+            <div id="details-content"></div>
         </div>
         <div id="graph">
-            <p>Graph</p>
+            <div class="svg-container">
+                <div id="graph-content" class="svg-content"></div>
+            </div>
         </div>
     </div>
     <script src="./js/network.js"></script>
     <script src="./js/profiler.js"></script>
+    <script src="./js/graph.js"></script>
     <script src="./js/data.js"></script>
     <script src="./js/script.js"></script>
 </body>
