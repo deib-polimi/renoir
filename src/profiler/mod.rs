@@ -6,9 +6,10 @@ pub use without_profiler::*;
 use crate::network::Coord;
 use crate::stream::BlockId;
 
+pub use metrics::*;
+
 #[cfg(feature = "profiler")]
 mod backend;
-#[cfg(feature = "profiler")]
 mod metrics;
 
 /// The available profiling metrics.
@@ -61,11 +62,6 @@ mod with_profiler {
         static PROFILER: UnsafeCell<ProfilerBackend> = UnsafeCell::new(ProfilerBackend::new(*START_TIME));
     }
 
-    /// A time point.
-    ///
-    /// This represents the number of milliseconds since the start of the execution.
-    pub type TimePoint = u32;
-
     /// The type of the channel sender with the `ProfilerResult`s.
     type ProfilerSender = UnboundedChannelSender<ProfilerResult>;
     /// The type of the channel receiver with the `ProfilerResult`s.
@@ -82,9 +78,9 @@ mod with_profiler {
         PROFILER.with(|t| unsafe { &mut *t.get() })
     }
 
-    /// Wait for all the threads that used the profiler to exit, collect all their data, print the
-    /// results to the log and reset the profiler.
-    pub fn wait_profiler() {
+    /// Wait for all the threads that used the profiler to exit, collect all their data and reset
+    /// the profiler.
+    pub fn wait_profiler() -> Vec<ProfilerResult> {
         let mut channels = CHANNEL.lock().unwrap();
         let profiler_receiver = channels.1.take().expect("Profiler receiver already taken");
 
@@ -96,14 +92,11 @@ mod with_profiler {
             results.push(profiler_res);
         }
 
-        debug!(
-            "Profiler results:\n{}",
-            serde_json::to_string(&results).unwrap()
-        );
-
         let (sender, receiver) = ProfilerReceiver::new();
         channels.0 = Some(sender);
         channels.1 = Some(receiver);
+
+        results
     }
 }
 
@@ -111,7 +104,7 @@ mod with_profiler {
 #[cfg(not(feature = "profiler"))]
 mod without_profiler {
     use crate::network::Coord;
-    use crate::profiler::Profiler;
+    use crate::profiler::*;
 
     /// The fake profiler for when the `profiler` feature is disabled.
     static mut PROFILER: NoOpProfiler = NoOpProfiler;
@@ -144,5 +137,7 @@ mod without_profiler {
     }
 
     /// Do nothing, since there is nothing to wait for.
-    pub fn wait_profiler() {}
+    pub fn wait_profiler() -> Vec<ProfilerResult> {
+        Default::default()
+    }
 }

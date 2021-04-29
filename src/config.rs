@@ -32,6 +32,7 @@ pub(crate) struct LocalRuntimeConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct RemoteRuntimeConfig {
     pub(crate) hosts: Vec<RemoteHostConfig>,
+    pub(crate) tracing_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

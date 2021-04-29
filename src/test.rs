@@ -123,7 +123,10 @@ impl TestHelper {
                 perf_path: None,
             });
         }
-        let runtime = ExecutionRuntime::Remote(RemoteRuntimeConfig { hosts });
+        let runtime = ExecutionRuntime::Remote(RemoteRuntimeConfig {
+            hosts,
+            tracing_dir: None,
+        });
         debug!("Running with remote configuration: {:?}", runtime);
 
         let mut join_handles = vec![];

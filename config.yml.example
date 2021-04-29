@@ -1,3 +1,5 @@
+# Directory where to store the tracing data in JSON
+# tracing_dir: ./tracing
 hosts:
   - address: localhost
     base_port: 9500

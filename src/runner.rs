@@ -10,6 +10,7 @@ use ssh2::Session;
 
 use crate::config::{RemoteHostConfig, RemoteRuntimeConfig};
 use crate::scheduler::HostId;
+use crate::TracingData;
 
 /// Environment variable set by the runner with the host id of the process. If it's missing the
 /// process will have to spawn the processes by itself.
@@ -44,9 +45,23 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
             .unwrap();
         join_handles.push(join_handle);
     }
+    let mut tracing_data = TracingData::default();
     for join_handle in join_handles {
-        join_handle.join().unwrap();
+        let data = join_handle.join().unwrap();
+        if let Some(data) = data {
+            tracing_data += data;
+        }
     }
+    if let Some(path) = config.tracing_dir {
+        std::fs::create_dir_all(&path).expect("Cannot create tracing directory");
+        let now = chrono::Local::now();
+        let file_name = format!("{}.json", now.format("%Y-%m-%d-%H%M%S"));
+        let target = path.join(file_name);
+        let mut target = std::fs::File::create(&target).expect("Cannot create tracing json file");
+        serde_json::to_writer(&mut target, &tracing_data)
+            .expect("Failed to write tracing json file");
+    }
+
     // all the remote processes have finished, exit to avoid running the environment inside the
     // spawner process
     std::process::exit(0);
@@ -69,7 +84,11 @@ fn is_spawned_process() -> bool {
 ///
 /// This function is allowed to block (i.e. not be asynchronous) since it will be run inside a
 /// `spawn_blocking`.
-fn spawn_remote_worker(host_id: HostId, mut host: RemoteHostConfig, config_str: String) {
+fn spawn_remote_worker(
+    host_id: HostId,
+    mut host: RemoteHostConfig,
+    config_str: String,
+) -> Option<TracingData> {
     if host.ssh.username.is_none() {
         host.ssh.username = Some(whoami::username());
     }
@@ -157,10 +176,21 @@ fn spawn_remote_worker(host_id: HostId, mut host: RemoteHostConfig, config_str: 
 
     // copy to stderr the output of the remote process
     let reader = BufReader::new(channel.stderr());
+    let mut tracing_data = None;
     for line in reader.lines() {
         if let Ok(line) = line {
-            // prefix each line with the id of the host
-            eprintln!("{}|{}", host_id, line);
+            if let Some(pos) = line.find("__RSTREAM2_TRACING_DATA__") {
+                let json_data = &line[(pos + "__RSTREAM2_TRACING_DATA__ ".len())..];
+                match serde_json::from_str(json_data) {
+                    Ok(data) => tracing_data = Some(data),
+                    Err(err) => {
+                        error!("Corrupted tracing data from host {}: {:?}", host_id, err);
+                    }
+                }
+            } else {
+                // prefix each line with the id of the host
+                eprintln!("{}|{}", host_id, line);
+            }
         }
     }
     channel.wait_close().unwrap();
@@ -180,6 +210,8 @@ fn spawn_remote_worker(host_id: HostId, mut host: RemoteHostConfig, config_str: 
         "Failed to remove remote executable on host {} at {}",
         host_id, remote_path
     );
+
+    tracing_data
 }
 
 /// Execute a command remotely and return the standard output and the exit code.

@@ -5,14 +5,15 @@ use std::thread::JoinHandle;
 
 use itertools::Itertools;
 
-use crate::block::{BatchMode, BlockStructure, InnerBlock, JobGraphGenerator};
+use crate::block::{wait_structure, BatchMode, BlockStructure, InnerBlock};
 use crate::channel::{BoundedChannelSender, UnboundedChannelReceiver, UnboundedChannelSender};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
-use crate::profiler::wait_profiler;
+use crate::profiler::{wait_profiler, ProfilerResult};
 use crate::stream::BlockId;
 use crate::worker::spawn_worker;
+use crate::TracingData;
 
 /// The identifier of an host.
 pub type HostId = usize;
@@ -200,22 +201,16 @@ impl Scheduler {
             join.push(handle.join_handle);
         }
 
-        // While the other workers are working on the computation, the main thread is building the
-        // dot diagram of the job graph. This computation should be pretty fast.
-        drop(self.block_structure_sender);
-        let mut job_graph_generator = JobGraphGenerator::new();
-        while let Ok((coord, structure)) = self.block_structure_receiver.recv() {
-            job_graph_generator.add_block(coord.block_id, structure);
-        }
-        let job_graph = job_graph_generator.finalize();
-        debug!("Job graph in dot format:\n{}", job_graph);
-
         for handle in join {
             handle.join().unwrap();
         }
         network.lock().unwrap().stop_and_wait();
 
-        wait_profiler();
+        drop(self.block_structure_sender);
+        let block_structures = wait_structure(self.block_structure_receiver);
+        let profiler_results = wait_profiler();
+
+        Self::log_tracing_data(block_structures, profiler_results);
     }
 
     /// Get the ids of the previous blocks of a given block in the job graph
@@ -249,6 +244,17 @@ impl Scheduler {
                 }
             }
         }
+    }
+
+    fn log_tracing_data(structures: Vec<(Coord, BlockStructure)>, profilers: Vec<ProfilerResult>) {
+        let data = TracingData {
+            structures,
+            profilers,
+        };
+        debug!(
+            "__RSTREAM2_TRACING_DATA__ {}",
+            serde_json::to_string(&data).unwrap()
+        );
     }
 
     fn log_topology(&self) {

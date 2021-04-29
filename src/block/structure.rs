@@ -1,19 +1,24 @@
-use crate::block::NextStrategy;
+use std::fmt::{Display, Formatter};
+
+use serde::{Deserialize, Serialize};
+
+use crate::block::{JobGraphGenerator, NextStrategy};
+use crate::channel::UnboundedChannelReceiver;
+use crate::network::Coord;
 use crate::operator::Data;
 use crate::stream::BlockId;
-use std::fmt::{Display, Formatter};
 
 /// Wrapper type that contains a string representing the type.
 ///
 /// The internal representation should not be considered unique nor exact. Its purpose is to be
 /// nice to look at.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DataType(String);
 
 /// The structural information about a block.
 ///
 /// This contains the structural information about the block and the operators it contains.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct BlockStructure {
     /// The structural information about the operators inside the block.
     ///
@@ -23,7 +28,7 @@ pub struct BlockStructure {
 }
 
 /// The structural information about an operator.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OperatorStructure {
     /// The title of the operator.
     pub title: String,
@@ -47,7 +52,7 @@ pub struct OperatorStructure {
 /// The kind of operator: either `Operator`, `Source` or `Sink`.
 ///
 /// This value can be used for customizing the look of the operator.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum OperatorKind {
     Operator,
     Sink,
@@ -59,7 +64,7 @@ pub enum OperatorKind {
 /// This receiver tells that an operator will receive some data from the network from the specified
 /// block. Inside a block there cannot be two operators that register a receiver from the same block
 /// id.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OperatorReceiver {
     /// The identifier of the block from which the data is arriving.
     pub previous_block_id: BlockId,
@@ -72,7 +77,7 @@ pub struct OperatorReceiver {
 /// This tell that an operator will establish a connection with an external block. That block should
 /// have registered the corresponding receiver. The strategy can be used to customize the look of
 /// this connection.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Connection {
     /// The id of the block that this operator is connecting to.
     pub to_block_id: BlockId,
@@ -83,7 +88,7 @@ pub struct Connection {
 }
 
 /// The strategy used for sending the data in a channel.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ConnectionStrategy {
     /// The data will sent to the only replica possible. Refer to `NextStrategy::OnlyOne`.
     OnlyOne,
@@ -183,6 +188,22 @@ impl<Out: Data> From<&NextStrategy<Out>> for ConnectionStrategy {
             NextStrategy::GroupBy(_) => ConnectionStrategy::GroupBy,
         }
     }
+}
+
+/// Wait the structural information from all the replicas and then print the DOT format to the log.
+pub fn wait_structure(
+    receiver: UnboundedChannelReceiver<(Coord, BlockStructure)>,
+) -> Vec<(Coord, BlockStructure)> {
+    let mut job_graph_generator = JobGraphGenerator::new();
+    let mut structures = vec![];
+    while let Ok((coord, structure)) = receiver.recv() {
+        structures.push((coord, structure.clone()));
+        job_graph_generator.add_block(coord.block_id, structure);
+    }
+    let job_graph = job_graph_generator.finalize();
+    debug!("Job graph in dot format:\n{}", job_graph);
+
+    structures
 }
 
 #[cfg(test)]
