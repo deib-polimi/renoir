@@ -1,0 +1,32 @@
+name: Website
+
+on:
+  - workflow_dispatch
+
+jobs:
+  website:
+    name: Website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: cargo doc
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: --color=always --no-deps --all
+      - name: website pages
+        run: |
+          mkdir -p ./target/website
+          cp -r target/doc ./target/website
+          cp -r tools/visualizer ./target/website
+          cp tools/index.html ./target/website
+      - name: Publish
+        uses: JamesIves/github-pages-deploy-action@4.1.1
+        with:
+          branch: gh-pages
+          folder: target/website

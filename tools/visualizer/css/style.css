@@ -27,6 +27,7 @@ body, html {
 #network {
     grid-area: network;
     font-size: 0;
+    overflow: hidden;
 }
 #details {
     grid-area: details;
