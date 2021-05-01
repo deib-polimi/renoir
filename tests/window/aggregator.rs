@@ -138,3 +138,38 @@ fn test_max_window() {
         }
     });
 }
+
+#[test]
+fn test_map_window() {
+    TestHelper::local_remote_env(|mut env| {
+        let source = IteratorSource::new(0..10u16);
+        let res = env
+            .stream(source)
+            .window_all(CountWindow::sliding(3, 2))
+            .map(|items| {
+                let mut res = 1;
+                for x in items {
+                    res *= x;
+                }
+                res
+            })
+            .collect_vec();
+        env.execute();
+        if let Some(mut res) = res.get() {
+            res.sort_unstable();
+            assert_eq!(
+                res,
+                vec![
+                    0,         // [0, 1, 2]
+                    2 * 3 * 4, // [2, 3, 4]
+                    4 * 5 * 6, // [4, 5, 6]
+                    6 * 7 * 8, // [6, 7, 8]
+                    8 * 9,     // [8, 9]
+                ]
+                .into_iter()
+                .sorted()
+                .collect_vec()
+            );
+        }
+    });
+}

@@ -155,3 +155,41 @@ fn test_max_window_keyed() {
         }
     });
 }
+
+#[test]
+fn test_map_window_keyed() {
+    TestHelper::local_remote_env(|mut env| {
+        let source = IteratorSource::new(0..10u16);
+        let res = env
+            .stream(source)
+            .group_by(|x| x % 2)
+            .window(CountWindow::sliding(3, 2))
+            .map(|items| {
+                let mut res = 1;
+                for x in items {
+                    res *= x;
+                }
+                res
+            })
+            .unkey()
+            .collect_vec();
+        env.execute();
+        if let Some(mut res) = res.get() {
+            res.sort_unstable();
+            assert_eq!(
+                res,
+                vec![
+                    (0, 0),         // [0, 2, 4]
+                    (0, 4 * 6 * 8), // [4, 6, 8]
+                    (0, 8),         // [8]
+                    (1, 3 * 5),     // [1, 3, 5]
+                    (1, 5 * 7 * 9), // [5, 7, 9]
+                    (1, 9),         // [9]
+                ]
+                .into_iter()
+                .sorted()
+                .collect_vec()
+            );
+        }
+    });
+}

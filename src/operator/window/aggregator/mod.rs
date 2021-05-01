@@ -7,6 +7,7 @@ pub use sum::*;
 mod first;
 mod fold;
 mod join;
+mod map;
 mod max;
 mod min;
 mod sum;
