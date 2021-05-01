@@ -5,6 +5,7 @@ use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::operator::source::Source;
 use crate::operator::Data;
+use crate::profiler::Stopwatch;
 use crate::runner::spawn_remote_workers;
 use crate::scheduler::Scheduler;
 use crate::stream::{BlockId, Stream};
@@ -66,6 +67,7 @@ impl StreamEnvironment {
 
     /// Start the computation. Await on the returned future to actually start the computation.
     pub fn execute(self) {
+        let _stopwatch = Stopwatch::new("execution");
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);
         let scheduler = env.scheduler.take().unwrap();

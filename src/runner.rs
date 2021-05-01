@@ -9,6 +9,7 @@ use itertools::Itertools;
 use ssh2::Session;
 
 use crate::config::{RemoteHostConfig, RemoteRuntimeConfig};
+use crate::profiler::Stopwatch;
 use crate::scheduler::HostId;
 use crate::TracingData;
 
@@ -30,6 +31,9 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
     if is_spawned_process() {
         return;
     }
+
+    let stopwatch = Stopwatch::new("wall");
+
     // from now we are sure this is the process that should spawn the remote workers
     info!("Spawning {} remote workers", config.hosts.len());
     let config_str = serde_yaml::to_string(&config).unwrap();
@@ -61,6 +65,8 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
         serde_json::to_writer(&mut target, &tracing_data)
             .expect("Failed to write tracing json file");
     }
+
+    drop(stopwatch);
 
     // all the remote processes have finished, exit to avoid running the environment inside the
     // spawner process

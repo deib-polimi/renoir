@@ -69,7 +69,6 @@ where
     fn next(&mut self) -> StreamElement<Out> {
         while !self.received_end && self.last_watermark.is_none() {
             match self.prev.next() {
-                // TODO: should this do something different with elements that are not timestamped?
                 element @ StreamElement::Item(_) => return element,
                 StreamElement::Timestamped(item, timestamp) => {
                     self.buffer.push(HeapElement { item, timestamp })
