@@ -5,7 +5,7 @@ impl<Key: DataKey, Out: Data, WindowDescr, OperatorChain>
     KeyedWindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<Key, Out> + Clone + 'static,
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn fold<NewOut: Data, F>(
         self,
@@ -28,7 +28,7 @@ where
 impl<Out: Data, WindowDescr, OperatorChain> WindowedStream<Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<(), Out> + Clone + 'static,
-    OperatorChain: Operator<KeyValue<(), Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
     pub fn fold<NewOut: Data, F>(
         self,

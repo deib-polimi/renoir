@@ -3,7 +3,7 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn unkey(self) -> Stream<KeyValue<Key, Out>, impl Operator<KeyValue<Key, Out>>> {
         self.0

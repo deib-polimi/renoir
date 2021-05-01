@@ -1,14 +1,13 @@
 use crate::operator::{Data, Operator};
 use crate::stream::Stream;
-use std::sync::Arc;
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn reduce<F>(self, f: F) -> Stream<Out, impl Operator<Out>>
     where
-        F: Fn(&mut Out, Out) + Send + Sync + 'static,
+        F: Fn(&mut Out, Out) + Send + Clone + 'static,
     {
         self.fold(None, move |acc, value| match acc {
             None => *acc = Some(value),
@@ -19,10 +18,8 @@ where
 
     pub fn reduce_assoc<F>(self, f: F) -> Stream<Out, impl Operator<Out>>
     where
-        F: Fn(&mut Out, Out) + Send + Sync + 'static,
+        F: Fn(&mut Out, Out) + Send + Clone + 'static,
     {
-        // FIXME: remove Arc if reduce function will be Clone
-        let f = Arc::new(f);
         let f2 = f.clone();
 
         self.fold_assoc(

@@ -1,8 +1,7 @@
 use core::iter::{IntoIterator, Iterator};
 use std::collections::VecDeque;
 use std::iter::repeat;
-
-use std::sync::Arc;
+use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
@@ -11,9 +10,10 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Flatten<Out: Data, IterOut, NewOut: Data, PreviousOperators>
+pub struct Flatten<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators>
 where
     IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
+    MakeIter: Fn(Out) -> IterOut + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -23,32 +23,35 @@ where
     // This is used to make `Flatten` behave differently when applied to `Stream` or `KeyedStream`
     // Takes `Out` as input, returns an `Iterator` with items of type `NewOut`
     #[derivative(Debug = "ignore")]
-    make_iter: Arc<dyn Fn(Out) -> IterOut + Send + Sync>,
+    make_iter: MakeIter,
+    _out: PhantomData<Out>,
+    _iter_out: PhantomData<Out>,
 }
 
-impl<Out: Data, IterOut, NewOut: Data, PreviousOperators>
-    Flatten<Out, IterOut, NewOut, PreviousOperators>
+impl<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators>
+    Flatten<Out, IterOut, MakeIter, NewOut, PreviousOperators>
 where
     IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
-    PreviousOperators: Operator<Out> + Send,
+    MakeIter: Fn(Out) -> IterOut + Send + Clone,
+    PreviousOperators: Operator<Out>,
 {
-    fn new<F>(prev: PreviousOperators, make_iter: F) -> Self
-    where
-        F: Fn(Out) -> IterOut + Send + Sync + 'static,
-    {
+    fn new(prev: PreviousOperators, make_iter: MakeIter) -> Self {
         Self {
             prev,
             buffer: Default::default(),
-            make_iter: Arc::new(make_iter),
+            make_iter,
+            _out: Default::default(),
+            _iter_out: Default::default(),
         }
     }
 }
 
-impl<Out: Data, IterOut, NewOut: Data, PreviousOperators> Operator<NewOut>
-    for Flatten<Out, IterOut, NewOut, PreviousOperators>
+impl<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators> Operator<NewOut>
+    for Flatten<Out, IterOut, MakeIter, NewOut, PreviousOperators>
 where
     IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
-    PreviousOperators: Operator<Out> + Send,
+    MakeIter: Fn(Out) -> IterOut + Send + Clone,
+    PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -95,7 +98,7 @@ impl<Out: Data, OperatorChain, NewOut: Data> Stream<Out, OperatorChain>
 where
     Out: IntoIterator<Item = NewOut>,
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn flatten(self) -> Stream<NewOut, impl Operator<NewOut>> {
         self.add_operator(|prev| Flatten::new(prev, |x| x.into_iter()))
@@ -104,7 +107,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     // FIXME: MapOut does not really need to be Data, for example the normal iterators are not
     //        serializable
@@ -115,7 +118,7 @@ where
     where
         MapOut: IntoIterator<Item = NewOut>,
         <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-        F: Fn(Out) -> MapOut + Send + Sync + 'static,
+        F: Fn(Out) -> MapOut + Send + Clone + 'static,
     {
         self.map(f).flatten()
     }
@@ -125,7 +128,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, OperatorChain> KeyedStream<Key, Out,
 where
     Out: IntoIterator<Item = NewOut>,
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn flatten(self) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
         self.add_operator(|prev| Flatten::new(prev, |(k, x)| repeat(k).zip(x.into_iter())))
@@ -134,7 +137,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn flat_map<NewOut: Data, MapOut: Data, F>(
         self,
@@ -143,7 +146,7 @@ where
     where
         MapOut: IntoIterator<Item = NewOut>,
         <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-        F: Fn(KeyValue<&Key, Out>) -> MapOut + Send + Sync + 'static,
+        F: Fn(KeyValue<&Key, Out>) -> MapOut + Send + Clone + 'static,
     {
         self.map(f).flatten()
     }
@@ -151,10 +154,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::operator::flatten::Flatten;
     use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
-    use std::time::Duration;
 
     #[test]
     fn test_flatten_no_timestamps() {

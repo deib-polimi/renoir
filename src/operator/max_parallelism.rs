@@ -4,7 +4,7 @@ use crate::stream::Stream;
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn max_parallelism(self, max_parallelism: usize) -> Stream<Out, impl Operator<Out>> {
         assert!(max_parallelism > 0, "Cannot set the parallelism to zero");

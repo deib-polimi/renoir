@@ -65,7 +65,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, F, WindowDescr, OperatorChain>
     Operator<KeyValue<Key, NewOut>>
     for GenericWindowOperator<Key, Out, NewOut, F, WindowDescr, OperatorChain>
 where
-    F: Fn(&Window<Key, Out>) -> NewOut + Clone,
+    F: Fn(&Window<Key, Out>) -> NewOut + Clone + Send,
     WindowDescr: WindowDescription<Key, Out> + Clone,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
@@ -137,7 +137,7 @@ impl<Key: DataKey, Out: Data, WindowDescr, OperatorChain>
     KeyedWindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<Key, Out> + Clone + 'static,
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     /// Add a new generic window operator to a `KeyedWindowedStream`,
     /// after adding a Reorder operator.
@@ -150,7 +150,7 @@ where
     where
         NewOut: Data,
         S: Into<String>,
-        F: Fn(&Window<Key, Out>) -> NewOut + Clone + 'static,
+        F: Fn(&Window<Key, Out>) -> NewOut + Clone + Send + 'static,
     {
         let stream = self.inner;
         let descr = self.descr;

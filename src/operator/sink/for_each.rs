@@ -1,25 +1,27 @@
-use std::sync::Arc;
-
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::Sink;
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
+use std::marker::PhantomData;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct ForEachSink<Out: Data, PreviousOperators>
+pub struct ForEachSink<Out: Data, F, PreviousOperators>
 where
+    F: Fn(Out) + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
-    f: Arc<dyn Fn(Out) + Send + Sync>,
+    f: F,
+    _out: PhantomData<Out>,
 }
 
-impl<Out: Data, PreviousOperators> Operator<()> for ForEachSink<Out, PreviousOperators>
+impl<Out: Data, F, PreviousOperators> Operator<()> for ForEachSink<Out, F, PreviousOperators>
 where
-    PreviousOperators: Operator<Out> + Send,
+    F: Fn(Out) + Send + Clone,
+    PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -49,19 +51,25 @@ where
     }
 }
 
-impl<Out: Data, PreviousOperators> Sink for ForEachSink<Out, PreviousOperators> where
-    PreviousOperators: Operator<Out> + Send
+impl<Out: Data, F, PreviousOperators> Sink for ForEachSink<Out, F, PreviousOperators>
+where
+    F: Fn(Out) + Send + Clone,
+    PreviousOperators: Operator<Out>,
 {
 }
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
-    pub fn for_each<F: Fn(Out) + Send + Sync + 'static>(self, f: F) {
+    pub fn for_each<F>(self, f: F)
+    where
+        F: Fn(Out) + Send + Clone + 'static,
+    {
         self.add_operator(|prev| ForEachSink {
             prev,
-            f: Arc::new(f),
+            f,
+            _out: Default::default(),
         })
         .finalize_block();
     }
@@ -69,9 +77,12 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
-    pub fn for_each<F: Fn(Key, Out) + Send + Sync + 'static>(self, f: F) {
+    pub fn for_each<F>(self, f: F)
+    where
+        F: Fn(Key, Out) + Send + Clone + 'static,
+    {
         self.0.for_each(move |(key, out)| f(key, out))
     }
 }

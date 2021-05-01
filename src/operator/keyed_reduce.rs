@@ -1,11 +1,9 @@
-use std::sync::Arc;
-
 use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn group_by_reduce<Key: DataKey, Keyer, F>(
         self,
@@ -13,11 +11,9 @@ where
         f: F,
     ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
-        F: Fn(&mut Out, Out) + Send + Sync + 'static,
+        Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
+        F: Fn(&mut Out, Out) + Send + Clone + 'static,
     {
-        // FIXME: remove Arc if reduce function will be Clone
-        let f = Arc::new(f);
         let f2 = f.clone();
 
         self.group_by_fold(
@@ -41,11 +37,11 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn reduce<F>(self, f: F) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        F: Fn(&mut Out, Out) + Send + Sync + 'static,
+        F: Fn(&mut Out, Out) + Send + Clone + 'static,
     {
         self.fold(None, move |acc, value| match acc {
             None => *acc = Some(value),

@@ -4,7 +4,7 @@ use crate::stream::Stream;
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn shuffle(self) -> Stream<Out, impl Operator<Out>> {
         self.add_block(EndBlock::new, NextStrategy::Random)

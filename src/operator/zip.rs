@@ -128,14 +128,14 @@ impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
 
 impl<Out1: Data, OperatorChain1> Stream<Out1, OperatorChain1>
 where
-    OperatorChain1: Operator<Out1> + Send + 'static,
+    OperatorChain1: Operator<Out1> + 'static,
 {
     pub fn zip<Out2: Data, OperatorChain2>(
         self,
         oth: Stream<Out2, OperatorChain2>,
     ) -> Stream<(Out1, Out2), impl Operator<(Out1, Out2)>>
     where
-        OperatorChain2: Operator<Out2> + Send + 'static,
+        OperatorChain2: Operator<Out2> + 'static,
     {
         let mut new_stream = self.add_y_connection(oth, Zip::new);
         // if the zip operator is partitioned there could be some loss of data

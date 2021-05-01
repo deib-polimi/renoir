@@ -66,23 +66,23 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn replay<Body, DeltaUpdate: Data + Default, State: Data, OperatorChain2>(
         self,
         num_iterations: usize,
         initial_state: State,
         body: Body,
-        local_fold: impl Fn(&mut DeltaUpdate, Out) + Send + Sync + 'static,
-        global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Sync + 'static,
-        loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
+        local_fold: impl Fn(&mut DeltaUpdate, Out) + Send + Clone + 'static,
+        global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Clone + 'static,
+        loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
     ) -> Stream<State, impl Operator<State>>
     where
         Body: Fn(
             Stream<Out, Replay<Out, State, OperatorChain>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,
-        OperatorChain2: Operator<Out> + Send + 'static,
+        OperatorChain2: Operator<Out> + 'static,
     {
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.
