@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
@@ -7,44 +7,47 @@ use crate::stream::Stream;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Fold<Out: Data, NewOut: Data, PreviousOperators>
+pub struct Fold<Out: Data, NewOut: Data, F, PreviousOperators>
 where
+    F: Fn(&mut NewOut, Out) + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
-    fold: Arc<dyn Fn(&mut NewOut, Out) + Send + Sync>,
+    fold: F,
     init: NewOut,
     accumulator: Option<NewOut>,
     timestamp: Option<Timestamp>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
     received_end_iter: bool,
+    _out: PhantomData<Out>,
 }
 
-impl<Out: Data, NewOut: Data, PreviousOperators: Operator<Out>>
-    Fold<Out, NewOut, PreviousOperators>
+impl<Out: Data, NewOut: Data, F, PreviousOperators: Operator<Out>>
+    Fold<Out, NewOut, F, PreviousOperators>
+where
+    F: Fn(&mut NewOut, Out) + Send + Clone,
 {
-    fn new<F>(prev: PreviousOperators, init: NewOut, fold: F) -> Self
-    where
-        F: Fn(&mut NewOut, Out) + Send + Sync + 'static,
-    {
+    fn new(prev: PreviousOperators, init: NewOut, fold: F) -> Self {
         Fold {
             prev,
-            fold: Arc::new(fold),
+            fold,
             init,
             accumulator: None,
             timestamp: None,
             max_watermark: None,
             received_end: false,
             received_end_iter: false,
+            _out: Default::default(),
         }
     }
 }
 
-impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
-    for Fold<Out, NewOut, PreviousOperators>
+impl<Out: Data, NewOut: Data, F, PreviousOperators> Operator<NewOut>
+    for Fold<Out, NewOut, F, PreviousOperators>
 where
+    F: Fn(&mut NewOut, Out) + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -126,7 +129,7 @@ where
 {
     pub fn fold<NewOut: Data, F>(self, init: NewOut, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        F: Fn(&mut NewOut, Out) + Send + Sync + 'static,
+        F: Fn(&mut NewOut, Out) + Send + Clone + 'static,
     {
         self.max_parallelism(1)
             .add_operator(|prev| Fold::new(prev, init, f))
@@ -139,8 +142,8 @@ where
         global: Global,
     ) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        Local: Fn(&mut NewOut, Out) + Send + Sync + 'static,
-        Global: Fn(&mut NewOut, NewOut) + Send + Sync + 'static,
+        Local: Fn(&mut NewOut, Out) + Send + Clone + 'static,
+        Global: Fn(&mut NewOut, NewOut) + Send + Clone + 'static,
     {
         self.add_operator(|prev| Fold::new(prev, init.clone(), local))
             .max_parallelism(1)

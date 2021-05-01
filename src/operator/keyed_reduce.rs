@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
@@ -13,11 +11,9 @@ where
         f: F,
     ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
-        F: Fn(&mut Out, Out) + Send + Sync + 'static,
+        Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
+        F: Fn(&mut Out, Out) + Send + Clone + 'static,
     {
-        // FIXME: remove Arc if reduce function will be Clone
-        let f = Arc::new(f);
         let f2 = f.clone();
 
         self.group_by_fold(
@@ -45,7 +41,7 @@ where
 {
     pub fn reduce<F>(self, f: F) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        F: Fn(&mut Out, Out) + Send + Sync + 'static,
+        F: Fn(&mut Out, Out) + Send + Clone + 'static,
     {
         self.fold(None, move |acc, value| match acc {
             None => *acc = Some(value),

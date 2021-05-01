@@ -2,6 +2,7 @@ use core::iter::Iterator;
 use std::collections::hash_map::{DefaultHasher, Entry};
 use std::collections::HashMap;
 use std::hash::Hasher;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorStructure};
@@ -11,37 +12,39 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
-pub struct KeyedFold<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators>
+pub struct KeyedFold<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators>
 where
+    F: Fn(&mut NewOut, Out) + Send + Clone,
     PreviousOperators: Operator<KeyValue<Key, Out>>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
-    fold: Arc<dyn Fn(&mut NewOut, Out) + Send + Sync>,
+    fold: F,
     init: NewOut,
     accumulators: HashMap<Key, NewOut>,
     timestamps: HashMap<Key, Timestamp>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
     received_end_iter: bool,
+    _out: PhantomData<Out>,
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators: Operator<KeyValue<Key, Out>>>
-    KeyedFold<Key, Out, NewOut, PreviousOperators>
+impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators: Operator<KeyValue<Key, Out>>>
+    KeyedFold<Key, Out, NewOut, F, PreviousOperators>
+where
+    F: Fn(&mut NewOut, Out) + Send + Clone,
 {
-    fn new<F>(prev: PreviousOperators, init: NewOut, fold: F) -> Self
-    where
-        F: Fn(&mut NewOut, Out) + Send + Sync + 'static,
-    {
+    fn new(prev: PreviousOperators, init: NewOut, fold: F) -> Self {
         KeyedFold {
             prev,
-            fold: Arc::new(fold),
+            fold,
             init,
             accumulators: Default::default(),
             timestamps: Default::default(),
             max_watermark: None,
             received_end: false,
             received_end_iter: false,
+            _out: Default::default(),
         }
     }
 
@@ -60,9 +63,10 @@ impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators: Operator<KeyValue
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators> Operator<KeyValue<Key, NewOut>>
-    for KeyedFold<Key, Out, NewOut, PreviousOperators>
+impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Operator<KeyValue<Key, NewOut>>
+    for KeyedFold<Key, Out, NewOut, F, PreviousOperators>
 where
+    F: Fn(&mut NewOut, Out) + Send + Clone,
     PreviousOperators: Operator<KeyValue<Key, Out>>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -149,12 +153,10 @@ where
         global: Global,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
-        Local: Fn(&mut NewOut, Out) + Send + Sync + 'static,
-        Global: Fn(&mut NewOut, NewOut) + Send + Sync + 'static,
+        Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
+        Local: Fn(&mut NewOut, Out) + Send + Clone + 'static,
+        Global: Fn(&mut NewOut, NewOut) + Send + Clone + 'static,
     {
-        let keyer = Arc::new(keyer);
-
         // GroupBy based on key
         let next_strategy: NextStrategy<(Key, NewOut)> =
             NextStrategy::GroupBy(Arc::new(move |(key, _out)| {
@@ -187,7 +189,7 @@ where
         f: F,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        F: Fn(&mut NewOut, Out) + Send + Sync + 'static,
+        F: Fn(&mut NewOut, Out) + Send + Clone + 'static,
     {
         self.add_operator(|prev| KeyedFold::new(prev, init, f))
     }

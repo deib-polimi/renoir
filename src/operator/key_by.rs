@@ -1,34 +1,44 @@
-use std::sync::Arc;
+use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, DataKey, Keyer};
+use crate::operator::{Data, DataKey};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct KeyBy<Key: DataKey, Out: Data, OperatorChain>
+pub struct KeyBy<Key: DataKey, Out: Data, Keyer, OperatorChain>
 where
+    Keyer: Fn(&Out) -> Key + Send + Clone,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
     #[derivative(Debug = "ignore")]
-    keyer: Keyer<Key, Out>,
+    keyer: Keyer,
+    _key: PhantomData<Key>,
+    _out: PhantomData<Out>,
 }
 
-impl<Key: DataKey, Out: Data, OperatorChain> KeyBy<Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, Keyer, OperatorChain> KeyBy<Key, Out, Keyer, OperatorChain>
 where
+    Keyer: Fn(&Out) -> Key + Send + Clone,
     OperatorChain: Operator<Out>,
 {
-    pub fn new(prev: OperatorChain, keyer: Keyer<Key, Out>) -> Self {
-        Self { prev, keyer }
+    pub fn new(prev: OperatorChain, keyer: Keyer) -> Self {
+        Self {
+            prev,
+            keyer,
+            _key: Default::default(),
+            _out: Default::default(),
+        }
     }
 }
 
-impl<Key: DataKey, Out: Data, OperatorChain> Operator<KeyValue<Key, Out>>
-    for KeyBy<Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Operator<KeyValue<Key, Out>>
+    for KeyBy<Key, Out, Keyer, OperatorChain>
 where
+    Keyer: Fn(&Out) -> Key + Send + Clone,
     OperatorChain: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -72,24 +82,21 @@ where
         keyer: Keyer,
     ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
+        Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
     {
-        let keyer = Arc::new(keyer);
         KeyedStream(self.add_operator(|prev| KeyBy::new(prev, keyer)))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use crate::operator::{KeyBy, Operator, StreamElement};
     use crate::test::FakeOperator;
 
     #[test]
     fn test_key_by() {
         let fake_operator = FakeOperator::new(0..10u8);
-        let mut key_by = KeyBy::new(fake_operator, Arc::new(|&n| n));
+        let mut key_by = KeyBy::new(fake_operator, |&n| n);
 
         for i in 0..10u8 {
             match key_by.next() {

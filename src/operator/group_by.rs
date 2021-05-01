@@ -1,14 +1,11 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
-
 use std::sync::Arc;
 
 use crate::block::NextStrategy;
 use crate::operator::{Data, DataKey, EndBlock};
 use crate::operator::{KeyBy, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
-
-pub type Keyer<Key, Out> = Arc<dyn Fn(&Out) -> Key + Send + Sync>;
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -19,9 +16,8 @@ where
         keyer: Keyer,
     ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Keyer: Fn(&Out) -> Key + Send + Sync + 'static,
+        Keyer: Fn(&Out) -> Key + Send + Clone + Sync + 'static,
     {
-        let keyer = Arc::new(keyer);
         let keyer2 = keyer.clone();
 
         let next_strategy = NextStrategy::GroupBy(Arc::new(move |out| {

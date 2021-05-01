@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
@@ -7,33 +7,37 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Map<Out: Data, NewOut: Data, PreviousOperators>
+pub struct Map<Out: Data, NewOut: Data, F, PreviousOperators>
 where
+    F: Fn(Out) -> NewOut + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
-    f: Arc<dyn Fn(Out) -> NewOut + Send + Sync>,
+    f: F,
+    _out: PhantomData<Out>,
+    _new_out: PhantomData<NewOut>,
 }
 
-impl<Out: Data, NewOut: Data, PreviousOperators> Map<Out, NewOut, PreviousOperators>
+impl<Out: Data, NewOut: Data, F, PreviousOperators> Map<Out, NewOut, F, PreviousOperators>
 where
+    F: Fn(Out) -> NewOut + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
-    fn new<F>(prev: PreviousOperators, f: F) -> Self
-    where
-        F: Fn(Out) -> NewOut + Send + Sync + 'static,
-    {
+    fn new(prev: PreviousOperators, f: F) -> Self {
         Self {
             prev,
-            f: Arc::new(f),
+            f,
+            _out: Default::default(),
+            _new_out: Default::default(),
         }
     }
 }
 
-impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
-    for Map<Out, NewOut, PreviousOperators>
+impl<Out: Data, NewOut: Data, F, PreviousOperators> Operator<NewOut>
+    for Map<Out, NewOut, F, PreviousOperators>
 where
+    F: Fn(Out) -> NewOut + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -41,7 +45,7 @@ where
     }
 
     fn next(&mut self) -> StreamElement<NewOut> {
-        self.prev.next().map(&*self.f)
+        self.prev.next().map(&self.f)
     }
 
     fn to_string(&self) -> String {
@@ -66,7 +70,7 @@ where
 {
     pub fn map<NewOut: Data, F>(self, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        F: Fn(Out) -> NewOut + Send + Sync + 'static,
+        F: Fn(Out) -> NewOut + Send + Clone + 'static,
     {
         self.add_operator(|prev| Map::new(prev, f))
     }
@@ -81,7 +85,7 @@ where
         f: F,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        F: Fn(KeyValue<&Key, Out>) -> NewOut + Send + Sync + 'static,
+        F: Fn(KeyValue<&Key, Out>) -> NewOut + Send + Clone + 'static,
     {
         self.add_operator(|prev| {
             Map::new(prev, move |(k, v)| {
@@ -95,10 +99,10 @@ where
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use std::time::Duration;
 
     use crate::operator::{Map, Operator, StreamElement};
     use crate::test::FakeOperator;
-    use std::time::Duration;
 
     #[test]
     fn map_stream() {

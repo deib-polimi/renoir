@@ -33,6 +33,7 @@ fn main() {
     eprintln!("Elapsed: {:?}", elapsed);
 }
 
+#[derive(Clone)]
 struct Tokenizer {
     re: Regex,
 }

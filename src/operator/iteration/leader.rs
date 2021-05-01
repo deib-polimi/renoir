@@ -20,7 +20,11 @@ use crate::scheduler::ExecutionMetadata;
 /// followed by a `StreamElement::FlushAndReset`.
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
-pub struct IterationLeader<DeltaUpdate: Data, State: Data> {
+pub struct IterationLeader<DeltaUpdate: Data, State: Data, Global, LoopCond>
+where
+    Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
+    LoopCond: Fn(&mut State) -> bool + Send + Clone,
+{
     /// The coordinates of this block.
     coord: Coord,
 
@@ -61,18 +65,23 @@ pub struct IterationLeader<DeltaUpdate: Data, State: Data> {
 
     /// The function that combines the global state with a delta update.
     #[derivative(Debug = "ignore")]
-    global_fold: Arc<dyn Fn(&mut State, DeltaUpdate) + Send + Sync>,
+    global_fold: Global,
     /// A function that, given the global state, checks whether the iteration should continue.
     #[derivative(Debug = "ignore")]
-    loop_condition: Arc<dyn Fn(&mut State) -> bool + Send + Sync>,
+    loop_condition: LoopCond,
 }
 
-impl<DeltaUpdate: Data, State: Data> IterationLeader<DeltaUpdate, State> {
+impl<DeltaUpdate: Data, State: Data, Global, LoopCond>
+    IterationLeader<DeltaUpdate, State, Global, LoopCond>
+where
+    Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
+    LoopCond: Fn(&mut State) -> bool + Send + Clone,
+{
     pub fn new(
         initial_state: State,
         num_iterations: usize,
-        global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Sync + 'static,
-        loop_condition: impl Fn(&mut State) -> bool + Send + Sync + 'static,
+        global_fold: Global,
+        loop_condition: LoopCond,
         feedback_block_id: Arc<AtomicUsize>,
     ) -> Self {
         Self {
@@ -88,13 +97,18 @@ impl<DeltaUpdate: Data, State: Data> IterationLeader<DeltaUpdate, State> {
             initial_state,
             feedback_block_id,
             emit_flush_and_restart: false,
-            global_fold: Arc::new(global_fold),
-            loop_condition: Arc::new(loop_condition),
+            global_fold,
+            loop_condition,
         }
     }
 }
 
-impl<DeltaUpdate: Data, State: Data> Operator<State> for IterationLeader<DeltaUpdate, State> {
+impl<DeltaUpdate: Data, State: Data, Global, LoopCond> Operator<State>
+    for IterationLeader<DeltaUpdate, State, Global, LoopCond>
+where
+    Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
+    LoopCond: Fn(&mut State) -> bool + Send + Clone,
+{
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let mut network = metadata.network.lock().unwrap();
         self.coord = metadata.coord;
@@ -209,7 +223,12 @@ impl<DeltaUpdate: Data, State: Data> Operator<State> for IterationLeader<DeltaUp
     }
 }
 
-impl<DeltaUpdate: Data, State: Data> Source<State> for IterationLeader<DeltaUpdate, State> {
+impl<DeltaUpdate: Data, State: Data, Global, LoopCond> Source<State>
+    for IterationLeader<DeltaUpdate, State, Global, LoopCond>
+where
+    Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
+    LoopCond: Fn(&mut State) -> bool + Send + Clone,
+{
     fn get_max_parallelism(&self) -> Option<usize> {
         Some(1)
     }

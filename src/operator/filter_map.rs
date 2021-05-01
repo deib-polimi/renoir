@@ -7,7 +7,7 @@ where
 {
     pub fn filter_map<NewOut: Data, F>(self, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        F: Fn(Out) -> Option<NewOut> + Send + Sync + 'static,
+        F: Fn(Out) -> Option<NewOut> + Send + Clone + 'static,
     {
         self.map(f).filter(|x| x.is_some()).map(|x| x.unwrap())
     }
@@ -22,7 +22,7 @@ where
         f: F,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        F: Fn(KeyValue<&Key, Out>) -> Option<NewOut> + Send + Sync + 'static,
+        F: Fn(KeyValue<&Key, Out>) -> Option<NewOut> + Send + Clone + 'static,
     {
         self.map(f)
             .filter(|(_, x)| x.is_some())
