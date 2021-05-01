@@ -74,7 +74,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     /// Add a new operator to the current chain inside the stream. This consumes the stream and
     /// returns a new one with the operator added.
@@ -116,7 +116,7 @@ where
         next_strategy: NextStrategy<Out>,
     ) -> Stream<Out, StartBlock<Out>>
     where
-        Op: Operator<()> + Send + 'static,
+        Op: Operator<()> + 'static,
         GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
     {
         let batch_mode = self.block.batch_mode;
@@ -157,7 +157,7 @@ where
     ) -> Stream<NewOut, StartOperator>
     where
         Out2: Data,
-        OperatorChain2: Operator<Out2> + Send + 'static,
+        OperatorChain2: Operator<Out2> + 'static,
         NewOut: Data,
         StartOperator: Operator<NewOut>,
         GetStartOp: Fn(BlockId, BlockId, Option<Arc<IterationStateLock>>) -> StartOperator,
@@ -250,7 +250,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
         self,

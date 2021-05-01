@@ -109,7 +109,7 @@ impl Scheduler {
         &mut self,
         block: InnerBlock<Out, OperatorChain>,
     ) where
-        OperatorChain: Operator<Out> + Send + 'static,
+        OperatorChain: Operator<Out> + 'static,
     {
         let block_id = block.id;
         let info = self.block_info(&block);

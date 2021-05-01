@@ -29,7 +29,7 @@ where
 impl<Key: DataKey, Out: Data, OperatorChain> Operator<KeyValue<Key, Out>>
     for KeyBy<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send,
+    OperatorChain: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -65,7 +65,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn key_by<Key: DataKey, Keyer>(
         self,

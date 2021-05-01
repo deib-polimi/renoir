@@ -19,7 +19,7 @@ where
 
 impl<Out: Data, PreviousOperators> Operator<()> for ForEachSink<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out> + Send,
+    PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -50,13 +50,13 @@ where
 }
 
 impl<Out: Data, PreviousOperators> Sink for ForEachSink<Out, PreviousOperators> where
-    PreviousOperators: Operator<Out> + Send
+    PreviousOperators: Operator<Out>
 {
 }
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn for_each<F: Fn(Out) + Send + Sync + 'static>(self, f: F) {
         self.add_operator(|prev| ForEachSink {
@@ -69,7 +69,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn for_each<F: Fn(Key, Out) + Send + Sync + 'static>(self, f: F) {
         self.0.for_each(move |(key, out)| f(key, out))

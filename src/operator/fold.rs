@@ -45,7 +45,7 @@ impl<Out: Data, NewOut: Data, PreviousOperators: Operator<Out>>
 impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
     for Fold<Out, NewOut, PreviousOperators>
 where
-    PreviousOperators: Operator<Out> + Send,
+    PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -122,7 +122,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn fold<NewOut: Data, F>(self, init: NewOut, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where

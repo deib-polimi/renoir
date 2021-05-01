@@ -4,7 +4,7 @@ use crate::stream::Stream;
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn split(self, splits: usize) -> Vec<Stream<Out, impl Operator<Out>>> {
         // This is needed to maintain the same parallelism of the split block

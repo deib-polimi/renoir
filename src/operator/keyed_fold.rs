@@ -63,7 +63,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators: Operator<KeyValue
 impl<Key: DataKey, Out: Data, NewOut: Data, PreviousOperators> Operator<KeyValue<Key, NewOut>>
     for KeyedFold<Key, Out, NewOut, PreviousOperators>
 where
-    PreviousOperators: Operator<KeyValue<Key, Out>> + Send,
+    PreviousOperators: Operator<KeyValue<Key, Out>>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -139,7 +139,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn group_by_fold<Key: DataKey, NewOut: Data, Keyer, Local, Global>(
         self,
@@ -179,7 +179,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn fold<NewOut: Data, F>(
         self,

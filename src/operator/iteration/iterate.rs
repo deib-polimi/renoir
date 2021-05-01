@@ -91,7 +91,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn iterate<Body, DeltaUpdate: Data + Default, State: Data, OperatorChain2>(
         self,
@@ -110,7 +110,7 @@ where
             Stream<Out, Iterate<Out, State, OperatorChain>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,
-        OperatorChain2: Operator<Out> + Send + 'static,
+        OperatorChain2: Operator<Out> + 'static,
     {
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.

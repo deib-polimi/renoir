@@ -61,7 +61,7 @@ where
 
 impl<Out: Data, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send,
+    OperatorChain: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata.clone());

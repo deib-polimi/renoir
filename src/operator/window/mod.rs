@@ -197,7 +197,7 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>> Display
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn window<WinOut: Data, WinDescr: WindowDescription<Key, WinOut>>(
         self,
@@ -213,7 +213,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn window_all<WinOut: Data, WinDescr: WindowDescription<(), WinOut>>(
         self,

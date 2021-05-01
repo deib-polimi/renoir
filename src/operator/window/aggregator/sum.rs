@@ -6,7 +6,7 @@ impl<Key: DataKey, Out: Data, WindowDescr, OperatorChain>
     KeyedWindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<Key, Out> + Clone + 'static,
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
     for<'a> Out: Sum<&'a Out>,
 {
     pub fn sum(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
@@ -18,7 +18,7 @@ impl<Out: Data + Ord, WindowDescr, OperatorChain>
     WindowedStream<Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<(), Out> + Clone + 'static,
-    OperatorChain: Operator<KeyValue<(), Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<(), Out>> + 'static,
     for<'a> Out: Sum<&'a Out>,
 {
     pub fn sum(self) -> Stream<Out, impl Operator<Out>> {

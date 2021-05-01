@@ -4,7 +4,7 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {
         self.block.batch_mode = batch_mode;
@@ -14,7 +14,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {
         self.0.block.batch_mode = batch_mode;

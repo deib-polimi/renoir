@@ -12,7 +12,7 @@ pub type Keyer<Key, Out> = Arc<dyn Fn(&Out) -> Key + Send + Sync>;
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn group_by<Key: DataKey, Keyer>(
         self,

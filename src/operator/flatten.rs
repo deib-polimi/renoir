@@ -30,7 +30,7 @@ impl<Out: Data, IterOut, NewOut: Data, PreviousOperators>
     Flatten<Out, IterOut, NewOut, PreviousOperators>
 where
     IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
-    PreviousOperators: Operator<Out> + Send,
+    PreviousOperators: Operator<Out>,
 {
     fn new<F>(prev: PreviousOperators, make_iter: F) -> Self
     where
@@ -48,7 +48,7 @@ impl<Out: Data, IterOut, NewOut: Data, PreviousOperators> Operator<NewOut>
     for Flatten<Out, IterOut, NewOut, PreviousOperators>
 where
     IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
-    PreviousOperators: Operator<Out> + Send,
+    PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -95,7 +95,7 @@ impl<Out: Data, OperatorChain, NewOut: Data> Stream<Out, OperatorChain>
 where
     Out: IntoIterator<Item = NewOut>,
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn flatten(self) -> Stream<NewOut, impl Operator<NewOut>> {
         self.add_operator(|prev| Flatten::new(prev, |x| x.into_iter()))
@@ -104,7 +104,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     // FIXME: MapOut does not really need to be Data, for example the normal iterators are not
     //        serializable
@@ -125,7 +125,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, OperatorChain> KeyedStream<Key, Out,
 where
     Out: IntoIterator<Item = NewOut>,
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn flatten(self) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
         self.add_operator(|prev| Flatten::new(prev, |(k, x)| repeat(k).zip(x.into_iter())))
@@ -134,7 +134,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn flat_map<NewOut: Data, MapOut: Data, F>(
         self,

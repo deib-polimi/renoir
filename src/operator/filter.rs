@@ -7,8 +7,8 @@ use std::marker::PhantomData;
 #[derive(Clone)]
 struct Filter<Out: Data, PreviousOperator, Predicate>
 where
-    Predicate: Fn(&Out) -> bool + Clone + 'static,
-    PreviousOperator: Operator<Out> + Send + 'static,
+    Predicate: Fn(&Out) -> bool + Send + Clone + 'static,
+    PreviousOperator: Operator<Out> + 'static,
 {
     prev: PreviousOperator,
     predicate: Predicate,
@@ -17,8 +17,8 @@ where
 
 impl<Out: Data, PreviousOperator, Predicate> Filter<Out, PreviousOperator, Predicate>
 where
-    Predicate: Fn(&Out) -> bool + Clone + 'static,
-    PreviousOperator: Operator<Out> + Send + 'static,
+    Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
+    PreviousOperator: Operator<Out> + 'static,
 {
     fn new(prev: PreviousOperator, predicate: Predicate) -> Self {
         Self {
@@ -32,8 +32,8 @@ where
 impl<Out: Data, PreviousOperator, Predicate> Operator<Out>
     for Filter<Out, PreviousOperator, Predicate>
 where
-    Predicate: Fn(&Out) -> bool + Clone + 'static,
-    PreviousOperator: Operator<Out> + Send + 'static,
+    Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
+    PreviousOperator: Operator<Out> + 'static,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -66,11 +66,11 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn filter<Predicate>(self, predicate: Predicate) -> Stream<Out, impl Operator<Out>>
     where
-        Predicate: Fn(&Out) -> bool + Clone + 'static,
+        Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
     {
         self.add_operator(|prev| Filter::new(prev, predicate))
     }
@@ -78,14 +78,14 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn filter<Predicate>(
         self,
         predicate: Predicate,
     ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Predicate: Fn(&KeyValue<Key, Out>) -> bool + Clone + 'static,
+        Predicate: Fn(&KeyValue<Key, Out>) -> bool + Clone + Send + 'static,
     {
         self.add_operator(|prev| Filter::new(prev, predicate))
     }

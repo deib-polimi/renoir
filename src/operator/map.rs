@@ -34,7 +34,7 @@ where
 impl<Out: Data, NewOut: Data, PreviousOperators> Operator<NewOut>
     for Map<Out, NewOut, PreviousOperators>
 where
-    PreviousOperators: Operator<Out> + Send,
+    PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -62,7 +62,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn map<NewOut: Data, F>(self, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
@@ -74,7 +74,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn map<NewOut: Data, F>(
         self,

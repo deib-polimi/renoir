@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + Send + 'static,
+    OperatorChain: Operator<Out> + 'static,
 {
     pub fn reduce<F>(self, f: F) -> Stream<Out, impl Operator<Out>>
     where

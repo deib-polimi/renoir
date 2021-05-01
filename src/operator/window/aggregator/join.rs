@@ -12,14 +12,14 @@ impl<Key: DataKey, Out: Data, Out2: Data, WindowDescr, OperatorChain>
     KeyedWindowedStream<Key, Out, OperatorChain, JoinElement<Out, Out2>, WindowDescr>
 where
     WindowDescr: WindowDescription<Key, JoinElement<Out, Out2>> + Clone + 'static,
-    OperatorChain: Operator<KeyValue<Key, Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn join<OperatorChain2>(
         self,
         right: KeyedStream<Key, Out2, OperatorChain2>,
     ) -> KeyedStream<Key, (Out, Out2), impl Operator<KeyValue<Key, (Out, Out2)>>>
     where
-        OperatorChain2: Operator<KeyValue<Key, Out2>> + Send + 'static,
+        OperatorChain2: Operator<KeyValue<Key, Out2>> + 'static,
     {
         // map the left and right streams to the same type
         let left = self.inner.map(|(_, x)| JoinElement::Left(x));
@@ -59,14 +59,14 @@ impl<Out: Data, Out2: Data, WindowDescr, OperatorChain>
     WindowedStream<Out, OperatorChain, JoinElement<Out, Out2>, WindowDescr>
 where
     WindowDescr: WindowDescription<(), JoinElement<Out, Out2>> + Clone + 'static,
-    OperatorChain: Operator<KeyValue<(), Out>> + Send + 'static,
+    OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
     pub fn join<OperatorChain2>(
         self,
         right: Stream<Out2, OperatorChain2>,
     ) -> Stream<(Out, Out2), impl Operator<(Out, Out2)>>
     where
-        OperatorChain2: Operator<Out2> + Send + 'static,
+        OperatorChain2: Operator<Out2> + 'static,
     {
         self.inner
             .join(right.max_parallelism(1).key_by(|_| ()))

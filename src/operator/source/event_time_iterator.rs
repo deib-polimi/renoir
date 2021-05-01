@@ -34,7 +34,7 @@ where
 impl<Out: Data, It, WatermarkGen> Source<Out> for EventTimeIteratorSource<Out, It, WatermarkGen>
 where
     It: Iterator<Item = (Out, Timestamp)> + Send + 'static,
-    WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
+    WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp> + Send,
 {
     fn get_max_parallelism(&self) -> Option<usize> {
         Some(1)
@@ -44,7 +44,7 @@ where
 impl<Out: Data, It, WatermarkGen> Operator<Out> for EventTimeIteratorSource<Out, It, WatermarkGen>
 where
     It: Iterator<Item = (Out, Timestamp)> + Send + 'static,
-    WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp>,
+    WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp> + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
