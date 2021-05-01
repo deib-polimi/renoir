@@ -1,0 +1,39 @@
+# The list of known workers
+known_hosts:
+ - StreamWorker1
+ - StreamWorker2
+ - StreamWorker3
+ - StreamWorker4
+
+# Name of the directory where to place the execution results
+results_dir: "./results/{experiment}/{system}"
+# Directory where to put temporary files locally
+temp_dir: ./temp
+# Directory to use for compiling the binaries in the first worker
+compilation_dir: /tmp/compilation
+# Directory where flink is installed (with bin/ and conf/ inside)
+# It should be the same in the master node as well as in the workers
+flink_base_path: /home/ubuntu/flink
+
+# Whether to do an extra run (for each hyperparameter configuration) ignoring
+# the results
+warmup: true
+# Number of runs from which data is collected
+num_runs: 5
+
+# List of hyper parameters to try. All the combinations of values will be tried.
+hyperparameters:
+  # Number of hosts to run the benchmark on
+  num_hosts: [4, 3, 2, 1]
+  # When using RStream this is the number of "slots" in the hostfile (sources
+  # and sinks are added automatically).
+  # In Flink and MPI it's the number of slots assigned to each worker.
+  procs_per_host: [8]
+
+  # You can add more hyperparameters here!
+
+  # Example: an MPI/OpenMP implementation may spawn "threads_per_proc" threads
+  # for each process, taking this parameter as command line argument. You can
+  # use, for example, `-T {threads_per_proc}` as extra arguments to tell the
+  # program how many threads it is allowed to use.
+  # threads_per_proc: [4, 8]
