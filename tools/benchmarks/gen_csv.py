@@ -12,7 +12,7 @@ import coloredlogs
 
 logger = logging.getLogger("gen_csv")
 
-regex = re.compile(r"(?P<type>(timens|events):)?(?P<name>[a-zA-Z0-9]+):(?P<amount>[\d.]+)")
+regex = re.compile(r"(?:(?P<type>(?:timens|events)):)?(?P<name>[a-zA-Z0-9]+):(?P<amount>[\d.]+)")
 
 def parse_lines(content):
     result = {}

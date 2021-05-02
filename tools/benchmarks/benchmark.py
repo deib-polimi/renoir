@@ -133,6 +133,7 @@ class MPI(Benchmark):
 
 class RStream(Benchmark):
     exec_path = "/tmp/rstreambin"
+    compilation_suffix = "rstream"
 
     def __init__(self, config):
         self.config = config
@@ -145,7 +146,8 @@ class RStream(Benchmark):
             source += "/"
 
         logger.info("Copying source files from %s to %s", source, compiler_host)
-        compilation_dir = self.config["compilation_dir"]
+        compilation_dir = self.config["compilation_dir"] + "/" + self.compilation_suffix
+        run_on(compiler_host, "mkdir -p %s" % compilation_dir, shell=True)
         sync_on(compiler_host, source, compilation_dir)
 
         logger.info("Compinging using cargo")
@@ -205,9 +207,10 @@ class RStream(Benchmark):
                 self.exec_path,
                 *extra_args,
             ]
-            return run_benchmark(cmd)
+            return run_benchmark(cmd, cwd=args.directory)
 
 class RStream2(RStream):
+    compilation_suffix = "rstream2"
     def run(self, args, hyperparameters, run_index):
         num_hosts = hyperparameters["num_hosts"]
         procs_per_host = hyperparameters["procs_per_host"]
@@ -313,9 +316,9 @@ class Flink(Benchmark):
         return run_benchmark(cmd)
 
 
-def run_benchmark(cmd):
+def run_benchmark(cmd, cwd=None):
     logger.debug("Command: %s", shlex.join(cmd))
-    out = subprocess.run(cmd, capture_output=True)
+    out = subprocess.run(cmd, capture_output=True, cwd=cwd)
     stdout = out.stdout.decode()
     stderr = out.stderr.decode()
     if out.returncode != 0:
