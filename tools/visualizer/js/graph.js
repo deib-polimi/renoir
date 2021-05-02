@@ -7,8 +7,15 @@ const resetGraph = () => {
     d3.select("#" + graphContainerId).select("svg").remove();
 };
 
-const drawProfilerGraph = (series, title, yFormat) => {
+const drawProfilerGraph = (series, title, iteration_boundaries, yFormat) => {
     if (!yFormat) yFormat = (d) => d;
+
+    const iterToIndex = {};
+    let maxIterTime = 0;
+    Object.entries(iteration_boundaries.data).map(([block_id, times], index) => {
+        iterToIndex[block_id] = index;
+        maxIterTime = Math.max(maxIterTime, times[times.length - 1]);
+    });
 
     const container = document.getElementById(graphContainerId);
     const svgWidth = container.clientWidth;
@@ -42,7 +49,7 @@ const drawProfilerGraph = (series, title, yFormat) => {
     data.push([bucketTime, bucketValue * scaleFactor]);
 
     const x = d3.scaleLinear()
-        .domain(d3.extent(data, (d) => d[0]))
+        .domain([0, Math.max(d3.max(data, (d) => d[0]), maxIterTime)])
         .range([left, svgWidth-right]);
     // x-axis
     root
@@ -59,9 +66,21 @@ const drawProfilerGraph = (series, title, yFormat) => {
             .tickSize(-(svgHeight - bottom - top))
             .tickFormat("")
             .ticks(5));
+    for (const [block_id, times] of Object.entries(iteration_boundaries.data)) {
+        const color = d3.schemeCategory20[iterToIndex[block_id]];
+        for (const time of times) {
+            const xPos = x(time);
+            root.append("line")
+                .attr("stroke", color)
+                .attr("x1", xPos)
+                .attr("x2", xPos)
+                .attr("y1", top)
+                .attr("y2", svgHeight-bottom);
+        }
+    }
 
     const y = d3.scaleLinear()
-        .domain(d3.extent(data, (d) => d[1]))
+        .domain([0, d3.max(data, (d) => d[1])])
         .range([svgHeight - bottom, top]);
     // y-axis
     root

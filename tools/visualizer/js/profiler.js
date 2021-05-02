@@ -71,6 +71,17 @@ class ChannelMetric {
     }
 }
 
+class IterationBoundaries {
+    constructor() {
+        this.data = {};
+    }
+
+    add(block_id, time) {
+        if (!(block_id in this.data)) this.data[block_id] = [];
+        this.data[block_id].push(time);
+    }
+}
+
 class Profiler {
     constructor(data) {
         this.channel_metrics = {
@@ -81,6 +92,7 @@ class Profiler {
             net_bytes_in: new ChannelMetric(),
             net_bytes_out: new ChannelMetric(),
         };
+        this.iteration_boundaries = new IterationBoundaries();
         for (const profiler of data) {
             for (const {metrics, start_ms} of profiler.buckets) {
                 for (const {from, to, value} of metrics.items_in) {
@@ -96,6 +108,9 @@ class Profiler {
                 for (const {from, to, value} of metrics.net_messages_out) {
                     this.channel_metrics.net_messages_out.add(from, to, start_ms, value[0]);
                     this.channel_metrics.net_bytes_out.add(from, to, start_ms, value[1]);
+                }
+                for (const [block_id, time] of metrics.iteration_boundaries) {
+                    this.iteration_boundaries.add(block_id, time);
                 }
             }
         }

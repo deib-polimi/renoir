@@ -84,17 +84,17 @@ const buildJobGraph = (structures, profiler) => {
                 const key = ChannelMetric.blockPairKey(block_id, connection.to_block_id);
                 if (key in linkMetrics.items_out) {
                     const drawMessages = () => {
-                        drawProfilerGraph(linkMetrics.items_out[key].series, `Items/s in ${block_id} → ${to_block_id}`, (v) => formatNumber(v));
+                        drawProfilerGraph(linkMetrics.items_out[key].series, `Items/s in ${block_id} → ${to_block_id}`, profiler.iteration_boundaries, (v) => formatNumber(v));
                     };
                     const drawNetworkMessages = () => {
-                        drawProfilerGraph(linkMetrics.net_messages_out[key].series, `Network messages/s in ${block_id} → ${to_block_id}`);
+                        drawProfilerGraph(linkMetrics.net_messages_out[key].series, `Network messages/s in ${block_id} → ${to_block_id}`, profiler.iteration_boundaries);
                     };
                     const drawNetworkBytes = () => {
-                        drawProfilerGraph(linkMetrics.net_bytes_out[key].series, `Network bytes/s in ${block_id} → ${to_block_id}`, (v) => formatBytes(v)+"/s");
+                        drawProfilerGraph(linkMetrics.net_bytes_out[key].series, `Network bytes/s in ${block_id} → ${to_block_id}`, profiler.iteration_boundaries, (v) => formatBytes(v)+"/s");
                     };
                     const total = linkMetrics.items_out[key].series.total;
                     li.append(": ")
-                        .append(`${formatNumber(total)} items sent`, () => drawMessages());
+                        .append(makeLink(`${formatNumber(total)} items sent`, () => drawMessages()));
 
                     drawMessages();
                     if (key in linkMetrics.net_messages_out) {
@@ -102,9 +102,9 @@ const buildJobGraph = (structures, profiler) => {
                         const bytes = linkMetrics.net_bytes_out[key].series.total;
                         li
                             .append(" (in ")
-                            .append(`${numMex} messages`, () => drawNetworkMessages())
+                            .append(makeLink(`${numMex} messages`, () => drawNetworkMessages()))
                             .append(", for a ")
-                            .append(`total of ${formatBytes(bytes)}`, () => drawNetworkBytes())
+                            .append(makeLink(`total of ${formatBytes(bytes)}`, () => drawNetworkBytes()))
                             .append(")");
 
                     }
@@ -125,13 +125,13 @@ const buildJobGraph = (structures, profiler) => {
                 const key = ChannelMetric.blockPairKey(receiver.previous_block_id, block_id);
                 if (key in linkMetrics.items_in) {
                     const drawMessages = () => {
-                        drawProfilerGraph(linkMetrics.items_in[key].series, `Items/s in ${from_block_id} → ${block_id}`, (v) => formatNumber(v));
+                        drawProfilerGraph(linkMetrics.items_in[key].series, `Items/s in ${from_block_id} → ${block_id}`, profiler.iteration_boundaries, (v) => formatNumber(v));
                     };
                     const drawNetworkMessages = () => {
-                        drawProfilerGraph(linkMetrics.net_messages_in[key].series, `Network messages/s in ${from_block_id} → ${block_id}`);
+                        drawProfilerGraph(linkMetrics.net_messages_in[key].series, `Network messages/s in ${from_block_id} → ${block_id}`, profiler.iteration_boundaries);
                     };
                     const drawNetworkBytes = () => {
-                        drawProfilerGraph(linkMetrics.net_bytes_in[key].series, `Network bytes/s in ${from_block_id} → ${block_id}`, (v) => formatBytes(v)+"/s");
+                        drawProfilerGraph(linkMetrics.net_bytes_in[key].series, `Network bytes/s in ${from_block_id} → ${block_id}`, profiler.iteration_boundaries, (v) => formatBytes(v)+"/s");
                     };
                     const total = linkMetrics.items_in[key].series.total;
                     li.append(": ")
@@ -182,10 +182,10 @@ const buildJobGraph = (structures, profiler) => {
             const message = linkMetrics.net_messages_in[metricsKey].series.total;
             const bytes = linkMetrics.net_bytes_in[metricsKey].series.total;
             const drawNetworkMessages = () => {
-                drawProfilerGraph(linkMetrics.net_messages_in[metricsKey].series, `Network messages/s in ${from_block_id} → ${to_block_id}`);
+                drawProfilerGraph(linkMetrics.net_messages_in[metricsKey].series, `Network messages/s in ${from_block_id} → ${to_block_id}`, profiler.iteration_boundaries);
             };
             const drawNetworkBytes = () => {
-                drawProfilerGraph(linkMetrics.net_bytes_in[metricsKey].series, `Network bytes/s in ${from_block_id} → ${to_block_id}`, (v) => formatBytes(v)+"/s");
+                drawProfilerGraph(linkMetrics.net_bytes_in[metricsKey].series, `Network bytes/s in ${from_block_id} → ${to_block_id}`, profiler.iteration_boundaries, (v) => formatBytes(v)+"/s");
             };
             detailsContent.append($("<p>")
                 .append($("<strong>").text("Traffic: "))
@@ -339,13 +339,13 @@ const buildExecutionGraph = (structures, profiler) => {
                     const net_messages = profiler.channel_metrics.net_messages_out.data[key];
                     const net_bytes = profiler.channel_metrics.net_bytes_out.data[key];
                     const drawMessages = () => {
-                        drawProfilerGraph(messages.series, `Items/s in ${formatCoord(coord)} → ${formatCoord(to)}`, (v) => formatNumber(v));
+                        drawProfilerGraph(messages.series, `Items/s in ${formatCoord(coord)} → ${formatCoord(to)}`, profiler.iteration_boundaries, (v) => formatNumber(v));
                     };
                     const drawNetworkMessages = () => {
-                        drawProfilerGraph(net_messages.series, `Network messages/s in ${formatCoord(coord)} → ${formatCoord(to)}`);
+                        drawProfilerGraph(net_messages.series, `Network messages/s in ${formatCoord(coord)} → ${formatCoord(to)}`, profiler.iteration_boundaries);
                     };
                     const drawNetworkBytes = () => {
-                        drawProfilerGraph(net_bytes.series, `Network bytes/s in ${formatCoord(coord)} → ${formatCoord(to)}`, (v) => formatBytes(v)+"/s");
+                        drawProfilerGraph(net_bytes.series, `Network bytes/s in ${formatCoord(coord)} → ${formatCoord(to)}`, profiler.iteration_boundaries, (v) => formatBytes(v)+"/s");
                     };
                     const total = messages.series.total;
                     li.append(": ")
@@ -382,13 +382,13 @@ const buildExecutionGraph = (structures, profiler) => {
                     const net_messages = profiler.channel_metrics.net_messages_in.data[key];
                     const net_bytes = profiler.channel_metrics.net_bytes_in.data[key];
                     const drawMessages = () => {
-                        drawProfilerGraph(messages.series, `Items/s in ${formatCoord(from)} → ${formatCoord(coord)}`, (v) => formatNumber(v));
+                        drawProfilerGraph(messages.series, `Items/s in ${formatCoord(from)} → ${formatCoord(coord)}`, profiler.iteration_boundaries, (v) => formatNumber(v));
                     };
                     const drawNetworkMessages = () => {
-                        drawProfilerGraph(net_messages.series, `Network messages/s in ${formatCoord(from)} → ${formatCoord(coord)}`);
+                        drawProfilerGraph(net_messages.series, `Network messages/s in ${formatCoord(from)} → ${formatCoord(coord)}`, profiler.iteration_boundaries);
                     };
                     const drawNetworkBytes = () => {
-                        drawProfilerGraph(net_bytes.series, `Network bytes/s in ${formatCoord(from)} → ${formatCoord(coord)}`, (v) => formatBytes(v)+"/s");
+                        drawProfilerGraph(net_bytes.series, `Network bytes/s in ${formatCoord(from)} → ${formatCoord(coord)}`, profiler.iteration_boundaries, (v) => formatBytes(v)+"/s");
                     };
                     li.append(": ")
                         .append(makeLink(`${formatNumber(messages.series.total)} items received`, () => drawMessages()));
@@ -436,10 +436,10 @@ const buildExecutionGraph = (structures, profiler) => {
             const messages = profiler.channel_metrics.net_messages_in.data[metricsKey].series;
             const bytes = profiler.channel_metrics.net_bytes_in.data[metricsKey].series;
             const drawNetworkMessages = () => {
-                drawProfilerGraph(messages, `Network messages/s in ${coordPair}`);
+                drawProfilerGraph(messages, `Network messages/s in ${coordPair}`, profiler.iteration_boundaries);
             };
             const drawNetworkBytes = () => {
-                drawProfilerGraph(bytes, `Network bytes/s in ${coordPair}`, (v) => formatBytes(v)+"/s");
+                drawProfilerGraph(bytes, `Network bytes/s in ${coordPair}`, profiler.iteration_boundaries, (v) => formatBytes(v)+"/s");
             };
             detailsContent.append($("<p>")
                 .append($("<strong>").text("Traffic: "))

@@ -33,12 +33,11 @@ body, html {
     grid-area: details;
     padding: 0 20px;
     border-left: 1px solid;
-    overflow: scroll;
+    overflow: auto;
 }
 #graph {
     grid-area: graph;
     border-top: 1px solid;
-    /*padding: 5px;*/
 }
 
 .svg-container {
