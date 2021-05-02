@@ -15,7 +15,7 @@ where
     where
         F: Fn(&mut NewOut, &Out) + Clone + Send + 'static,
     {
-        self.add_generic_window_operator("Fold", move |window| {
+        self.add_generic_window_operator("WindowFold", move |window| {
             let mut res = init.clone();
             for value in window.items() {
                 (fold)(&mut res, value);

@@ -8,7 +8,9 @@ where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn min(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        self.add_generic_window_operator("Min", |window| window.items().min().unwrap().clone())
+        self.add_generic_window_operator("WindowMin", |window| {
+            window.items().min().unwrap().clone()
+        })
     }
 }
 

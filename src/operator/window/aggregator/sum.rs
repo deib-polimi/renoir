@@ -10,7 +10,7 @@ where
     for<'a> Out: Sum<&'a Out>,
 {
     pub fn sum(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        self.add_generic_window_operator("Sum", |window| window.items().sum())
+        self.add_generic_window_operator("WindowSum", |window| window.items().sum())
     }
 }
 

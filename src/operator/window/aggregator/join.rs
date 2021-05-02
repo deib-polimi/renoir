@@ -28,7 +28,7 @@ where
         // concatenate the two streams and apply the window
         left.concat(right)
             .window(self.descr)
-            .add_generic_window_operator("Join", move |window| {
+            .add_generic_window_operator("WindowJoin", move |window| {
                 // divide the elements coming from the left stream from the elements
                 // coming from the right stream
                 let (left, right) = window

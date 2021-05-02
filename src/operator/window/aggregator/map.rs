@@ -14,7 +14,7 @@ where
     where
         F: Fn(&mut dyn Iterator<Item = &Out>) -> NewOut + Clone + Send + 'static,
     {
-        self.add_generic_window_operator("Map", move |window| (map_func)(&mut window.items()))
+        self.add_generic_window_operator("WindowMap", move |window| (map_func)(&mut window.items()))
     }
 }
 

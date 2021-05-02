@@ -8,7 +8,9 @@ where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn max(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        self.add_generic_window_operator("Max", |window| window.items().max().unwrap().clone())
+        self.add_generic_window_operator("WindowMax", |window| {
+            window.items().max().unwrap().clone()
+        })
     }
 }
 

@@ -9,7 +9,9 @@ where
 {
     /// For each window, return the first element.
     pub fn first(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        self.add_generic_window_operator("First", |window| window.items().next().unwrap().clone())
+        self.add_generic_window_operator("WindowFirst", |window| {
+            window.items().next().unwrap().clone()
+        })
     }
 }
 
