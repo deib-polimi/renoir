@@ -1,4 +1,19 @@
 const inputSelector = document.getElementById("file-picker");
+const jobGraphRadio = document.getElementById("job-graph");
+const executionGraphRadio = document.getElementById("execution-graph");
+const gravitySelect = document.getElementById("gravity");
+const redrawButton = document.getElementById("redraw");
+
+window.graphMode = "job";
+window.profiler = null;
+
+const drawGraph = (structures, profiler) => {
+    if (window.graphMode === "job") {
+        drawJobGraph(structures, profiler);
+    } else {
+        drawExecutionGraph(structures, profiler);
+    }
+}
 
 inputSelector.addEventListener("change", (event) => {
     const files = event.target.files;
@@ -15,13 +30,38 @@ inputSelector.addEventListener("change", (event) => {
         } catch (e) {
             alert("Malformed JSON data: " + e);
         }
-        const structures = json["structures"];
-        const profilers = json["profilers"];
-        if (!structures || !profilers) {
+        window.structures = json["structures"];
+        window.profilers = json["profilers"];
+        if (!window.structures || !window.profilers) {
             alert("Invalid JSON data: structures or profilers missing");
             return;
         }
-        processData(structures, profilers);
+        window.profiler = new Profiler(window.profilers);
+        drawGraph(window.structures, window.profiler);
     });
     reader.readAsText(file);
+});
+
+jobGraphRadio.addEventListener("change", () => {
+    window.graphMode = "job";
+    if (window.profiler) {
+        drawGraph(window.structures, window.profiler);
+    }
+});
+
+executionGraphRadio.addEventListener("change", () => {
+    window.graphMode = "execution";
+    if (window.profiler) {
+        drawGraph(window.structures, window.profiler);
+    }
+});
+
+gravitySelect.addEventListener("change", () => {
+    changeGravity(!gravityEnabled);
+});
+
+redrawButton.addEventListener("click", () => {
+    if (window.profiler) {
+        drawGraph(window.structures, window.profiler);
+    }
 });

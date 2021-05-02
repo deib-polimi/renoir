@@ -33,6 +33,7 @@ body, html {
     grid-area: details;
     padding: 0 20px;
     border-left: 1px solid;
+    overflow: scroll;
 }
 #graph {
     grid-area: graph;

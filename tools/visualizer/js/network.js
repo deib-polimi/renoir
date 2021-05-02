@@ -97,6 +97,18 @@ function rectCollide() {
     return force
 }
 
+let gravityEnabled = true;
+let gravityCallbacks = [];
+
+const changeGravity = (enabled) => {
+    gravityEnabled = enabled;
+    for (const callback of gravityCallbacks) callback();
+};
+
+const resetNetwork = () => {
+    gravityCallbacks = [];
+};
+
 const drawNetwork = (nodes, links) => {
     const nodeById = {};
 
@@ -447,6 +459,21 @@ const drawNetwork = (nodes, links) => {
         simulation.force("link").links(node.links);
         simulation.alpha(1).restart();
 
+        gravityCallbacks.push(() => {
+            if (gravityEnabled) {
+                for (const n of node.children) {
+                    node.fx = null;
+                    node.fy = null;
+                    simulation.alpha(1).restart();
+                }
+            } else {
+                for (const n of node.children) {
+                    node.fx = node.x;
+                    node.fy = node.y;
+                }
+            }
+        });
+
         const drag = () => {
             return d3.drag()
                 .on("start", (d) => {
@@ -460,8 +487,10 @@ const drawNetwork = (nodes, links) => {
                 })
                 .on("end", (d) => {
                     if (!d3.event.active) simulation.alphaTarget(0);
-                    d.fx = null;
-                    d.fy = null;
+                    if (gravityEnabled) {
+                        d.fx = null;
+                        d.fy = null;
+                    }
                 });
         }
 

@@ -7,7 +7,7 @@ const resetGraph = () => {
     d3.select("#" + graphContainerId).select("svg").remove();
 };
 
-const drawGraph = (series, title, yFormat) => {
+const drawProfilerGraph = (series, title, yFormat) => {
     if (!yFormat) yFormat = (d) => d;
 
     const container = document.getElementById(graphContainerId);
@@ -90,6 +90,7 @@ const drawGraph = (series, title, yFormat) => {
 
     root
         .append("text")
+        .attr("text-anchor", "middle")
         .attr("alignment-baseline", "middle")
         .attr("x", svgWidth / 2)
         .attr("y", top / 2)

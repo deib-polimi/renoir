@@ -12,6 +12,19 @@
         <div id="toolbar">
             <span>Select a file:</span>
             <input id="file-picker" type="file" accept=".json" />
+            <span>
+                <input id="job-graph" type="radio" name="graph" checked="checked">
+                <label for="job-graph">Job graph</label>
+            </span>
+            <span>
+                <input id="execution-graph" type="radio" name="graph">
+                <label for="execution-graph">Execution graph</label>
+            </span>
+            <span>
+                <input id="gravity" type="checkbox" checked="checked">
+                <label for="gravity">Gravity</label>
+            </span>
+            <button id="redraw">Redraw</button>
         </div>
         <div id="network">
             <div class="svg-container">
