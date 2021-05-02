@@ -180,7 +180,7 @@ class RStream(Benchmark):
         with tempfile.NamedTemporaryFile("w", dir=self.config["temp_dir"]) as hostfile:
             hostfile_content = ""
             for i, host in enumerate(self.config["known_hosts"][:num_hosts]):
-                slots = procs_per_host
+                slots = procs_per_host * args.num_steps
                 if i == 0:
                     # source process
                     slots += 1
@@ -502,6 +502,11 @@ if __name__ == "__main__":
     rstream.add_argument(
         "example",
         help="Name of the example to compile and run",
+    )
+    rstream.add_argument(
+        "num_steps",
+        help="Number of steps of the pipeline: the number of processes to spawn is adjusted based on this.",
+        type=int,
     )
     rstream.add_argument(
         "extra_args",
