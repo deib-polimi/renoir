@@ -4,7 +4,6 @@ use std::num::NonZeroUsize;
 
 use crate::operator::window::{Window, WindowDescription, WindowGenerator};
 use crate::operator::{Data, DataKey, StreamElement, Timestamp};
-use crate::stream::KeyValue;
 
 #[derive(Clone, Debug)]
 pub struct CountWindow {
@@ -65,10 +64,10 @@ impl<Key: DataKey, Out: Data> CountWindowGenerator<Key, Out> {
 }
 
 impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator<Key, Out> {
-    fn add(&mut self, item: StreamElement<KeyValue<Key, Out>>) {
+    fn add(&mut self, item: StreamElement<Out>) {
         match item {
-            StreamElement::Item((_, item)) => self.buffer.push_back(item),
-            StreamElement::Timestamped((_, item), ts) => {
+            StreamElement::Item(item) => self.buffer.push_back(item),
+            StreamElement::Timestamped(item, ts) => {
                 self.buffer.push_back(item);
                 self.timestamp_buffer.push_back(ts);
             }
@@ -122,16 +121,18 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
 mod tests {
     use std::time::Duration;
 
-    use crate::operator::{CountWindow, StreamElement, WindowDescription, WindowGenerator};
+    use crate::operator::{
+        CountWindow, CountWindowGenerator, StreamElement, WindowDescription, WindowGenerator,
+    };
 
     #[test]
     fn count_window_watermark() {
         let descr = CountWindow::sliding(3, 2);
-        let mut generator = descr.new_generator();
+        let mut generator: CountWindowGenerator<u32, _> = descr.new_generator();
 
-        generator.add(StreamElement::Timestamped((0, 1), Duration::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, Duration::from_secs(1)));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped((0, 2), Duration::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, Duration::from_secs(2)));
         assert!(generator.next_window().is_none());
         generator.add(StreamElement::Watermark(Duration::from_secs(4)));
         assert!(generator.next_window().is_none());
@@ -147,13 +148,13 @@ mod tests {
     #[test]
     fn count_window_timestamp() {
         let descr = CountWindow::sliding(3, 2);
-        let mut generator = descr.new_generator();
+        let mut generator: CountWindowGenerator<u32, _> = descr.new_generator();
 
-        generator.add(StreamElement::Timestamped((0, 1), Duration::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, Duration::from_secs(1)));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped((0, 2), Duration::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, Duration::from_secs(2)));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped((0, 3), Duration::from_secs(3)));
+        generator.add(StreamElement::Timestamped(3, Duration::from_secs(3)));
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Duration::from_secs(3)));
         assert_eq!(window.size, 3);

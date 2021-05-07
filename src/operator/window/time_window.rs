@@ -47,12 +47,12 @@ impl<Key: DataKey, Out: Data> TimeWindowGenerator<Key, Out> {
 }
 
 impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for TimeWindowGenerator<Key, Out> {
-    fn add(&mut self, item: StreamElement<(Key, Out)>) {
+    fn add(&mut self, item: StreamElement<Out>) {
         match item {
             StreamElement::Item(_) => {
                 panic!("Event time window cannot handle elements without a timestamp")
             }
-            StreamElement::Timestamped((_, v), ts) => {
+            StreamElement::Timestamped(v, ts) => {
                 assert!(ts >= self.last_seen);
                 self.last_seen = ts;
 

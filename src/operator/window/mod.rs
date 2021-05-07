@@ -29,7 +29,7 @@ pub trait WindowDescription<Key: DataKey, Out: Data>: Send {
 /// A WindowGenerator handles the generation of windows for a given key.
 pub trait WindowGenerator<Key: DataKey, Out: Data>: Send {
     /// Handle a new element of the stream.
-    fn add(&mut self, item: StreamElement<KeyValue<Key, Out>>);
+    fn add(&mut self, item: StreamElement<Out>);
     /// If a window is ready, return it so that it can be processed.
     fn next_window(&mut self) -> Option<Window<Key, Out>>;
     /// Close the current open window.
@@ -135,10 +135,12 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
             );
             self.generators.clear();
         }
+
         match &el {
-            StreamElement::Item((k, _)) | StreamElement::Timestamped((k, _), _) => {
-                let key = k.clone();
-                if let Some(gen) = self.generators.get_mut(k) {
+            StreamElement::Item(_) | StreamElement::Timestamped(_, _) => {
+                let (key, el) = el.remove_key();
+                let key = key.unwrap();
+                if let Some(gen) = self.generators.get_mut(&key) {
                     gen.add(el);
                 } else {
                     let mut gen = self.descr.new_generator();
@@ -157,7 +159,7 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
                 self.should_reset = matches!(el, StreamElement::FlushAndRestart);
                 // Pass the element to every window generator
                 for (_key, gen) in self.generators.iter_mut() {
-                    gen.add(el.clone());
+                    gen.add(el.clone().remove_key().1);
                 }
                 // Save this element so that it can be forwarded downstream
                 self.extra_items.push_back(el);

@@ -61,7 +61,7 @@ impl<Key: DataKey, Out: Data> ProcessingTimeWindowGenerator<Key, Out> {
 impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out>
     for ProcessingTimeWindowGenerator<Key, Out>
 {
-    fn add(&mut self, element: StreamElement<(Key, Out)>) {
+    fn add(&mut self, element: StreamElement<Out>) {
         match element {
             StreamElement::Item(item) => {
                 // TODO: consider not using `SystemTime`

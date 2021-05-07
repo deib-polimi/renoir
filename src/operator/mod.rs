@@ -21,6 +21,7 @@ pub use zip::*;
 
 use crate::block::BlockStructure;
 use crate::scheduler::ExecutionMetadata;
+use crate::stream::KeyValue;
 
 mod batch_mode;
 mod concat;
@@ -154,6 +155,18 @@ impl<Out: Data> StreamElement<Out> {
             StreamElement::FlushBatch => "FlushBatch",
             StreamElement::Terminate => "Terminate",
             StreamElement::FlushAndRestart => "FlushAndRestart",
+        }
+    }
+}
+
+impl<Key: DataKey, Out: Data> StreamElement<KeyValue<Key, Out>> {
+    /// Map a `StreamElement<KeyValue(Key, Out)>` to a `StreamElement<Out>`,
+    /// returning the key if possible
+    pub(crate) fn remove_key(self) -> (Option<Key>, StreamElement<Out>) {
+        match self {
+            StreamElement::Item((k, v)) => (Some(k), StreamElement::Item(v)),
+            StreamElement::Timestamped((k, v), ts) => (Some(k), StreamElement::Timestamped(v, ts)),
+            _ => (None, self.map(|_| unreachable!())),
         }
     }
 }

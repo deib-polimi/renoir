@@ -47,22 +47,24 @@ mod tests {
     use itertools::Itertools;
 
     use crate::operator::window::EventTimeWindow;
-    use crate::operator::{StreamElement, Timestamp, WindowDescription, WindowGenerator};
+    use crate::operator::{
+        EventTimeWindowGenerator, StreamElement, Timestamp, WindowDescription, WindowGenerator,
+    };
 
     #[test]
     fn sliding_event_time() {
         let descr = EventTimeWindow::sliding(Duration::from_secs(3), Duration::from_millis(2500));
-        let mut generator = descr.new_generator();
+        let mut generator: EventTimeWindowGenerator<u32, _> = descr.new_generator();
 
         // current window [0, 3)
-        generator.add(StreamElement::Timestamped((0, 0), Timestamp::from_secs(0)));
+        generator.add(StreamElement::Timestamped(0, Timestamp::from_secs(0)));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped((0, 1), Timestamp::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, Timestamp::from_secs(1)));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped((0, 2), Timestamp::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, Timestamp::from_secs(2)));
         assert!(generator.next_window().is_none());
         // this closes the window
-        generator.add(StreamElement::Timestamped((0, 3), Timestamp::from_secs(3)));
+        generator.add(StreamElement::Timestamped(3, Timestamp::from_secs(3)));
 
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Timestamp::from_secs(3)));
@@ -83,10 +85,7 @@ mod tests {
         drop(window);
 
         // current window [7.5, 10.5)
-        generator.add(StreamElement::Timestamped(
-            (0, 10),
-            Timestamp::from_secs(10),
-        ));
+        generator.add(StreamElement::Timestamped(10, Timestamp::from_secs(10)));
         assert!(generator.next_window().is_none());
         generator.add(StreamElement::FlushAndRestart);
 
