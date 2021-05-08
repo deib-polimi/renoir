@@ -66,6 +66,9 @@ lazy-init = "0.5"
 # Format dates and times
 chrono = "0.4"
 
+# faster allocator
+mimalloc = { version = "*", optional = true }
+
 [dev-dependencies]
 # for the tests
 tempfile = "3.2"

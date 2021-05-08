@@ -5,6 +5,10 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
+#[cfg(feature = "mimalloc")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use std::ops::{Add, AddAssign};
 
 use serde::{Deserialize, Serialize};
