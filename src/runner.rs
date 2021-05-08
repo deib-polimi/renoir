@@ -183,20 +183,18 @@ fn spawn_remote_worker(
     // copy to stderr the output of the remote process
     let reader = BufReader::new(channel.stderr());
     let mut tracing_data = None;
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            if let Some(pos) = line.find("__RSTREAM2_TRACING_DATA__") {
-                let json_data = &line[(pos + "__RSTREAM2_TRACING_DATA__ ".len())..];
-                match serde_json::from_str(json_data) {
-                    Ok(data) => tracing_data = Some(data),
-                    Err(err) => {
-                        error!("Corrupted tracing data from host {}: {:?}", host_id, err);
-                    }
+    for line in reader.lines().flatten() {
+        if let Some(pos) = line.find("__RSTREAM2_TRACING_DATA__") {
+            let json_data = &line[(pos + "__RSTREAM2_TRACING_DATA__ ".len())..];
+            match serde_json::from_str(json_data) {
+                Ok(data) => tracing_data = Some(data),
+                Err(err) => {
+                    error!("Corrupted tracing data from host {}: {:?}", host_id, err);
                 }
-            } else {
-                // prefix each line with the id of the host
-                eprintln!("{}|{}", host_id, line);
             }
+        } else {
+            // prefix each line with the id of the host
+            eprintln!("{}|{}", host_id, line);
         }
     }
     channel.wait_close().unwrap();
