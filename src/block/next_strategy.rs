@@ -29,6 +29,8 @@ pub(crate) enum NextStrategy<Out: Data> {
     Random,
     /// Among the next replica, the one is selected based on the hash of the key of the message.
     GroupBy(#[derivative(Debug = "ignore")] Arc<dyn Fn(&Out) -> usize + Send + Sync>),
+    /// Every following replica will receive every message.
+    All,
 }
 
 impl<Out: Data> NextStrategy<Out> {
@@ -43,6 +45,18 @@ impl<Out: Data> NextStrategy<Out> {
         senders: &HashMap<ReceiverEndpoint, NetworkSender<Out>>,
         ignore_block: Option<BlockId>,
     ) -> Vec<SenderList> {
+        // If NextStrategy is All, return every sender except the ignored ones.
+        // Each sender has its own SenderList.
+        if matches!(self, NextStrategy::All) {
+            return senders
+                .iter()
+                .filter_map(|(coord, sender)| match ignore_block {
+                    Some(ignore_block) if coord.coord.block_id == ignore_block => None,
+                    _ => Some(SenderList(vec![sender.receiver_endpoint])),
+                })
+                .collect();
+        }
+
         let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();
         for (coord, sender) in senders {
             by_block_id
@@ -67,7 +81,7 @@ impl<Out: Data> NextStrategy<Out> {
     /// Compute the index of the replica which this message should be forwarded to.
     pub fn index(&self, message: &Out) -> usize {
         match self {
-            NextStrategy::OnlyOne => 0,
+            NextStrategy::OnlyOne | NextStrategy::All => 0,
             NextStrategy::Random => thread_rng().gen(),
             NextStrategy::GroupBy(keyer) => keyer(message),
         }

@@ -134,11 +134,13 @@ impl JobGraphGenerator {
                         ConnectionStrategy::OnlyOne => "dotted",
                         ConnectionStrategy::Random => "solid",
                         ConnectionStrategy::GroupBy => "dashed",
+                        ConnectionStrategy::All => "bold",
                     };
                     let sublabel = match connection.strategy {
                         ConnectionStrategy::OnlyOne => "only-one",
                         ConnectionStrategy::Random => "shuffle",
                         ConnectionStrategy::GroupBy => "group-by",
+                        ConnectionStrategy::All => "broadcast",
                     };
 
                     let from_id = Self::operator_id(from_block, from_index);

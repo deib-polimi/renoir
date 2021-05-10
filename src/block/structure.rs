@@ -96,6 +96,8 @@ pub enum ConnectionStrategy {
     Random,
     /// A key-based approach is used for choosing the next replica.
     GroupBy,
+    /// All the replicas receive all the elements of the stream.
+    All,
 }
 
 impl DataType {
@@ -186,6 +188,7 @@ impl<Out: Data> From<&NextStrategy<Out>> for ConnectionStrategy {
             NextStrategy::OnlyOne => ConnectionStrategy::OnlyOne,
             NextStrategy::Random => ConnectionStrategy::Random,
             NextStrategy::GroupBy(_) => ConnectionStrategy::GroupBy,
+            NextStrategy::All => ConnectionStrategy::All,
         }
     }
 }
