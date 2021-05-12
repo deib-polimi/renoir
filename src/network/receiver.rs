@@ -3,7 +3,8 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 
 use crate::channel::{
-    BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectAnyResult, TryRecvError,
+    BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectAnyResult, SelectResult,
+    TryRecvError,
 };
 use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::Data;
@@ -92,6 +93,27 @@ impl<In: Data> NetworkReceiver<In> {
     #[allow(dead_code)]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<NetworkMessage<In>, RecvTimeoutError> {
         self.profile_message(self.receiver.recv_timeout(timeout))
+    }
+
+    /// Receive a message from any sender of this receiver of the other provided receiver.
+    ///
+    /// The first message of the two is returned. If both receivers are ready one of them is chosen
+    /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
+    /// fairness property.
+    pub fn select<In2: Data>(
+        &self,
+        other: &NetworkReceiver<In2>,
+    ) -> SelectResult<NetworkMessage<In>, NetworkMessage<In2>> {
+        self.receiver.select(&other.receiver)
+    }
+
+    /// Same as `select`, with a timeout.
+    pub fn select_timeout<In2: Data>(
+        &self,
+        other: &NetworkReceiver<In2>,
+        timeout: Duration,
+    ) -> Result<SelectResult<NetworkMessage<In>, NetworkMessage<In2>>, RecvTimeoutError> {
+        self.receiver.select_timeout(&other.receiver, timeout)
     }
 
     /// Same as `select`, but takes multiple receivers to select from.

@@ -13,22 +13,21 @@ fn main() {
 
     env.spawn_remote_workers();
 
-    let n = 5u64;
-    let n_iter = 5;
+    let s1 = env.stream(IteratorSource::new(0..5u64));
+    let s2 = env.stream(IteratorSource::new(0..5i32));
+    let res = s1
+        .join_with(s2, |n: &u64| (*n % 2) as u8, |n: &i32| (*n % 2) as u8)
+        .ship_hash()
+        .local_hash()
+        .inner()
+        .unkey()
+        .collect_vec();
 
-    let source = IteratorSource::new(0..n);
-    let (state, res) = env.stream(source).shuffle().iterate(
-        n_iter,
-        0u64,
-        |s, state| s.map(move |x| x + *state.get()),
-        |delta: &mut u64, x| *delta += x,
-        |old_state, delta| *old_state += delta,
-        |_state| true,
-    );
-    let state = state.collect_vec();
-    let res = res.collect_vec();
     env.execute();
 
-    info!("Output: {:?}", res.get());
-    info!("Output: {:?}", state.get());
+    if let Some(res) = res.get() {
+        for (k, (lhs, rhs)) in res {
+            info!("key {} -> {:?} {:?}", k, lhs, rhs);
+        }
+    }
 }
