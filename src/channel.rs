@@ -25,7 +25,6 @@ pub type RecvTimeoutError = ExtRecvTimeoutError;
 pub type TryRecvError = ExtTryRecvError;
 
 /// An _either_ type with the result of a select on 2 channels.
-#[allow(dead_code)] // TODO: remove once joins are implemented
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SelectResult<In1, In2> {
     /// The result refers to the first selected channel.
