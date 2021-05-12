@@ -1,10 +1,12 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 
 use crate::network::{NetworkSender, ReceiverEndpoint};
-use crate::operator::Data;
+use crate::operator::{Data, KeyerFn};
 use crate::stream::BlockId;
 
 /// The list with the interesting senders of a single block.
@@ -34,6 +36,18 @@ pub(crate) enum NextStrategy<Out: Data> {
 }
 
 impl<Out: Data> NextStrategy<Out> {
+    /// Build a `NextStrategy` from a keyer function.
+    pub(crate) fn group_by<Key: Hash, Keyer>(keyer: Keyer) -> NextStrategy<Out>
+    where
+        Keyer: KeyerFn<Key, Out>,
+    {
+        NextStrategy::GroupBy(Arc::new(move |item| {
+            let mut s = DefaultHasher::new();
+            keyer(item).hash(&mut s);
+            s.finish() as usize
+        }))
+    }
+
     /// Group the senders from a block using the current next strategy.
     ///
     /// The returned value is a list of `SenderList`s, one for each next block in the execution

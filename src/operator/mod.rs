@@ -58,6 +58,10 @@ impl<T: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static> Dat
 pub trait DataKey: Data + Hash + Eq {}
 impl<T: Data + Hash + Eq> DataKey for T {}
 
+/// Marker trait for the function that extracts the key out of a type.
+pub trait KeyerFn<Key, Out>: Fn(&Out) -> Key + Clone + Send + Sync + 'static {}
+impl<Key, Out, T: Fn(&Out) -> Key + Clone + Send + Sync + 'static> KeyerFn<Key, Out> for T {}
+
 /// When using timestamps and watermarks, this type expresses the timestamp of a message or of a
 /// watermark.
 pub type Timestamp = Duration;

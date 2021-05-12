@@ -1,7 +1,3 @@
-use std::collections::hash_map::DefaultHasher;
-use std::hash::Hasher;
-use std::sync::Arc;
-
 use crate::block::NextStrategy;
 use crate::operator::{Data, DataKey, EndBlock};
 use crate::operator::{KeyBy, Operator};
@@ -18,14 +14,7 @@ where
     where
         Keyer: Fn(&Out) -> Key + Send + Clone + Sync + 'static,
     {
-        let keyer2 = keyer.clone();
-
-        let next_strategy = NextStrategy::GroupBy(Arc::new(move |out| {
-            let mut s = DefaultHasher::new();
-            keyer2(out).hash(&mut s);
-            s.finish() as usize
-        }));
-
+        let next_strategy = NextStrategy::group_by(keyer.clone());
         let new_stream = self
             .add_block(EndBlock::new, next_strategy)
             .add_operator(|prev| KeyBy::new(prev, keyer));

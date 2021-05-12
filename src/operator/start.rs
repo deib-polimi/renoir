@@ -11,11 +11,11 @@ use crate::operator::{Data, IterationStateLock, Operator, StreamElement, Timesta
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 
-#[derive(Clone, Debug, Default)]
 /// Handle watermarks coming from multiple replicas.
 /// A watermark with timestamp `ts` is safe to be passed downstream if and only if,
 /// for every previous replica, a watermark with timestamp greater or equal to `ts`
 /// has already been received
+#[derive(Clone, Debug, Default)]
 struct WatermarkFrontier {
     /// Watermark with largest timestamp received, for each replica
     largest_watermark: Vec<Option<Timestamp>>,
