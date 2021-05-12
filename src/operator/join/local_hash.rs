@@ -7,7 +7,8 @@ use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
 use crate::operator::join::start::{JoinElement, JoinStartBlock};
 use crate::operator::{
-    Data, DataKey, InnerJoinTuple, KeyerFn, LeftJoinTuple, Operator, OuterJoinTuple, StreamElement,
+    DataKey, ExchangeData, InnerJoinTuple, KeyerFn, LeftJoinTuple, Operator, OuterJoinTuple,
+    StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
@@ -49,8 +50,8 @@ impl<Key: DataKey, Out> Default for SideHashMap<Key, Out> {
 #[derive(Clone, Debug)]
 struct JoinLocalHash<
     Key: DataKey,
-    Out1: Data,
-    Out2: Data,
+    Out1: ExchangeData,
+    Out2: ExchangeData,
     OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
 > {
     prev: OperatorChain,
@@ -62,8 +63,8 @@ struct JoinLocalHash<
 
 impl<
         Key: DataKey,
-        Out1: Data,
-        Out2: Data,
+        Out1: ExchangeData,
+        Out2: ExchangeData,
         OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
     > JoinLocalHash<Key, Out1, Out2, OperatorChain>
 {
@@ -77,7 +78,7 @@ impl<
         }
     }
 
-    fn add_item<OutL: Data, OutR: Data>(
+    fn add_item<OutL: ExchangeData, OutR: ExchangeData>(
         (key, item): (Key, OutL),
         left: &mut SideHashMap<Key, OutL>,
         right: &mut SideHashMap<Key, OutR>,
@@ -140,8 +141,8 @@ impl<
 
 impl<
         Key: DataKey,
-        Out1: Data,
-        Out2: Data,
+        Out1: ExchangeData,
+        Out2: ExchangeData,
         OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
     > Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>
     for JoinLocalHash<Key, Out1, Out2, OperatorChain>
@@ -225,8 +226,8 @@ impl<
 
 pub struct JoinStreamLocalHash<
     Key: DataKey,
-    Out1: Data,
-    Out2: Data,
+    Out1: ExchangeData,
+    Out2: ExchangeData,
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
     ShipStrat: ShipStrategy,
@@ -235,8 +236,14 @@ pub struct JoinStreamLocalHash<
     _s: PhantomData<ShipStrat>,
 }
 
-impl<Key: DataKey, Out1: Data, Out2: Data, Keyer1, Keyer2, ShipStrat: ShipStrategy>
-    JoinStreamLocalHash<Key, Out1, Out2, Keyer1, Keyer2, ShipStrat>
+impl<
+        Key: DataKey,
+        Out1: ExchangeData,
+        Out2: ExchangeData,
+        Keyer1,
+        Keyer2,
+        ShipStrat: ShipStrategy,
+    > JoinStreamLocalHash<Key, Out1, Out2, Keyer1, Keyer2, ShipStrat>
 where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
@@ -254,7 +261,7 @@ where
     }
 }
 
-impl<Key: DataKey, Out1: Data, Out2: Data, Keyer1, Keyer2>
+impl<Key: DataKey, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
     JoinStreamLocalHash<Key, Out1, Out2, Keyer1, Keyer2, ShipHash>
 where
     Keyer1: KeyerFn<Key, Out1>,
@@ -300,7 +307,7 @@ where
     }
 }
 
-impl<Key: DataKey, Out1: Data, Out2: Data, Keyer1, Keyer2>
+impl<Key: DataKey, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
     JoinStreamLocalHash<Key, Out1, Out2, Keyer1, Keyer2, ShipBroadcastRight>
 where
     Keyer1: KeyerFn<Key, Out1>,

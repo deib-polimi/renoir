@@ -3,13 +3,16 @@
 use std::marker::PhantomData;
 
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
-use crate::operator::{Data, InnerJoinTuple, LeftJoinTuple, OuterJoinTuple, StartBlock};
+use crate::operator::join::start::JoinStartBlock;
+use crate::operator::{
+    Data, ExchangeData, InnerJoinTuple, LeftJoinTuple, OuterJoinTuple, StartBlock,
+};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 pub struct JoinStreamLocalSortMerge<
     Key: Data + Ord,
-    Out1: Data,
-    Out2: Data,
+    Out1: ExchangeData,
+    Out2: ExchangeData,
     ShipStrat: ShipStrategy,
 > {
     _k: PhantomData<Key>,
@@ -18,7 +21,9 @@ pub struct JoinStreamLocalSortMerge<
     _s: PhantomData<ShipStrat>,
 }
 
-impl<Key: Data + Ord, Out1: Data, Out2: Data> JoinStreamLocalSortMerge<Key, Out1, Out2, ShipHash> {
+impl<Key: Data + Ord, Out1: ExchangeData, Out2: ExchangeData>
+    JoinStreamLocalSortMerge<Key, Out1, Out2, ShipHash>
+{
     pub fn inner(
         self,
         // ) -> KeyedStream<Key, InnerJoinTuple<Out1, Out2>, impl Operator<KeyValue<Key, InnerJoinTuple<Out1, Out2>>>> {
@@ -53,7 +58,7 @@ impl<Key: Data + Ord, Out1: Data, Out2: Data> JoinStreamLocalSortMerge<Key, Out1
     }
 }
 
-impl<Key: Data + Ord, Out1: Data, Out2: Data>
+impl<Key: Data + Ord, Out1: ExchangeData, Out2: ExchangeData>
     JoinStreamLocalSortMerge<Key, Out1, Out2, ShipBroadcastRight>
 {
     pub fn inner(

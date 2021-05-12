@@ -7,7 +7,7 @@ use crate::channel::{
     TryRecvError,
 };
 use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
-use crate::operator::Data;
+use crate::operator::ExchangeData;
 use crate::profiler::{get_profiler, Profiler};
 
 /// The capacity of the in-buffer.
@@ -24,7 +24,7 @@ const CHANNEL_CAPACITY: usize = 10;
 /// socket and send to the same in-memory channel the received messages.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct NetworkReceiver<In: Data> {
+pub struct NetworkReceiver<In: ExchangeData> {
     /// The ReceiverEndpoint of the current receiver.
     pub receiver_endpoint: ReceiverEndpoint,
     /// The actual receiver where the users of this struct will wait upon.
@@ -35,7 +35,7 @@ pub struct NetworkReceiver<In: Data> {
     local_sender: Option<BoundedChannelSender<NetworkMessage<In>>>,
 }
 
-impl<In: Data> NetworkReceiver<In> {
+impl<In: ExchangeData> NetworkReceiver<In> {
     /// Construct a new `NetworkReceiver`.
     ///
     /// To get its sender use `.sender()` for a `NetworkSender` or directly `.local_sender` for the
@@ -100,7 +100,7 @@ impl<In: Data> NetworkReceiver<In> {
     /// The first message of the two is returned. If both receivers are ready one of them is chosen
     /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
     /// fairness property.
-    pub fn select<In2: Data>(
+    pub fn select<In2: ExchangeData>(
         &self,
         other: &NetworkReceiver<In2>,
     ) -> SelectResult<NetworkMessage<In>, NetworkMessage<In2>> {
@@ -108,7 +108,7 @@ impl<In: Data> NetworkReceiver<In> {
     }
 
     /// Same as `select`, with a timeout.
-    pub fn select_timeout<In2: Data>(
+    pub fn select_timeout<In2: ExchangeData>(
         &self,
         other: &NetworkReceiver<In2>,
         timeout: Duration,

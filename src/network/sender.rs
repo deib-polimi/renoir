@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use crate::channel::BoundedChannelSender;
 use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{NetworkMessage, ReceiverEndpoint};
-use crate::operator::Data;
+use crate::operator::ExchangeData;
 use crate::profiler::{get_profiler, Profiler};
 
 /// The sender part of a connection between two replicas.
@@ -13,7 +13,7 @@ use crate::profiler::{get_profiler, Profiler};
 /// connection internally this points to the multiplexer that handles the remote channel.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct NetworkSender<Out: Data> {
+pub struct NetworkSender<Out: ExchangeData> {
     /// The ReceiverEndpoint of the recipient.
     pub receiver_endpoint: ReceiverEndpoint,
     /// The generic sender that will send the message either locally or remotely.
@@ -24,14 +24,14 @@ pub struct NetworkSender<Out: Data> {
 /// The internal sender that sends either to a local in-memory channel, or to a remote channel using
 /// a multiplexer.
 #[derive(Clone)]
-pub(crate) enum NetworkSenderImpl<Out: Data> {
+pub(crate) enum NetworkSenderImpl<Out: ExchangeData> {
     /// The channel is local, use an in-memory channel.
     Local(BoundedChannelSender<NetworkMessage<Out>>),
     /// The channel is remote, use the multiplexer.
     Remote(MultiplexingSender<Out>),
 }
 
-impl<Out: Data> NetworkSender<Out> {
+impl<Out: ExchangeData> NetworkSender<Out> {
     /// Create a new local sender that sends the data directly to the recipient.
     pub fn local(
         receiver_endpoint: ReceiverEndpoint,

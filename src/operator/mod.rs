@@ -53,12 +53,20 @@ mod window;
 mod zip;
 
 /// Marker trait that all the types inside a stream should implement.
-pub trait Data: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static {}
-impl<T: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static> Data for T {}
+pub trait Data: Clone + Send + Sync + 'static {}
+impl<T: Clone + Send + Sync + 'static> Data for T {}
 
-/// Maker trait that all the keys should implement.
+/// Marker trait for data types that are used to communicate between different blocks.
+pub trait ExchangeData: Data + Serialize + for<'a> Deserialize<'a> {}
+impl<T: Data + Serialize + for<'a> Deserialize<'a> + 'static> ExchangeData for T {}
+
+/// Marker trait that all the keys should implement.
 pub trait DataKey: Data + Hash + Eq {}
 impl<T: Data + Hash + Eq> DataKey for T {}
+
+/// Marker trait for key types that are used when communicating between different blocks.
+pub trait ExchangeDataKey: DataKey + ExchangeData {}
+impl<T: DataKey + ExchangeData> ExchangeDataKey for T {}
 
 /// Marker trait for the function that extracts the key out of a type.
 pub trait KeyerFn<Key, Out>: Fn(&Out) -> Key + Clone + Send + Sync + 'static {}

@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 
 use crate::network::{NetworkSender, ReceiverEndpoint};
-use crate::operator::{Data, KeyerFn};
+use crate::operator::{ExchangeData, KeyerFn};
 use crate::stream::BlockId;
 
 /// The list with the interesting senders of a single block.
@@ -19,7 +19,7 @@ pub(crate) struct SenderList(pub Vec<ReceiverEndpoint>);
 /// of their replica will receive it depends on the value of the next strategy.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub(crate) enum NextStrategy<Out: Data> {
+pub(crate) enum NextStrategy<Out: ExchangeData> {
     /// Only one of the replicas will receive the message:
     ///
     /// - if the block is not replicated, the only replica will receive the message
@@ -35,7 +35,7 @@ pub(crate) enum NextStrategy<Out: Data> {
     All,
 }
 
-impl<Out: Data> NextStrategy<Out> {
+impl<Out: ExchangeData> NextStrategy<Out> {
     /// Build a `NextStrategy` from a keyer function.
     pub(crate) fn group_by<Key: Hash, Keyer>(keyer: Keyer) -> NextStrategy<Out>
     where

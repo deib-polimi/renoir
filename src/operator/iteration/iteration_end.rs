@@ -1,6 +1,6 @@
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkSender, ReceiverEndpoint};
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 
@@ -12,7 +12,7 @@ use crate::stream::BlockId;
 /// `EndBlock` cannot be used here since special care should be taken when the input stream is
 /// empty.
 #[derive(Debug, Clone)]
-pub struct IterationEndBlock<DeltaUpdate: Data, OperatorChain>
+pub struct IterationEndBlock<DeltaUpdate: ExchangeData, OperatorChain>
 where
     OperatorChain: Operator<DeltaUpdate>,
 {
@@ -33,7 +33,7 @@ where
     coord: Coord,
 }
 
-impl<DeltaUpdate: Data, OperatorChain> IterationEndBlock<DeltaUpdate, OperatorChain>
+impl<DeltaUpdate: ExchangeData, OperatorChain> IterationEndBlock<DeltaUpdate, OperatorChain>
 where
     OperatorChain: Operator<DeltaUpdate>,
 {
@@ -48,7 +48,7 @@ where
     }
 }
 
-impl<DeltaUpdate: Data, OperatorChain> Operator<()>
+impl<DeltaUpdate: ExchangeData, OperatorChain> Operator<()>
     for IterationEndBlock<DeltaUpdate, OperatorChain>
 where
     DeltaUpdate: Default,

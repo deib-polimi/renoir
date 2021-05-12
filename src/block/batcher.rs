@@ -2,7 +2,7 @@ use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 
 use crate::network::{Coord, NetworkMessage, NetworkSender};
-use crate::operator::{Data, StreamElement};
+use crate::operator::{ExchangeData, StreamElement};
 
 /// Which policy to use for batching the messages before sending them.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -17,7 +17,7 @@ pub enum BatchMode {
 /// A `Batcher` wraps a sender and sends the messages in batches to reduce the network overhead.
 ///
 /// Internally it spawns a new task to handle the timeouts and join it at the end.
-pub(crate) struct Batcher<Out: Data> {
+pub(crate) struct Batcher<Out: ExchangeData> {
     /// Sender used to communicate with the other replicas
     remote_sender: NetworkSender<Out>,
     /// Batching mode used by the batcher
@@ -30,7 +30,7 @@ pub(crate) struct Batcher<Out: Data> {
     coord: Coord,
 }
 
-impl<Out: Data> Batcher<Out> {
+impl<Out: ExchangeData> Batcher<Out> {
     pub(crate) fn new(remote_sender: NetworkSender<Out>, mode: BatchMode, coord: Coord) -> Self {
         Self {
             remote_sender,

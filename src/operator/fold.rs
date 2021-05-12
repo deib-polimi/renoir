@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, Operator, StreamElement, Timestamp};
+use crate::operator::{Data, ExchangeData, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
@@ -129,13 +129,14 @@ where
 {
     pub fn fold<NewOut: Data, F>(self, init: NewOut, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
+        Out: ExchangeData,
         F: Fn(&mut NewOut, Out) + Send + Clone + 'static,
     {
         self.max_parallelism(1)
             .add_operator(|prev| Fold::new(prev, init, f))
     }
 
-    pub fn fold_assoc<NewOut: Data, Local, Global>(
+    pub fn fold_assoc<NewOut: ExchangeData, Local, Global>(
         self,
         init: NewOut,
         local: Local,

@@ -4,13 +4,13 @@ use crate::block::{
     BatchMode, Batcher, BlockStructure, Connection, NextStrategy, OperatorStructure, SenderList,
 };
 use crate::network::ReceiverEndpoint;
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
-pub struct EndBlock<Out: Data, OperatorChain>
+pub struct EndBlock<Out: ExchangeData, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -25,7 +25,7 @@ where
     ignore_block_ids: Vec<BlockId>,
 }
 
-impl<Out: Data, OperatorChain> EndBlock<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> EndBlock<Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -59,7 +59,7 @@ where
     }
 }
 
-impl<Out: Data, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {

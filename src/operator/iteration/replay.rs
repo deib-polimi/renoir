@@ -9,8 +9,8 @@ use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::{
-    Data, EndBlock, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
-    StreamElement,
+    Data, EndBlock, ExchangeData, IterationStateHandle, IterationStateLock, NewIterationState,
+    Operator, StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
@@ -19,7 +19,7 @@ use crate::stream::{BlockId, Stream};
 ///
 /// If a new iteration should start, the initial dataset is replayed.
 #[derive(Debug, Clone)]
-pub struct Replay<Out: Data, State: Data, OperatorChain>
+pub struct Replay<Out: Data, State: ExchangeData, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -41,7 +41,7 @@ where
     has_input_ended: bool,
 }
 
-impl<Out: Data, State: Data, OperatorChain> Replay<Out, State, OperatorChain>
+impl<Out: Data, State: ExchangeData, OperatorChain> Replay<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -68,7 +68,7 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    pub fn replay<Body, DeltaUpdate: Data + Default, State: Data, OperatorChain2>(
+    pub fn replay<Body, DeltaUpdate: ExchangeData + Default, State: ExchangeData, OperatorChain2>(
         self,
         num_iterations: usize,
         initial_state: State,
@@ -161,7 +161,8 @@ where
     }
 }
 
-impl<Out: Data, State: Data, OperatorChain> Operator<Out> for Replay<Out, State, OperatorChain>
+impl<Out: Data, State: ExchangeData, OperatorChain> Operator<Out>
+    for Replay<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {

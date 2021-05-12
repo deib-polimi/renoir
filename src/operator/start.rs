@@ -7,7 +7,7 @@ use itertools::Itertools;
 use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, ReceiverEndpoint};
 use crate::operator::source::Source;
-use crate::operator::{Data, IterationStateLock, Operator, StreamElement, Timestamp};
+use crate::operator::{ExchangeData, IterationStateLock, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 
@@ -81,7 +81,7 @@ impl WatermarkFrontier {
 
 #[derive(Debug, Derivative)]
 #[derivative(Clone)]
-pub struct StartBlock<Out: Data> {
+pub struct StartBlock<Out: ExchangeData> {
     metadata: Option<ExecutionMetadata>,
     #[derivative(Clone(clone_with = "clone_empty"))]
     receivers: Vec<NetworkReceiver<Out>>,
@@ -101,7 +101,7 @@ pub struct StartBlock<Out: Data> {
     state_generation: usize,
 }
 
-impl<Out: Data> StartBlock<Out> {
+impl<Out: ExchangeData> StartBlock<Out> {
     pub(crate) fn new(prev_block_id: BlockId, state_lock: Option<Arc<IterationStateLock>>) -> Self {
         Self {
             metadata: Default::default(),
@@ -147,7 +147,7 @@ impl<Out: Data> StartBlock<Out> {
     }
 }
 
-impl<Out: Data> Operator<Out> for StartBlock<Out> {
+impl<Out: ExchangeData> Operator<Out> for StartBlock<Out> {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let in_type = TypeId::of::<Out>();
         for &prev_block_id in &self.prev_block_ids {
@@ -295,7 +295,7 @@ fn clone_empty<T>(_: &[T]) -> Vec<T> {
     Vec::new()
 }
 
-impl<Out: Data> Source<Out> for StartBlock<Out> {
+impl<Out: ExchangeData> Source<Out> for StartBlock<Out> {
     fn get_max_parallelism(&self) -> Option<usize> {
         None
     }

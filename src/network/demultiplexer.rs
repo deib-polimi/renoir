@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use crate::channel::{BoundedChannelSender, UnboundedChannelReceiver, UnboundedChannelSender};
 use crate::network::remote::{deserialize, header_size, remote_recv};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
-use crate::operator::Data;
+use crate::operator::ExchangeData;
 use crate::profiler::{get_profiler, Profiler};
 
 /// Channel and its coordinate pointing to a local block.
@@ -21,7 +21,7 @@ type ReceiverEndpointMessageSender<In> =
 /// arrival they are routed to the correct receiver according to the `ReceiverEndpoint` the message
 /// is tagged with.
 #[derive(Debug)]
-pub(crate) struct DemultiplexingReceiver<In: Data> {
+pub(crate) struct DemultiplexingReceiver<In: ExchangeData> {
     /// The coordinate of this demultiplexer.
     coord: DemuxCoord,
     /// Tell the demultiplexer that a new receiver is present,
@@ -34,7 +34,7 @@ pub(crate) struct DemultiplexingReceiver<In: Data> {
 /// signaling that a new recipient is ready. When a remote multiplexer connects,
 /// `RegisterRemoteClient` is sent with the sender to that thread.
 #[derive(Debug, Clone)]
-enum DemultiplexerMessage<In: Data> {
+enum DemultiplexerMessage<In: ExchangeData> {
     /// A new local replica has been registered, the demultiplexer will inform all the deserializing
     /// threads of this new `ReceiverEndpoint`.
     RegisterReceiverEndpoint(ReceiverEndpointMessageSender<In>),
@@ -43,7 +43,7 @@ enum DemultiplexerMessage<In: Data> {
     RegisterRemoteClient(UnboundedChannelSender<ReceiverEndpointMessageSender<In>>),
 }
 
-impl<In: Data> DemultiplexingReceiver<In> {
+impl<In: ExchangeData> DemultiplexingReceiver<In> {
     /// Construct a new `DemultiplexingReceiver` for a block.
     ///
     /// All the local replicas of this block should be registered to this demultiplexer.

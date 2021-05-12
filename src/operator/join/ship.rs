@@ -2,9 +2,9 @@
 
 use crate::block::NextStrategy;
 use crate::operator::join::local_hash::JoinStreamLocalHash;
-use crate::operator::join::local_sort_merge::JoinStreamLocalSortMerge;
+// use crate::operator::join::local_sort_merge::JoinStreamLocalSortMerge;
 use crate::operator::join::start::{JoinElement, JoinStartBlock};
-use crate::operator::{Data, DataKey, JoinStream, KeyerFn, Operator};
+use crate::operator::{Data, DataKey, ExchangeData, JoinStream, KeyerFn, Operator};
 use crate::stream::Stream;
 
 #[derive(Clone, Copy)]
@@ -17,7 +17,7 @@ pub trait ShipStrategy: Clone + Send {}
 impl ShipStrategy for ShipHash {}
 impl ShipStrategy for ShipBroadcastRight {}
 
-pub struct JoinStreamShipHash<Key: DataKey, Out1: Data, Out2: Data, Keyer1, Keyer2>
+pub struct JoinStreamShipHash<Key: DataKey, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
 where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
@@ -25,15 +25,20 @@ where
     inner: Stream<JoinElement<Key, Out1, Out2>, JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>>,
 }
 
-pub struct JoinStreamShipBroadcastRight<Key: Data, Out1: Data, Out2: Data, Keyer1, Keyer2>
-where
+pub struct JoinStreamShipBroadcastRight<
+    Key: Data,
+    Out1: ExchangeData,
+    Out2: ExchangeData,
+    Keyer1,
+    Keyer2,
+> where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
     inner: Stream<JoinElement<Key, Out1, Out2>, JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>>,
 }
 
-impl<Key: DataKey, Out1: Data, Out2: Data, Keyer1, Keyer2>
+impl<Key: DataKey, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
     JoinStreamShipHash<Key, Out1, Out2, Keyer1, Keyer2>
 where
     Keyer1: KeyerFn<Key, Out1>,
@@ -65,15 +70,15 @@ where
         JoinStreamLocalHash::new(self.inner)
     }
 
-    pub fn local_sort_merge(self) -> JoinStreamLocalSortMerge<Key, Out1, Out2, ShipHash>
-    where
-        Key: Ord,
-    {
-        todo!()
-    }
+    // pub fn local_sort_merge(self) -> JoinStreamLocalSortMerge<Key, Out1, Out2, ShipHash>
+    // where
+    //     Key: Ord,
+    // {
+    //     todo!()
+    // }
 }
 
-impl<Key: Data, Out1: Data, Out2: Data, Keyer1, Keyer2>
+impl<Key: Data, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
     JoinStreamShipBroadcastRight<Key, Out1, Out2, Keyer1, Keyer2>
 where
     Keyer1: KeyerFn<Key, Out1>,
@@ -108,10 +113,10 @@ where
         JoinStreamLocalHash::new(self.inner)
     }
 
-    pub fn local_sort_merge(self) -> JoinStreamLocalSortMerge<Key, Out1, Out2, ShipBroadcastRight>
-    where
-        Key: Ord,
-    {
-        todo!()
-    }
+    // pub fn local_sort_merge(self) -> JoinStreamLocalSortMerge<Key, Out1, Out2, ShipBroadcastRight>
+    // where
+    //     Key: Ord,
+    // {
+    //     todo!()
+    // }
 }

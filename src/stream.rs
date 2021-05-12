@@ -7,7 +7,9 @@ use itertools::Itertools;
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
-use crate::operator::{Data, EndBlock, IterationStateLock, Operator, WindowDescription};
+use crate::operator::{
+    Data, EndBlock, ExchangeData, IterationStateLock, Operator, WindowDescription,
+};
 use crate::operator::{DataKey, StartBlock};
 use std::marker::PhantomData;
 
@@ -116,6 +118,7 @@ where
         next_strategy: NextStrategy<Out>,
     ) -> Stream<Out, StartBlock<Out>>
     where
+        Out: ExchangeData,
         Op: Operator<()> + 'static,
         GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
     {
@@ -158,7 +161,8 @@ where
         next_strategy2: NextStrategy<Out2>,
     ) -> Stream<NewOut, StartOperator>
     where
-        Out2: Data,
+        Out: ExchangeData,
+        Out2: ExchangeData,
         OperatorChain2: Operator<Out2> + 'static,
         NewOut: Data,
         StartOperator: Operator<NewOut>,

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::block::{BatchMode, BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::channel::SelectResult;
 use crate::network::{NetworkMessage, NetworkReceiver, NetworkTopology, ReceiverEndpoint};
-use crate::operator::{Data, IterationStateLock, KeyerFn, Operator, StreamElement};
+use crate::operator::{Data, ExchangeData, IterationStateLock, KeyerFn, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, KeyValue};
 
@@ -22,7 +22,7 @@ pub(crate) enum JoinElement<Key, Out1, Out2> {
 
 #[derive(Debug, Derivative)]
 #[derivative(Clone)]
-struct SideReceiver<Key: Data, Out: Data, Keyer>
+struct SideReceiver<Key: Data, Out: ExchangeData, Keyer>
 where
     Keyer: KeyerFn<Key, Out>,
 {
@@ -40,7 +40,7 @@ fn clone_none<T>(_: &Option<T>) -> Option<T> {
     None
 }
 
-impl<Key: Data, Out: Data, Keyer> SideReceiver<Key, Out, Keyer>
+impl<Key: Data, Out: ExchangeData, Keyer> SideReceiver<Key, Out, Keyer>
 where
     Keyer: KeyerFn<Key, Out>,
 {
@@ -88,7 +88,7 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct JoinStartBlock<Key: Data, Out1: Data, Out2: Data, Keyer1, Keyer2>
+pub(crate) struct JoinStartBlock<Key: Data, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
 where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
@@ -105,7 +105,7 @@ where
     buffer: VecDeque<StreamElement<JoinElement<Key, Out1, Out2>>>,
 }
 
-impl<Key: Data, Out1: Data, Out2: Data, Keyer1, Keyer2>
+impl<Key: Data, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
     JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>
 where
     Keyer1: KeyerFn<Key, Out1>,
@@ -130,7 +130,7 @@ where
         }
     }
 
-    fn process_side_messages<Out: Data, Keyer: KeyerFn<Key, Out>>(
+    fn process_side_messages<Out: ExchangeData, Keyer: KeyerFn<Key, Out>>(
         side: &mut SideReceiver<Key, Out, Keyer>,
         messages: NetworkMessage<Out>,
         wrap: fn((Key, Out)) -> JoinElement<Key, Out1, Out2>,
@@ -157,7 +157,7 @@ where
         }
     }
 
-    fn recv_side<Out: Data, Keyer: KeyerFn<Key, Out>>(
+    fn recv_side<Out: ExchangeData, Keyer: KeyerFn<Key, Out>>(
         side: &mut SideReceiver<Key, Out, Keyer>,
         timed_out: &mut bool,
         batch_mode: &BatchMode,
@@ -262,8 +262,8 @@ where
     }
 }
 
-impl<Key: Data, Out1: Data, Out2: Data, Keyer1, Keyer2> Operator<JoinElement<Key, Out1, Out2>>
-    for JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>
+impl<Key: Data, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
+    Operator<JoinElement<Key, Out1, Out2>> for JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>
 where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,

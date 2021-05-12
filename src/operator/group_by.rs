@@ -1,9 +1,9 @@
 use crate::block::NextStrategy;
-use crate::operator::{Data, DataKey, EndBlock};
+use crate::operator::{DataKey, EndBlock, ExchangeData};
 use crate::operator::{KeyBy, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {

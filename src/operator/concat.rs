@@ -1,8 +1,8 @@
 use crate::block::NextStrategy;
-use crate::operator::{Data, DataKey, Operator, StartBlock};
+use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StartBlock};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
@@ -22,7 +22,7 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
