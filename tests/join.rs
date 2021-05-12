@@ -186,3 +186,81 @@ fn join_hash_hash_outer2() {
         run_test!(env, 10, 5, 7, hash, hash, outer);
     });
 }
+
+#[test]
+fn self_join() {
+    TestHelper::local_remote_env(|mut env| {
+        let n = 200u32;
+        let s1 = env
+            .stream(IteratorSource::new(0..n))
+            .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)));
+        let mut splits = s1.split(2).into_iter();
+
+        let s1 = splits.next().unwrap();
+        let s2 = splits.next().unwrap().shuffle().map(|n| n * 2);
+        let res = s1
+            .join(s2, |n: &u32| *n % 2, |n: &u32| *n % 2)
+            .unkey()
+            .collect_vec();
+        env.execute();
+
+        if let Some(mut res) = res.get() {
+            let mut expected = vec![];
+            for a in 0..n {
+                for b in 0..n {
+                    if a % 2 == 0 {
+                        expected.push((0, (a, 2 * b)));
+                    }
+                }
+            }
+            res.sort_unstable();
+            expected.sort_unstable();
+            assert_eq!(res, expected);
+        }
+    });
+}
+
+#[test]
+fn join_in_loop() {
+    TestHelper::local_remote_env(|mut env| {
+        let n = 200u32;
+        let n_iter = 10;
+        let s = env
+            .stream(IteratorSource::new(0..n))
+            .shuffle()
+            .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)));
+
+        let state = s
+            .replay(
+                n_iter,
+                0,
+                |s, _| {
+                    let mut splits = s.split(2).into_iter();
+                    let s1 = splits.next().unwrap();
+                    let s2 = splits.next().unwrap().shuffle().map(|n| n * 3);
+                    s1.join(s2, |n: &u32| *n % 2, |n: &u32| *n % 2)
+                        .unkey()
+                        .map(|(k, (l, r))| k + l + r)
+                },
+                |delta: &mut u32, item| *delta += item,
+                |state, delta| *state += delta,
+                |_| true,
+            )
+            .collect_vec();
+        env.execute();
+        if let Some(state) = state.get() {
+            let state = state[0];
+            let mut expected = 0;
+            for _ in 0..n_iter {
+                for a in 0..n {
+                    for b in 0..n {
+                        if a % 2 == (3 * b) % 2 {
+                            expected += a % 2 + a + 3 * b;
+                        }
+                    }
+                }
+            }
+            assert_eq!(state, expected);
+        }
+    });
+}

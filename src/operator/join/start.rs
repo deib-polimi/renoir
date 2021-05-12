@@ -88,12 +88,12 @@ where
                 self.num_prev += 1;
             }
         }
+        self.missing_terminate = self.num_prev;
         self.reset();
     }
 
     /// Reset this struct, making it ready for the next iteration.
     fn reset(&mut self) {
-        self.missing_terminate = self.num_prev;
         self.missing_flush_and_restart = self.num_prev;
     }
 
@@ -227,20 +227,28 @@ where
     /// from a single side if the other has already ended.
     ///
     /// When both sides are done, this will emit an extra `FlushAndRestart` message.
-    fn select(&mut self) {
+    ///
+    /// If this returns `Some(elem)`, that message should be returned immediately.
+    fn select(&mut self) -> Option<StreamElement<JoinElement<Key, Out1, Out2>>> {
         assert!(self.buffer.is_empty());
+        let metadata = self.metadata.as_ref().unwrap();
 
         let batch_mode = &self.metadata.as_ref().unwrap().batch_mode;
         if self.left.is_terminated() && self.right.is_terminated() {
             // the stream is ended for everyone, just terminate
-            self.buffer.push_back(StreamElement::Terminate);
+            debug!("JoinStartBlock at {} terminated", metadata.coord);
+            return Some(StreamElement::Terminate);
         } else if self.left.is_ended() && self.right.is_ended() {
             // both the sides received flush and restart, reset
+            debug!(
+                "JoinStartBlock at {} received all flush and restart",
+                metadata.coord
+            );
             self.left.reset();
             self.right.reset();
             self.wait_for_state = true;
             self.state_generation += 2;
-            self.buffer.push_back(StreamElement::FlushAndRestart);
+            return Some(StreamElement::FlushAndRestart);
         } else if self.left.is_ended() {
             // the left side has already ended, recv only from the right
             Self::recv_side(
@@ -303,6 +311,7 @@ where
                 _ => panic!("One of the receivers failed"),
             }
         }
+        None
     }
 }
 
@@ -324,12 +333,14 @@ where
         if let Some(item) = self.buffer.pop_front() {
             return item;
         }
-        self.select();
         if self.wait_for_state {
             if let Some(lock) = self.state_lock.as_ref() {
                 lock.wait_for_update(self.state_generation);
             }
             self.wait_for_state = false;
+        }
+        if let Some(elem) = self.select() {
+            return elem;
         }
         self.next()
     }
