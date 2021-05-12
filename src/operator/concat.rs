@@ -1,3 +1,4 @@
+use crate::block::NextStrategy;
 use crate::operator::{Data, DataKey, Operator, StartBlock};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
@@ -12,9 +13,12 @@ where
     where
         OperatorChain2: Operator<Out> + 'static,
     {
-        self.add_y_connection(oth, |id1, id2, state_lock| {
-            StartBlock::concat(vec![id1, id2], state_lock)
-        })
+        self.add_y_connection(
+            oth,
+            |id1, id2, state_lock| StartBlock::concat(vec![id1, id2], state_lock),
+            NextStrategy::OnlyOne,
+            NextStrategy::OnlyOne,
+        )
     }
 }
 

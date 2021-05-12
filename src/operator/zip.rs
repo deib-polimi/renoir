@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
+use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStructure};
 use crate::operator::{Data, IterationStateLock, Operator, StartBlock, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
@@ -137,7 +137,8 @@ where
     where
         OperatorChain2: Operator<Out2> + 'static,
     {
-        let mut new_stream = self.add_y_connection(oth, Zip::new);
+        let mut new_stream =
+            self.add_y_connection(oth, Zip::new, NextStrategy::OnlyOne, NextStrategy::OnlyOne);
         // if the zip operator is partitioned there could be some loss of data
         new_stream.block.scheduler_requirements.max_parallelism(1);
         new_stream

@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 
-use crate::block::{BatchMode, InnerBlock, NextStrategy};
+use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::{Data, EndBlock, IterationStateLock, Operator, WindowDescription};
 use crate::operator::{DataKey, StartBlock};
@@ -42,7 +42,7 @@ where
 /// `KeyedStream` semantics.
 ///
 /// The type of the `Key` must be a valid key inside an hashmap.
-pub struct KeyedStream<Key: DataKey, Out: Data, OperatorChain>(
+pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(
     pub Stream<KeyValue<Key, Out>, OperatorChain>,
 )
 where
@@ -154,18 +154,25 @@ where
         self,
         oth: Stream<Out2, OperatorChain2>,
         get_start_operator: GetStartOp,
+        next_strategy1: NextStrategy<Out>,
+        next_strategy2: NextStrategy<Out2>,
     ) -> Stream<NewOut, StartOperator>
     where
         Out2: Data,
         OperatorChain2: Operator<Out2> + 'static,
         NewOut: Data,
         StartOperator: Operator<NewOut>,
-        GetStartOp: Fn(BlockId, BlockId, Option<Arc<IterationStateLock>>) -> StartOperator,
+        GetStartOp: FnOnce(BlockId, BlockId, Option<Arc<IterationStateLock>>) -> StartOperator,
     {
         let batch_mode = self.block.batch_mode;
+        let is_only_one1 = matches!(next_strategy1, NextStrategy::OnlyOne);
+        let is_only_one2 = matches!(next_strategy2, NextStrategy::OnlyOne);
         let scheduler_requirements1 = self.block.scheduler_requirements.clone();
         let scheduler_requirements2 = oth.block.scheduler_requirements.clone();
-        if scheduler_requirements1.max_parallelism != scheduler_requirements2.max_parallelism {
+        if is_only_one1
+            && is_only_one2
+            && scheduler_requirements1.max_parallelism != scheduler_requirements2.max_parallelism
+        {
             panic!(
                 "The parallelism of the 2 blocks coming inside a Y connection must be equal. \
                 On the left ({}) is {:?}, on the right ({}) is {:?}",
@@ -186,11 +193,11 @@ where
 
         // close previous blocks
         let mut old_stream1 =
-            self.add_operator(|prev| EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode));
+            self.add_operator(|prev| EndBlock::new(prev, next_strategy1, batch_mode));
         let mut old_stream2 =
-            oth.add_operator(|prev| EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode));
-        old_stream1.block.is_only_one_strategy = true;
-        old_stream2.block.is_only_one_strategy = true;
+            oth.add_operator(|prev| EndBlock::new(prev, next_strategy2, batch_mode));
+        old_stream1.block.is_only_one_strategy = is_only_one1;
+        old_stream2.block.is_only_one_strategy = is_only_one2;
 
         let mut env = old_stream1.env.borrow_mut();
         let old_id1 = old_stream1.block.id;
@@ -214,8 +221,13 @@ where
             ),
             env: old_stream1.env,
         };
-        // make sure the new block has the same parallelism of the previous one
-        new_stream.block.scheduler_requirements = scheduler_requirements1;
+        // make sure the new block has the same parallelism of the previous one with OnlyOne
+        // strategy
+        new_stream.block.scheduler_requirements = match (is_only_one1, is_only_one2) {
+            (true, _) => scheduler_requirements1,
+            (_, true) => scheduler_requirements2,
+            _ => SchedulerRequirements::default(),
+        };
         new_stream
     }
 
