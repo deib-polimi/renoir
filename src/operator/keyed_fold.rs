@@ -7,7 +7,8 @@ use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorStructure};
 use crate::operator::{
-    Data, DataKey, EndBlock, ExchangeData, KeyBy, Operator, StreamElement, Timestamp,
+    Data, DataKey, EndBlock, ExchangeData, ExchangeDataKey, KeyBy, Operator, StreamElement,
+    Timestamp,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
@@ -147,7 +148,7 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    pub fn group_by_fold<Key: DataKey, NewOut: ExchangeData, Keyer, Local, Global>(
+    pub fn group_by_fold<Key: ExchangeDataKey, NewOut: ExchangeData, Keyer, Local, Global>(
         self,
         keyer: Keyer,
         init: NewOut,

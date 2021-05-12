@@ -1,11 +1,11 @@
-use crate::operator::{Data, DataKey, ExchangeData, Operator};
+use crate::operator::{Data, DataKey, ExchangeData, ExchangeDataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    pub fn group_by_reduce<Key: DataKey, Keyer, F>(
+    pub fn group_by_reduce<Key: ExchangeDataKey, Keyer, F>(
         self,
         keyer: Keyer,
         f: F,

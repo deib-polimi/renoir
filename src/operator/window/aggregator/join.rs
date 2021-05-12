@@ -1,4 +1,4 @@
-use crate::operator::{DataKey, ExchangeData, Operator, WindowDescription};
+use crate::operator::{ExchangeData, ExchangeDataKey, Operator, WindowDescription};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +8,7 @@ pub enum JoinElement<A, B> {
     Right(B),
 }
 
-impl<Key: DataKey, Out: ExchangeData, Out2: ExchangeData, WindowDescr, OperatorChain>
+impl<Key: ExchangeDataKey, Out: ExchangeData, Out2: ExchangeData, WindowDescr, OperatorChain>
     KeyedWindowedStream<Key, Out, OperatorChain, JoinElement<Out, Out2>, WindowDescr>
 where
     WindowDescr: WindowDescription<Key, JoinElement<Out, Out2>> + Clone + 'static,
