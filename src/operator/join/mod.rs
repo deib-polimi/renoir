@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::operator::join::ship::{JoinStreamShipBroadcastRight, JoinStreamShipHash};
 use crate::operator::{Data, DataKey, ExchangeData, KeyerFn, Operator};
-use crate::stream::Stream;
+use crate::stream::{KeyValue, KeyedStream, Stream};
 
 mod local_hash;
 // mod local_sort_merge;
@@ -48,8 +48,74 @@ pub struct JoinStream<
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out> + 'static,
 {
+    pub fn join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
+        self,
+        rhs: Stream<Out2, OperatorChain2>,
+        keyer1: Keyer1,
+        keyer2: Keyer2,
+    ) -> KeyedStream<
+        Key,
+        InnerJoinTuple<Out, Out2>,
+        impl Operator<KeyValue<Key, InnerJoinTuple<Out, Out2>>>,
+    >
+    where
+        Key: DataKey,
+        OperatorChain2: Operator<Out2> + 'static,
+        Keyer1: KeyerFn<Key, Out>,
+        Keyer2: KeyerFn<Key, Out2>,
+    {
+        self.join_with(rhs, keyer1, keyer2)
+            .ship_hash()
+            .local_hash()
+            .inner()
+    }
+
+    pub fn left_join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
+        self,
+        rhs: Stream<Out2, OperatorChain2>,
+        keyer1: Keyer1,
+        keyer2: Keyer2,
+    ) -> KeyedStream<
+        Key,
+        LeftJoinTuple<Out, Out2>,
+        impl Operator<KeyValue<Key, LeftJoinTuple<Out, Out2>>>,
+    >
+    where
+        Key: DataKey,
+        OperatorChain2: Operator<Out2> + 'static,
+        Keyer1: KeyerFn<Key, Out>,
+        Keyer2: KeyerFn<Key, Out2>,
+    {
+        self.join_with(rhs, keyer1, keyer2)
+            .ship_hash()
+            .local_hash()
+            .left()
+    }
+
+    pub fn outer_join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
+        self,
+        rhs: Stream<Out2, OperatorChain2>,
+        keyer1: Keyer1,
+        keyer2: Keyer2,
+    ) -> KeyedStream<
+        Key,
+        OuterJoinTuple<Out, Out2>,
+        impl Operator<KeyValue<Key, OuterJoinTuple<Out, Out2>>>,
+    >
+    where
+        Key: DataKey,
+        OperatorChain2: Operator<Out2> + 'static,
+        Keyer1: KeyerFn<Key, Out>,
+        Keyer2: KeyerFn<Key, Out2>,
+    {
+        self.join_with(rhs, keyer1, keyer2)
+            .ship_hash()
+            .local_hash()
+            .outer()
+    }
+
     pub fn join_with<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
         rhs: Stream<Out2, OperatorChain2>,

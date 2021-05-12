@@ -51,6 +51,27 @@ macro_rules! run_test {
     }};
 }
 
+macro_rules! run_test_shortcut {
+    ($env:expr, $n1:expr, $n2:expr, $m:expr, $variant:tt) => {{
+        let s1 = $env.stream(IteratorSource::new(0..$n1));
+        let s2 = $env.stream(IteratorSource::new(0..$n2));
+        let join = s1
+            .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)));
+        let res = run_test_shortcut!(@variant, $variant, join, s2, |x: &u16| *x as u8 % $m, |x: &u32| *x as u8 % $m);
+        let res = res.unkey().collect_vec();
+        $env.execute();
+        if let Some(res) = res.get() {
+            let res = res.into_iter().sorted().collect_vec();
+            let expected = run_test!(@get_expected, $variant, $n1, $n2, $m);
+            assert_eq!(res, expected);
+        }
+    }};
+    // join variant
+    (@variant, inner, $prev:expr, $rhs:expr, $k1:expr, $k2:expr) => { $prev.join($rhs, $k1, $k2) };
+    (@variant, left, $prev:expr, $rhs:expr, $k1:expr, $k2:expr) => { $prev.left_join($rhs, $k1, $k2) };
+    (@variant, outer, $prev:expr, $rhs:expr, $k1:expr, $k2:expr) => { $prev.outer_join($rhs, $k1, $k2) };
+}
+
 fn build_expected_outer(n1: u16, n2: u32, m: u8) -> Vec<(u8, (Option<u16>, Option<u32>))> {
     let mut expected = vec![];
     let mut used_right = HashSet::new();
@@ -94,6 +115,27 @@ fn build_expected_left(n1: u16, n2: u32, m: u8) -> Vec<(u8, (u16, Option<u32>))>
             _ => None,
         })
         .collect_vec()
+}
+
+#[test]
+fn join_shortcut() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test_shortcut!(env, 5, 10, 7, inner);
+    });
+}
+
+#[test]
+fn left_join_shortcut() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test_shortcut!(env, 5, 10, 7, left);
+    });
+}
+
+#[test]
+fn outer_join_shortcut() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test_shortcut!(env, 5, 10, 7, outer);
+    });
 }
 
 #[test]
