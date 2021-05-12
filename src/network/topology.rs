@@ -12,35 +12,35 @@ use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{
     BlockCoord, Coord, DemuxCoord, NetworkReceiver, NetworkSender, ReceiverEndpoint,
 };
-use crate::operator::Data;
+use crate::operator::ExchangeData;
 use crate::scheduler::HostId;
 use crate::stream::BlockId;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
-struct ReceiverKey<In: Data>(PhantomData<In>);
+struct ReceiverKey<In: ExchangeData>(PhantomData<In>);
 
-impl<In: Data> Key for ReceiverKey<In> {
+impl<In: ExchangeData> Key for ReceiverKey<In> {
     type Value = HashMap<ReceiverEndpoint, NetworkReceiver<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `NetworkSender`s.
-struct SenderKey<In: Data>(PhantomData<In>);
+struct SenderKey<In: ExchangeData>(PhantomData<In>);
 
-impl<In: Data> Key for SenderKey<In> {
+impl<In: ExchangeData> Key for SenderKey<In> {
     type Value = HashMap<ReceiverEndpoint, NetworkSender<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `DemultiplexingReceiver`s.
-struct DemultiplexingReceiverKey<In: Data>(PhantomData<In>);
+struct DemultiplexingReceiverKey<In: ExchangeData>(PhantomData<In>);
 
-impl<In: Data> Key for DemultiplexingReceiverKey<In> {
+impl<In: ExchangeData> Key for DemultiplexingReceiverKey<In> {
     type Value = HashMap<DemuxCoord, DemultiplexingReceiver<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `MultiplexingSender`s.
-struct MultiplexingSenderKey<In: Data>(PhantomData<In>);
+struct MultiplexingSenderKey<In: ExchangeData>(PhantomData<In>);
 
-impl<In: Data> Key for MultiplexingSenderKey<In> {
+impl<In: ExchangeData> Key for MultiplexingSenderKey<In> {
     type Value = HashMap<DemuxCoord, MultiplexingSender<In>>;
 }
 
@@ -162,7 +162,7 @@ impl NetworkTopology {
     ///
     /// If a replica has more that one _outgoing_ type this method must not be used, but separate
     /// calls to `get_sender` should be done.
-    pub fn get_senders<T: Data>(
+    pub fn get_senders<T: ExchangeData>(
         &mut self,
         coord: Coord,
     ) -> HashMap<ReceiverEndpoint, NetworkSender<T>> {
@@ -187,7 +187,10 @@ impl NetworkTopology {
 
     /// Get the sender associated with a given receiver endpoint. This may register a new channel if
     /// it was not registered before.
-    pub fn get_sender<T: Data>(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<T> {
+    pub fn get_sender<T: ExchangeData>(
+        &mut self,
+        receiver_endpoint: ReceiverEndpoint,
+    ) -> NetworkSender<T> {
         if !self.senders.contains::<SenderKey<T>>() {
             self.senders.insert::<SenderKey<T>>(Default::default());
         }
@@ -207,7 +210,7 @@ impl NetworkTopology {
     /// channel if it was not registered before.
     ///
     /// Calling this function twice with the same parameter will panic.
-    pub fn get_receiver<T: Data>(
+    pub fn get_receiver<T: ExchangeData>(
         &mut self,
         receiver_endpoint: ReceiverEndpoint,
     ) -> NetworkReceiver<T> {
@@ -238,7 +241,7 @@ impl NetworkTopology {
     ///
     /// This will initialize both the sender and the receiver to the receiver. If it's appropriate
     /// also the multiplexer and/or the demultiplexer are initialized and started.
-    fn register_channel<T: Data>(&mut self, receiver_endpoint: ReceiverEndpoint) {
+    fn register_channel<T: ExchangeData>(&mut self, receiver_endpoint: ReceiverEndpoint) {
         debug!("Registering {}", receiver_endpoint);
         assert!(
             self.registered_receivers.insert(receiver_endpoint),
@@ -636,7 +639,7 @@ mod tests {
         join1.join().unwrap();
     }
 
-    fn receiver<T: Data + Ord + Debug>(receiver: NetworkReceiver<T>, expected: Vec<T>) {
+    fn receiver<T: ExchangeData + Ord + Debug>(receiver: NetworkReceiver<T>, expected: Vec<T>) {
         let res = (0..expected.len())
             .map(|_| receiver.recv().unwrap().batch())
             .flatten()

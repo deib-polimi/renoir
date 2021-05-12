@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use crate::channel::{BoundedChannelReceiver, BoundedChannelSender};
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
-use crate::operator::Data;
+use crate::operator::ExchangeData;
 
 /// Maximum number of attempts to make for connecting to a remote host.
 const CONNECT_ATTEMPTS: usize = 10;
@@ -24,12 +24,12 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 ///
 /// The `ReceiverEndpoint` is sent alongside the actual message in order to demultiplex it.
 #[derive(Debug, Clone)]
-pub struct MultiplexingSender<Out: Data> {
+pub struct MultiplexingSender<Out: ExchangeData> {
     /// The internal sender that points to the actual multiplexed channel.
     sender: BoundedChannelSender<(ReceiverEndpoint, NetworkMessage<Out>)>,
 }
 
-impl<Out: Data> MultiplexingSender<Out> {
+impl<Out: ExchangeData> MultiplexingSender<Out> {
     /// Construct a new `MultiplexingSender` for a block.
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).

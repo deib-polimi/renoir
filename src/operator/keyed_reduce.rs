@@ -1,7 +1,7 @@
-use crate::operator::{Data, DataKey, Operator};
+use crate::operator::{Data, DataKey, ExchangeData, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {

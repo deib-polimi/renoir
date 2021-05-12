@@ -2,12 +2,14 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
-use crate::operator::{Data, IterationStateLock, Operator, StartBlock, StreamElement, Timestamp};
+use crate::operator::{
+    ExchangeData, IterationStateLock, Operator, StartBlock, StreamElement, Timestamp,
+};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
 
 #[derive(Debug, Clone)]
-pub struct Zip<Out1: Data, Out2: Data> {
+pub struct Zip<Out1: ExchangeData, Out2: ExchangeData> {
     prev_block_id1: BlockId,
     prev_block_id2: BlockId,
     prev1: StartBlock<Out1>,
@@ -17,7 +19,7 @@ pub struct Zip<Out1: Data, Out2: Data> {
     item1_stash: Option<StreamElement<Out1>>,
 }
 
-impl<Out1: Data, Out2: Data> Zip<Out1, Out2> {
+impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
     fn new(
         prev_block_id1: BlockId,
         prev_block_id2: BlockId,
@@ -35,7 +37,7 @@ impl<Out1: Data, Out2: Data> Zip<Out1, Out2> {
     }
 }
 
-impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
+impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev1.setup(metadata.clone());
         self.prev2.setup(metadata);
@@ -126,11 +128,11 @@ impl<Out1: Data, Out2: Data> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
     }
 }
 
-impl<Out1: Data, OperatorChain1> Stream<Out1, OperatorChain1>
+impl<Out1: ExchangeData, OperatorChain1> Stream<Out1, OperatorChain1>
 where
     OperatorChain1: Operator<Out1> + 'static,
 {
-    pub fn zip<Out2: Data, OperatorChain2>(
+    pub fn zip<Out2: ExchangeData, OperatorChain2>(
         self,
         oth: Stream<Out2, OperatorChain2>,
     ) -> Stream<(Out1, Out2), impl Operator<(Out1, Out2)>>

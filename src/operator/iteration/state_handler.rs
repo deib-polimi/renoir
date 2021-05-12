@@ -4,8 +4,8 @@ use lazy_init::Lazy;
 
 use crate::network::Coord;
 use crate::operator::{
-    Data, IterationStateHandle, IterationStateLock, NewIterationState, Operator, StartBlock,
-    StreamElement,
+    ExchangeData, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
+    StartBlock, StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
@@ -15,7 +15,7 @@ use crate::stream::BlockId;
 /// This will keep track of the state locks and barriers for updating the state, as well as
 /// receiving the state from the leader.
 #[derive(Debug, Clone)]
-pub(crate) struct IterationStateHandler<State: Data> {
+pub(crate) struct IterationStateHandler<State: ExchangeData> {
     /// The coordinate of this replica.
     pub coord: Coord,
 
@@ -49,7 +49,7 @@ fn select_leader(replicas: &[Coord]) -> Coord {
     *replicas.iter().min().unwrap()
 }
 
-impl<State: Data> IterationStateHandler<State> {
+impl<State: ExchangeData> IterationStateHandler<State> {
     pub(crate) fn new(
         leader_block_id: BlockId,
         state_ref: IterationStateHandle<State>,

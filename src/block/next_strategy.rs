@@ -4,7 +4,7 @@ use std::sync::Arc;
 use rand::{thread_rng, Rng};
 
 use crate::network::{NetworkSender, ReceiverEndpoint};
-use crate::operator::Data;
+use crate::operator::ExchangeData;
 use crate::stream::BlockId;
 
 /// The list with the interesting senders of a single block.
@@ -17,7 +17,7 @@ pub(crate) struct SenderList(pub Vec<ReceiverEndpoint>);
 /// of their replica will receive it depends on the value of the next strategy.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub(crate) enum NextStrategy<Out: Data> {
+pub(crate) enum NextStrategy<Out: ExchangeData> {
     /// Only one of the replicas will receive the message:
     ///
     /// - if the block is not replicated, the only replica will receive the message
@@ -33,7 +33,7 @@ pub(crate) enum NextStrategy<Out: Data> {
     All,
 }
 
-impl<Out: Data> NextStrategy<Out> {
+impl<Out: ExchangeData> NextStrategy<Out> {
     /// Group the senders from a block using the current next strategy.
     ///
     /// The returned value is a list of `SenderList`s, one for each next block in the execution

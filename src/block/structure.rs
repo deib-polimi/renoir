@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::block::{JobGraphGenerator, NextStrategy};
 use crate::channel::UnboundedChannelReceiver;
 use crate::network::Coord;
-use crate::operator::Data;
+use crate::operator::ExchangeData;
 use crate::stream::BlockId;
 
 /// Wrapper type that contains a string representing the type.
@@ -173,7 +173,7 @@ impl OperatorReceiver {
 }
 
 impl Connection {
-    pub(crate) fn new<T: Data>(to_block_id: BlockId, strategy: &NextStrategy<T>) -> Self {
+    pub(crate) fn new<T: ExchangeData>(to_block_id: BlockId, strategy: &NextStrategy<T>) -> Self {
         Self {
             to_block_id,
             data_type: DataType::of::<T>(),
@@ -182,7 +182,7 @@ impl Connection {
     }
 }
 
-impl<Out: Data> From<&NextStrategy<Out>> for ConnectionStrategy {
+impl<Out: ExchangeData> From<&NextStrategy<Out>> for ConnectionStrategy {
     fn from(strategy: &NextStrategy<Out>) -> Self {
         match strategy {
             NextStrategy::OnlyOne => ConnectionStrategy::OnlyOne,

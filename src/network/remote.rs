@@ -8,7 +8,7 @@ use bincode::{DefaultOptions, Options};
 use serde::{Deserialize, Serialize};
 
 use crate::network::{Coord, DemuxCoord, NetworkMessage, ReceiverEndpoint};
-use crate::operator::Data;
+use crate::operator::ExchangeData;
 use crate::profiler::{get_profiler, Profiler};
 use crate::scheduler::ReplicaId;
 use crate::stream::BlockId;
@@ -45,7 +45,7 @@ struct MessageHeader {
 /// The network protocol works as follow:
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
-pub(crate) fn remote_send<T: Data>(
+pub(crate) fn remote_send<T: ExchangeData>(
     what: NetworkMessage<T>,
     dest: ReceiverEndpoint,
     stream: &mut TcpStream,
@@ -132,7 +132,7 @@ pub(crate) fn remote_recv(
 }
 
 /// Try to deserialize a serialized message.
-pub(crate) fn deserialize<T: Data>(message: SerializedMessage) -> Result<T> {
+pub(crate) fn deserialize<T: ExchangeData>(message: SerializedMessage) -> Result<T> {
     Ok(MESSAGE_CONFIG.deserialize(&message)?)
 }
 

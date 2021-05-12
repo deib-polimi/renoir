@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::source::Source;
-use crate::operator::{Data, NewIterationState, Operator, StartBlock, StreamElement};
+use crate::operator::{ExchangeData, NewIterationState, Operator, StartBlock, StreamElement};
 use crate::profiler::{get_profiler, Profiler};
 use crate::scheduler::ExecutionMetadata;
 
@@ -20,7 +20,7 @@ use crate::scheduler::ExecutionMetadata;
 /// followed by a `StreamElement::FlushAndReset`.
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
-pub struct IterationLeader<DeltaUpdate: Data, State: Data, Global, LoopCond>
+pub struct IterationLeader<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond>
 where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
     LoopCond: Fn(&mut State) -> bool + Send + Clone,
@@ -71,7 +71,7 @@ where
     loop_condition: LoopCond,
 }
 
-impl<DeltaUpdate: Data, State: Data, Global, LoopCond>
+impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond>
     IterationLeader<DeltaUpdate, State, Global, LoopCond>
 where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
@@ -103,7 +103,7 @@ where
     }
 }
 
-impl<DeltaUpdate: Data, State: Data, Global, LoopCond> Operator<State>
+impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond> Operator<State>
     for IterationLeader<DeltaUpdate, State, Global, LoopCond>
 where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
@@ -223,7 +223,7 @@ where
     }
 }
 
-impl<DeltaUpdate: Data, State: Data, Global, LoopCond> Source<State>
+impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond> Source<State>
     for IterationLeader<DeltaUpdate, State, Global, LoopCond>
 where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,

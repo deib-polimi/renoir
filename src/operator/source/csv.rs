@@ -3,6 +3,7 @@ use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use csv::{Reader, ReaderBuilder};
+use serde::Deserialize;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
@@ -29,7 +30,7 @@ impl<R: Read> Read for LimitedReader<R> {
     }
 }
 
-pub struct CsvSource<Out: Data> {
+pub struct CsvSource<Out: Data + for<'a> Deserialize<'a>> {
     path: PathBuf,
     csv_reader: Option<Reader<LimitedReader<BufReader<File>>>>,
     has_headers: bool,
@@ -37,7 +38,7 @@ pub struct CsvSource<Out: Data> {
     _out: PhantomData<Out>,
 }
 
-impl<Out: Data> CsvSource<Out> {
+impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
     pub fn new<P: Into<PathBuf>>(path: P, has_headers: bool) -> Self {
         Self {
             path: path.into(),
@@ -49,13 +50,13 @@ impl<Out: Data> CsvSource<Out> {
     }
 }
 
-impl<Out: Data> Source<Out> for CsvSource<Out> {
+impl<Out: Data + for<'a> Deserialize<'a>> Source<Out> for CsvSource<Out> {
     fn get_max_parallelism(&self) -> Option<usize> {
         None
     }
 }
 
-impl<Out: Data> Operator<Out> for CsvSource<Out> {
+impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let global_id = metadata.global_id;
         let num_replicas = metadata.replicas.len();
@@ -172,7 +173,7 @@ impl<Out: Data> Operator<Out> for CsvSource<Out> {
     }
 }
 
-impl<Out: Data> Clone for CsvSource<Out> {
+impl<Out: Data + for<'a> Deserialize<'a>> Clone for CsvSource<Out> {
     fn clone(&self) -> Self {
         assert!(
             self.csv_reader.is_none(),

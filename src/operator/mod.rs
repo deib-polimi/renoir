@@ -51,12 +51,16 @@ mod window;
 mod zip;
 
 /// Marker trait that all the types inside a stream should implement.
-pub trait Data: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static {}
-impl<T: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a> + 'static> Data for T {}
+pub trait Data: Clone + Send + Sync + 'static {}
+impl<T: Clone + Send + Sync + 'static> Data for T {}
+
+/// Marker trait for data types that are used to communicate between different blocks.
+pub trait ExchangeData: Data + Serialize + for<'a> Deserialize<'a> {}
+impl<T: Data + Serialize + for<'a> Deserialize<'a> + 'static> ExchangeData for T {}
 
 /// Maker trait that all the keys should implement.
-pub trait DataKey: Data + Hash + Eq {}
-impl<T: Data + Hash + Eq> DataKey for T {}
+pub trait DataKey: ExchangeData + Hash + Eq {}
+impl<T: ExchangeData + Hash + Eq> DataKey for T {}
 
 /// When using timestamps and watermarks, this type expresses the timestamp of a message or of a
 /// watermark.

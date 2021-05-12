@@ -1,11 +1,11 @@
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
 
 #[derive(Debug)]
-pub struct CollectVecSink<Out: Data, PreviousOperators>
+pub struct CollectVecSink<Out: ExchangeData, PreviousOperators>
 where
     PreviousOperators: Operator<Out>,
 {
@@ -14,7 +14,7 @@ where
     output: StreamOutputRef<Vec<Out>>,
 }
 
-impl<Out: Data, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
+impl<Out: ExchangeData, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
 where
     PreviousOperators: Operator<Out>,
 {
@@ -54,12 +54,12 @@ where
     }
 }
 
-impl<Out: Data, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators> where
+impl<Out: ExchangeData, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators> where
     PreviousOperators: Operator<Out>
 {
 }
 
-impl<Out: Data, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
+impl<Out: ExchangeData, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
 where
     PreviousOperators: Operator<Out>,
 {
@@ -68,7 +68,7 @@ where
     }
 }
 
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {

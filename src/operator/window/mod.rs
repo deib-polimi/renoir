@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 pub use aggregator::*;
 pub use description::*;
 
-use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
+use crate::operator::{Data, DataKey, ExchangeData, Operator, StreamElement, Timestamp};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
 mod aggregator;
@@ -213,7 +213,7 @@ where
     }
 }
 
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {

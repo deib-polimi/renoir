@@ -10,7 +10,7 @@ use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::{
-    Data, EndBlock, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
+    EndBlock, ExchangeData, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
     StartBlock, StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
@@ -25,7 +25,7 @@ fn clone_with_default<T: Default>(_: &T) -> T {
 /// After an iteration what comes out of the loop will come back inside for the next iteration.
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
-pub struct Iterate<Out: Data, State: Data, OperatorChain>
+pub struct Iterate<Out: ExchangeData, State: ExchangeData, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -59,7 +59,7 @@ where
     has_input_ended: bool,
 }
 
-impl<Out: Data, State: Data, OperatorChain> Iterate<Out, State, OperatorChain>
+impl<Out: ExchangeData, State: ExchangeData, OperatorChain> Iterate<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -89,11 +89,11 @@ where
     }
 }
 
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    pub fn iterate<Body, DeltaUpdate: Data + Default, State: Data, OperatorChain2>(
+    pub fn iterate<Body, DeltaUpdate: ExchangeData + Default, State: ExchangeData, OperatorChain2>(
         self,
         num_iterations: usize,
         initial_state: State,
@@ -259,7 +259,8 @@ where
     }
 }
 
-impl<Out: Data, State: Data, OperatorChain> Operator<Out> for Iterate<Out, State, OperatorChain>
+impl<Out: ExchangeData, State: ExchangeData, OperatorChain> Operator<Out>
+    for Iterate<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
