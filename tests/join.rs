@@ -146,9 +146,23 @@ fn join_hash_hash_inner() {
 }
 
 #[test]
+fn join_hash_sort_merge_inner() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test!(env, 5, 10, 7, hash, sort_merge, inner);
+    });
+}
+
+#[test]
 fn join_hash_hash_inner_big() {
     TestHelper::local_remote_env(|mut env| {
         run_test!(env, 200, 200, 7, hash, hash, inner);
+    });
+}
+
+#[test]
+fn join_hash_sort_merge_inner_big() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test!(env, 200, 200, 7, hash, sort_merge, inner);
     });
 }
 
@@ -160,9 +174,23 @@ fn join_bc_hash_inner() {
 }
 
 #[test]
+fn join_bc_sort_merge_inner() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test!(env, 5, 10, 7, broadcast_right, sort_merge, inner);
+    });
+}
+
+#[test]
 fn join_hash_hash_left() {
     TestHelper::local_remote_env(|mut env| {
         run_test!(env, 5, 10, 7, hash, hash, left);
+    });
+}
+
+#[test]
+fn join_hash_sort_merge_left() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test!(env, 5, 10, 7, hash, sort_merge, left);
     });
 }
 
@@ -174,6 +202,13 @@ fn join_bc_hash_left() {
 }
 
 #[test]
+fn join_bc_sort_merge_left() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test!(env, 5, 10, 7, broadcast_right, sort_merge, left);
+    });
+}
+
+#[test]
 fn join_hash_hash_outer1() {
     TestHelper::local_remote_env(|mut env| {
         run_test!(env, 5, 10, 7, hash, hash, outer);
@@ -181,8 +216,22 @@ fn join_hash_hash_outer1() {
 }
 
 #[test]
+fn join_hash_sort_merge_outer1() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test!(env, 5, 10, 7, hash, sort_merge, outer);
+    });
+}
+
+#[test]
 fn join_hash_hash_outer2() {
     TestHelper::local_remote_env(|mut env| {
         run_test!(env, 10, 5, 7, hash, hash, outer);
+    });
+}
+
+#[test]
+fn join_hash_sort_merge_outer2() {
+    TestHelper::local_remote_env(|mut env| {
+        run_test!(env, 10, 5, 7, hash, sort_merge, outer);
     });
 }

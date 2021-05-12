@@ -7,38 +7,11 @@ use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
 use crate::operator::join::start::{JoinElement, JoinStartBlock};
 use crate::operator::{
-    DataKey, ExchangeData, InnerJoinTuple, KeyerFn, LeftJoinTuple, Operator, OuterJoinTuple,
-    StreamElement,
+    DataKey, ExchangeData, InnerJoinTuple, JoinVariant, KeyerFn, LeftJoinTuple, Operator,
+    OuterJoinTuple, StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
-
-/// The variant of the join, either a inner, a left or a full outer join.
-#[derive(Clone, Debug)]
-enum JoinVariant {
-    /// The join is full inner.
-    Inner,
-    /// The join is a left outer join..
-    ///
-    /// This means that all the left elements will appear at least once in the output.
-    Left,
-    /// The join is full outer.
-    ///
-    /// This means that all the elements will appear in at least one output tuple.
-    Outer,
-}
-
-impl JoinVariant {
-    /// Whether this variant is left outer (either left or full outer).
-    fn left_outer(&self) -> bool {
-        matches!(self, JoinVariant::Left | JoinVariant::Outer)
-    }
-
-    /// Whether this variant is right outer (i.e. full outer since we don't support right join).
-    fn right_outer(&self) -> bool {
-        matches!(self, JoinVariant::Outer)
-    }
-}
 
 /// This type keeps the elements of a side of the join.
 #[derive(Debug, Clone)]

@@ -2,7 +2,7 @@
 
 use crate::block::NextStrategy;
 use crate::operator::join::local_hash::JoinStreamLocalHash;
-// use crate::operator::join::local_sort_merge::JoinStreamLocalSortMerge;
+use crate::operator::join::local_sort_merge::JoinStreamLocalSortMerge;
 use crate::operator::join::start::{JoinElement, JoinStartBlock};
 use crate::operator::{Data, DataKey, ExchangeData, JoinStream, KeyerFn, Operator};
 use crate::stream::Stream;
@@ -81,12 +81,14 @@ where
         JoinStreamLocalHash::new(self.inner)
     }
 
-    // pub fn local_sort_merge(self) -> JoinStreamLocalSortMerge<Key, Out1, Out2, ShipHash>
-    // where
-    //     Key: Ord,
-    // {
-    //     todo!()
-    // }
+    pub fn local_sort_merge(
+        self,
+    ) -> JoinStreamLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, ShipHash>
+    where
+        Key: Ord,
+    {
+        JoinStreamLocalSortMerge::new(self.inner)
+    }
 }
 
 impl<Key: Data, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
@@ -124,10 +126,12 @@ where
         JoinStreamLocalHash::new(self.inner)
     }
 
-    // pub fn local_sort_merge(self) -> JoinStreamLocalSortMerge<Key, Out1, Out2, ShipBroadcastRight>
-    // where
-    //     Key: Ord,
-    // {
-    //     todo!()
-    // }
+    pub fn local_sort_merge(
+        self,
+    ) -> JoinStreamLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, ShipBroadcastRight>
+    where
+        Key: Ord,
+    {
+        JoinStreamLocalSortMerge::new(self.inner)
+    }
 }

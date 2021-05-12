@@ -5,7 +5,7 @@ use crate::operator::{Data, DataKey, ExchangeData, KeyerFn, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 mod local_hash;
-// mod local_sort_merge;
+mod local_sort_merge;
 mod ship;
 mod start;
 
@@ -15,6 +15,33 @@ pub type InnerJoinTuple<Out1, Out2> = (Out1, Out2);
 pub type LeftJoinTuple<Out1, Out2> = (Out1, Option<Out2>);
 /// Type alias for a pair of joined items in an outer join.
 pub type OuterJoinTuple<Out1, Out2> = (Option<Out1>, Option<Out2>);
+
+/// The variant of the join, either a inner, a left or a full outer join.
+#[derive(Clone, Debug)]
+pub(crate) enum JoinVariant {
+    /// The join is full inner.
+    Inner,
+    /// The join is a left outer join..
+    ///
+    /// This means that all the left elements will appear at least once in the output.
+    Left,
+    /// The join is full outer.
+    ///
+    /// This means that all the elements will appear in at least one output tuple.
+    Outer,
+}
+
+impl JoinVariant {
+    /// Whether this variant is left outer (either left or full outer).
+    pub(crate) fn left_outer(&self) -> bool {
+        matches!(self, JoinVariant::Left | JoinVariant::Outer)
+    }
+
+    /// Whether this variant is right outer (i.e. full outer since we don't support right join).
+    pub(crate) fn right_outer(&self) -> bool {
+        matches!(self, JoinVariant::Outer)
+    }
+}
 
 /// Intermediate stream type for building the join between two streams.
 ///
