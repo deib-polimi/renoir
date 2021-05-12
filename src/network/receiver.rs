@@ -72,7 +72,6 @@ impl<In: ExchangeData> NetworkReceiver<In> {
     }
 
     /// Receive a message from any sender.
-    #[allow(dead_code)]
     pub fn recv(&self) -> Result<NetworkMessage<In>> {
         self.profile_message(self.receiver.recv().map_err(|e| {
             anyhow!(
@@ -84,13 +83,11 @@ impl<In: ExchangeData> NetworkReceiver<In> {
     }
 
     /// Receive a message from any sender without blocking.
-    #[allow(dead_code)]
     pub fn try_recv(&self) -> Result<NetworkMessage<In>, TryRecvError> {
         self.profile_message(self.receiver.try_recv())
     }
 
     /// Receive a message from any sender with a timeout.
-    #[allow(dead_code)]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<NetworkMessage<In>, RecvTimeoutError> {
         self.profile_message(self.receiver.recv_timeout(timeout))
     }

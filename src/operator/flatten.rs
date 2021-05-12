@@ -109,8 +109,6 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    // FIXME: MapOut does not really need to be Data, for example the normal iterators are not
-    //        serializable
     pub fn flat_map<MapOut: Data, NewOut: Data, F>(
         self,
         f: F,

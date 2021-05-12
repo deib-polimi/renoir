@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
+use crate::network::Coord;
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
 use crate::operator::join::start::{JoinElement, JoinStartBlock};
 use crate::operator::{
@@ -53,6 +54,7 @@ struct JoinLocalHash<
     OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
 > {
     prev: OperatorChain,
+    coord: Coord,
 
     /// The content of the left side.
     left: SideHashMap<Key, Out1>,
@@ -77,6 +79,7 @@ impl<
     fn new(prev: OperatorChain, variant: JoinVariant) -> Self {
         Self {
             prev,
+            coord: Default::default(),
             left: Default::default(),
             right: Default::default(),
             variant,
@@ -160,6 +163,7 @@ impl<
     for JoinLocalHash<Key, Out1, Out2, OperatorChain>
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.coord = metadata.coord;
         self.prev.setup(metadata);
     }
 
@@ -210,6 +214,8 @@ impl<
                 assert!(self.right.keys.is_empty());
                 self.left.ended = false;
                 self.right.ended = false;
+                debug!("JoinLocalHash at {} emitted FlushAndRestart", self.coord);
+                return StreamElement::FlushAndRestart;
             }
             StreamElement::Terminate => return StreamElement::Terminate,
             StreamElement::FlushBatch => return StreamElement::FlushBatch,
