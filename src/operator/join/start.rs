@@ -12,27 +12,45 @@ use crate::operator::{Data, ExchangeData, IterationStateLock, KeyerFn, Operator,
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, KeyValue};
 
+/// A handy type for merging the two streams coming to a join.
+///
+/// `LeftEnd` and `RightEnd` are used to mark the end of their respective sides: it's equivalent to
+/// a `StreamElement::FlushAndRestart` for one of the sides.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) enum JoinElement<Key, Out1, Out2> {
+    /// An element from the left side.
     Left(KeyValue<Key, Out1>),
+    /// An element from the right side.
     Right(KeyValue<Key, Out2>),
+    /// The left side has ended.
     LeftEnd,
+    /// The right side has ended.
     RightEnd,
 }
 
+/// Utility struct that handles the receiver of a single side.
 #[derive(Debug, Derivative)]
 #[derivative(Clone)]
 struct SideReceiver<Key: Data, Out: ExchangeData, Keyer>
 where
     Keyer: KeyerFn<Key, Out>,
 {
+    /// The actual receiver from which data is received.
     #[derivative(Clone(clone_with = "clone_none"))]
     receiver: Option<NetworkReceiver<Out>>,
-    missing_terminate: usize,
-    missing_flush_and_restart: usize,
-    keyer: Keyer,
+    /// The id of the block that sends data into this side.
     prev_block_id: BlockId,
+
+    /// The number of `StreamElement::Terminate` items yet to be received.
+    missing_terminate: usize,
+    /// The number of `StreamElement::FlushAndRestart` items yet to be received.
+    missing_flush_and_restart: usize,
+    /// The number of previous replicas the will send data to this one.
     num_prev: usize,
+
+    /// The keyer function for extracting the key from a message of this side.
+    keyer: Keyer,
+
     _k: PhantomData<Key>,
 }
 
@@ -73,28 +91,38 @@ where
         self.reset();
     }
 
+    /// Reset this struct, making it ready for the next iteration.
     fn reset(&mut self) {
         self.missing_terminate = self.num_prev;
         self.missing_flush_and_restart = self.num_prev;
     }
 
+    /// Whether this operator has ended, i.e. all the previous operators have sent all the data.
     fn is_ended(&self) -> bool {
         self.missing_flush_and_restart == 0
     }
 
+    /// Whether this operator has received `Terminate` from all the previous replicas.
     fn is_terminated(&self) -> bool {
         self.missing_terminate == 0
     }
 }
 
+/// The starting operator of a block with a join.
+///
+/// This will receive data from the two sides and merge the two streams into a single one that the
+/// next operator (the local join operator) will be able to use more easily.
 #[derive(Clone, Debug)]
 pub(crate) struct JoinStartBlock<Key: Data, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
 where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
+    /// The receiver for the left side.
     left: SideReceiver<Key, Out1, Keyer1>,
+    /// The receiver for the right side.
     right: SideReceiver<Key, Out2, Keyer2>,
+    /// Whether a timeout occurred so the operator flushes the batch and blocks for new messages.
     timed_out: bool,
 
     state_lock: Option<Arc<IterationStateLock>>,
@@ -130,6 +158,12 @@ where
         }
     }
 
+    /// Process a new message from a given side.
+    ///
+    /// This will extract all the messages in the batch, filter the control items (flushes and
+    /// terminates) and later wrap the items in the correct `JoinElement` variant.
+    ///
+    /// This will add the received messages in the buffer.
     fn process_side_messages<Out: ExchangeData, Keyer: KeyerFn<Key, Out>>(
         side: &mut SideReceiver<Key, Out, Keyer>,
         messages: NetworkMessage<Out>,
@@ -157,6 +191,9 @@ where
         }
     }
 
+    /// Try to receive data from a single side, eventually timing out.
+    ///
+    /// This will add the received messages in the buffer.
     fn recv_side<Out: ExchangeData, Keyer: KeyerFn<Key, Out>>(
         side: &mut SideReceiver<Key, Out, Keyer>,
         timed_out: &mut bool,
@@ -183,6 +220,13 @@ where
         Self::process_side_messages(side, messages, wrap, end, buffer);
     }
 
+    /// Given that the buffer is empty, receive from the network the next batch and try to put some
+    /// data into the buffer.
+    ///
+    /// This will add also the control messages (flushes and terminates) when needed, and receive
+    /// from a single side if the other has already ended.
+    ///
+    /// When both sides are done, this will emit an extra `FlushAndRestart` message.
     fn select(&mut self) {
         assert!(self.buffer.is_empty());
 

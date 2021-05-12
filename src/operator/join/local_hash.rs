@@ -13,27 +13,45 @@ use crate::operator::{
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
+/// The variant of the join, either a inner, a left or a full outer join.
 #[derive(Clone, Debug)]
 enum JoinVariant {
+    /// The join is full inner.
     Inner,
+    /// The join is a left outer join..
+    ///
+    /// This means that all the left elements will appear at least once in the output.
     Left,
+    /// The join is full outer.
+    ///
+    /// This means that all the elements will appear in at least one output tuple.
     Outer,
 }
 
 impl JoinVariant {
+    /// Whether this variant is left outer (either left or full outer).
     fn left_outer(&self) -> bool {
         matches!(self, JoinVariant::Left | JoinVariant::Outer)
     }
 
+    /// Whether this variant is right outer (i.e. full outer since we don't support right join).
     fn right_outer(&self) -> bool {
         matches!(self, JoinVariant::Outer)
     }
 }
 
+/// This type keeps the elements of a side of the join.
 #[derive(Debug, Clone)]
 struct SideHashMap<Key: DataKey, Out> {
+    /// The actual items on this side, grouped by key.
+    ///
+    /// Note that when the other side ends this map is emptied.
     data: HashMap<Key, Vec<Out>>,
+    /// The set of all the keys seen.
+    ///
+    /// Note that when this side ends this set is emptied since it won't be used again.
     keys: HashSet<Key>,
+    /// Whether this side has ended.
     ended: bool,
 }
 
@@ -47,6 +65,13 @@ impl<Key: DataKey, Out> Default for SideHashMap<Key, Out> {
     }
 }
 
+/// This operator performs the join using the local hash strategy.
+///
+/// The previous operator should be a `JoinStartBlock` that emits the `JoinElement` of the two
+/// incoming streams.
+///
+/// This operator is able to produce the outer join tuples (the most general type of join), but it
+/// can be asked to skip generating the `None` tuples if the join was actually inner.
 #[derive(Clone, Debug)]
 struct JoinLocalHash<
     Key: DataKey,
@@ -55,9 +80,17 @@ struct JoinLocalHash<
     OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
 > {
     prev: OperatorChain,
+
+    /// The content of the left side.
     left: SideHashMap<Key, Out1>,
+    /// The content of the right side.
     right: SideHashMap<Key, Out2>,
+    /// The variant of join to build.
+    ///
+    /// This is used for optimizing the behaviour in case of inner and left joins, avoiding to
+    /// generate useless tuples.
     variant: JoinVariant,
+    /// The already generated tuples, but not yet returned.
     buffer: VecDeque<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>,
 }
 
@@ -78,6 +111,9 @@ impl<
         }
     }
 
+    /// Add a new item on the _left_ side, storing the newly generated tuples inside the buffer.
+    ///
+    /// This can be used to add _right_ tuples by swapping left and right parameters.
     fn add_item<OutL: ExchangeData, OutR: ExchangeData>(
         (key, item): (Key, OutL),
         left: &mut SideHashMap<Key, OutL>,
@@ -111,6 +147,9 @@ impl<
         }
     }
 
+    /// Mark the left side as ended, generating all the remaining tuples if the join is outer.
+    ///
+    /// This can be used to mark also the right side by swapping the parameters.
     fn side_ended<OutL, OutR>(
         right_outer: bool,
         left: &mut SideHashMap<Key, OutL>,
@@ -133,7 +172,7 @@ impl<
             // in any case, we won't need the right hashmap anymore.
             right.data.clear();
         }
-        // we will never look at it, and nothing will be inserted.
+        // we will never look at it, and nothing will be inserted, drop it freeing some memory.
         left.keys.clear();
         left.ended = true;
     }
@@ -224,6 +263,12 @@ impl<
     }
 }
 
+/// This is an intermediate type for building a join operator.
+///
+/// The ship strategy has already been selected and it's stored in `ShipStrat`, the local strategy
+/// is hash and now the join variant has to be selected.
+///
+/// Note that `outer` join is not supported if the ship strategy is `broadcast_right`.
 pub struct JoinStreamLocalHash<
     Key: DataKey,
     Out1: ExchangeData,

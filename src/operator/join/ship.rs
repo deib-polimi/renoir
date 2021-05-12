@@ -7,16 +7,23 @@ use crate::operator::join::start::{JoinElement, JoinStartBlock};
 use crate::operator::{Data, DataKey, ExchangeData, JoinStream, KeyerFn, Operator};
 use crate::stream::Stream;
 
+/// Marker type for remembering that hash is the selected ship strategy.
 #[derive(Clone, Copy)]
 pub struct ShipHash;
+
+/// Marker type for remembering that broadcast_right is the selected ship strategy.
 #[derive(Clone, Copy)]
 pub struct ShipBroadcastRight;
 
+/// Marker trait for the ship strategy marker types.
 pub trait ShipStrategy: Clone + Send {}
 
 impl ShipStrategy for ShipHash {}
 impl ShipStrategy for ShipBroadcastRight {}
 
+/// This is an intermediate type for building a join operator.
+///
+/// The ship strategy has been selected as hash, and now the local strategy has to be selected.
 pub struct JoinStreamShipHash<Key: DataKey, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
 where
     Keyer1: KeyerFn<Key, Out1>,
@@ -25,6 +32,10 @@ where
     inner: Stream<JoinElement<Key, Out1, Out2>, JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>>,
 }
 
+/// This is an intermediate type for building a join operator.
+///
+/// The ship strategy has been selected as broadcast_right, and now the local strategy has to be
+/// selected.
 pub struct JoinStreamShipBroadcastRight<
     Key: Data,
     Out1: ExchangeData,
