@@ -4,6 +4,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use itertools::Itertools;
 use ssh2::Session;
@@ -20,7 +21,17 @@ pub(crate) const HOST_ID_ENV_VAR: &str = "RSTREAM_HOST_ID";
 /// required to have it on all the hosts.
 pub(crate) const CONFIG_ENV_VAR: &str = "RSTREAM_CONFIG";
 /// Size of the buffer used to send the executable file via SCP.
-pub(crate) const SCP_BUFFER_SIZE: usize = 64 * 1024;
+pub(crate) const SCP_BUFFER_SIZE: usize = 512 * 1024;
+
+/// Execution results returned by a remote worker.
+struct HostExecutionResult {
+    /// Tracing data if rstream is compiled with tracing enabled.
+    tracing: Option<TracingData>,
+    /// Time spent for sending the binary file to the remote worker.
+    sync_time: Duration,
+    /// Execution time excluding the sync.
+    execution_time: Duration,
+}
 
 /// Spawn all the remote workers via ssh and wait until all of them complete, after that exit from
 /// the process,
@@ -50,12 +61,18 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
         join_handles.push(join_handle);
     }
     let mut tracing_data = TracingData::default();
+    let mut max_execution_time = Duration::default();
+    let mut max_sync_time = Duration::default();
     for join_handle in join_handles {
-        let data = join_handle.join().unwrap();
-        if let Some(data) = data {
+        let result = join_handle.join().unwrap();
+        max_execution_time = max_execution_time.max(result.execution_time);
+        max_sync_time = max_sync_time.max(result.sync_time);
+        if let Some(data) = result.tracing {
             tracing_data += data;
         }
     }
+    Stopwatch::print("max-remote-execution", max_execution_time);
+    Stopwatch::print("max-remote-sync", max_sync_time);
     if let Some(path) = config.tracing_dir {
         std::fs::create_dir_all(&path).expect("Cannot create tracing directory");
         let now = chrono::Local::now();
@@ -94,7 +111,7 @@ fn spawn_remote_worker(
     host_id: HostId,
     mut host: RemoteHostConfig,
     config_str: String,
-) -> Option<TracingData> {
+) -> HostExecutionResult {
     if host.ssh.username.is_none() {
         host.ssh.username = Some(whoami::username());
     }
@@ -145,6 +162,7 @@ fn spawn_remote_worker(
     );
     debug!("Authentication succeeded to host {}", host_id);
 
+    let sync_start = Instant::now();
     // generate a temporary file on remote host
     let (remote_path, exit_code) =
         run_remote_command(&mut session, "mktemp -p '' rstream2.XXXXXXXX");
@@ -172,11 +190,13 @@ fn spawn_remote_worker(
         Path::new(&remote_path),
         0o500,
     );
+    let sync_time = sync_start.elapsed();
 
     // build the remote command
     let command = build_remote_command(host_id, config_str.as_str(), remote_path, &host.perf_path);
     debug!("Executing on host {}:\n{}", host_id, command);
 
+    let execution_start = Instant::now();
     let mut channel = session.channel_session().unwrap();
     channel.exec(&command).unwrap();
 
@@ -200,6 +220,8 @@ fn spawn_remote_worker(
     channel.wait_close().unwrap();
     info!("Exit status: {}", channel.exit_status().unwrap());
 
+    let execution_time = execution_start.elapsed();
+
     debug!(
         "Removing temporary binary file at host {}: {}",
         host_id, remote_path
@@ -215,7 +237,11 @@ fn spawn_remote_worker(
         host_id, remote_path
     );
 
-    tracing_data
+    HostExecutionResult {
+        tracing: tracing_data,
+        execution_time,
+        sync_time,
+    }
 }
 
 /// Execute a command remotely and return the standard output and the exit code.
@@ -298,6 +324,7 @@ fn build_remote_command(
         "export {host_id_env}={host_id};
 export {config_env}={config};
 export RUST_LOG={rust_log};
+export RUST_BACKTRACE={rust_backtrace};
 export RUST_LOG_STYLE=always;
 {perf_cmd}{binary_path} {args}",
         host_id_env = HOST_ID_ENV_VAR,
@@ -307,6 +334,7 @@ export RUST_LOG_STYLE=always;
         perf_cmd = perf_cmd,
         binary_path = binary_path,
         args = args,
-        rust_log = std::env::var("RUST_LOG").unwrap_or_default()
+        rust_log = std::env::var("RUST_LOG").unwrap_or_default(),
+        rust_backtrace = std::env::var("RUST_BACKTRACE").unwrap_or_default(),
     )
 }
