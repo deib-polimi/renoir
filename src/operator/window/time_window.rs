@@ -1,4 +1,6 @@
-use crate::operator::{Data, DataKey, StreamElement, Timestamp, Window, WindowGenerator};
+use crate::operator::{
+    timestamp_max, Data, DataKey, StreamElement, Timestamp, Window, WindowGenerator,
+};
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::time::Duration;
@@ -71,7 +73,7 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for TimeWindowGenerator<
                 self.last_seen = ts;
             }
             StreamElement::FlushAndRestart => {
-                self.last_seen = Timestamp::new(u64::MAX, 0);
+                self.last_seen = timestamp_max();
             }
             StreamElement::FlushBatch => unreachable!("Windows do not handle FlushBatch"),
             StreamElement::Terminate => unreachable!("Windows do not handle Terminate"),

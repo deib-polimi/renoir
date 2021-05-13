@@ -1,6 +1,14 @@
+use serde::{Deserialize, Serialize};
+
 use crate::block::NextStrategy;
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StartBlock};
 use crate::stream::{KeyValue, KeyedStream, Stream};
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum ConcatElement<A, B> {
+    Left(A),
+    Right(B),
+}
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -20,6 +28,21 @@ where
             NextStrategy::OnlyOne,
         )
     }
+
+    pub(crate) fn map_concat<Out2, OperatorChain2>(
+        self,
+        right: Stream<Out2, OperatorChain2>,
+    ) -> Stream<ConcatElement<Out, Out2>, impl Operator<ConcatElement<Out, Out2>>>
+    where
+        Out2: ExchangeData,
+        OperatorChain2: Operator<Out2> + 'static,
+    {
+        // map the left and right streams to the same type
+        let left = self.map(ConcatElement::Left);
+        let right = right.map(ConcatElement::Right);
+
+        left.concat(right)
+    }
 }
 
 impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
@@ -34,5 +57,24 @@ where
         OperatorChain2: Operator<KeyValue<Key, Out>> + 'static,
     {
         KeyedStream(self.0.concat(oth.0))
+    }
+
+    pub(crate) fn map_concat<Out2, OperatorChain2>(
+        self,
+        right: KeyedStream<Key, Out2, OperatorChain2>,
+    ) -> KeyedStream<
+        Key,
+        ConcatElement<Out, Out2>,
+        impl Operator<KeyValue<Key, ConcatElement<Out, Out2>>>,
+    >
+    where
+        Out2: ExchangeData,
+        OperatorChain2: Operator<KeyValue<Key, Out2>> + 'static,
+    {
+        // map the left and right streams to the same type
+        let left = self.map(|(_, x)| ConcatElement::Left(x));
+        let right = right.map(|(_, x)| ConcatElement::Right(x));
+
+        left.concat(right)
     }
 }

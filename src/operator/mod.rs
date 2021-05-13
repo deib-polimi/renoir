@@ -9,6 +9,7 @@ pub use concat::*;
 pub use end::*;
 pub use filter::*;
 pub use group_by::*;
+pub use interval_join::*;
 pub use iteration::*;
 pub use join::*;
 pub use key_by::*;
@@ -34,6 +35,7 @@ mod filter_map;
 mod flatten;
 mod fold;
 mod group_by;
+mod interval_join;
 mod iteration;
 mod join;
 mod key_by;
@@ -75,6 +77,12 @@ impl<Key, Out, T: Fn(&Out) -> Key + Clone + Send + Sync + 'static> KeyerFn<Key, 
 /// When using timestamps and watermarks, this type expresses the timestamp of a message or of a
 /// watermark.
 pub type Timestamp = Duration;
+/// Returns `Duration::new(u64::MAX, 1_000_000_000 - 1)`, which is equivalent to `Duration::MAX`.
+/// This is needed because `Duration::MAX` is unstable and `Duration::new` cannot be used to
+/// initialize a constant value.
+pub(crate) fn timestamp_max() -> Duration {
+    Duration::new(u64::MAX, 1_000_000_000 - 1)
+}
 
 /// An element of the stream. This is what enters and exits from the operators.
 ///

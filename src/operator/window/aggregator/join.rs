@@ -1,17 +1,10 @@
-use crate::operator::{ExchangeData, ExchangeDataKey, Operator, WindowDescription};
+use crate::operator::{ConcatElement, ExchangeData, ExchangeDataKey, Operator, WindowDescription};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
-use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum JoinElement<A, B> {
-    Left(A),
-    Right(B),
-}
 
 impl<Key: ExchangeDataKey, Out: ExchangeData, Out2: ExchangeData, WindowDescr, OperatorChain>
-    KeyedWindowedStream<Key, Out, OperatorChain, JoinElement<Out, Out2>, WindowDescr>
+    KeyedWindowedStream<Key, Out, OperatorChain, ConcatElement<Out, Out2>, WindowDescr>
 where
-    WindowDescr: WindowDescription<Key, JoinElement<Out, Out2>> + Clone + 'static,
+    WindowDescr: WindowDescription<Key, ConcatElement<Out, Out2>> + Clone + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     pub fn join<OperatorChain2>(
@@ -21,26 +14,23 @@ where
     where
         OperatorChain2: Operator<KeyValue<Key, Out2>> + 'static,
     {
-        // map the left and right streams to the same type
-        let left = self.inner.map(|(_, x)| JoinElement::Left(x));
-        let right = right.map(|(_, x)| JoinElement::Right(x));
-
         // concatenate the two streams and apply the window
-        left.concat(right)
+        self.inner
+            .map_concat(right)
             .window(self.descr)
             .add_generic_window_operator("WindowJoin", move |window| {
                 // divide the elements coming from the left stream from the elements
                 // coming from the right stream
                 let (left, right) = window
                     .items()
-                    .partition::<Vec<_>, _>(|x| matches!(x, JoinElement::Left(_)));
+                    .partition::<Vec<_>, _>(|x| matches!(x, ConcatElement::Left(_)));
 
                 // calculate all the pairs of elements in the current window
                 let mut res = Vec::new();
                 for l in left.into_iter() {
                     for r in right.iter() {
                         match (l, r) {
-                            (JoinElement::Left(l), JoinElement::Right(r)) => {
+                            (ConcatElement::Left(l), ConcatElement::Right(r)) => {
                                 res.push((l.clone(), r.clone()))
                             }
                             _ => {
@@ -56,9 +46,9 @@ where
 }
 
 impl<Out: ExchangeData, Out2: ExchangeData, WindowDescr, OperatorChain>
-    WindowedStream<Out, OperatorChain, JoinElement<Out, Out2>, WindowDescr>
+    WindowedStream<Out, OperatorChain, ConcatElement<Out, Out2>, WindowDescr>
 where
-    WindowDescr: WindowDescription<(), JoinElement<Out, Out2>> + Clone + 'static,
+    WindowDescr: WindowDescription<(), ConcatElement<Out, Out2>> + Clone + 'static,
     OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
     pub fn join<OperatorChain2>(
