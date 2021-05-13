@@ -12,7 +12,8 @@ import coloredlogs
 
 logger = logging.getLogger("gen_csv")
 
-regex = re.compile(r"(?:(?P<type>(?:timens|events)):)?(?P<name>[a-zA-Z0-9]+):(?P<amount>[\d.]+)")
+regex = re.compile(r"(?:(?P<type>(?:timens|events)):)?(?P<name>[a-zA-Z0-9-_]+):(?P<amount>[\d.]+)")
+
 
 def parse_lines(content):
     result = {}
@@ -44,10 +45,11 @@ def extract_dict(path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("results_dir", help="Directory where the results are stored")
+    parser.add_argument("results_dir", help="Directory where the results are stored", nargs="+")
     parser.add_argument(
-        "output_file",
+        "-o",
         help="CSV file where to write the results. - for stdout",
+        dest="output_file",
         default="-",
         nargs="?",
     )
@@ -61,7 +63,9 @@ if __name__ == "__main__":
         fmt="%(asctime)s,%(msecs)03d %(levelname)s %(message)s",
     )
 
-    files = list(glob.glob(args.results_dir + "/**/*.json", recursive=True))
+    files = []
+    for path in args.results_dir:
+        files += list(glob.glob(path + "/**/*.json", recursive=True))
     logger.info("%d JSON found", len(files))
 
     if not files:
