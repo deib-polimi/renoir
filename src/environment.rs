@@ -35,6 +35,8 @@ pub(crate) struct StreamEnvironmentInner {
 pub struct StreamEnvironment {
     /// Reference to the actual content of the environment.
     inner: Rc<RefCell<StreamEnvironmentInner>>,
+    /// Instant when the environment is created.
+    build_time: Stopwatch,
 }
 
 impl StreamEnvironment {
@@ -43,6 +45,7 @@ impl StreamEnvironment {
         info!("Constructing environment");
         StreamEnvironment {
             inner: Rc::new(RefCell::new(StreamEnvironmentInner::new(config))),
+            build_time: Stopwatch::new("build"),
         }
     }
 
@@ -67,6 +70,7 @@ impl StreamEnvironment {
 
     /// Start the computation. Await on the returned future to actually start the computation.
     pub fn execute(self) {
+        drop(self.build_time);
         let _stopwatch = Stopwatch::new("execution");
         let mut env = self.inner.borrow_mut();
         info!("Starting execution of {} blocks", env.block_count);

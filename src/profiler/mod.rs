@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub use metrics::*;
 #[cfg(feature = "profiler")]
@@ -45,12 +45,17 @@ impl Stopwatch {
             start: Instant::now(),
         }
     }
+
+    /// Print a timing information in a recognizable format.
+    pub fn print(name: &str, elapsed: Duration) {
+        eprintln!("timens:{}:{}", name, elapsed.as_nanos())
+    }
 }
 
 impl Drop for Stopwatch {
     fn drop(&mut self) {
         let dur = self.start.elapsed();
-        eprintln!("timens:{}:{}", self.name, dur.as_nanos());
+        Self::print(&self.name, dur);
     }
 }
 
