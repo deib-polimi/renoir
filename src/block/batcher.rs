@@ -1,8 +1,10 @@
 use std::num::NonZeroUsize;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::{ExchangeData, StreamElement};
+
+use coarsetime::Instant;
 
 /// Which policy to use for batching the messages before sending them.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -48,7 +50,7 @@ impl<Out: ExchangeData> Batcher<Out> {
         // if too much time elapsed since the last flush, flush the buffer
         let max_delay = self.mode.max_delay();
         let timeout_elapsed = max_delay
-            .map(|max_delay| self.last_send.elapsed() > max_delay)
+            .map(|max_delay| self.last_send.elapsed() > max_delay.into())
             .unwrap_or(false);
         if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed {
             self.flush();

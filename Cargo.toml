@@ -66,6 +66,9 @@ lazy-init = "0.5"
 # Format dates and times
 chrono = "0.4"
 
+# Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
+coarsetime = "0.1"
+
 # faster allocator
 mimalloc = { version = "*", optional = true }
 
@@ -100,6 +103,9 @@ name = "batch_mode"
 harness = false
 [[bench]]
 name = "recv_vs_select"
+harness = false
+[[bench]]
+name = "coarse_time"
 harness = false
 
 [profile.release]

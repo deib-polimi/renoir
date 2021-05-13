@@ -35,7 +35,7 @@ pub(crate) struct StreamEnvironmentInner {
 pub struct StreamEnvironment {
     /// Reference to the actual content of the environment.
     inner: Rc<RefCell<StreamEnvironmentInner>>,
-    /// Instant when the environment is created.
+    /// Measure the time for building the graph.
     build_time: Stopwatch,
 }
 
