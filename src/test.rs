@@ -16,12 +16,12 @@ use std::time::Duration;
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;
-/// How many ports to allocate for each host.
-const PORTS_PER_HOST: u16 = 100;
 
 lazy_static! {
-    /// The first available port for the next host.
-    static ref PORT_OFFSET: AtomicU16 = AtomicU16::new(0);
+    /// The index of the current test.
+    ///
+    /// It will be used to generate unique local IP addresses for each test.
+    static ref TEST_INDEX: AtomicU16 = AtomicU16::new(0);
 }
 
 /// Helper functions for running the integration tests.
@@ -107,17 +107,14 @@ impl TestHelper {
     ) {
         Self::setup();
         let mut hosts = vec![];
-        for _ in 0..num_hosts {
-            // When using directly the `AtomicU16` counter to assign ports, when the counter
-            // overflows some tests try to bind very small ports, failing.
-            // Instead, we use the counter to encode the offset from `TEST_BASE_PORT`.
-            // We ignore the most significant bit of `PORT_OFFSET`, so that `PORT_OFFSET` is always
-            // in the range 0..2^15.
-            let base_port =
-                TEST_BASE_PORT + (PORT_OFFSET.fetch_add(PORTS_PER_HOST, Ordering::SeqCst) & 0x7fff);
+        for host_id in 0..num_hosts {
+            let test_id = TEST_INDEX.fetch_add(1, Ordering::SeqCst) + 1;
+            let high_part = (test_id & 0xff00) >> 8;
+            let low_part = test_id & 0xff;
+            let address = format!("127.{}.{}.{}", high_part, low_part, host_id);
             hosts.push(RemoteHostConfig {
-                address: "localhost".to_string(),
-                base_port,
+                address,
+                base_port: TEST_BASE_PORT,
                 num_cores: cores_per_host,
                 ssh: Default::default(),
                 perf_path: None,
