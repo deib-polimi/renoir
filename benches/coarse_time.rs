@@ -23,10 +23,10 @@ fn coarse_time_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("coarse_time");
     group.sample_size(100);
     group.warm_up_time(Duration::from_secs(3));
-    group.bench_function("std::time::Instant", |b| b.iter(|| std_time_instant()));
-    group.bench_function("coarsetime::Instant", |b| b.iter(|| coarsetime_instant()));
+    group.bench_function("std::time::Instant", |b| b.iter(std_time_instant));
+    group.bench_function("coarsetime::Instant", |b| b.iter(coarsetime_instant));
     group.bench_function("coarsetime::Instant-lazy", |b| {
-        b.iter(|| coarsetime_instant_lazy())
+        b.iter(coarsetime_instant_lazy)
     });
     group.finish();
 
