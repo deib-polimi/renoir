@@ -81,53 +81,47 @@ impl<
     /// Generate some join tuples. Since the number of join tuples can be quite high,
     /// this is used to generate the tuples incrementally, so that the memory usage is lower.
     fn advance(&mut self) {
-        if self.left.is_empty() && self.right.is_empty() {
-            // nothing to do, return
-            return;
-        }
-
-        // try matching one element of the left side with some elements of the right side
-        if let Some((lkey, lvalue)) = self.left.pop() {
-            // discard the elements of the right side with key bigger than the key of
-            // the element of the left side
-            let discarded = self
-                .right
-                .iter()
-                .rev()
-                .take_while(|(rkey, _)| rkey > &lkey)
-                .count();
-            for _ in 0..discarded {
-                self.discard_right();
-            }
-
-            // check if there is at least one element matching in the right side
-            let has_matches = matches!(self.right.last(), Some((rkey, _)) if rkey == &lkey);
-
-            if has_matches {
-                let matches = self
+        while self.buffer.is_empty() && (!self.left.is_empty() || !self.right.is_empty()) {
+            // try matching one element of the left side with some elements of the right side
+            if let Some((lkey, lvalue)) = self.left.pop() {
+                // discard the elements of the right side with key bigger than the key of
+                // the element of the left side
+                let discarded = self
                     .right
                     .iter()
                     .rev()
-                    .take_while(|(rkey, _)| &lkey == rkey)
-                    .map(|(_, rvalue)| {
-                        (lkey.clone(), (Some(lvalue.clone()), Some(rvalue.clone())))
-                    });
-                self.buffer.extend(matches);
-            } else if self.variant.left_outer() {
-                self.buffer.push_back((lkey.clone(), (Some(lvalue), None)));
+                    .take_while(|(rkey, _)| rkey > &lkey)
+                    .count();
+                for _ in 0..discarded {
+                    self.discard_right();
+                }
+
+                // check if there is at least one element matching in the right side
+                let has_matches = matches!(self.right.last(), Some((rkey, _)) if rkey == &lkey);
+
+                if has_matches {
+                    let matches = self
+                        .right
+                        .iter()
+                        .rev()
+                        .take_while(|(rkey, _)| &lkey == rkey)
+                        .map(|(_, rvalue)| {
+                            (lkey.clone(), (Some(lvalue.clone()), Some(rvalue.clone())))
+                        });
+                    self.buffer.extend(matches);
+                } else if self.variant.left_outer() {
+                    self.buffer.push_back((lkey.clone(), (Some(lvalue), None)));
+                }
+
+                // set this key as the last key processed
+                self.last_left_key = Some(lkey);
+            } else {
+                // there are no elements left in the left side,
+                // so discard what is remaining in the right side
+                while !self.right.is_empty() {
+                    self.discard_right();
+                }
             }
-
-            // set this key as the last key processed
-            self.last_left_key = Some(lkey);
-        } else {
-            // there are no elements left in the left side,
-            // so discard what is remaining in the right side
-            self.discard_right();
-        }
-
-        if self.buffer.is_empty() {
-            // keep advancing until the buffer is not empty (or there are no elements left)
-            self.advance();
         }
     }
 }
@@ -145,51 +139,51 @@ impl<
     }
 
     fn next(&mut self) -> StreamElement<(Key, (Option<Out1>, Option<Out2>))> {
-        if self.buffer.is_empty() && self.left_ended && self.right_ended {
-            // try to generate some join tuples
-            self.advance();
+        loop {
+            if self.buffer.is_empty() && self.left_ended && self.right_ended {
+                // try to generate some join tuples
+                self.advance();
+            }
+
+            if let Some(item) = self.buffer.pop_front() {
+                return StreamElement::Item(item);
+            }
+
+            match self.prev.next() {
+                StreamElement::Item(JoinElement::Left(item)) => {
+                    self.left.push(item);
+                }
+                StreamElement::Item(JoinElement::Right(item)) => {
+                    self.right.push(item);
+                }
+                StreamElement::Item(JoinElement::LeftEnd) => {
+                    self.left_ended = true;
+                    self.left.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
+                }
+                StreamElement::Item(JoinElement::RightEnd) => {
+                    self.right_ended = true;
+                    self.right.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
+                }
+                StreamElement::Timestamped(_, _) | StreamElement::Watermark(_) => {
+                    panic!("Cannot join timestamp streams")
+                }
+                StreamElement::FlushAndRestart => {
+                    assert!(self.left_ended);
+                    assert!(self.right_ended);
+                    assert!(self.left.is_empty());
+                    assert!(self.right.is_empty());
+
+                    // reset the state of the operator
+                    self.left_ended = false;
+                    self.right_ended = false;
+                    self.last_left_key = None;
+
+                    return StreamElement::FlushAndRestart;
+                }
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
+                StreamElement::Terminate => return StreamElement::Terminate,
+            }
         }
-
-        if let Some(item) = self.buffer.pop_front() {
-            return StreamElement::Item(item);
-        }
-
-        match self.prev.next() {
-            StreamElement::Item(JoinElement::Left(item)) => {
-                self.left.push(item);
-            }
-            StreamElement::Item(JoinElement::Right(item)) => {
-                self.right.push(item);
-            }
-            StreamElement::Item(JoinElement::LeftEnd) => {
-                self.left_ended = true;
-                self.left.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
-            }
-            StreamElement::Item(JoinElement::RightEnd) => {
-                self.right_ended = true;
-                self.right.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
-            }
-            StreamElement::Timestamped(_, _) | StreamElement::Watermark(_) => {
-                panic!("Cannot join timestamp streams")
-            }
-            StreamElement::FlushAndRestart => {
-                assert!(self.left_ended);
-                assert!(self.right_ended);
-                assert!(self.left.is_empty());
-                assert!(self.right.is_empty());
-
-                // reset the state of the operator
-                self.left_ended = true;
-                self.right_ended = false;
-                self.last_left_key = None;
-
-                return StreamElement::FlushAndRestart;
-            }
-            StreamElement::FlushBatch => return StreamElement::FlushBatch,
-            StreamElement::Terminate => return StreamElement::Terminate,
-        }
-
-        self.next()
     }
 
     fn to_string(&self) -> String {

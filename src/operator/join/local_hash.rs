@@ -168,62 +168,62 @@ impl<
     }
 
     fn next(&mut self) -> StreamElement<(Key, OuterJoinTuple<Out1, Out2>)> {
-        if let Some(item) = self.buffer.pop_front() {
-            return StreamElement::Item(item);
+        while self.buffer.is_empty() {
+            match self.prev.next() {
+                StreamElement::Item(JoinElement::Left(item)) => Self::add_item(
+                    item,
+                    &mut self.left,
+                    &mut self.right,
+                    self.variant.left_outer(),
+                    self.variant.right_outer(),
+                    &mut self.buffer,
+                    |x, y| (x, y),
+                ),
+                StreamElement::Item(JoinElement::Right(item)) => Self::add_item(
+                    item,
+                    &mut self.right,
+                    &mut self.left,
+                    self.variant.right_outer(),
+                    self.variant.left_outer(),
+                    &mut self.buffer,
+                    |x, y| (y, x),
+                ),
+                StreamElement::Item(JoinElement::LeftEnd) => Self::side_ended(
+                    self.variant.right_outer(),
+                    &mut self.left,
+                    &mut self.right,
+                    &mut self.buffer,
+                    |x, y| (x, y),
+                ),
+                StreamElement::Item(JoinElement::RightEnd) => Self::side_ended(
+                    self.variant.left_outer(),
+                    &mut self.right,
+                    &mut self.left,
+                    &mut self.buffer,
+                    |x, y| (y, x),
+                ),
+                StreamElement::FlushAndRestart => {
+                    assert!(self.left.ended);
+                    assert!(self.right.ended);
+                    assert!(self.left.data.is_empty());
+                    assert!(self.right.data.is_empty());
+                    assert!(self.left.keys.is_empty());
+                    assert!(self.right.keys.is_empty());
+                    self.left.ended = false;
+                    self.right.ended = false;
+                    debug!("JoinLocalHash at {} emitted FlushAndRestart", self.coord);
+                    return StreamElement::FlushAndRestart;
+                }
+                StreamElement::Terminate => return StreamElement::Terminate,
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
+                StreamElement::Watermark(_) | StreamElement::Timestamped(_, _) => {
+                    panic!("Cannot yet join timestamped streams")
+                }
+            }
         }
 
-        match self.prev.next() {
-            StreamElement::Item(JoinElement::Left(item)) => Self::add_item(
-                item,
-                &mut self.left,
-                &mut self.right,
-                self.variant.left_outer(),
-                self.variant.right_outer(),
-                &mut self.buffer,
-                |x, y| (x, y),
-            ),
-            StreamElement::Item(JoinElement::Right(item)) => Self::add_item(
-                item,
-                &mut self.right,
-                &mut self.left,
-                self.variant.right_outer(),
-                self.variant.left_outer(),
-                &mut self.buffer,
-                |x, y| (y, x),
-            ),
-            StreamElement::Item(JoinElement::LeftEnd) => Self::side_ended(
-                self.variant.right_outer(),
-                &mut self.left,
-                &mut self.right,
-                &mut self.buffer,
-                |x, y| (x, y),
-            ),
-            StreamElement::Item(JoinElement::RightEnd) => Self::side_ended(
-                self.variant.left_outer(),
-                &mut self.right,
-                &mut self.left,
-                &mut self.buffer,
-                |x, y| (y, x),
-            ),
-            StreamElement::FlushAndRestart => {
-                assert!(self.left.ended);
-                assert!(self.right.ended);
-                assert!(self.left.data.is_empty());
-                assert!(self.right.data.is_empty());
-                assert!(self.left.keys.is_empty());
-                assert!(self.right.keys.is_empty());
-                self.left.ended = false;
-                self.right.ended = false;
-                debug!("JoinLocalHash at {} emitted FlushAndRestart", self.coord);
-                return StreamElement::FlushAndRestart;
-            }
-            StreamElement::Terminate => return StreamElement::Terminate,
-            StreamElement::FlushBatch => return StreamElement::FlushBatch,
-            StreamElement::Watermark(_) | StreamElement::Timestamped(_, _) => {
-                panic!("Cannot yet join timestamped streams")
-            }
-        }
-        self.next()
+        let item = self.buffer.pop_front().unwrap();
+        StreamElement::Item(item)
     }
 
     fn to_string(&self) -> String {

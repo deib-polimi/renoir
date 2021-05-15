@@ -131,46 +131,45 @@ where
     }
 
     fn next(&mut self) -> StreamElement<(Key, (Out, Out2))> {
-        if let Some((ts, item)) = self.buffer.pop_front() {
-            return StreamElement::Timestamped(item, ts);
-        }
+        while self.buffer.is_empty() {
+            if self.received_restart {
+                assert!(self.left.is_empty());
+                assert!(self.right.is_empty());
 
-        if self.received_restart {
-            assert!(self.left.is_empty());
-            assert!(self.right.is_empty());
+                self.received_restart = false;
+                self.last_seen = Default::default();
 
-            self.received_restart = false;
-            self.last_seen = Default::default();
+                return StreamElement::FlushAndRestart;
+            }
 
-            return StreamElement::FlushAndRestart;
-        }
-
-        match self.prev.next() {
-            StreamElement::Timestamped((key, item), ts) => {
-                assert!(ts >= self.last_seen);
-                self.last_seen = ts;
-                match item {
-                    ConcatElement::Left(item) => self.left.push_back((ts, (key, item))),
-                    ConcatElement::Right(item) => {
-                        self.right.entry(key).or_default().push_back((ts, item))
+            match self.prev.next() {
+                StreamElement::Timestamped((key, item), ts) => {
+                    assert!(ts >= self.last_seen);
+                    self.last_seen = ts;
+                    match item {
+                        ConcatElement::Left(item) => self.left.push_back((ts, (key, item))),
+                        ConcatElement::Right(item) => {
+                            self.right.entry(key).or_default().push_back((ts, item))
+                        }
                     }
                 }
+                StreamElement::Watermark(ts) => {
+                    assert!(ts >= self.last_seen);
+                    self.last_seen = ts;
+                }
+                StreamElement::FlushAndRestart => {
+                    self.received_restart = true;
+                }
+                StreamElement::Item(_) => panic!("Interval Join only supports timestamped streams"),
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
+                StreamElement::Terminate => return StreamElement::Terminate,
             }
-            StreamElement::Watermark(ts) => {
-                assert!(ts >= self.last_seen);
-                self.last_seen = ts;
-            }
-            StreamElement::FlushAndRestart => {
-                self.received_restart = true;
-            }
-            StreamElement::Item(_) => panic!("Interval Join only supports timestamped streams"),
-            StreamElement::FlushBatch => return StreamElement::FlushBatch,
-            StreamElement::Terminate => return StreamElement::Terminate,
+
+            self.advance();
         }
 
-        self.advance();
-
-        self.next()
+        let (ts, item) = self.buffer.pop_front().unwrap();
+        StreamElement::Timestamped(item, ts)
     }
 
     fn to_string(&self) -> String {
