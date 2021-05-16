@@ -5,8 +5,7 @@ use crate::operator::{
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use hashbrown::HashMap;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::time::Duration;
 
 type OutputElement<Key, Out, Out2> = KeyValue<Key, (Out, Out2)>;
