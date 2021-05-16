@@ -27,6 +27,8 @@ struct SideHashMap<Key: DataKey, Out> {
     keys: HashSet<Key>,
     /// Whether this side has ended.
     ended: bool,
+    /// The number of items received.
+    count: usize,
 }
 
 impl<Key: DataKey, Out> Default for SideHashMap<Key, Out> {
@@ -35,6 +37,7 @@ impl<Key: DataKey, Out> Default for SideHashMap<Key, Out> {
             data: Default::default(),
             keys: Default::default(),
             ended: false,
+            count: 0,
         }
     }
 }
@@ -99,6 +102,7 @@ impl<
         buffer: &mut VecDeque<(Key, OuterJoinTuple<Out1, Out2>)>,
         make_pair: impl Fn(Option<OutL>, Option<OutR>) -> OuterJoinTuple<Out1, Out2>,
     ) {
+        left.count += 1;
         if let Some(right) = right.data.get(&key) {
             // the left item has at least one right matching element
             for rhs in right {
@@ -188,20 +192,34 @@ impl<
                     &mut self.buffer,
                     |x, y| (y, x),
                 ),
-                StreamElement::Item(JoinElement::LeftEnd) => Self::side_ended(
-                    self.variant.right_outer(),
-                    &mut self.left,
-                    &mut self.right,
-                    &mut self.buffer,
-                    |x, y| (x, y),
-                ),
-                StreamElement::Item(JoinElement::RightEnd) => Self::side_ended(
-                    self.variant.left_outer(),
-                    &mut self.right,
-                    &mut self.left,
-                    &mut self.buffer,
-                    |x, y| (y, x),
-                ),
+                StreamElement::Item(JoinElement::LeftEnd) => {
+                    debug!(
+                        "Left side of join ended with {} elements on the left \
+                        and {} elements on the right",
+                        self.left.count, self.right.count
+                    );
+                    Self::side_ended(
+                        self.variant.right_outer(),
+                        &mut self.left,
+                        &mut self.right,
+                        &mut self.buffer,
+                        |x, y| (x, y),
+                    )
+                }
+                StreamElement::Item(JoinElement::RightEnd) => {
+                    debug!(
+                        "Right side of join ended with {} elements on the left \
+                        and {} elements on the right",
+                        self.left.count, self.right.count
+                    );
+                    Self::side_ended(
+                        self.variant.left_outer(),
+                        &mut self.right,
+                        &mut self.left,
+                        &mut self.buffer,
+                        |x, y| (y, x),
+                    )
+                }
                 StreamElement::FlushAndRestart => {
                     assert!(self.left.ended);
                     assert!(self.right.ended);
@@ -210,7 +228,9 @@ impl<
                     assert!(self.left.keys.is_empty());
                     assert!(self.right.keys.is_empty());
                     self.left.ended = false;
+                    self.left.count = 0;
                     self.right.ended = false;
+                    self.right.count = 0;
                     debug!("JoinLocalHash at {} emitted FlushAndRestart", self.coord);
                     return StreamElement::FlushAndRestart;
                 }
