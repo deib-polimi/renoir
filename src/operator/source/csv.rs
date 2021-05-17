@@ -10,9 +10,10 @@ use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
-/// Limits the bytes to be read from a type that implements `io::Read`
+/// Wrapper that limits the bytes that can be read from a type that implements `io::Read`.
 struct LimitedReader<R: Read> {
     inner: R,
+    /// Bytes remaining to be read.
     remaining: usize,
 }
 
@@ -24,7 +25,13 @@ impl<R: Read> LimitedReader<R> {
 
 impl<R: Read> Read for LimitedReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let read_bytes = self.inner.read(buf)?.min(self.remaining);
+        let read_bytes = if self.remaining > 0 {
+            // if there are some bytes to be read, call read on the inner reader
+            self.inner.read(buf)?.min(self.remaining)
+        } else {
+            // all the bytes have been read
+            0
+        };
         self.remaining -= read_bytes;
         Ok(read_bytes)
     }
@@ -72,10 +79,17 @@ impl Default for CsvOptions {
     }
 }
 
+/// Source that reads and parses a CSV file.
+///
+/// The file is divided in chunks and is read concurrently by multiple replicas.
 pub struct CsvSource<Out: Data + for<'a> Deserialize<'a>> {
+    /// Path of the file.
     path: PathBuf,
+    /// Reader used to parse the CSV file.
     csv_reader: Option<Reader<LimitedReader<BufReader<File>>>>,
+    /// Options to customize the CSV parser.
     options: CsvOptions,
+    /// Whether the reader has terminated its job.
     terminated: bool,
     _out: PhantomData<Out>,
 }
