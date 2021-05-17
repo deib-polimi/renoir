@@ -2,7 +2,7 @@ use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use csv::{Reader, ReaderBuilder};
+use csv::{Reader, ReaderBuilder, Terminator, Trim};
 use serde::Deserialize;
 use std::fs::File;
 use std::io;
@@ -30,23 +30,115 @@ impl<R: Read> Read for LimitedReader<R> {
     }
 }
 
+/// Options for the CSV parser.
+#[derive(Clone)]
+struct CsvOptions {
+    /// Byte used to mark a line as a comment.
+    comment: Option<u8>,
+    /// Field delimiter.
+    delimiter: u8,
+    /// Whether quotes are escaped by using doubled quotes.
+    double_quote: bool,
+    /// Byte used to escape quotes.
+    escape: Option<u8>,
+    /// Whether to allow records with different number of fields.
+    flexible: bool,
+    /// Byte used to quote fields.
+    quote: u8,
+    /// Whether to enable field quoting.
+    quoting: bool,
+    /// Line terminator.
+    terminator: Terminator,
+    /// Whether to trim fields and/or headers.
+    trim: Trim,
+    /// Whether the CSV file has headers.
+    has_headers: bool,
+}
+
+impl Default for CsvOptions {
+    fn default() -> Self {
+        Self {
+            comment: None,
+            delimiter: b',',
+            double_quote: true,
+            escape: None,
+            flexible: false,
+            quote: b'"',
+            quoting: true,
+            terminator: Terminator::CRLF,
+            trim: Trim::None,
+            has_headers: true,
+        }
+    }
+}
+
 pub struct CsvSource<Out: Data + for<'a> Deserialize<'a>> {
     path: PathBuf,
     csv_reader: Option<Reader<LimitedReader<BufReader<File>>>>,
-    has_headers: bool,
+    options: CsvOptions,
     terminated: bool,
     _out: PhantomData<Out>,
 }
 
 impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
-    pub fn new<P: Into<PathBuf>>(path: P, has_headers: bool) -> Self {
+    pub fn new<P: Into<PathBuf>>(path: P) -> Self {
         Self {
             path: path.into(),
             csv_reader: None,
-            has_headers,
+            options: Default::default(),
             terminated: false,
             _out: PhantomData,
         }
+    }
+
+    pub fn comment(mut self, comment: Option<u8>) -> Self {
+        self.options.comment = comment;
+        self
+    }
+
+    pub fn delimiter(mut self, delimiter: u8) -> Self {
+        self.options.delimiter = delimiter;
+        self
+    }
+
+    pub fn double_quote(mut self, double_quote: bool) -> Self {
+        self.options.double_quote = double_quote;
+        self
+    }
+
+    pub fn escape(mut self, escape: Option<u8>) -> Self {
+        self.options.escape = escape;
+        self
+    }
+
+    pub fn flexible(mut self, flexible: bool) -> Self {
+        self.options.flexible = flexible;
+        self
+    }
+
+    pub fn quote(mut self, quote: u8) -> Self {
+        self.options.quote = quote;
+        self
+    }
+
+    pub fn quoting(mut self, quoting: bool) -> Self {
+        self.options.quoting = quoting;
+        self
+    }
+
+    pub fn terminator(mut self, terminator: Terminator) -> Self {
+        self.options.terminator = terminator;
+        self
+    }
+
+    pub fn trim(mut self, trim: Trim) -> Self {
+        self.options.trim = trim;
+        self
+    }
+
+    pub fn has_headers(mut self, has_headers: bool) -> Self {
+        self.options.has_headers = has_headers;
+        self
     }
 }
 
@@ -72,11 +164,17 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
 
         let mut buf_reader = BufReader::new(file);
 
+        let last_byte_terminator = match self.options.terminator {
+            Terminator::CRLF => b'\n',
+            Terminator::Any(terminator) => terminator,
+            _ => unreachable!(),
+        };
+
         // Handle the header
         let mut header = Vec::new();
-        let header_size = if self.has_headers {
+        let header_size = if self.options.has_headers {
             buf_reader
-                .read_until(b'\n', &mut header)
+                .read_until(last_byte_terminator, &mut header)
                 .expect("Error while reading CSV header") as u64
         } else {
             0
@@ -101,7 +199,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
             // discard first line
             let mut buf = Vec::new();
             start += buf_reader
-                .read_until(b'\n', &mut buf)
+                .read_until(last_byte_terminator, &mut buf)
                 .expect("Error while reading first line from file") as u64;
         }
 
@@ -114,7 +212,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
             // get to the end of the line
             let mut buf = Vec::new();
             end += buf_reader
-                .read_until(b'\n', &mut buf)
+                .read_until(last_byte_terminator, &mut buf)
                 .expect("Error while reading last line from file") as u64;
         }
 
@@ -128,10 +226,19 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
 
         // Create csv::Reader
         let mut csv_reader = ReaderBuilder::new()
-            .has_headers(self.has_headers)
+            .comment(self.options.comment)
+            .delimiter(self.options.delimiter)
+            .double_quote(self.options.double_quote)
+            .escape(self.options.escape)
+            .flexible(self.options.flexible)
+            .quote(self.options.quote)
+            .quoting(self.options.quoting)
+            .terminator(self.options.terminator)
+            .trim(self.options.trim)
+            .has_headers(self.options.has_headers)
             .from_reader(limited_reader);
 
-        if self.has_headers {
+        if self.options.has_headers {
             // set the headers of the CSV file
             csv_reader.set_byte_headers(
                 Reader::from_reader(header.as_slice())
@@ -182,7 +289,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Clone for CsvSource<Out> {
         Self {
             path: self.path.clone(),
             csv_reader: None,
-            has_headers: self.has_headers,
+            options: self.options.clone(),
             terminated: false,
             _out: PhantomData,
         }
@@ -209,7 +316,7 @@ mod tests {
                 }
 
                 let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-                let source = CsvSource::<(i32, i32)>::new(file.path(), false);
+                let source = CsvSource::<(i32, i32)>::new(file.path()).has_headers(false);
                 let res = env.stream(source).shuffle().collect_vec();
                 env.execute();
 
@@ -237,7 +344,7 @@ mod tests {
                 }
 
                 let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-                let source = CsvSource::<T>::new(file.path(), true);
+                let source = CsvSource::<T>::new(file.path());
                 let res = env.stream(source).shuffle().collect_vec();
                 env.execute();
 

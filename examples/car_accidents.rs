@@ -70,7 +70,7 @@ fn query1<P: Into<PathBuf>>(
     env: &mut StreamEnvironment,
     path: P,
 ) -> StreamOutput<Vec<(Week, u32)>> {
-    let source = source::CsvSource::<Accident>::new(path, true);
+    let source = source::CsvSource::<Accident>::new(path).has_headers(true);
     let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
     query1_with_source(source)
 }
@@ -152,7 +152,7 @@ fn query2<P: Into<PathBuf>>(
     env: &mut StreamEnvironment,
     path: P,
 ) -> StreamOutput<Vec<(String, i32, u32)>> {
-    let source = source::CsvSource::<Accident>::new(path, true);
+    let source = source::CsvSource::<Accident>::new(path).has_headers(true);
     let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
     query2_with_source(source)
 }
@@ -245,7 +245,7 @@ fn query3<P: Into<PathBuf>>(
     StreamOutput<Vec<(String, Week, i32, u32)>>,
     StreamOutput<Vec<((String, u16), (i32, u32, f64))>>,
 ) {
-    let source = source::CsvSource::<Accident>::new(path, true);
+    let source = source::CsvSource::<Accident>::new(path).has_headers(true);
     let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
     query3_with_source(source)
 }
@@ -327,7 +327,7 @@ fn main() {
     env.spawn_remote_workers();
 
     let (query1, query2, query3) = if share_source {
-        let source = source::CsvSource::<Accident>::new(path, true);
+        let source = source::CsvSource::<Accident>::new(path).has_headers(true);
         let mut splits = env
             .stream(source)
             .batch_mode(BatchMode::fixed(1000))

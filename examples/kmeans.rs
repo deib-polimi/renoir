@@ -151,7 +151,7 @@ fn main() {
     assert_eq!(centroids.len(), num_centroids);
     let initial_state = State::new(centroids);
 
-    let source = source::CsvSource::<Point>::new(path, false);
+    let source = source::CsvSource::<Point>::new(path).has_headers(false);
     let res = env
         .stream(source)
         .replay(

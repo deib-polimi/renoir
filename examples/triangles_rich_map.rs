@@ -16,7 +16,7 @@ fn main() {
 
     env.spawn_remote_workers();
 
-    let source = source::CsvSource::<(u32, u32)>::new(path, false);
+    let source = source::CsvSource::<(u32, u32)>::new(path).has_headers(false);
     let mut edges = env
         .stream(source)
         // make sure v1 is less than v2
