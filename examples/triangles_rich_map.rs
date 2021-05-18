@@ -28,7 +28,7 @@ fn main() {
         .unwrap()
         .group_by(|(v1, _)| *v1)
         // generate all the triangles incrementally
-        .rich_map({
+        .rich_flat_map({
             let mut old_vertices = Vec::new();
             move |(_, (_, y))| {
                 let new_triangles = old_vertices
@@ -39,7 +39,6 @@ fn main() {
                 new_triangles
             }
         })
-        .flatten()
         .unkey()
         .map(|(v1, (v2, v3))| (v1, v2, v3))
         // keep only valid triangles
