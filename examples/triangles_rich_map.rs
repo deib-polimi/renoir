@@ -45,8 +45,8 @@ fn main() {
         // keep only valid triangles
         .join(
             edges.pop().unwrap(),
-            |(_v1, v2, v3): &(u32, u32, u32)| (*v2, *v3),
-            |(v1, v2): &(u32, u32)| (*v1, *v2),
+            |(_v1, v2, v3)| (*v2, *v3),
+            |(v1, v2)| (*v1, *v2),
         )
         .unkey()
         // count the triangles

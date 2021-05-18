@@ -90,8 +90,8 @@ where
     where
         Key: DataKey,
         OperatorChain2: Operator<Out2> + 'static,
-        Keyer1: KeyerFn<Key, Out>,
-        Keyer2: KeyerFn<Key, Out2>,
+        Keyer1: Fn(&Out) -> Key + KeyerFn<Key, Out>,
+        Keyer2: Fn(&Out2) -> Key + KeyerFn<Key, Out2>,
     {
         self.join_with(rhs, keyer1, keyer2)
             .ship_hash()
@@ -112,8 +112,8 @@ where
     where
         Key: DataKey,
         OperatorChain2: Operator<Out2> + 'static,
-        Keyer1: KeyerFn<Key, Out>,
-        Keyer2: KeyerFn<Key, Out2>,
+        Keyer1: Fn(&Out) -> Key + KeyerFn<Key, Out>,
+        Keyer2: Fn(&Out2) -> Key + KeyerFn<Key, Out2>,
     {
         self.join_with(rhs, keyer1, keyer2)
             .ship_hash()
@@ -134,8 +134,8 @@ where
     where
         Key: DataKey,
         OperatorChain2: Operator<Out2> + 'static,
-        Keyer1: KeyerFn<Key, Out>,
-        Keyer2: KeyerFn<Key, Out2>,
+        Keyer1: Fn(&Out) -> Key + KeyerFn<Key, Out>,
+        Keyer2: Fn(&Out2) -> Key + KeyerFn<Key, Out2>,
     {
         self.join_with(rhs, keyer1, keyer2)
             .ship_hash()
@@ -151,8 +151,8 @@ where
     ) -> JoinStream<Key, Out, Out2, OperatorChain, OperatorChain2, Keyer1, Keyer2>
     where
         OperatorChain2: Operator<Out2>,
-        Keyer1: KeyerFn<Key, Out>,
-        Keyer2: KeyerFn<Key, Out2>,
+        Keyer1: Fn(&Out) -> Key + KeyerFn<Key, Out>,
+        Keyer2: Fn(&Out2) -> Key + KeyerFn<Key, Out2>,
     {
         JoinStream {
             lhs: self,

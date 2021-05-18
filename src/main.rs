@@ -16,7 +16,7 @@ fn main() {
     let s1 = env.stream(IteratorSource::new(0..5u64));
     let s2 = env.stream(IteratorSource::new(0..5i32));
     let res = s1
-        .join_with(s2, |n: &u64| (*n % 2) as u8, |n: &i32| (*n % 2) as u8)
+        .join_with(s2, |n| (*n % 2) as u8, |n| (*n % 2) as u8)
         .ship_hash()
         .local_hash()
         .inner()

@@ -15,7 +15,7 @@ macro_rules! run_test {
         let s2 = $env.stream(IteratorSource::new(0..$n2));
         let join = s1
             .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)))
-            .join_with(s2, |x: &u16| *x as u8 % $m, |x: &u32| *x as u8 % $m);
+            .join_with(s2, |x| *x as u8 % $m, |x| *x as u8 % $m);
         let ship = run_test!(@ship_pre, $ship, join);
         let local = run_test!(@local, $local, ship);
         let variant = run_test!(@variant, $variant, local);
@@ -247,10 +247,7 @@ fn self_join() {
 
         let s1 = splits.next().unwrap();
         let s2 = splits.next().unwrap().shuffle().map(|n| n * 2);
-        let res = s1
-            .join(s2, |n: &u32| *n % 2, |n: &u32| *n % 2)
-            .unkey()
-            .collect_vec();
+        let res = s1.join(s2, |n| *n % 2, |n| *n % 2).unkey().collect_vec();
         env.execute();
 
         if let Some(mut res) = res.get() {
@@ -287,7 +284,7 @@ fn join_in_loop() {
                     let mut splits = s.split(2).into_iter();
                     let s1 = splits.next().unwrap();
                     let s2 = splits.next().unwrap().shuffle().map(|n| n * 3);
-                    s1.join(s2, |n: &u32| *n % 2, |n: &u32| *n % 2)
+                    s1.join(s2, |n| *n % 2, |n| *n % 2)
                         .unkey()
                         .map(|(k, (l, r))| k + l + r)
                 },
