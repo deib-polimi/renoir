@@ -87,8 +87,13 @@ class RStream2(System):
         System.__init__(self, "rstream2", "max-remote-execution")
 
 
+class Flink(System):
+    def __init__(self):
+        System.__init__(self, "flink", "total")
+
+
 def main(args):
-    systems = [RStream1(), RStream2()]
+    systems = [RStream1(), RStream2(), Flink()]
 
     for row in csv.DictReader(sys.stdin):
         system = row["system"]
@@ -96,6 +101,8 @@ def main(args):
             systems[0].add(row)
         elif system == "rstream2":
             systems[1].add(row)
+        elif system == "flink":
+            systems[2].add(row)
         else:
             raise ValueError("Unsupported system: " + system)
 
