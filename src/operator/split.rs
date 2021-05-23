@@ -9,7 +9,7 @@ where
     pub fn split(self, splits: usize) -> Vec<Stream<Out, impl Operator<Out>>> {
         // This is needed to maintain the same parallelism of the split block
         let scheduler_requirements = self.block.scheduler_requirements.clone();
-        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::OnlyOne);
+        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::only_one());
         new_stream.block.scheduler_requirements = scheduler_requirements;
 
         let mut streams = Vec::with_capacity(splits);

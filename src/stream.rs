@@ -1,5 +1,6 @@
 use std::any::TypeId;
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -8,10 +9,9 @@ use itertools::Itertools;
 use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::{
-    Data, EndBlock, ExchangeData, IterationStateLock, Operator, WindowDescription,
+    Data, EndBlock, ExchangeData, IterationStateLock, KeyerFn, Operator, WindowDescription,
 };
 use crate::operator::{DataKey, StartBlock};
-use std::marker::PhantomData;
 
 /// Identifier of a block in the job graph.
 pub type BlockId = usize;
@@ -112,15 +112,16 @@ where
     /// be an `Operator<()>`.
     ///
     /// The new block is initialized with a `StartBlock`.
-    pub(crate) fn add_block<GetEndOp, Op>(
+    pub(crate) fn add_block<GetEndOp, Op, IndexFn>(
         self,
         get_end_operator: GetEndOp,
-        next_strategy: NextStrategy<Out>,
+        next_strategy: NextStrategy<Out, IndexFn>,
     ) -> Stream<Out, StartBlock<Out>>
     where
+        IndexFn: KeyerFn<usize, Out>,
         Out: ExchangeData,
         Op: Operator<()> + 'static,
-        GetEndOp: FnOnce(OperatorChain, NextStrategy<Out>, BatchMode) -> Op,
+        GetEndOp: FnOnce(OperatorChain, NextStrategy<Out, IndexFn>, BatchMode) -> Op,
     {
         let batch_mode = self.block.batch_mode;
         let state_lock = self.block.iteration_state_lock_stack.clone();
@@ -153,16 +154,26 @@ where
     /// The start operator of the new block must support multiple inputs: the provided function
     /// will be called with the ids of the 2 input blocks and should return the new start operator
     /// of the new block.
-    pub(crate) fn add_y_connection<Out2, OperatorChain2, NewOut, StartOperator, GetStartOp>(
+    pub(crate) fn add_y_connection<
+        Out2,
+        OperatorChain2,
+        NewOut,
+        StartOperator,
+        GetStartOp,
+        IndexFn1,
+        IndexFn2,
+    >(
         self,
         oth: Stream<Out2, OperatorChain2>,
         get_start_operator: GetStartOp,
-        next_strategy1: NextStrategy<Out>,
-        next_strategy2: NextStrategy<Out2>,
+        next_strategy1: NextStrategy<Out, IndexFn1>,
+        next_strategy2: NextStrategy<Out2, IndexFn2>,
     ) -> Stream<NewOut, StartOperator>
     where
         Out: ExchangeData,
         Out2: ExchangeData,
+        IndexFn1: KeyerFn<usize, Out>,
+        IndexFn2: KeyerFn<usize, Out2>,
         OperatorChain2: Operator<Out2> + 'static,
         NewOut: Data,
         StartOperator: Operator<NewOut>,

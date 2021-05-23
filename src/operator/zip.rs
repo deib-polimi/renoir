@@ -139,8 +139,12 @@ where
     where
         OperatorChain2: Operator<Out2> + 'static,
     {
-        let mut new_stream =
-            self.add_y_connection(oth, Zip::new, NextStrategy::OnlyOne, NextStrategy::OnlyOne);
+        let mut new_stream = self.add_y_connection(
+            oth,
+            Zip::new,
+            NextStrategy::only_one(),
+            NextStrategy::only_one(),
+        );
         // if the zip operator is partitioned there could be some loss of data
         new_stream.block.scheduler_requirements.max_parallelism(1);
         new_stream

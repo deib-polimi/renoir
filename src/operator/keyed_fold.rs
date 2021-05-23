@@ -3,7 +3,6 @@ use std::collections::hash_map::{DefaultHasher, Entry};
 use std::collections::HashMap;
 use std::hash::Hasher;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorStructure};
 use crate::operator::{
@@ -161,12 +160,14 @@ where
         Global: Fn(&mut NewOut, NewOut) + Send + Clone + 'static,
     {
         // GroupBy based on key
-        let next_strategy: NextStrategy<(Key, NewOut)> =
-            NextStrategy::GroupBy(Arc::new(move |(key, _out)| {
+        let next_strategy = NextStrategy::GroupBy(
+            move |(key, _out): &(Key, NewOut)| {
                 let mut s = DefaultHasher::new();
                 key.hash(&mut s);
                 s.finish() as usize
-            }));
+            },
+            Default::default(),
+        );
 
         let new_stream = self
             // key_by with given keyer

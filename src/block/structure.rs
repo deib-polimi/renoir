@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::block::{JobGraphGenerator, NextStrategy};
 use crate::channel::UnboundedChannelReceiver;
 use crate::network::Coord;
-use crate::operator::ExchangeData;
+use crate::operator::{ExchangeData, KeyerFn};
 use crate::stream::BlockId;
 
 /// Wrapper type that contains a string representing the type.
@@ -173,7 +173,13 @@ impl OperatorReceiver {
 }
 
 impl Connection {
-    pub(crate) fn new<T: ExchangeData>(to_block_id: BlockId, strategy: &NextStrategy<T>) -> Self {
+    pub(crate) fn new<T: ExchangeData, IndexFn>(
+        to_block_id: BlockId,
+        strategy: &NextStrategy<T, IndexFn>,
+    ) -> Self
+    where
+        IndexFn: KeyerFn<usize, T>,
+    {
         Self {
             to_block_id,
             data_type: DataType::of::<T>(),
@@ -182,12 +188,15 @@ impl Connection {
     }
 }
 
-impl<Out: ExchangeData> From<&NextStrategy<Out>> for ConnectionStrategy {
-    fn from(strategy: &NextStrategy<Out>) -> Self {
+impl<Out: ExchangeData, IndexFn> From<&NextStrategy<Out, IndexFn>> for ConnectionStrategy
+where
+    IndexFn: KeyerFn<usize, Out>,
+{
+    fn from(strategy: &NextStrategy<Out, IndexFn>) -> Self {
         match strategy {
             NextStrategy::OnlyOne => ConnectionStrategy::OnlyOne,
             NextStrategy::Random => ConnectionStrategy::Random,
-            NextStrategy::GroupBy(_) => ConnectionStrategy::GroupBy,
+            NextStrategy::GroupBy(_, _) => ConnectionStrategy::GroupBy,
             NextStrategy::All => ConnectionStrategy::All,
         }
     }

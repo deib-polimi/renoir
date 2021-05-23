@@ -7,6 +7,6 @@ where
     OperatorChain: Operator<Out> + 'static,
 {
     pub fn broadcast(self) -> Stream<Out, impl Operator<Out>> {
-        self.add_block(EndBlock::new, NextStrategy::All)
+        self.add_block(EndBlock::new, NextStrategy::all())
     }
 }

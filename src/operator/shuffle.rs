@@ -7,6 +7,6 @@ where
     OperatorChain: Operator<Out> + 'static,
 {
     pub fn shuffle(self) -> Stream<Out, impl Operator<Out>> {
-        self.add_block(EndBlock::new, NextStrategy::Random)
+        self.add_block(EndBlock::new, NextStrategy::random())
     }
 }

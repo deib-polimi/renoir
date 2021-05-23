@@ -211,9 +211,9 @@ where
         let mut operator = OperatorStructure::new::<State, _>("IterationLeader");
         operator
             .connections
-            .push(Connection::new::<NewIterationState<State>>(
+            .push(Connection::new::<NewIterationState<State>, _>(
                 self.new_state_senders[0].receiver_endpoint.coord.block_id,
-                &NextStrategy::OnlyOne,
+                &NextStrategy::only_one(),
             ));
         self.delta_update_receiver
             .as_ref()

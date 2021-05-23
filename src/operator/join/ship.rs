@@ -111,8 +111,8 @@ where
             move |prev1, prev2, state_lock| {
                 JoinStartBlock::new(keyer1, keyer2, prev1, prev2, state_lock)
             },
-            NextStrategy::OnlyOne,
-            NextStrategy::All,
+            NextStrategy::only_one(),
+            NextStrategy::all(),
         );
         JoinStreamShipBroadcastRight { inner }
     }

@@ -121,9 +121,9 @@ where
 
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<DeltaUpdate, _>("IterationEndBlock");
-        operator.connections.push(Connection::new::<DeltaUpdate>(
+        operator.connections.push(Connection::new::<DeltaUpdate, _>(
             self.leader_block_id,
-            &NextStrategy::OnlyOne,
+            &NextStrategy::only_one(),
         ));
         self.prev.structure().add_operator(operator)
     }

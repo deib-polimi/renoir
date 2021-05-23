@@ -157,7 +157,7 @@ where
         //        is not changed by the following operators. This because the next strategy affects
         //        the connections made by the scheduler and if accidentally set to OnlyOne will
         //        break the connections.
-        output_stream.add_block(EndBlock::new, NextStrategy::Random)
+        output_stream.add_block(EndBlock::new, NextStrategy::random())
     }
 }
 

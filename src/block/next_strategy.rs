@@ -1,7 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use std::marker::PhantomData;
 
 use rand::{thread_rng, Rng};
 
@@ -17,9 +17,11 @@ pub(crate) struct SenderList(pub Vec<ReceiverEndpoint>);
 ///
 /// A block in the job graph may have many next blocks. Each of them will receive the message, which
 /// of their replica will receive it depends on the value of the next strategy.
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
-pub(crate) enum NextStrategy<Out: ExchangeData> {
+#[derive(Clone, Debug)]
+pub(crate) enum NextStrategy<Out: ExchangeData, IndexFn = fn(&Out) -> usize>
+where
+    IndexFn: KeyerFn<usize, Out>,
+{
     /// Only one of the replicas will receive the message:
     ///
     /// - if the block is not replicated, the only replica will receive the message
@@ -30,24 +32,49 @@ pub(crate) enum NextStrategy<Out: ExchangeData> {
     /// A random replica will receive the message.
     Random,
     /// Among the next replica, the one is selected based on the hash of the key of the message.
-    GroupBy(#[derivative(Debug = "ignore")] Arc<dyn Fn(&Out) -> usize + Send + Sync>),
+    GroupBy(IndexFn, PhantomData<Out>),
     /// Every following replica will receive every message.
     All,
 }
 
 impl<Out: ExchangeData> NextStrategy<Out> {
     /// Build a `NextStrategy` from a keyer function.
-    pub(crate) fn group_by<Key: Hash, Keyer>(keyer: Keyer) -> NextStrategy<Out>
+    pub(crate) fn group_by<Key: Hash, Keyer>(
+        keyer: Keyer,
+    ) -> NextStrategy<Out, impl KeyerFn<usize, Out>>
     where
         Keyer: KeyerFn<Key, Out>,
     {
-        NextStrategy::GroupBy(Arc::new(move |item| {
-            let mut s = DefaultHasher::new();
-            keyer(item).hash(&mut s);
-            s.finish() as usize
-        }))
+        NextStrategy::GroupBy(
+            move |item: &Out| {
+                let mut s = DefaultHasher::new();
+                keyer(item).hash(&mut s);
+                s.finish() as usize
+            },
+            Default::default(),
+        )
     }
 
+    /// Returns `NextStrategy::All` with default `IndexFn`.
+    pub(crate) fn all() -> NextStrategy<Out> {
+        NextStrategy::All
+    }
+
+    /// Returns `NextStrategy::OnlyOne` with default `IndexFn`.
+    pub(crate) fn only_one() -> NextStrategy<Out> {
+        NextStrategy::OnlyOne
+    }
+
+    /// Returns `NextStrategy::Random` with default `IndexFn`.
+    pub(crate) fn random() -> NextStrategy<Out> {
+        NextStrategy::Random
+    }
+}
+
+impl<Out: ExchangeData, IndexFn> NextStrategy<Out, IndexFn>
+where
+    IndexFn: KeyerFn<usize, Out>,
+{
     /// Group the senders from a block using the current next strategy.
     ///
     /// The returned value is a list of `SenderList`s, one for each next block in the execution
@@ -97,7 +124,7 @@ impl<Out: ExchangeData> NextStrategy<Out> {
         match self {
             NextStrategy::OnlyOne | NextStrategy::All => 0,
             NextStrategy::Random => thread_rng().gen(),
-            NextStrategy::GroupBy(keyer) => keyer(message),
+            NextStrategy::GroupBy(keyer, _) => keyer(message),
         }
     }
 }

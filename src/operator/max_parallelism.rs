@@ -9,7 +9,7 @@ where
     pub fn max_parallelism(self, max_parallelism: usize) -> Stream<Out, impl Operator<Out>> {
         assert!(max_parallelism > 0, "Cannot set the parallelism to zero");
 
-        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::OnlyOne);
+        let mut new_stream = self.add_block(EndBlock::new, NextStrategy::only_one());
         new_stream
             .block
             .scheduler_requirements

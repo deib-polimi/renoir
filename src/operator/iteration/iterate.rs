@@ -186,7 +186,7 @@ where
                 end.ignore_destination(output_block_id);
                 end
             },
-            NextStrategy::OnlyOne,
+            NextStrategy::only_one(),
         );
         let body_end_block_id = body_end.block.id;
         body_end.block.iteration_state_lock_stack.pop().unwrap();
@@ -206,7 +206,7 @@ where
         // Second split of the body: the data will be fed back to the Iterate block
         let batch_mode = body_end.block.batch_mode;
         let mut feedback_end = body_end.add_operator(|prev| {
-            let mut end = EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode);
+            let mut end = EndBlock::new(prev, NextStrategy::only_one(), batch_mode);
             end.mark_feedback(iterate_block_id);
             end
         });
@@ -253,7 +253,7 @@ where
         //        the connections made by the scheduler and if accidentally set to OnlyOne will
         //        break the connections.
         (
-            leader_stream.add_block(EndBlock::new, NextStrategy::Random),
+            leader_stream.add_block(EndBlock::new, NextStrategy::random()),
             output,
         )
     }
@@ -384,9 +384,9 @@ where
             self.feedback_end_block_id.load(Ordering::Acquire),
         ));
         let output_block_id = self.output_block_id.load(Ordering::Acquire);
-        operator.connections.push(Connection::new::<Out>(
+        operator.connections.push(Connection::new::<Out, _>(
             output_block_id,
-            &NextStrategy::OnlyOne,
+            &NextStrategy::only_one(),
         ));
         self.prev.structure().add_operator(operator)
     }

@@ -4,19 +4,20 @@ use crate::block::{
     BatchMode, Batcher, BlockStructure, Connection, NextStrategy, OperatorStructure, SenderList,
 };
 use crate::network::ReceiverEndpoint;
-use crate::operator::{ExchangeData, Operator, StreamElement};
+use crate::operator::{ExchangeData, KeyerFn, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
-pub struct EndBlock<Out: ExchangeData, OperatorChain>
+pub struct EndBlock<Out: ExchangeData, OperatorChain, IndexFn>
 where
+    IndexFn: KeyerFn<usize, Out>,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
     metadata: Option<ExecutionMetadata>,
-    next_strategy: NextStrategy<Out>,
+    next_strategy: NextStrategy<Out, IndexFn>,
     batch_mode: BatchMode,
     sender_groups: Vec<SenderList>,
     #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
@@ -25,13 +26,14 @@ where
     ignore_block_ids: Vec<BlockId>,
 }
 
-impl<Out: ExchangeData, OperatorChain> EndBlock<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain, IndexFn> EndBlock<Out, OperatorChain, IndexFn>
 where
+    IndexFn: KeyerFn<usize, Out>,
     OperatorChain: Operator<Out>,
 {
     pub(crate) fn new(
         prev: OperatorChain,
-        next_strategy: NextStrategy<Out>,
+        next_strategy: NextStrategy<Out, IndexFn>,
         batch_mode: BatchMode,
     ) -> Self {
         Self {
@@ -59,8 +61,10 @@ where
     }
 }
 
-impl<Out: ExchangeData, OperatorChain> Operator<()> for EndBlock<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain, IndexFn> Operator<()>
+    for EndBlock<Out, OperatorChain, IndexFn>
 where
+    IndexFn: KeyerFn<usize, Out>,
     OperatorChain: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -164,7 +168,7 @@ where
                 let block_id = sender_group.0[0].coord.block_id;
                 operator
                     .connections
-                    .push(Connection::new::<Out>(block_id, &self.next_strategy));
+                    .push(Connection::new::<Out, _>(block_id, &self.next_strategy));
             }
         }
         self.prev.structure().add_operator(operator)

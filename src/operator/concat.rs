@@ -24,8 +24,8 @@ where
         self.add_y_connection(
             oth,
             |id1, id2, state_lock| StartBlock::concat(vec![id1, id2], state_lock),
-            NextStrategy::OnlyOne,
-            NextStrategy::OnlyOne,
+            NextStrategy::only_one(),
+            NextStrategy::only_one(),
         )
     }
 
