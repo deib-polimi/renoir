@@ -1,5 +1,5 @@
 use rstream::operator::source::EventTimeIteratorSource;
-use rstream::operator::{EventTimeWindow, Timestamp};
+use rstream::operator::{EventTimeWindow, SessionWindow, Timestamp};
 use rstream::test::TestHelper;
 
 #[test]
@@ -114,6 +114,66 @@ fn window_all_join() {
                 }
             }
             expected.sort_unstable();
+
+            assert_eq!(res, expected);
+        }
+    });
+}
+
+#[test]
+fn session_window_join() {
+    TestHelper::local_remote_env(|mut env| {
+        let source1 = EventTimeIteratorSource::new(
+            vec![0, 1, 2, 6, 7, 8]
+                .into_iter()
+                .map(|x| (x, Timestamp::from_secs(x))),
+            |x, ts| {
+                if x % 2 == 1 {
+                    Some(*ts)
+                } else {
+                    None
+                }
+            },
+        );
+
+        let source2 = EventTimeIteratorSource::new(
+            vec![1, 3, 6, 9, 10, 11]
+                .into_iter()
+                .map(|x| (x, Timestamp::from_secs(x))),
+            |x, ts| {
+                if x % 2 == 0 {
+                    Some(*ts)
+                } else {
+                    None
+                }
+            },
+        );
+
+        let stream1 = env.stream(source1).shuffle().group_by(|x| x % 2);
+        let stream2 = env.stream(source2).shuffle().group_by(|x| x % 2);
+
+        let res = stream1
+            .window(SessionWindow::with_gap(Timestamp::from_secs(3)))
+            .join(stream2)
+            .unkey()
+            .collect_vec();
+        env.execute();
+
+        if let Some(mut res) = res.get() {
+            let mut expected = vec![
+                // key 0
+                (0, (6, 6)),
+                (0, (6, 10)),
+                (0, (8, 6)),
+                (0, (8, 10)),
+                // key 1
+                (1, (1, 1)),
+                (1, (1, 3)),
+                (1, (7, 9)),
+                (1, (7, 11)),
+            ];
+            expected.sort_unstable();
+            res.sort_unstable();
 
             assert_eq!(res, expected);
         }
