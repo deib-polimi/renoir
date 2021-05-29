@@ -1,5 +1,5 @@
 use rstream::operator::source::EventTimeIteratorSource;
-use rstream::operator::{EventTimeWindow, SessionWindow, Timestamp};
+use rstream::operator::{EventTimeWindow, Timestamp};
 use rstream::test::TestHelper;
 
 #[test]
@@ -153,7 +153,7 @@ fn session_window_join() {
         let stream2 = env.stream(source2).shuffle().group_by(|x| x % 2);
 
         let res = stream1
-            .window(SessionWindow::with_gap(Timestamp::from_secs(3)))
+            .window(EventTimeWindow::session(Timestamp::from_secs(3)))
             .join(stream2)
             .unkey()
             .collect_vec();

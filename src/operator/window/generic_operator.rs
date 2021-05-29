@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::window::KeyedWindowManager;
+use crate::operator::window::window_manager::KeyedWindowManager;
 use crate::operator::{
     Data, DataKey, Operator, Reorder, StreamElement, Window, WindowDescription, WindowGenerator,
 };
