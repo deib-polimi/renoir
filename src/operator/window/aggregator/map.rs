@@ -12,7 +12,7 @@ where
         map_func: F,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        F: Fn(&mut dyn Iterator<Item = &Out>) -> NewOut + Clone + Send + 'static,
+        F: Fn(&mut dyn ExactSizeIterator<Item = &Out>) -> NewOut + Clone + Send + 'static,
     {
         self.add_generic_window_operator("WindowMap", move |window| (map_func)(&mut window.items()))
     }
@@ -25,7 +25,7 @@ where
 {
     pub fn map<NewOut: Data, F>(self, map_func: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        F: Fn(&mut dyn Iterator<Item = &Out>) -> NewOut + Clone + Send + 'static,
+        F: Fn(&mut dyn ExactSizeIterator<Item = &Out>) -> NewOut + Clone + Send + 'static,
     {
         self.inner.map(map_func).unkey().map(|(_, x)| x)
     }

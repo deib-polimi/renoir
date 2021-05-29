@@ -51,7 +51,7 @@ pub struct Window<'a, Key: DataKey, Out: Data> {
 
 impl<'a, Key: DataKey, Out: Data> Window<'a, Key, Out> {
     /// An iterator to the elements of the window.
-    fn items(&self) -> impl Iterator<Item = &Out> {
+    fn items(&self) -> impl ExactSizeIterator<Item = &Out> {
         self.gen.buffer().iter().take(self.size)
     }
 }

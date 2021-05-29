@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+pub use add_timestamps::*;
 pub use batch_mode::*;
 pub use broadcast::*;
 pub use concat::*;
@@ -29,6 +30,7 @@ use crate::block::BlockStructure;
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyValue;
 
+mod add_timestamps;
 mod batch_mode;
 mod broadcast;
 mod concat;

@@ -1,4 +1,4 @@
-use rstream::operator::source::EventTimeIteratorSource;
+use rstream::operator::source::IteratorSource;
 use rstream::operator::Timestamp;
 use rstream::test::TestHelper;
 use std::time::Duration;
@@ -6,30 +6,22 @@ use std::time::Duration;
 #[test]
 fn interval_join_keyed_stream() {
     TestHelper::local_remote_env(|mut env| {
-        let source = EventTimeIteratorSource::new(
-            (0..10).map(|x| (x, Timestamp::from_nanos(x as u64))),
-            |x, ts| {
-                if x % 2 == 0 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            },
-        );
+        let source = IteratorSource::new(0..10);
+        let source2 = IteratorSource::new(0..10);
 
-        let source2 = EventTimeIteratorSource::new(
-            (0..10).map(|x| (x, Timestamp::from_nanos(x as u64))),
-            |x, ts| {
-                if x % 2 == 0 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            },
-        );
-        let right = env.stream(source2).group_by(|x| x % 2);
+        let right = env
+            .stream(source2)
+            .add_timestamps(
+                |&x| Timestamp::from_nanos(x as u64),
+                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
+            )
+            .group_by(|x| x % 2);
         let res = env
             .stream(source)
+            .add_timestamps(
+                |&x| Timestamp::from_nanos(x as u64),
+                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
+            )
             .group_by(|x| x % 2)
             .interval_join(right, Duration::from_nanos(1), Duration::from_nanos(2))
             .unkey()
@@ -57,30 +49,19 @@ fn interval_join_keyed_stream() {
 #[test]
 fn interval_join_stream() {
     TestHelper::local_remote_env(|mut env| {
-        let source = EventTimeIteratorSource::new(
-            (0..10).map(|x| (x, Timestamp::from_nanos(x as u64))),
-            |x, ts| {
-                if x % 2 == 0 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            },
-        );
+        let source = IteratorSource::new(0..10);
+        let source2 = IteratorSource::new(0..10);
 
-        let source2 = EventTimeIteratorSource::new(
-            (0..10).map(|x| (x, Timestamp::from_nanos(x as u64))),
-            |x, ts| {
-                if x % 2 == 0 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            },
+        let right = env.stream(source2).add_timestamps(
+            |&x| Timestamp::from_nanos(x as u64),
+            |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
         );
-        let right = env.stream(source2);
         let res = env
             .stream(source)
+            .add_timestamps(
+                |&x| Timestamp::from_nanos(x as u64),
+                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
+            )
             .interval_join(right, Duration::from_nanos(1), Duration::from_nanos(2))
             .collect_vec();
 

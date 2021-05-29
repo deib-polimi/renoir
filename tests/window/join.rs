@@ -1,31 +1,27 @@
-use rstream::operator::source::EventTimeIteratorSource;
+use rstream::operator::source::IteratorSource;
 use rstream::operator::{EventTimeWindow, Timestamp};
 use rstream::test::TestHelper;
 
 #[test]
 fn window_join() {
     TestHelper::local_remote_env(|mut env| {
-        let source1 =
-            EventTimeIteratorSource::new((0..10).map(|x| (x, Timestamp::from_secs(x))), |x, ts| {
-                if x % 2 == 1 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            });
+        let source1 = IteratorSource::new(0..10);
+        let source2 = IteratorSource::new(0..10);
 
-        let source2 =
-            EventTimeIteratorSource::new((0..10).map(|x| (x, Timestamp::from_secs(x))), |x, ts| {
-                if x % 2 == 0 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            });
-
-        let stream1 = env.stream(source1).shuffle().group_by(|x| x % 2);
+        let stream1 = env
+            .stream(source1)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
+            )
+            .shuffle()
+            .group_by(|x| x % 2);
         let stream2 = env
             .stream(source2)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
+            )
             .shuffle()
             .group_by(|x| x % 2)
             .map(|(_, x)| ('a'..'z').nth(x as usize).unwrap());
@@ -70,27 +66,22 @@ fn window_join() {
 #[test]
 fn window_all_join() {
     TestHelper::local_remote_env(|mut env| {
-        let source1 =
-            EventTimeIteratorSource::new((0..10).map(|x| (x, Timestamp::from_secs(x))), |x, ts| {
-                if x % 2 == 1 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            });
+        let source1 = IteratorSource::new(0..10);
+        let source2 = IteratorSource::new(0..10);
 
-        let source2 =
-            EventTimeIteratorSource::new((0..10).map(|x| (x, Timestamp::from_secs(x))), |x, ts| {
-                if x % 2 == 0 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            });
-
-        let stream1 = env.stream(source1).shuffle();
+        let stream1 = env
+            .stream(source1)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
+            )
+            .shuffle();
         let stream2 = env
             .stream(source2)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
+            )
             .shuffle()
             .map(|x| ('a'..'z').nth(x as usize).unwrap());
 
@@ -123,34 +114,25 @@ fn window_all_join() {
 #[test]
 fn session_window_join() {
     TestHelper::local_remote_env(|mut env| {
-        let source1 = EventTimeIteratorSource::new(
-            vec![0, 1, 2, 6, 7, 8]
-                .into_iter()
-                .map(|x| (x, Timestamp::from_secs(x))),
-            |x, ts| {
-                if x % 2 == 1 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            },
-        );
+        let source1 = IteratorSource::new(vec![0, 1, 2, 6, 7, 8].into_iter());
+        let source2 = IteratorSource::new(vec![1, 3, 6, 9, 10, 11].into_iter());
 
-        let source2 = EventTimeIteratorSource::new(
-            vec![1, 3, 6, 9, 10, 11]
-                .into_iter()
-                .map(|x| (x, Timestamp::from_secs(x))),
-            |x, ts| {
-                if x % 2 == 0 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            },
-        );
-
-        let stream1 = env.stream(source1).shuffle().group_by(|x| x % 2);
-        let stream2 = env.stream(source2).shuffle().group_by(|x| x % 2);
+        let stream1 = env
+            .stream(source1)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
+            )
+            .shuffle()
+            .group_by(|x| x % 2);
+        let stream2 = env
+            .stream(source2)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
+            )
+            .shuffle()
+            .group_by(|x| x % 2);
 
         let res = stream1
             .window(EventTimeWindow::session(Timestamp::from_secs(3)))

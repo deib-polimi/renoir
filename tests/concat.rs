@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 
-use rstream::operator::source::{EventTimeIteratorSource, IteratorSource};
+use rstream::operator::source::IteratorSource;
 use rstream::operator::Timestamp;
 use rstream::test::{TestHelper, WatermarkChecker};
 
@@ -84,17 +84,23 @@ fn concat_empty_with_empty() {
 #[test]
 fn concat_with_timestamps() {
     TestHelper::local_remote_env(|mut env| {
-        let source1 = EventTimeIteratorSource::new(
-            (0..10u64).map(|x| (x, Timestamp::from_secs(x))),
-            |x, ts| if x % 2 == 1 { Some(*ts) } else { None },
-        );
-        let source2 = EventTimeIteratorSource::new(
-            (100..110u64).map(|x| (x, Timestamp::from_secs(x % 10))),
-            |x, ts| if x % 2 == 1 { Some(*ts) } else { None },
-        );
+        let source1 = IteratorSource::new(0..10u64);
+        let source2 = IteratorSource::new(100..110u64);
 
-        let stream1 = env.stream(source1).shuffle();
-        let stream2 = env.stream(source2).shuffle();
+        let stream1 = env
+            .stream(source1)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
+            )
+            .shuffle();
+        let stream2 = env
+            .stream(source2)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x % 10),
+                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
+            )
+            .shuffle();
 
         let num_watermarks = Arc::new(AtomicUsize::new(0));
         let stream = stream1
