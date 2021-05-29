@@ -1,23 +1,20 @@
 use std::time::Duration;
 
-use rstream::operator::source::EventTimeIteratorSource;
+use rstream::operator::source::IteratorSource;
 use rstream::operator::{EventTimeWindow, Timestamp};
 use rstream::test::TestHelper;
 
 #[test]
 fn sliding_event_time() {
     TestHelper::local_remote_env(|mut env| {
-        let source =
-            EventTimeIteratorSource::new((0..10).map(|x| (x, Timestamp::from_secs(x))), |x, ts| {
-                if x % 2 == 1 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            });
+        let source = IteratorSource::new(0..10);
 
         let res = env
             .stream(source)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
+            )
             .group_by(|x| x % 2)
             .window(EventTimeWindow::sliding(
                 Duration::from_secs(3),
@@ -44,17 +41,14 @@ fn sliding_event_time() {
 #[test]
 fn tumbling_event_time() {
     TestHelper::local_remote_env(|mut env| {
-        let source =
-            EventTimeIteratorSource::new((0..10).map(|x| (x, Timestamp::from_secs(x))), |x, ts| {
-                if x % 2 == 1 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            });
+        let source = IteratorSource::new(0..10);
 
         let res = env
             .stream(source)
+            .add_timestamps(
+                |&x| Timestamp::from_secs(x),
+                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
+            )
             .group_by(|x| x % 2)
             .window(EventTimeWindow::tumbling(Duration::from_secs(3)))
             .first()
