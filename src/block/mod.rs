@@ -75,6 +75,17 @@ where
             _out_type: Default::default(),
         }
     }
+
+    /// Obtain a vector of opaque items representing the stack of iterations.
+    ///
+    /// An empty vector is returned when the block is outside any iterations, more than one element
+    /// if it's inside nested iterations.
+    pub(crate) fn iteration_stack(&self) -> Vec<*const ()> {
+        self.iteration_state_lock_stack
+            .iter()
+            .map(|s| Arc::as_ptr(s) as *const ())
+            .collect()
+    }
 }
 
 impl<Out: Data, OperatorChain> Display for InnerBlock<Out, OperatorChain>

@@ -121,12 +121,20 @@ where
             self.add_operator(|prev| Replay::new(prev, state, leader_block_id, state_lock.clone()));
         let replay_block_id = iter_start.block.id;
 
+        // save the stack of the iteration for checking the stream returned by the body
         iter_start.block.iteration_state_lock_stack.push(state_lock);
+        let pre_iter_stack = iter_start.block.iteration_stack();
+
         let mut iter_end = body(iter_start, state_clone)
             .key_by(|_| ())
             .fold(DeltaUpdate::default(), local_fold)
             .unkey()
             .map(|(_, delta_update)| delta_update);
+
+        let post_iter_stack = iter_end.block.iteration_stack();
+        if pre_iter_stack != post_iter_stack {
+            panic!("The body of the iteration should return the stream given as parameter");
+        }
         iter_end.block.iteration_state_lock_stack.pop().unwrap();
 
         let iter_end = iter_end.add_operator(|prev| IterationEndBlock::new(prev, leader_block_id));

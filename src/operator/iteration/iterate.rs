@@ -175,6 +175,9 @@ where
             .block
             .iteration_state_lock_stack
             .push(state_lock.clone());
+        // save the stack of the iteration for checking the stream returned by the body
+        let pre_iter_stack = iter_start.block.iteration_stack();
+
         // attach the body of the loop to the Iterate operator
         let body_end = body(iter_start, state_clone);
 
@@ -189,6 +192,11 @@ where
             NextStrategy::only_one(),
         );
         let body_end_block_id = body_end.block.id;
+
+        let post_iter_stack = body_end.block.iteration_stack();
+        if pre_iter_stack != post_iter_stack {
+            panic!("The body of the iteration should return the stream given as parameter");
+        }
         body_end.block.iteration_state_lock_stack.pop().unwrap();
 
         // First split of the body: the data will be reduced into delta updates
