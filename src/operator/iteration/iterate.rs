@@ -106,7 +106,7 @@ where
         Stream<Out, impl Operator<Out>>,
     )
     where
-        Body: Fn(
+        Body: FnOnce(
             Stream<Out, Iterate<Out, State, OperatorChain>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,

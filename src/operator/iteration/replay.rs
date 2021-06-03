@@ -78,7 +78,7 @@ where
         loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
     ) -> Stream<State, impl Operator<State>>
     where
-        Body: Fn(
+        Body: FnOnce(
             Stream<Out, Replay<Out, State, OperatorChain>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,
