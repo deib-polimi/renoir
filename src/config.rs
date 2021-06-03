@@ -183,7 +183,7 @@ impl CommandLineOptions {
     /// Check that the configuration provided is valid.
     fn validate(&self) {
         if !(self.remote.is_some() ^ self.local.is_some()) {
-            panic!("Use one of --remote or --threads");
+            panic!("Use one of --remote or --local");
         }
         if let Some(threads) = self.local {
             if threads == 0 {

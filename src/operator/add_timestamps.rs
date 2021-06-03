@@ -8,8 +8,8 @@ use std::marker::PhantomData;
 pub struct AddTimestamp<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
 where
     OperatorChain: Operator<Out>,
-    TimestampGen: Fn(&Out) -> Timestamp + Clone + Send + 'static,
-    WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+    TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
+    WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
     prev: OperatorChain,
     timestamp_gen: TimestampGen,
@@ -22,8 +22,8 @@ impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
     AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
 where
     OperatorChain: Operator<Out>,
-    TimestampGen: Fn(&Out) -> Timestamp + Clone + Send + 'static,
-    WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+    TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
+    WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
     fn new(prev: OperatorChain, timestamp_gen: TimestampGen, watermark_gen: WatermarkGen) -> Self {
         Self {
@@ -40,8 +40,8 @@ impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain> Operator<Out>
     for AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
 where
     OperatorChain: Operator<Out>,
-    TimestampGen: Fn(&Out) -> Timestamp + Clone + Send + 'static,
-    WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+    TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
+    WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -88,8 +88,8 @@ where
         watermark_gen: WatermarkGen,
     ) -> Stream<Out, impl Operator<Out>>
     where
-        TimestampGen: Fn(&Out) -> Timestamp + Clone + Send + 'static,
-        WatermarkGen: Fn(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+        TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
+        WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
     {
         self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
     }
