@@ -9,9 +9,10 @@ use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, Rece
 use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
+use crate::operator::start::StartBlock;
 use crate::operator::{
     EndBlock, ExchangeData, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
-    StartBlock, StreamElement,
+    StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
@@ -164,7 +165,7 @@ where
         // prepare the stream that will output the content of the loop
         let output = StreamEnvironmentInner::stream(
             env.clone(),
-            StartBlock::new(
+            StartBlock::single(
                 iterate_block_id,
                 iter_start.block.iteration_state_lock_stack.last().cloned(),
             ),
@@ -184,7 +185,7 @@ where
         // Split the body of the loop in 2: the end block of the loop must ignore the output stream
         // since it's manually handled by the Iterate operator.
         let mut body_end = body_end.add_block(
-            |prev, next_strategy, batch_mode| {
+            move |prev, next_strategy, batch_mode| {
                 let mut end = EndBlock::new(prev, next_strategy, batch_mode);
                 end.ignore_destination(output_block_id);
                 end
@@ -202,7 +203,7 @@ where
         // First split of the body: the data will be reduced into delta updates
         let delta_update_end = StreamEnvironmentInner::stream(
             env.clone(),
-            StartBlock::new(body_end_block_id, Some(state_lock)),
+            StartBlock::single(body_end_block_id, Some(state_lock)),
         )
         .key_by(|_| ())
         .fold(DeltaUpdate::default(), local_fold)

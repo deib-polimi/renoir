@@ -3,9 +3,10 @@ use std::sync::{Arc, Barrier};
 use lazy_init::Lazy;
 
 use crate::network::Coord;
+use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock};
 use crate::operator::{
     ExchangeData, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
-    StartBlock, StreamElement,
+    StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
@@ -20,7 +21,7 @@ pub(crate) struct IterationStateHandler<State: ExchangeData> {
     pub coord: Coord,
 
     /// Receiver of the new state from the leader.
-    pub new_state_receiver: StartBlock<NewIterationState<State>>,
+    pub new_state_receiver: SingleStartBlockReceiverOperator<NewIterationState<State>>,
     /// The id of the block where `IterationLeader` is.
     pub leader_block_id: BlockId,
 
@@ -60,7 +61,7 @@ impl<State: ExchangeData> IterationStateHandler<State> {
             is_local_leader: false,
             num_local_replicas: 0,
 
-            new_state_receiver: StartBlock::new(leader_block_id, None),
+            new_state_receiver: StartBlock::single(leader_block_id, None),
             leader_block_id,
             state_ref,
             state_barrier: Arc::new(Default::default()),

@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::network::Coord;
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
-use crate::operator::join::start::{JoinElement, JoinStartBlock};
+use crate::operator::start::{MultipleStartBlockReceiverOperator, TwoSidesItem};
 use crate::operator::{
     DataKey, ExchangeData, InnerJoinTuple, JoinVariant, KeyerFn, LeftJoinTuple, Operator,
     OuterJoinTuple, StreamElement,
@@ -44,9 +44,6 @@ impl<Key: DataKey, Out> Default for SideHashMap<Key, Out> {
 
 /// This operator performs the join using the local hash strategy.
 ///
-/// The previous operator should be a `JoinStartBlock` that emits the `JoinElement` of the two
-/// incoming streams.
-///
 /// This operator is able to produce the outer join tuples (the most general type of join), but it
 /// can be asked to skip generating the `None` tuples if the join was actually inner.
 #[derive(Clone, Debug)]
@@ -54,7 +51,9 @@ struct JoinLocalHash<
     Key: DataKey,
     Out1: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
+    Keyer1: KeyerFn<Key, Out1>,
+    Keyer2: KeyerFn<Key, Out2>,
+    OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
 > {
     prev: OperatorChain,
     coord: Coord,
@@ -63,6 +62,10 @@ struct JoinLocalHash<
     left: SideHashMap<Key, Out1>,
     /// The content of the right side.
     right: SideHashMap<Key, Out2>,
+
+    keyer1: Keyer1,
+    keyer2: Keyer2,
+
     /// The variant of join to build.
     ///
     /// This is used for optimizing the behaviour in case of inner and left joins, avoiding to
@@ -76,15 +79,19 @@ impl<
         Key: DataKey,
         Out1: ExchangeData,
         Out2: ExchangeData,
-        OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
-    > JoinLocalHash<Key, Out1, Out2, OperatorChain>
+        Keyer1: KeyerFn<Key, Out1>,
+        Keyer2: KeyerFn<Key, Out2>,
+        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
+    > JoinLocalHash<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
-    fn new(prev: OperatorChain, variant: JoinVariant) -> Self {
+    fn new(prev: OperatorChain, variant: JoinVariant, keyer1: Keyer1, keyer2: Keyer2) -> Self {
         Self {
             prev,
             coord: Default::default(),
             left: Default::default(),
             right: Default::default(),
+            keyer1,
+            keyer2,
             variant,
             buffer: Default::default(),
         }
@@ -162,9 +169,11 @@ impl<
         Key: DataKey,
         Out1: ExchangeData,
         Out2: ExchangeData,
-        OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
+        Keyer1: KeyerFn<Key, Out1>,
+        Keyer2: KeyerFn<Key, Out2>,
+        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
     > Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>
-    for JoinLocalHash<Key, Out1, Out2, OperatorChain>
+    for JoinLocalHash<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.coord = metadata.coord;
@@ -174,8 +183,8 @@ impl<
     fn next(&mut self) -> StreamElement<(Key, OuterJoinTuple<Out1, Out2>)> {
         while self.buffer.is_empty() {
             match self.prev.next() {
-                StreamElement::Item(JoinElement::Left(item)) => Self::add_item(
-                    item,
+                StreamElement::Item(TwoSidesItem::Left(item)) => Self::add_item(
+                    ((self.keyer1)(&item), item),
                     &mut self.left,
                     &mut self.right,
                     self.variant.left_outer(),
@@ -183,8 +192,8 @@ impl<
                     &mut self.buffer,
                     |x, y| (x, y),
                 ),
-                StreamElement::Item(JoinElement::Right(item)) => Self::add_item(
-                    item,
+                StreamElement::Item(TwoSidesItem::Right(item)) => Self::add_item(
+                    ((self.keyer2)(&item), item),
                     &mut self.right,
                     &mut self.left,
                     self.variant.right_outer(),
@@ -192,7 +201,7 @@ impl<
                     &mut self.buffer,
                     |x, y| (y, x),
                 ),
-                StreamElement::Item(JoinElement::LeftEnd) => {
+                StreamElement::Item(TwoSidesItem::LeftEnd) => {
                     debug!(
                         "Left side of join ended with {} elements on the left \
                         and {} elements on the right",
@@ -206,7 +215,7 @@ impl<
                         |x, y| (x, y),
                     )
                 }
-                StreamElement::Item(JoinElement::RightEnd) => {
+                StreamElement::Item(TwoSidesItem::RightEnd) => {
                     debug!(
                         "Right side of join ended with {} elements on the left \
                         and {} elements on the right",
@@ -276,7 +285,10 @@ pub struct JoinStreamLocalHash<
     Keyer2: KeyerFn<Key, Out2>,
     ShipStrat: ShipStrategy,
 > {
-    stream: Stream<JoinElement<Key, Out1, Out2>, JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>>,
+    stream: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+    keyer1: Keyer1,
+    keyer2: Keyer2,
+    _key: PhantomData<Key>,
     _s: PhantomData<ShipStrat>,
 }
 
@@ -293,13 +305,15 @@ where
     Keyer2: KeyerFn<Key, Out2>,
 {
     pub(crate) fn new(
-        stream: Stream<
-            JoinElement<Key, Out1, Out2>,
-            JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>,
-        >,
+        stream: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+        keyer1: Keyer1,
+        keyer2: Keyer2,
     ) -> Self {
         Self {
             stream,
+            keyer1,
+            keyer2,
+            _key: Default::default(),
             _s: Default::default(),
         }
     }
@@ -318,9 +332,11 @@ where
         InnerJoinTuple<Out1, Out2>,
         impl Operator<KeyValue<Key, InnerJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         let inner = self
             .stream
-            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Inner));
+            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Inner, keyer1, keyer2));
         KeyedStream(inner).map(|(_key, (lhs, rhs))| (lhs.unwrap(), rhs.unwrap()))
     }
 
@@ -331,9 +347,11 @@ where
         LeftJoinTuple<Out1, Out2>,
         impl Operator<KeyValue<Key, LeftJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         let inner = self
             .stream
-            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Left));
+            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Left, keyer1, keyer2));
         KeyedStream(inner).map(|(_key, (lhs, rhs))| (lhs.unwrap(), rhs))
     }
 
@@ -344,9 +362,11 @@ where
         OuterJoinTuple<Out1, Out2>,
         impl Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         let inner = self
             .stream
-            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Outer));
+            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Outer, keyer1, keyer2));
         KeyedStream(inner)
     }
 }
@@ -363,8 +383,10 @@ where
         KeyValue<Key, InnerJoinTuple<Out1, Out2>>,
         impl Operator<KeyValue<Key, InnerJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         self.stream
-            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Inner))
+            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Inner, keyer1, keyer2))
             .map(|(key, (lhs, rhs))| (key, (lhs.unwrap(), rhs.unwrap())))
     }
 
@@ -374,8 +396,10 @@ where
         KeyValue<Key, LeftJoinTuple<Out1, Out2>>,
         impl Operator<KeyValue<Key, LeftJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         self.stream
-            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Left))
+            .add_operator(|prev| JoinLocalHash::new(prev, JoinVariant::Left, keyer1, keyer2))
             .map(|(key, (lhs, rhs))| (key, (lhs.unwrap(), rhs)))
     }
 }

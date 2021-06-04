@@ -8,10 +8,11 @@ use itertools::Itertools;
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
+use crate::operator::DataKey;
+use crate::operator::StartBlock;
 use crate::operator::{
     Data, EndBlock, ExchangeData, IterationStateLock, KeyerFn, Operator, WindowDescription,
 };
-use crate::operator::{DataKey, StartBlock};
 
 /// Identifier of a block in the job graph.
 pub type BlockId = usize;
@@ -116,7 +117,7 @@ where
         self,
         get_end_operator: GetEndOp,
         next_strategy: NextStrategy<Out, IndexFn>,
-    ) -> Stream<Out, StartBlock<Out>>
+    ) -> Stream<Out, impl Operator<Out>>
     where
         IndexFn: KeyerFn<usize, Out>,
         Out: ExchangeData,
@@ -136,7 +137,7 @@ where
         scheduler.connect_blocks(old_id, new_id, TypeId::of::<Out>());
         drop(env);
 
-        let start_block = StartBlock::new(old_id, state_lock.last().cloned());
+        let start_block = StartBlock::single(old_id, state_lock.last().cloned());
         Stream {
             block: InnerBlock::new(new_id, start_block, batch_mode, state_lock),
             env: old_stream.env,

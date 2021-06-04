@@ -4,19 +4,17 @@ use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
-use crate::operator::join::start::{JoinElement, JoinStartBlock};
+use crate::operator::start::{MultipleStartBlockReceiverOperator, TwoSidesItem};
 use crate::operator::{
     Data, ExchangeData, InnerJoinTuple, JoinVariant, KeyerFn, LeftJoinTuple, Operator,
     OuterJoinTuple, StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::worker::replica_coord;
 use std::collections::VecDeque;
 
 /// This operator performs the join using the local sort-merge strategy.
-///
-/// The previous operator should be a `JoinStartBlock` that emits the `JoinElement` of the two
-/// incoming streams.
 ///
 /// This operator is able to produce the outer join tuples (the most general type of join), but it
 /// can be asked to skip generating the `None` tuples if the join was actually inner.
@@ -25,9 +23,15 @@ struct JoinLocalSortMerge<
     Key: Data + Ord,
     Out1: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
+    Keyer1: KeyerFn<Key, Out1>,
+    Keyer2: KeyerFn<Key, Out2>,
+    OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
 > {
     prev: OperatorChain,
+
+    keyer1: Keyer1,
+    keyer2: Keyer2,
+
     /// Whether the left side has ended.
     left_ended: bool,
     /// Whether the right side has ended.
@@ -49,12 +53,16 @@ impl<
         Key: Data + Ord,
         Out1: ExchangeData,
         Out2: ExchangeData,
-        OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
-    > JoinLocalSortMerge<Key, Out1, Out2, OperatorChain>
+        Keyer1: KeyerFn<Key, Out1>,
+        Keyer2: KeyerFn<Key, Out2>,
+        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
+    > JoinLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
-    fn new(prev: OperatorChain, variant: JoinVariant) -> Self {
+    fn new(prev: OperatorChain, variant: JoinVariant, keyer1: Keyer1, keyer2: Keyer2) -> Self {
         Self {
             prev,
+            keyer1,
+            keyer2,
             left_ended: false,
             right_ended: false,
             left: Default::default(),
@@ -130,9 +138,11 @@ impl<
         Key: Data + Ord,
         Out1: ExchangeData,
         Out2: ExchangeData,
-        OperatorChain: Operator<JoinElement<Key, Out1, Out2>>,
+        Keyer1: KeyerFn<Key, Out1>,
+        Keyer2: KeyerFn<Key, Out2>,
+        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
     > Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>
-    for JoinLocalSortMerge<Key, Out1, Out2, OperatorChain>
+    for JoinLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -150,17 +160,17 @@ impl<
             }
 
             match self.prev.next() {
-                StreamElement::Item(JoinElement::Left(item)) => {
-                    self.left.push(item);
+                StreamElement::Item(TwoSidesItem::Left(item)) => {
+                    self.left.push(((self.keyer1)(&item), item));
                 }
-                StreamElement::Item(JoinElement::Right(item)) => {
-                    self.right.push(item);
+                StreamElement::Item(TwoSidesItem::Right(item)) => {
+                    self.right.push(((self.keyer2)(&item), item));
                 }
-                StreamElement::Item(JoinElement::LeftEnd) => {
+                StreamElement::Item(TwoSidesItem::LeftEnd) => {
                     self.left_ended = true;
                     self.left.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
                 }
-                StreamElement::Item(JoinElement::RightEnd) => {
+                StreamElement::Item(TwoSidesItem::RightEnd) => {
                     self.right_ended = true;
                     self.right.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
                 }
@@ -168,8 +178,12 @@ impl<
                     panic!("Cannot join timestamp streams")
                 }
                 StreamElement::FlushAndRestart => {
-                    assert!(self.left_ended);
-                    assert!(self.right_ended);
+                    assert!(self.left_ended, "{} left missing", replica_coord().unwrap());
+                    assert!(
+                        self.right_ended,
+                        "{} right missing",
+                        replica_coord().unwrap()
+                    );
                     assert!(self.left.is_empty());
                     assert!(self.right.is_empty());
 
@@ -216,7 +230,10 @@ pub struct JoinStreamLocalSortMerge<
     Keyer2: KeyerFn<Key, Out2>,
     ShipStrat: ShipStrategy,
 > {
-    stream: Stream<JoinElement<Key, Out1, Out2>, JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>>,
+    stream: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+    keyer1: Keyer1,
+    keyer2: Keyer2,
+    _key: PhantomData<Key>,
     _s: PhantomData<ShipStrat>,
 }
 
@@ -228,13 +245,15 @@ where
     ShipStrat: ShipStrategy,
 {
     pub(crate) fn new(
-        stream: Stream<
-            JoinElement<Key, Out1, Out2>,
-            JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>,
-        >,
+        stream: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+        keyer1: Keyer1,
+        keyer2: Keyer2,
     ) -> Self {
         Self {
             stream,
+            keyer1,
+            keyer2,
+            _key: Default::default(),
             _s: Default::default(),
         }
     }
@@ -253,9 +272,11 @@ where
         InnerJoinTuple<Out1, Out2>,
         impl Operator<KeyValue<Key, InnerJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         let inner = self
             .stream
-            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Inner));
+            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Inner, keyer1, keyer2));
         KeyedStream(inner.map(|(key, (lhs, rhs))| (key, (lhs.unwrap(), rhs.unwrap()))))
     }
 
@@ -266,9 +287,11 @@ where
         LeftJoinTuple<Out1, Out2>,
         impl Operator<KeyValue<Key, LeftJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         let inner = self
             .stream
-            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Left));
+            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Left, keyer1, keyer2));
         KeyedStream(inner.map(|(key, (lhs, rhs))| (key, (lhs.unwrap(), rhs))))
     }
 
@@ -279,9 +302,11 @@ where
         OuterJoinTuple<Out1, Out2>,
         impl Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         let inner = self
             .stream
-            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Outer));
+            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Outer, keyer1, keyer2));
         KeyedStream(inner)
     }
 }
@@ -298,8 +323,10 @@ where
         KeyValue<Key, InnerJoinTuple<Out1, Out2>>,
         impl Operator<KeyValue<Key, InnerJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         self.stream
-            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Inner))
+            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Inner, keyer1, keyer2))
             .map(|(key, (lhs, rhs))| (key, (lhs.unwrap(), rhs.unwrap())))
     }
 
@@ -309,8 +336,10 @@ where
         KeyValue<Key, LeftJoinTuple<Out1, Out2>>,
         impl Operator<KeyValue<Key, LeftJoinTuple<Out1, Out2>>>,
     > {
+        let keyer1 = self.keyer1;
+        let keyer2 = self.keyer2;
         self.stream
-            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Left))
+            .add_operator(|prev| JoinLocalSortMerge::new(prev, JoinVariant::Left, keyer1, keyer2))
             .map(|(key, (lhs, rhs))| (key, (lhs.unwrap(), rhs)))
     }
 }

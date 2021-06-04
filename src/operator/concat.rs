@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::block::NextStrategy;
-use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StartBlock};
+use crate::operator::start::{StartBlock, TwoSidesItem};
+use crate::operator::{ExchangeData, ExchangeDataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -23,10 +24,15 @@ where
     {
         self.add_y_connection(
             oth,
-            |id1, id2, state_lock| StartBlock::concat(vec![id1, id2], state_lock),
+            StartBlock::multiple,
             NextStrategy::only_one(),
             NextStrategy::only_one(),
         )
+        .flat_map(|e| match e {
+            TwoSidesItem::Left(item) => Some(item),
+            TwoSidesItem::Right(item) => Some(item),
+            _ => None,
+        })
     }
 
     pub(crate) fn map_concat<Out2, OperatorChain2>(

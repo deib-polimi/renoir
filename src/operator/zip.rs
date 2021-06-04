@@ -2,21 +2,18 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStructure};
-use crate::operator::{
-    ExchangeData, IterationStateLock, Operator, StartBlock, StreamElement, Timestamp,
-};
+use crate::operator::start::{MultipleStartBlockReceiverOperator, StartBlock, TwoSidesItem};
+use crate::operator::{ExchangeData, IterationStateLock, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Zip<Out1: ExchangeData, Out2: ExchangeData> {
+    prev: MultipleStartBlockReceiverOperator<Out1, Out2>,
+    stash1: VecDeque<StreamElement<Out1>>,
+    stash2: VecDeque<StreamElement<Out2>>,
     prev_block_id1: BlockId,
     prev_block_id2: BlockId,
-    prev1: StartBlock<Out1>,
-    prev2: StartBlock<Out2>,
-    watermarks1: VecDeque<Timestamp>,
-    watermarks2: VecDeque<Timestamp>,
-    item1_stash: Option<StreamElement<Out1>>,
 }
 
 impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
@@ -26,77 +23,52 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
         state_lock: Option<Arc<IterationStateLock>>,
     ) -> Self {
         Self {
+            prev: StartBlock::multiple(prev_block_id1, prev_block_id2, state_lock),
+            stash1: Default::default(),
+            stash2: Default::default(),
             prev_block_id1,
             prev_block_id2,
-            prev1: StartBlock::new(prev_block_id1, state_lock.clone()),
-            prev2: StartBlock::new(prev_block_id2, state_lock),
-            watermarks1: Default::default(),
-            watermarks2: Default::default(),
-            item1_stash: None,
         }
     }
 }
 
 impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
     fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev1.setup(metadata.clone());
-        self.prev2.setup(metadata);
+        self.prev.setup(metadata);
     }
 
     fn next(&mut self) -> StreamElement<(Out1, Out2)> {
-        // both the streams have received a watermark...
-        if !self.watermarks1.is_empty() && !self.watermarks2.is_empty() {
-            // ...for sure no message earlier than the smaller watermark will be emitted
-            return if self.watermarks1[0] < self.watermarks2[0] {
-                StreamElement::Watermark(self.watermarks1.pop_front().unwrap())
-            } else {
-                StreamElement::Watermark(self.watermarks2.pop_front().unwrap())
-            };
+        while self.stash1.is_empty() || self.stash2.is_empty() {
+            let item = self.prev.next();
+            match item {
+                StreamElement::Item(TwoSidesItem::Left(left)) => {
+                    self.stash1.push_back(StreamElement::Item(left))
+                }
+                StreamElement::Timestamped(TwoSidesItem::Left(left), ts) => {
+                    self.stash1.push_back(StreamElement::Timestamped(left, ts))
+                }
+                StreamElement::Item(TwoSidesItem::Right(right)) => {
+                    self.stash2.push_back(StreamElement::Item(right))
+                }
+                StreamElement::Timestamped(TwoSidesItem::Right(right), ts) => {
+                    self.stash2.push_back(StreamElement::Timestamped(right, ts))
+                }
+                // ignore LeftEnd | RightEnd
+                StreamElement::Item(_) | StreamElement::Timestamped(_, _) => continue,
+
+                // At this point we can emit the watermark safely since all the stashed items will
+                // stall until a message from the "other side" is received, and the resulting pair
+                // have the max of the two timestamps as timestamp. This timestamp will be for sure
+                // bigger than this watermark since the start block will keep the frontier valid.
+                StreamElement::Watermark(_) => return item.map(|_| unreachable!()),
+
+                StreamElement::FlushBatch
+                | StreamElement::Terminate
+                | StreamElement::FlushAndRestart => return item.map(|_| unreachable!()),
+            }
         }
-        // if an item was stored from the previous call of `next` because it couldn't be returned
-        // immediately
-        let item1 = if let Some(item1) = self.item1_stash.take() {
-            item1
-        } else {
-            loop {
-                match self.prev1.next() {
-                    StreamElement::Watermark(ts) => self.watermarks1.push_back(ts),
-                    StreamElement::FlushBatch => return StreamElement::FlushBatch,
-                    StreamElement::FlushAndRestart => {
-                        // consume the other stream
-                        while !matches!(self.prev2.next(), StreamElement::FlushAndRestart) {}
-                        return StreamElement::FlushAndRestart;
-                    }
-                    StreamElement::Terminate => {
-                        // consume the other stream
-                        while !matches!(self.prev2.next(), StreamElement::Terminate) {}
-                        return StreamElement::Terminate;
-                    }
-                    item => break item,
-                }
-            }
-        };
-        let item2 = loop {
-            match self.prev2.next() {
-                StreamElement::Watermark(ts) => self.watermarks2.push_back(ts),
-                StreamElement::FlushBatch => {
-                    // make sure not to lose item1
-                    self.item1_stash = Some(item1);
-                    return StreamElement::FlushBatch;
-                }
-                StreamElement::FlushAndRestart => {
-                    // consume the other stream
-                    while !matches!(self.prev1.next(), StreamElement::FlushAndRestart) {}
-                    return StreamElement::FlushAndRestart;
-                }
-                StreamElement::Terminate => {
-                    // consume the other stream
-                    while !matches!(self.prev1.next(), StreamElement::Terminate) {}
-                    return StreamElement::Terminate;
-                }
-                item => break item,
-            }
-        };
+        let item1 = self.stash1.pop_front().unwrap();
+        let item2 = self.stash2.pop_front().unwrap();
         match (item1, item2) {
             (StreamElement::Item(item1), StreamElement::Item(item2)) => {
                 StreamElement::Item((item1, item2))

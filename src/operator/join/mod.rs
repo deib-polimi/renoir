@@ -7,7 +7,6 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 mod local_hash;
 mod local_sort_merge;
 mod ship;
-mod start;
 
 /// Type alias for a pair of joined items in an inner join.
 pub type InnerJoinTuple<Out1, Out2> = (Out1, Out2);

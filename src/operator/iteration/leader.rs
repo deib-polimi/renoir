@@ -4,7 +4,8 @@ use std::sync::Arc;
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::source::Source;
-use crate::operator::{ExchangeData, NewIterationState, Operator, StartBlock, StreamElement};
+use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock, StartBlockReceiver};
+use crate::operator::{ExchangeData, NewIterationState, Operator, StreamElement};
 use crate::profiler::{get_profiler, Profiler};
 use crate::scheduler::ExecutionMetadata;
 
@@ -46,7 +47,7 @@ where
     /// The receiver from the `IterationEndBlock`s at the end of the loop.
     ///
     /// This will be set inside `setup` when we will know the id of that block.
-    delta_update_receiver: Option<StartBlock<DeltaUpdate>>,
+    delta_update_receiver: Option<SingleStartBlockReceiverOperator<DeltaUpdate>>,
     /// The number of replicas of `IterationEndBlock`.
     num_receivers: usize,
     /// The id of the block where `IterationEndBlock` is.
@@ -122,9 +123,9 @@ where
         // at this point the id of the block with IterationEndBlock must be known
         let feedback_block_id = self.feedback_block_id.load(Ordering::Acquire);
         // get the receiver for the delta updates
-        let mut delta_update_receiver = StartBlock::new(feedback_block_id, None);
+        let mut delta_update_receiver = StartBlock::single(feedback_block_id, None);
         delta_update_receiver.setup(metadata);
-        self.num_receivers = delta_update_receiver.num_prev();
+        self.num_receivers = delta_update_receiver.receiver().prev_replicas().len();
         self.delta_update_receiver = Some(delta_update_receiver);
     }
 

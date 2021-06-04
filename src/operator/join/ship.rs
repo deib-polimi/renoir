@@ -1,9 +1,11 @@
 #![allow(clippy::type_complexity)]
 
+use std::marker::PhantomData;
+
 use crate::block::NextStrategy;
 use crate::operator::join::local_hash::JoinStreamLocalHash;
 use crate::operator::join::local_sort_merge::JoinStreamLocalSortMerge;
-use crate::operator::join::start::{JoinElement, JoinStartBlock};
+use crate::operator::start::{MultipleStartBlockReceiverOperator, StartBlock, TwoSidesItem};
 use crate::operator::{Data, DataKey, ExchangeData, JoinStream, KeyerFn, Operator};
 use crate::stream::Stream;
 
@@ -29,7 +31,10 @@ where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
-    inner: Stream<JoinElement<Key, Out1, Out2>, JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>>,
+    inner: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+    keyer1: Keyer1,
+    keyer2: Keyer2,
+    _key: PhantomData<Key>,
 }
 
 /// This is an intermediate type for building a join operator.
@@ -46,7 +51,10 @@ pub struct JoinStreamShipBroadcastRight<
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
-    inner: Stream<JoinElement<Key, Out1, Out2>, JoinStartBlock<Key, Out1, Out2, Keyer1, Keyer2>>,
+    inner: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+    keyer1: Keyer1,
+    keyer2: Keyer2,
+    _key: PhantomData<Key>,
 }
 
 impl<Key: DataKey, Out1: ExchangeData, Out2: ExchangeData, Keyer1, Keyer2>
@@ -68,17 +76,20 @@ where
         let next_strategy2 = NextStrategy::group_by(keyer2.clone());
         let inner = prev.lhs.add_y_connection(
             prev.rhs,
-            move |prev1, prev2, state_lock| {
-                JoinStartBlock::new(keyer1, keyer2, prev1, prev2, state_lock)
-            },
+            StartBlock::multiple,
             next_strategy1,
             next_strategy2,
         );
-        JoinStreamShipHash { inner }
+        JoinStreamShipHash {
+            inner,
+            keyer1,
+            keyer2,
+            _key: Default::default(),
+        }
     }
 
     pub fn local_hash(self) -> JoinStreamLocalHash<Key, Out1, Out2, Keyer1, Keyer2, ShipHash> {
-        JoinStreamLocalHash::new(self.inner)
+        JoinStreamLocalHash::new(self.inner, self.keyer1, self.keyer2)
     }
 
     pub fn local_sort_merge(
@@ -87,7 +98,7 @@ where
     where
         Key: Ord,
     {
-        JoinStreamLocalSortMerge::new(self.inner)
+        JoinStreamLocalSortMerge::new(self.inner, self.keyer1, self.keyer2)
     }
 }
 
@@ -108,13 +119,16 @@ where
         let keyer2 = prev.keyer2;
         let inner = prev.lhs.add_y_connection(
             prev.rhs,
-            move |prev1, prev2, state_lock| {
-                JoinStartBlock::new(keyer1, keyer2, prev1, prev2, state_lock)
-            },
+            StartBlock::multiple,
             NextStrategy::only_one(),
             NextStrategy::all(),
         );
-        JoinStreamShipBroadcastRight { inner }
+        JoinStreamShipBroadcastRight {
+            inner,
+            keyer1,
+            keyer2,
+            _key: Default::default(),
+        }
     }
 
     pub fn local_hash(
@@ -123,7 +137,7 @@ where
     where
         Key: DataKey,
     {
-        JoinStreamLocalHash::new(self.inner)
+        JoinStreamLocalHash::new(self.inner, self.keyer1, self.keyer2)
     }
 
     pub fn local_sort_merge(
@@ -132,6 +146,6 @@ where
     where
         Key: Ord,
     {
-        JoinStreamLocalSortMerge::new(self.inner)
+        JoinStreamLocalSortMerge::new(self.inner, self.keyer1, self.keyer2)
     }
 }

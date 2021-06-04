@@ -21,7 +21,7 @@ pub use rich_filter_map::*;
 pub use rich_flat_map::*;
 pub use rich_map::*;
 pub use shuffle::*;
-pub use start::*;
+pub(crate) use start::*;
 pub use unkey::*;
 pub use window::*;
 pub use zip::*;
