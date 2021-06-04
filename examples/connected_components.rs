@@ -89,15 +89,15 @@ fn main() {
                         }
                     })
             },
-            |delta: &mut Vec<(u64, u64)>, (x, comp_id)| {
+            |delta: &mut Vec<(u64, u64)>, (x, component)| {
                 // collect all changes
-                delta.push((x, comp_id));
+                delta.push((x, component));
             },
             |state, changes| {
                 // apply all changes
                 state.updated = state.updated || !changes.is_empty();
-                for (x, comp_id) in changes {
-                    state.component.insert(x, comp_id);
+                for (x, component) in changes {
+                    state.component.insert(x, component);
                 }
             },
             |state| {
