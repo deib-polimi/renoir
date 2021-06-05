@@ -211,7 +211,7 @@ where
                 (oth.block.iteration_state_lock_stack.clone(), true, false)
             } else {
                 // oth is the side input, cache it
-                (oth.block.iteration_state_lock_stack.clone(), false, true)
+                (self.block.iteration_state_lock_stack.clone(), false, true)
             }
         };
 

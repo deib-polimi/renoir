@@ -37,7 +37,7 @@ fn main() {
         )
         .unkey();
 
-    let result = env
+    let (dropme, result) = env
         .stream(pages_source)
         // distribute the ranks evenly
         .map(move |x| (x, 1.0 / num_pages as f64, 1.0 / num_pages as f64))
@@ -85,18 +85,18 @@ fn main() {
                 *state = false;
                 condition
             },
-        )
-        // keep the stream output
-        .1
-        .collect_vec();
+        );
+    let result = result.collect_vec();
+    dropme.for_each(|_| {});
 
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();
 
-    if let Some(res) = result.get() {
+    if let Some(mut res) = result.get() {
         eprintln!("Output: {:?}", res.len());
         if cfg!(debug) {
+            res.sort_by_key(|(x, _, _)| *x);
             for (x, _, rank) in res {
                 eprintln!("{}: {}", x, rank);
             }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -7,26 +7,19 @@ use rstream::config::EnvironmentConfig;
 use rstream::environment::StreamEnvironment;
 use rstream::operator::source;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 struct State {
-    // maps each vertex to its current component
+    /// Maps each vertex to its current component.
     component: HashMap<u64, u64>,
-    // whether the state has been updated in the current iteration
+    /// Whether the state has been updated in the current iteration.
     updated: bool,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self::new()
-    }
+    /// Number of iterations.
+    iteration_count: usize,
 }
 
 impl State {
     fn new() -> Self {
-        Self {
-            component: Default::default(),
-            updated: false,
-        }
+        Default::default()
     }
 
     fn get_component(&self, vertex: u64) -> Option<u64> {
@@ -57,7 +50,7 @@ fn main() {
         // edges are undirected
         .flat_map(|(x, y)| vec![(x, y), (y, x)]);
 
-    let result = env
+    let (result, dropme) = env
         .stream(vertices_source)
         // put each node in its own component
         .map(|x| (x, x))
@@ -104,12 +97,13 @@ fn main() {
                 // stop if there were no changes
                 let condition = state.updated;
                 state.updated = false;
+                state.iteration_count += 1;
                 condition
             },
-        )
-        // we are interested in the state
-        .0
-        .collect_vec();
+        );
+    // we are interested in the state
+    let result = result.collect_vec();
+    dropme.for_each(|_| {});
 
     let start = Instant::now();
     env.execute();
@@ -122,7 +116,9 @@ fn main() {
                 eprintln!("{} -> {}", x, component);
             }
         }
-        eprintln!("Output: {:?}", final_state.component.len());
+        let components = final_state.component.values().collect::<HashSet<_>>().len();
+        eprintln!("Number of components: {:?}", components);
+        eprintln!("Iterations: {:?}", final_state.iteration_count);
     }
     eprintln!("Elapsed: {:?}", elapsed);
 }
