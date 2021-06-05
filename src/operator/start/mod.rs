@@ -108,14 +108,21 @@ impl<Out: ExchangeData> StartBlock<Out, SingleStartBlockReceiver<Out>> {
 impl<OutL: ExchangeData, OutR: ExchangeData>
     StartBlock<TwoSidesItem<OutL, OutR>, MultipleStartBlockReceiver<OutL, OutR>>
 {
-    /// Create a `StartBlock` able to receive data from 2 previous blocks..
+    /// Create a `StartBlock` able to receive data from 2 previous blocks, setting up the cache.
     pub(crate) fn multiple(
         previous_block_id1: BlockId,
         previous_block_id2: BlockId,
+        left_cache: bool,
+        right_cache: bool,
         state_lock: Option<Arc<IterationStateLock>>,
     ) -> MultipleStartBlockReceiverOperator<OutL, OutR> {
         StartBlock::new(
-            MultipleStartBlockReceiver::new(previous_block_id1, previous_block_id2),
+            MultipleStartBlockReceiver::new(
+                previous_block_id1,
+                previous_block_id2,
+                left_cache,
+                right_cache,
+            ),
             state_lock,
         )
     }

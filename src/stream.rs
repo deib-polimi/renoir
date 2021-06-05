@@ -4,8 +4,6 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use itertools::Itertools;
-
 use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::DataKey;
@@ -178,7 +176,8 @@ where
         OperatorChain2: Operator<Out2> + 'static,
         NewOut: Data,
         StartOperator: Operator<NewOut>,
-        GetStartOp: FnOnce(BlockId, BlockId, Option<Arc<IterationStateLock>>) -> StartOperator,
+        GetStartOp:
+            FnOnce(BlockId, BlockId, bool, bool, Option<Arc<IterationStateLock>>) -> StartOperator,
     {
         let batch_mode = self.block.batch_mode;
         let is_only_one1 = matches!(next_strategy1, NextStrategy::OnlyOne);
@@ -198,14 +197,23 @@ where
                 scheduler_requirements2.max_parallelism
             );
         }
-        let state_lock1 = &self.block.iteration_state_lock_stack;
-        let state_lock2 = &oth.block.iteration_state_lock_stack;
-        if state_lock1.iter().map(|s| Arc::as_ptr(s)).collect_vec()
-            != state_lock2.iter().map(|s| Arc::as_ptr(s)).collect_vec()
-        {
-            panic!("The state locks of the 2 blocks coming inside a Y connection must be equal");
-        }
-        let state_lock = state_lock1.clone();
+
+        let iteration_stack1 = self.block.iteration_stack();
+        let iteration_stack2 = oth.block.iteration_stack();
+        let (state_lock, left_cache, right_cache) = if iteration_stack1 == iteration_stack2 {
+            (self.block.iteration_state_lock_stack.clone(), false, false)
+        } else {
+            if !iteration_stack1.is_empty() && !iteration_stack2.is_empty() {
+                panic!("Side inputs are supported only if one of the streams is coming from outside any iteration");
+            }
+            if iteration_stack1.is_empty() {
+                // self is the side input, cache it
+                (oth.block.iteration_state_lock_stack.clone(), true, false)
+            } else {
+                // oth is the side input, cache it
+                (oth.block.iteration_state_lock_stack.clone(), false, true)
+            }
+        };
 
         // close previous blocks
         let mut old_stream1 =
@@ -231,7 +239,13 @@ where
         let mut new_stream = Stream {
             block: InnerBlock::new(
                 new_id,
-                get_start_operator(old_id1, old_id2, state_lock.last().cloned()),
+                get_start_operator(
+                    old_id1,
+                    old_id2,
+                    left_cache,
+                    right_cache,
+                    state_lock.last().cloned(),
+                ),
                 batch_mode,
                 state_lock,
             ),

@@ -29,21 +29,33 @@ pub(crate) enum TwoSidesItem<OutL: Data, OutR: Data> {
 
 /// The actual receiver from one of the two sides.
 #[derive(Clone, Debug)]
-struct SideReceiver<Out: ExchangeData> {
+struct SideReceiver<Out: ExchangeData, Item: ExchangeData> {
     /// The internal receiver for this side.
     receiver: SingleStartBlockReceiver<Out>,
     /// The number of replicas this side has.
     num_replicas: usize,
     /// How many replicas from this side has not yet sent `StreamElement::FlushAndRestart`.
     missing_flush_and_restart: usize,
+    /// Whether this side is cached (i.e. after it is fully read, it's just replayed indefinitely).
+    cached: bool,
+    /// The content of the cache, if any.
+    cache: Vec<NetworkMessage<Item>>,
+    /// Whether the cache has been fully populated.
+    cache_done: bool,
+    /// The index of the first element to return from the cache.
+    cache_pointer: usize,
 }
 
-impl<Out: ExchangeData> SideReceiver<Out> {
-    fn new(previous_block_id: BlockId) -> Self {
+impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
+    fn new(previous_block_id: BlockId, cached: bool) -> Self {
         Self {
             receiver: SingleStartBlockReceiver::new(previous_block_id),
             num_replicas: 0,
             missing_flush_and_restart: 0,
+            cached,
+            cache: Default::default(),
+            cache_done: false,
+            cache_pointer: 0,
         }
     }
 
@@ -55,10 +67,21 @@ impl<Out: ExchangeData> SideReceiver<Out> {
 
     fn reset(&mut self) {
         self.missing_flush_and_restart = self.num_replicas;
+        self.cache_done = true;
+        self.cache_pointer = 0;
     }
 
     fn is_ended(&self) -> bool {
         self.missing_flush_and_restart == 0
+    }
+
+    fn next_cached_item(&mut self) -> Option<NetworkMessage<Item>> {
+        if self.cache_pointer >= self.cache.len() {
+            None
+        } else {
+            self.cache_pointer += 1;
+            Some(self.cache[self.cache_pointer - 1].clone())
+        }
     }
 }
 
@@ -68,15 +91,24 @@ impl<Out: ExchangeData> SideReceiver<Out> {
 /// that discriminates the two sides.
 #[derive(Clone, Debug)]
 pub(crate) struct MultipleStartBlockReceiver<OutL: ExchangeData, OutR: ExchangeData> {
-    left: SideReceiver<OutL>,
-    right: SideReceiver<OutR>,
+    left: SideReceiver<OutL, TwoSidesItem<OutL, OutR>>,
+    right: SideReceiver<OutR, TwoSidesItem<OutL, OutR>>,
 }
 
 impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, OutR> {
-    pub(super) fn new(left_block_id: BlockId, right_block_id: BlockId) -> Self {
+    pub(super) fn new(
+        left_block_id: BlockId,
+        right_block_id: BlockId,
+        left_cache: bool,
+        right_cache: bool,
+    ) -> Self {
+        assert!(
+            !(left_cache && right_cache),
+            "At most one of the two sides can be cached"
+        );
         Self {
-            left: SideReceiver::new(left_block_id),
-            right: SideReceiver::new(right_block_id),
+            left: SideReceiver::new(left_block_id, left_cache),
+            right: SideReceiver::new(right_block_id, right_cache),
         }
     }
 
@@ -87,7 +119,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
     /// `StreamElement::FlushAndRestart` messages and eventually emit the `LeftEnd`/`RightEnd`
     /// accordingly.
     fn process_side<Out: ExchangeData>(
-        side: &mut SideReceiver<Out>,
+        side: &mut SideReceiver<Out, TwoSidesItem<OutL, OutR>>,
         message: NetworkMessage<Out>,
         wrap: fn(Out) -> TwoSidesItem<OutL, OutR>,
         end: TwoSidesItem<OutL, OutR>,
@@ -96,7 +128,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
         let data = message
             .batch()
             .into_iter()
-            .flat_map(move |item| {
+            .flat_map(|item| {
                 let mut res = Vec::new();
                 if matches!(item, StreamElement::FlushAndRestart) {
                     side.missing_flush_and_restart -= 1;
@@ -105,17 +137,24 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
                         res.push(StreamElement::Item(end.clone()));
                     }
                 }
-                res.push(item.map(wrap));
+                // StreamElement::Terminate should not be put in the cache
+                if !side.cached || !matches!(item, StreamElement::Terminate) {
+                    res.push(item.map(wrap));
+                }
                 res
             })
             .collect::<Batch<_>>();
-        NetworkMessage::new(data, sender)
+        let message = NetworkMessage::new(data, sender);
+        if side.cached {
+            side.cache.push(message.clone());
+        }
+        message
     }
 
     /// Receive from the previous sides the next batch, or fail with a timeout if provided.
     ///
     /// This will access only the needed side (i.e. if one of the sides ended, only the other is
-    /// probed).
+    /// probed). This will try to use the cache if it's available.
     fn select(
         &mut self,
         timeout: Option<Duration>,
@@ -124,6 +163,19 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
         if self.left.is_ended() && self.right.is_ended() {
             self.left.reset();
             self.right.reset();
+        }
+
+        // some items are ready from the cache, use them
+        // TODO: should this be fair with the other non-cached side?
+        if self.left.cached && self.left.cache_done {
+            if let Some(batch) = self.left.next_cached_item() {
+                return Ok(batch);
+            }
+        }
+        if self.right.cached && self.right.cache_done {
+            if let Some(batch) = self.right.next_cached_item() {
+                return Ok(batch);
+            }
         }
 
         enum Side<L, R> {
@@ -196,7 +248,14 @@ impl<OutL: ExchangeData, OutR: ExchangeData> StartBlockReceiver<TwoSidesItem<Out
     }
 
     fn cached_replicas(&self) -> usize {
-        0 // TODO
+        let mut cached = 0;
+        if self.left.cached {
+            cached += self.left.num_replicas
+        }
+        if self.right.cached {
+            cached += self.right.num_replicas
+        }
+        cached
     }
 
     fn recv_timeout(

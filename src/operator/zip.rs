@@ -20,10 +20,18 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
     fn new(
         prev_block_id1: BlockId,
         prev_block_id2: BlockId,
+        left_cache: bool,
+        right_cache: bool,
         state_lock: Option<Arc<IterationStateLock>>,
     ) -> Self {
         Self {
-            prev: StartBlock::multiple(prev_block_id1, prev_block_id2, state_lock),
+            prev: StartBlock::multiple(
+                prev_block_id1,
+                prev_block_id2,
+                left_cache,
+                right_cache,
+                state_lock,
+            ),
             stash1: Default::default(),
             stash2: Default::default(),
             prev_block_id1,
