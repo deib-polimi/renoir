@@ -15,7 +15,7 @@ use crate::stream::BlockId;
 ///
 /// Since those two parts are merged the information about which one ends is lost, therefore there
 /// are two extra variants to keep track of that.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) enum TwoSidesItem<OutL: Data, OutR: Data> {
     /// An element of the stream on the left.
     Left(OutL),
@@ -41,7 +41,7 @@ struct SideReceiver<Out: ExchangeData, Item: ExchangeData> {
     /// The content of the cache, if any.
     cache: Vec<NetworkMessage<Item>>,
     /// Whether the cache has been fully populated.
-    cache_done: bool,
+    cache_full: bool,
     /// The index of the first element to return from the cache.
     cache_pointer: usize,
 }
@@ -54,7 +54,7 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
             missing_flush_and_restart: 0,
             cached,
             cache: Default::default(),
-            cache_done: false,
+            cache_full: false,
             cache_pointer: 0,
         }
     }
@@ -65,23 +65,39 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
         self.missing_flush_and_restart = self.num_replicas;
     }
 
-    fn reset(&mut self) {
-        self.missing_flush_and_restart = self.num_replicas;
-        self.cache_done = true;
-        self.cache_pointer = 0;
+    fn recv(&mut self, timeout: Option<Duration>) -> Result<NetworkMessage<Out>, RecvTimeoutError> {
+        if let Some(timeout) = timeout {
+            self.receiver.recv_timeout(timeout)
+        } else {
+            Ok(self.receiver.recv())
+        }
     }
 
+    fn reset(&mut self) {
+        self.missing_flush_and_restart = self.num_replicas;
+        if self.cached {
+            self.cache_full = true;
+            self.cache_pointer = 0;
+        }
+    }
+
+    /// There is nothing more to read from this side (even from the cache).
     fn is_ended(&self) -> bool {
         self.missing_flush_and_restart == 0
     }
 
-    fn next_cached_item(&mut self) -> Option<NetworkMessage<Item>> {
-        if self.cache_pointer >= self.cache.len() {
-            None
-        } else {
-            self.cache_pointer += 1;
-            Some(self.cache[self.cache_pointer - 1].clone())
+    /// All the cached items have already been read.
+    fn cache_finished(&self) -> bool {
+        self.cache_pointer >= self.cache.len()
+    }
+
+    /// Get the next batch from the cache. This will panic if the cache has been entirely consumed.
+    fn next_cached_item(&mut self) -> NetworkMessage<Item> {
+        self.cache_pointer += 1;
+        if self.cache_finished() {
+            self.missing_flush_and_restart = 0;
         }
+        self.cache[self.cache_pointer - 1].clone()
     }
 }
 
@@ -93,6 +109,7 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
 pub(crate) struct MultipleStartBlockReceiver<OutL: ExchangeData, OutR: ExchangeData> {
     left: SideReceiver<OutL, TwoSidesItem<OutL, OutR>>,
     right: SideReceiver<OutR, TwoSidesItem<OutL, OutR>>,
+    first_message: bool,
 }
 
 impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, OutR> {
@@ -109,6 +126,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
         Self {
             left: SideReceiver::new(left_block_id, left_cache),
             right: SideReceiver::new(right_block_id, right_cache),
+            first_message: false,
         }
     }
 
@@ -163,19 +181,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
         if self.left.is_ended() && self.right.is_ended() {
             self.left.reset();
             self.right.reset();
-        }
-
-        // some items are ready from the cache, use them
-        // TODO: should this be fair with the other non-cached side?
-        if self.left.cached && self.left.cache_done {
-            if let Some(batch) = self.left.next_cached_item() {
-                return Ok(batch);
-            }
-        }
-        if self.right.cached && self.right.cache_done {
-            if let Some(batch) = self.right.next_cached_item() {
-                return Ok(batch);
-            }
+            self.first_message = true;
         }
 
         enum Side<L, R> {
@@ -183,18 +189,32 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
             Right(R),
         }
 
-        let data = if self.left.is_ended() {
-            Side::Right(if let Some(timeout) = timeout {
-                self.right.receiver.recv_timeout(timeout)
+        // First message of this iteration, and there is a side with the cache:
+        // we need to ask to the other side FIRST to know if this is the end of the stream or a new
+        // iteration is about to start.
+        let data = if self.first_message && (self.left.cached || self.right.cached) {
+            debug_assert!(!self.left.cached || self.left.cache_full);
+            debug_assert!(!self.right.cached || self.right.cache_full);
+            self.first_message = false;
+            if self.left.cached {
+                Side::Right(self.right.recv(timeout))
             } else {
-                Ok(self.right.receiver.recv())
-            })
+                Side::Left(self.left.recv(timeout))
+            }
+        } else if self.left.cached && self.left.cache_full && !self.left.cache_finished() {
+            // The left side is cached, therefore we can access it immediately
+            return Ok(self.left.next_cached_item());
+        } else if self.right.cached && self.right.cache_full && !self.right.cache_finished() {
+            // The right side is cached, therefore we can access it immediately
+            return Ok(self.right.next_cached_item());
+        } else if self.left.is_ended() {
+            // There is nothing more to read from the left side (if cached, all the cache has
+            // already been read).
+            Side::Right(self.right.recv(timeout))
         } else if self.right.is_ended() {
-            Side::Left(if let Some(timeout) = timeout {
-                self.left.receiver.recv_timeout(timeout)
-            } else {
-                Ok(self.left.receiver.recv())
-            })
+            // There is nothing more to read from the right side (if cached, all the cache has
+            // already been read).
+            Side::Left(self.left.recv(timeout))
         } else {
             let left = self.left.receiver.receiver.as_mut().unwrap();
             let right = self.right.receiver.receiver.as_mut().unwrap();

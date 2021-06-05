@@ -11,7 +11,7 @@ use crate::channel::RecvTimeoutError;
 use crate::network::{Coord, NetworkMessage};
 use crate::operator::source::Source;
 use crate::operator::start::watermark_frontier::WatermarkFrontier;
-use crate::operator::{ExchangeData, IterationStateLock, Operator, StreamElement};
+use crate::operator::{timestamp_max, ExchangeData, IterationStateLock, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 
@@ -235,6 +235,11 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                             .update(sender, ts)
                             .map(StreamElement::Watermark)
                     }
+                    StreamElement::FlushAndRestart => {
+                        // mark this replica as ended and let the frontier ignore it from now on
+                        watermark_frontier.update(sender, timestamp_max());
+                        Some(item)
+                    }
                     _ => Some(item),
                 })
                 .collect();
@@ -285,5 +290,295 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Source<Out>
 {
     fn get_max_parallelism(&self) -> Option<usize> {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::any::TypeId;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    use crate::block::BatchMode;
+    use crate::config::EnvironmentConfig;
+    use crate::network::{Coord, NetworkMessage, NetworkSender, NetworkTopology, ReceiverEndpoint};
+    use crate::operator::{Operator, StartBlock, StreamElement, Timestamp, TwoSidesItem};
+    use crate::scheduler::ExecutionMetadata;
+
+    #[allow(clippy::type_complexity)]
+    fn build_topology(
+        num_prev_blocks: usize,
+        num_replicas: usize,
+    ) -> (ExecutionMetadata, Vec<Vec<(Coord, NetworkSender<i32>)>>) {
+        let config = EnvironmentConfig::local(1);
+        let mut topology = NetworkTopology::new(config);
+        let dest = Coord::new(0, 0, 0);
+        let typ = TypeId::of::<i32>();
+
+        let mut senders = vec![];
+        let mut prev = vec![];
+        for block_id in 1..num_prev_blocks + 1 {
+            let mut block_senders = vec![];
+            for replica_id in 0..num_replicas {
+                let coord = Coord::new(block_id, 0, replica_id);
+                topology.connect(coord, dest, typ, false);
+                let sender = topology.get_sender(ReceiverEndpoint::new(dest, block_id));
+                block_senders.push((coord, sender));
+                prev.push((coord, typ));
+            }
+            senders.push(block_senders);
+        }
+
+        let metadata = ExecutionMetadata {
+            coord: dest,
+            replicas: vec![dest],
+            global_id: 0,
+            prev,
+            network: Arc::new(Mutex::new(topology)),
+            batch_mode: BatchMode::adaptive(100, Duration::from_millis(100)),
+        };
+        (metadata, senders)
+    }
+
+    fn ts(millis: u64) -> Timestamp {
+        Timestamp::from_millis(millis)
+    }
+
+    #[test]
+    fn test_single() {
+        let (metadata, mut senders) = build_topology(1, 2);
+        let (from1, sender1) = senders[0].pop().unwrap();
+        let (from2, sender2) = senders[0].pop().unwrap();
+
+        let mut start_block =
+            StartBlock::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
+        start_block.setup(metadata);
+
+        sender1
+            .send(NetworkMessage::new(
+                vec![StreamElement::Item(42), StreamElement::FlushAndRestart],
+                from1,
+            ))
+            .unwrap();
+
+        assert_eq!(StreamElement::Item(42), start_block.next());
+        assert_eq!(StreamElement::FlushBatch, start_block.next());
+
+        sender2
+            .send(NetworkMessage::new(
+                vec![StreamElement::FlushAndRestart],
+                from2,
+            ))
+            .unwrap();
+
+        assert_eq!(StreamElement::FlushAndRestart, start_block.next());
+
+        sender1
+            .send(NetworkMessage::new(vec![StreamElement::Terminate], from1))
+            .unwrap();
+        sender2
+            .send(NetworkMessage::new(vec![StreamElement::Terminate], from2))
+            .unwrap();
+
+        assert_eq!(StreamElement::Terminate, start_block.next());
+    }
+
+    #[test]
+    fn test_single_watermark() {
+        let (metadata, mut senders) = build_topology(1, 2);
+        let (from1, sender1) = senders[0].pop().unwrap();
+        let (from2, sender2) = senders[0].pop().unwrap();
+
+        let mut start_block =
+            StartBlock::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
+        start_block.setup(metadata);
+
+        sender1
+            .send(NetworkMessage::new(
+                vec![
+                    StreamElement::Timestamped(42, ts(10)),
+                    StreamElement::Watermark(ts(20)),
+                ],
+                from1,
+            ))
+            .unwrap();
+
+        assert_eq!(StreamElement::Timestamped(42, ts(10)), start_block.next());
+        assert_eq!(StreamElement::FlushBatch, start_block.next());
+
+        sender2
+            .send(NetworkMessage::new(
+                vec![StreamElement::Watermark(ts(100))],
+                from2,
+            ))
+            .unwrap();
+
+        assert_eq!(StreamElement::Watermark(ts(20)), start_block.next());
+        assert_eq!(StreamElement::FlushBatch, start_block.next());
+
+        sender1
+            .send(NetworkMessage::new(
+                vec![StreamElement::FlushAndRestart],
+                from1,
+            ))
+            .unwrap();
+        sender2
+            .send(NetworkMessage::new(
+                vec![StreamElement::Watermark(ts(110))],
+                from2,
+            ))
+            .unwrap();
+        assert_eq!(StreamElement::Watermark(ts(110)), start_block.next());
+    }
+
+    #[test]
+    fn test_multiple_no_cache() {
+        let (metadata, mut senders) = build_topology(2, 1);
+        let (from1, sender1) = senders[0].pop().unwrap();
+        let (from2, sender2) = senders[1].pop().unwrap();
+
+        let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
+            from1.block_id,
+            from2.block_id,
+            false,
+            false,
+            None,
+        );
+        start_block.setup(metadata);
+
+        sender1
+            .send(NetworkMessage::new(
+                vec![
+                    StreamElement::Timestamped(42, ts(10)),
+                    StreamElement::Watermark(ts(20)),
+                ],
+                from1,
+            ))
+            .unwrap();
+
+        assert_eq!(
+            StreamElement::Timestamped(TwoSidesItem::Left(42), ts(10)),
+            start_block.next()
+        );
+        assert_eq!(StreamElement::FlushBatch, start_block.next());
+
+        sender2
+            .send(NetworkMessage::new(
+                vec![
+                    StreamElement::Timestamped(69, ts(10)),
+                    StreamElement::Watermark(ts(20)),
+                ],
+                from2,
+            ))
+            .unwrap();
+
+        assert_eq!(
+            StreamElement::Timestamped(TwoSidesItem::Right(69), ts(10)),
+            start_block.next()
+        );
+        assert_eq!(StreamElement::Watermark(ts(20)), start_block.next());
+
+        sender1
+            .send(NetworkMessage::new(
+                vec![StreamElement::FlushAndRestart],
+                from1,
+            ))
+            .unwrap();
+        assert_eq!(
+            StreamElement::Item(TwoSidesItem::LeftEnd),
+            start_block.next()
+        );
+        sender2
+            .send(NetworkMessage::new(
+                vec![StreamElement::FlushAndRestart],
+                from2,
+            ))
+            .unwrap();
+        assert_eq!(
+            StreamElement::Item(TwoSidesItem::RightEnd),
+            start_block.next()
+        );
+        assert_eq!(StreamElement::FlushAndRestart, start_block.next());
+    }
+
+    #[test]
+    fn test_multiple_cache() {
+        let (metadata, mut senders) = build_topology(2, 1);
+        let (from1, sender1) = senders[0].pop().unwrap();
+        let (from2, sender2) = senders[1].pop().unwrap();
+
+        let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
+            from1.block_id,
+            from2.block_id,
+            true,
+            false,
+            None,
+        );
+        start_block.setup(metadata);
+
+        sender1
+            .send(NetworkMessage::new(vec![StreamElement::Item(42)], from1))
+            .unwrap();
+        sender1
+            .send(NetworkMessage::new(vec![StreamElement::Item(43)], from1))
+            .unwrap();
+        sender2
+            .send(NetworkMessage::new(vec![StreamElement::Item(69)], from2))
+            .unwrap();
+
+        let mut recv = [start_block.next(), start_block.next(), start_block.next()];
+        recv.sort(); // those messages can arrive unordered
+        assert_eq!(StreamElement::Item(TwoSidesItem::Left(42)), recv[0]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::Left(43)), recv[1]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::Right(69)), recv[2]);
+
+        sender1
+            .send(NetworkMessage::new(
+                vec![StreamElement::FlushAndRestart, StreamElement::Terminate],
+                from1,
+            ))
+            .unwrap();
+        sender2
+            .send(NetworkMessage::new(
+                vec![StreamElement::FlushAndRestart],
+                from2,
+            ))
+            .unwrap();
+
+        let mut recv = [start_block.next(), start_block.next()];
+        recv.sort(); // those messages can arrive unordered
+        assert_eq!(StreamElement::Item(TwoSidesItem::LeftEnd), recv[0]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::RightEnd), recv[1]);
+
+        assert_eq!(StreamElement::FlushAndRestart, start_block.next());
+
+        sender2
+            .send(NetworkMessage::new(
+                vec![StreamElement::Item(6969), StreamElement::FlushAndRestart],
+                from2,
+            ))
+            .unwrap();
+
+        let mut recv = [
+            start_block.next(),
+            start_block.next(),
+            start_block.next(),
+            start_block.next(),
+            start_block.next(),
+        ];
+        recv.sort(); // those messages can arrive unordered
+        assert_eq!(StreamElement::Item(TwoSidesItem::Left(42)), recv[0]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::Left(43)), recv[1]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::Right(6969)), recv[2]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::LeftEnd), recv[3]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::RightEnd), recv[4]);
+
+        assert_eq!(StreamElement::FlushAndRestart, start_block.next());
+
+        sender2
+            .send(NetworkMessage::new(vec![StreamElement::Terminate], from2))
+            .unwrap();
+
+        assert_eq!(StreamElement::Terminate, start_block.next());
     }
 }
