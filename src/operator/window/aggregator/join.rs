@@ -60,7 +60,6 @@ where
     {
         self.inner
             .join(right.max_parallelism(1).key_by(|_| ()))
-            .unkey()
-            .map(|(_, x)| x)
+            .drop_key()
     }
 }

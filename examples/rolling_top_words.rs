@@ -77,8 +77,8 @@ fn main() {
             words.resize_with(k.min(words.len()), Default::default);
             words
         })
-        .unkey()
-        .for_each(|(_, win)| {
+        .drop_key()
+        .for_each(|win| {
             println!("New window");
             for (word, count) in win {
                 println!("- {} ({})", word, count);

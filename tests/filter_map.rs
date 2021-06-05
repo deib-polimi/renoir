@@ -25,8 +25,7 @@ fn filter_map_keyed_stream() {
             .stream(source)
             .group_by(|n| n % 2)
             .filter_map(|(_key, x)| if x < 6 { Some(x * 2 + 1) } else { None })
-            .unkey()
-            .map(|(_k, v)| v)
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

@@ -207,8 +207,7 @@ where
         )
         .key_by(|_| ())
         .fold(DeltaUpdate::default(), local_fold)
-        .unkey()
-        .map(|(_, delta_update)| delta_update)
+        .drop_key()
         .add_operator(|prev| IterationEndBlock::new(prev, leader_block_id));
         let delta_update_end_block_id = delta_update_end.block.id;
 

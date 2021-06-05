@@ -21,3 +21,21 @@ fn unkey_keyed_stream() {
         }
     });
 }
+
+#[test]
+fn drop_key_keyed_stream() {
+    TestHelper::local_remote_env(|mut env| {
+        let source = IteratorSource::new(0..10u8);
+        let res = env
+            .stream(source)
+            .shuffle()
+            .key_by(|&n| n % 2)
+            .drop_key()
+            .collect_vec();
+        env.execute();
+        if let Some(res) = res.get() {
+            let res = res.into_iter().sorted().collect_vec();
+            assert_eq!(res, (0..10u8).collect_vec());
+        }
+    });
+}

@@ -127,11 +127,7 @@ fn concat_keyed_stream() {
         let stream1 = env.stream(source1).group_by(|x| x % 3);
         let stream2 = env.stream(source2).group_by(|x| x % 3);
 
-        let res = stream1
-            .concat(stream2)
-            .reduce(|x, y| *x += y)
-            .unkey()
-            .collect_vec();
+        let res = stream1.concat(stream2).reduce(|x, y| *x += y).collect_vec();
         env.execute();
 
         if let Some(mut res) = res.get() {

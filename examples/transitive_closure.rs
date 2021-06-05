@@ -34,14 +34,12 @@ fn main() {
                 .join(edges.pop().unwrap(), |(_z, x)| *x, |(x, _y)| *x)
                 // if there are a path z -> x and an edge x -> y, then generate the path z -> y
                 .map(|(_, ((z, _), (_, y)))| (z, y))
-                .unkey()
-                .map(|(_, (x, y))| (x, y))
+                .drop_key()
                 // concatenate the paths already present in the transitive closure
                 .concat(paths.pop().unwrap())
                 // delete duplicated paths
                 .group_by_reduce(|(x, y)| (*x, *y), |_, _| {})
-                .unkey()
-                .map(|(_, (x, y))| (x, y))
+                .drop_key()
         },
         |count: &mut u64, _| *count += 1,
         |(_old, new), count| *new += count,

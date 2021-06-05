@@ -62,7 +62,6 @@ fn query1_with_source(
             |k1, (_, k2)| *k1 += k2,
             |k1, k2| *k1 += k2,
         )
-        .unkey()
         .collect_vec()
 }
 

@@ -20,7 +20,6 @@ fn main() {
         .ship_hash()
         .local_hash()
         .inner()
-        .unkey()
         .collect_vec();
 
     env.execute();

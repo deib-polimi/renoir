@@ -21,6 +21,6 @@ where
     OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
     pub fn min(self) -> Stream<Out, impl Operator<Out>> {
-        self.inner.min().unkey().map(|(_, x)| x)
+        self.inner.min().drop_key()
     }
 }

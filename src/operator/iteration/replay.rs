@@ -128,8 +128,7 @@ where
         let mut iter_end = body(iter_start, state_clone)
             .key_by(|_| ())
             .fold(DeltaUpdate::default(), local_fold)
-            .unkey()
-            .map(|(_, delta_update)| delta_update);
+            .drop_key();
 
         let post_iter_stack = iter_end.block.iteration_stack();
         if pre_iter_stack != post_iter_stack {

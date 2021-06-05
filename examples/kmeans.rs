@@ -166,8 +166,8 @@ fn main() {
                             *n1 += n2;
                         },
                     )
-                    .unkey()
-                    .map(|(_, (p, _, n))| p / n)
+                    .drop_key()
+                    .map(|(p, _, n)| p / n)
             },
             |update: &mut Vec<Point>, p| update.push(p),
             move |state, mut update| {

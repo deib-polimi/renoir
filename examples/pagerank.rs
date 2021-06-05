@@ -60,8 +60,7 @@ fn main() {
                         let rank_to_distribute = rank / adj.len() as f64;
                         adj.into_iter().map(move |y| (y, rank_to_distribute))
                     })
-                    .unkey()
-                    .map(|(_x, (y, rank_to_distribute))| (y, rank_to_distribute))
+                    .drop_key()
                     .group_by_fold(
                         |(y, _)| *y,
                         0.0,

@@ -23,8 +23,7 @@ fn filter_keyed_stream() {
             .stream(source)
             .group_by(|n| n % 2)
             .filter(|(_key, x)| *x < 6)
-            .unkey()
-            .map(|(_k, v)| v)
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

@@ -29,7 +29,6 @@ fn window_join() {
         let res = stream1
             .window(EventTimeWindow::tumbling(Timestamp::from_secs(3)))
             .join(stream2)
-            .unkey()
             .collect_vec();
         env.execute();
 
@@ -137,7 +136,6 @@ fn session_window_join() {
         let res = stream1
             .window(EventTimeWindow::session(Timestamp::from_secs(3)))
             .join(stream2)
-            .unkey()
             .collect_vec();
         env.execute();
 

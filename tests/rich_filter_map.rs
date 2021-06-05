@@ -44,8 +44,7 @@ fn rich_filter_map_keyed_stream() {
                     }
                 }
             })
-            .unkey()
-            .map(|(_k, v)| v)
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

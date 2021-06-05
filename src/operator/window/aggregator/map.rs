@@ -27,6 +27,6 @@ where
     where
         F: Fn(&mut dyn ExactSizeIterator<Item = &Out>) -> NewOut + Clone + Send + 'static,
     {
-        self.inner.map(map_func).unkey().map(|(_, x)| x)
+        self.inner.map(map_func).drop_key()
     }
 }

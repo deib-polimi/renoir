@@ -33,7 +33,6 @@ fn flatten_keyed_stream() {
             .group_by(|v| v % 2)
             .map(|(_k, v)| vec![v, v, v])
             .flatten()
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {
@@ -75,7 +74,6 @@ fn flat_map_keyed_stream() {
             .stream(source)
             .group_by(|v| v % 2)
             .flat_map(|(_k, v)| vec![v, v, v])
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {

@@ -230,7 +230,6 @@ where
             .key_by(|_| ())
             .add_operator(Reorder::new)
             .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
-            .unkey()
-            .map(|(_key, value)| value)
+            .drop_key()
     }
 }

@@ -69,8 +69,8 @@ fn winning_bids(
                 }
             },
         )
-        .unkey()
-        .map(|(_, (auction, bid))| (auction.unwrap(), bid.unwrap()))
+        .drop_key()
+        .map(|(auction, bid)| (auction.unwrap(), bid.unwrap()))
 }
 
 /// Query 0: Passthrough
@@ -128,9 +128,9 @@ fn query3(
     person
         // WHERE A.seller = P.id
         .join(auction, |p| p.id, |a| a.seller)
-        .unkey()
+        .drop_key()
         // SELECT person, auction.id
-        .map(|(_, (p, a))| (p, a.id))
+        .map(|(p, a)| (p, a.id))
         .collect_vec()
 }
 
@@ -230,7 +230,6 @@ fn query6(
             let (sum, count) = w.fold((0, 0), |(s, c), (_a, b)| (s + b.price, c + 1));
             sum as f32 / count as f32
         })
-        .unkey()
         .collect_vec()
 }
 
@@ -274,8 +273,8 @@ fn query8(
         .group_by(|p| p.id)
         .window(window_descr)
         .join(auction.group_by(|a| a.seller))
-        .unkey()
-        .map(|(_, (p, a))| (p, a.reserve))
+        .drop_key()
+        .map(|(p, a)| (p, a.reserve))
         .collect_vec()
 }
 

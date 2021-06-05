@@ -38,6 +38,6 @@ where
     where
         F: Fn(&mut NewOut, &Out) + Clone + Send + 'static,
     {
-        self.inner.fold(init, fold).unkey().map(|(_, x)| x)
+        self.inner.fold(init, fold).drop_key()
     }
 }

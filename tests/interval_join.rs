@@ -24,7 +24,6 @@ fn interval_join_keyed_stream() {
             )
             .group_by(|x| x % 2)
             .interval_join(right, Duration::from_nanos(1), Duration::from_nanos(2))
-            .unkey()
             .collect_vec();
 
         env.execute();

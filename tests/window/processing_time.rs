@@ -14,8 +14,7 @@ fn tumbling_processing_time() {
             .group_by(|x| x % 2)
             .window(ProcessingTimeWindow::tumbling(Duration::from_micros(200)))
             .fold(0, |acc, x| *acc += x)
-            .unkey()
-            .map(|(_, x)| x)
+            .drop_key()
             .collect_vec();
         env.execute();
 

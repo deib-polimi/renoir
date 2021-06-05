@@ -31,8 +31,7 @@ fn map_keyed_stream() {
             .stream(source)
             .group_by(|n| n % 2)
             .map(|(k, v)| 100 * k + v)
-            .unkey()
-            .map(|(_k, v)| v)
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {

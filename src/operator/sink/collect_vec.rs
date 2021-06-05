@@ -1,8 +1,8 @@
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
-use crate::operator::{ExchangeData, Operator, StreamElement};
+use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::Stream;
+use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Debug)]
 pub struct CollectVecSink<Out: ExchangeData, PreviousOperators>
@@ -82,6 +82,15 @@ where
             })
             .finalize_block();
         StreamOutput { result: output }
+    }
+}
+
+impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+where
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+{
+    pub fn collect_vec(self) -> StreamOutput<Vec<(Key, Out)>> {
+        self.unkey().collect_vec()
     }
 }
 

@@ -13,7 +13,6 @@ fn group_by_fold_stream() {
                 |s, n| *s += &n.to_string(),
                 |s1, s2| *s1 += &s2,
             )
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -33,7 +32,6 @@ fn fold_keyed_stream() {
             .stream(source)
             .group_by(|n| n % 2)
             .fold("".to_string(), |s, n| *s += &n.to_string())
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -58,7 +56,6 @@ fn group_by_fold_shuffled_stream() {
                 |v, n| v.push(n),
                 |v1, mut v2| v1.append(&mut v2),
             )
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -81,7 +78,6 @@ fn fold_shuffled_keyed_stream() {
             .shuffle()
             .group_by(|n| n % 2)
             .fold(Vec::new(), |v, n| v.push(n))
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

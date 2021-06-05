@@ -21,6 +21,6 @@ where
     OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
     pub fn max(self) -> Stream<Out, impl Operator<Out>> {
-        self.inner.max().unkey().map(|(_, x)| x)
+        self.inner.max().drop_key()
     }
 }

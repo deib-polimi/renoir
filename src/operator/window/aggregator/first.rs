@@ -21,6 +21,6 @@ where
     OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
     pub fn first(self) -> Stream<Out, impl Operator<Out>> {
-        self.inner.first().unkey().map(|(_, x)| x)
+        self.inner.first().drop_key()
     }
 }

@@ -63,8 +63,7 @@ fn main() {
                     // for each component change (x, component) and each edge (x, y),
                     // propagate the change to y
                     .map(|(_, ((_x, component), (_, y)))| (y, component))
-                    .unkey()
-                    .map(|(_, (x, component))| (x, component))
+                    .drop_key()
                     // each vertex is assigned to the component with minimum id
                     .group_by_reduce(
                         |(x, _component)| *x,
@@ -72,9 +71,9 @@ fn main() {
                             *component1 = (*component1).min(component2);
                         },
                     )
-                    .unkey()
+                    .drop_key()
                     // filter only actual changes to component assignments
-                    .filter_map(move |(_, (x, component))| {
+                    .filter_map(move |(x, component)| {
                         let old_component = state.get().get_component(x);
                         match old_component {
                             Some(old_component) if old_component <= component => None,

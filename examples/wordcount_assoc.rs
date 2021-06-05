@@ -20,7 +20,7 @@ fn main() {
 
     let source = source::FileSource::new(path);
     let tokenizer = Tokenizer::new();
-    let stream = env
+    let result = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| tokenizer.tokenize(line))
@@ -30,8 +30,7 @@ fn main() {
             |count, _word| *count += 1,
             |a, b| *a += b,
         )
-        .unkey();
-    let result = stream.collect_vec();
+        .collect_vec();
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();

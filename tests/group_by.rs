@@ -10,7 +10,6 @@ fn group_by_stream() {
         let res = env
             .stream(source)
             .group_by(|&n| n.to_string().chars().next().unwrap())
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {

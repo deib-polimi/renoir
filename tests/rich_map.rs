@@ -41,7 +41,6 @@ fn rich_map_keyed_stream() {
                     count
                 }
             })
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {

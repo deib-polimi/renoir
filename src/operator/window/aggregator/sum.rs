@@ -22,6 +22,6 @@ where
     for<'a> Out: Sum<&'a Out>,
 {
     pub fn sum(self) -> Stream<Out, impl Operator<Out>> {
-        self.inner.sum().unkey().map(|(_, x)| x)
+        self.inner.sum().drop_key()
     }
 }

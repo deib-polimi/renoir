@@ -18,14 +18,13 @@ fn wordcount_fold(path: &Path) {
     let mut env = StreamEnvironment::new(config);
 
     let source = FileSource::new(path);
-    let stream = env
+    let _result = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
         .group_by(|word| word.clone())
         .fold(0, |count, _word| *count += 1)
-        .unkey();
-    let _result = stream.collect_vec();
+        .collect_vec();
     env.execute();
 }
 
@@ -54,15 +53,14 @@ fn wordcount_reduce(path: &Path) {
     let mut env = StreamEnvironment::new(config);
 
     let source = FileSource::new(path);
-    let stream = env
+    let _result = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
         .group_by(|word| word.clone())
         .map(|(_, word)| (word, 1))
         .reduce(|(_w1, c1), (_w2, c2)| *c1 += c2)
-        .unkey();
-    let _result = stream.collect_vec();
+        .collect_vec();
     env.execute();
 }
 

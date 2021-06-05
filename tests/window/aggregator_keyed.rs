@@ -12,7 +12,6 @@ fn test_first_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .first()
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -42,7 +41,6 @@ fn test_fold_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .fold(0, |acc, x| *acc += x)
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -75,7 +73,6 @@ fn test_sum_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .sum()
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -107,7 +104,6 @@ fn test_min_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .min()
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -136,7 +132,6 @@ fn test_max_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .max()
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -171,7 +166,6 @@ fn test_map_window_keyed() {
                 }
                 res
             })
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

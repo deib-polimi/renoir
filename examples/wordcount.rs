@@ -20,14 +20,13 @@ fn main() {
 
     let source = source::FileSource::new(path);
     let tokenizer = Tokenizer::new();
-    let stream = env
+    let result = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| tokenizer.tokenize(line))
         .group_by(|word| word.clone())
         .fold(0, |count, _word| *count += 1)
-        .unkey();
-    let result = stream.collect_vec();
+        .collect_vec();
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();

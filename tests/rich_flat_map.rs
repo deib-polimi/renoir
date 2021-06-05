@@ -46,7 +46,6 @@ fn rich_flat_map_keyed_stream() {
                     }
                 }
             })
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {

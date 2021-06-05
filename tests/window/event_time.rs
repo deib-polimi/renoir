@@ -21,8 +21,7 @@ fn sliding_event_time() {
                 Duration::from_millis(2500),
             ))
             .first()
-            .unkey()
-            .map(|(_, x)| x)
+            .drop_key()
             .collect_vec();
         env.execute();
 
@@ -52,8 +51,7 @@ fn tumbling_event_time() {
             .group_by(|x| x % 2)
             .window(EventTimeWindow::tumbling(Duration::from_secs(3)))
             .first()
-            .unkey()
-            .map(|(_, x)| x)
+            .drop_key()
             .collect_vec();
         env.execute();
 

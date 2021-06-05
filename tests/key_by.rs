@@ -6,12 +6,7 @@ use rstream::test::TestHelper;
 fn key_by_stream() {
     TestHelper::local_remote_env(|mut env| {
         let source = IteratorSource::new(0..10u8);
-        let res = env
-            .stream(source)
-            .shuffle()
-            .key_by(|&n| n)
-            .unkey()
-            .collect_vec();
+        let res = env.stream(source).shuffle().key_by(|&n| n).collect_vec();
         env.execute();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
@@ -29,7 +24,6 @@ fn key_by_stream2() {
             .stream(source)
             .shuffle()
             .key_by(|&n| n.to_string().chars().next().unwrap())
-            .unkey()
             .collect_vec();
         env.execute();
         if let Some(res) = res.get() {

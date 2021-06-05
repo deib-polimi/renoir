@@ -91,8 +91,7 @@ where
     {
         self.key_by(|_| ())
             .add_operator(|prev| RichMap::new(prev, move |(_, value)| f(value)))
-            .unkey()
-            .map(|(_, value)| value)
+            .drop_key()
     }
 }
 
