@@ -105,7 +105,7 @@ fn main() {
 
     if let Some(res) = result.get() {
         let final_state = &res[0];
-        if cfg!(debug) {
+        if cfg!(debug_assertions) {
             for (x, component) in &final_state.component {
                 eprintln!("{} -> {}", x, component);
             }

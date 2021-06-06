@@ -89,7 +89,7 @@ fn main() {
 
     if let Some(mut res) = result.get() {
         eprintln!("Output: {:?}", res.len());
-        if cfg!(debug) {
+        if cfg!(debug_assertions) {
             res.sort_by_key(|(x, _, _)| *x);
             for (x, _, rank) in res {
                 eprintln!("{}: {}", x, rank);
