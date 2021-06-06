@@ -66,10 +66,8 @@ fn main() {
         // count how many times each word appears in the window
         .map(|w| w.len())
         .unkey()
-        // bottleneck for computing the ranking of each window
-        .group_by(|_| ())
         // this window has the same alignment of the previous one, so it will contain the same items
-        .window(EventTimeWindow::tumbling(Duration::from_millis(win_step)))
+        .window_all(EventTimeWindow::tumbling(Duration::from_millis(win_step)))
         .map(move |w| {
             // find the k most frequent words for each window
             let mut words = w.cloned().collect::<Vec<(String, usize)>>();
@@ -77,7 +75,6 @@ fn main() {
             words.resize_with(k.min(words.len()), Default::default);
             words
         })
-        .drop_key()
         .for_each(|win| {
             println!("New window");
             for (word, count) in win {

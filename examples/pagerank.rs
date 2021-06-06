@@ -61,12 +61,7 @@ fn main() {
                         adj.into_iter().map(move |y| (y, rank_to_distribute))
                     })
                     .drop_key()
-                    .group_by_fold(
-                        |(y, _)| *y,
-                        0.0,
-                        |rank, (_y, rank_to_distribute)| *rank += rank_to_distribute,
-                        |rank1, rank2| *rank1 += rank2,
-                    )
+                    .group_by_sum(|(y, _)| *y, |&(_y, rank_to_distribute)| rank_to_distribute)
                     // apply dampening factor
                     .map(move |(_y, rank)| rank * DAMPENING + (1.0 - DAMPENING) / num_pages as f64)
                     .unkey()

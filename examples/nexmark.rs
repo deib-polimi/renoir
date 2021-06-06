@@ -148,24 +148,10 @@ fn query3(
 fn query4(
     auction: Stream<Auction, impl Operator<Auction> + 'static>,
     bid: Stream<Bid, impl Operator<Bid> + 'static>,
-) -> StreamOutput<Vec<(i64, f32)>> {
+) -> StreamOutput<Vec<(i64, f64)>> {
     winning_bids(auction, bid)
-        // TODO: operator .avg()
         // GROUP BY category, AVG(price)
-        .group_by_fold(
-            |(auction, _)| auction.category,
-            (0, 0),
-            |acc, (_, bid)| {
-                acc.0 += bid.price;
-                acc.1 += 1;
-            },
-            |acc, (sum, count)| {
-                acc.0 += sum;
-                acc.1 += count;
-            },
-        )
-        .unkey()
-        .map(|(cat, (sum, count))| (cat, (sum as f32) / (count as f32)))
+        .group_by_avg(|(auction, _)| auction.category, |(_, bid)| bid.price as f64)
         .collect_vec()
 }
 

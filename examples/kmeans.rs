@@ -80,13 +80,13 @@ impl Hash for Point {
     }
 }
 
-impl Div<u32> for Point {
+impl Div<f64> for Point {
     type Output = Self;
 
-    fn div(self, rhs: u32) -> Self::Output {
+    fn div(self, rhs: f64) -> Self::Output {
         Self {
-            x: self.x / rhs as f64,
-            y: self.y / rhs as f64,
+            x: self.x / rhs,
+            y: self.y / rhs,
         }
     }
 }
@@ -159,15 +159,8 @@ fn main() {
             initial_state,
             |s, state| {
                 s.map(move |point| (point, select_nearest(point, &state.get().centroids), 1))
-                    .group_by_reduce(
-                        |(_p, c, _n)| *c,
-                        |(p1, _, n1), (p2, _, n2)| {
-                            *p1 += p2;
-                            *n1 += n2;
-                        },
-                    )
+                    .group_by_avg(|(_p, c, _n)| *c, |(p, _c, _n)| *p)
                     .drop_key()
-                    .map(|(p, _, n)| p / n)
             },
             |update: &mut Vec<Point>, p| update.push(p),
             move |state, mut update| {

@@ -56,12 +56,7 @@ fn query1_with_source(
     source
         // map to the week with 1 if it was lethal, 0 otherwise
         .map(|a| (a.week(), (a.killed > 0) as u32))
-        .group_by_fold(
-            |(week, _)| *week,
-            0,
-            |k1, (_, k2)| *k1 += k2,
-            |k1, k2| *k1 += k2,
-        )
+        .group_by_sum(|(week, _killed)| *week, |(_week, killed)| *killed)
         .collect_vec()
 }
 

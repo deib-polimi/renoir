@@ -30,10 +30,11 @@ where
             },
             move |acc1, acc2| match acc1 {
                 None => *acc1 = acc2,
-                Some(acc1) => match acc2 {
-                    None => {}
-                    Some(acc2) => f2(acc1, acc2),
-                },
+                Some(acc1) => {
+                    if let Some(acc2) = acc2 {
+                        f2(acc1, acc2)
+                    }
+                }
             },
         )
         .map(|value| value.unwrap())

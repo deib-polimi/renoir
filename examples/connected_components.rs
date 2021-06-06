@@ -65,12 +65,7 @@ fn main() {
                     .map(|(_, ((_x, component), (_, y)))| (y, component))
                     .drop_key()
                     // each vertex is assigned to the component with minimum id
-                    .group_by_reduce(
-                        |(x, _component)| *x,
-                        |(_, component1), (_, component2)| {
-                            *component1 = (*component1).min(component2);
-                        },
-                    )
+                    .group_by_min_element(|(x, _component)| *x, |(_x, component)| *component)
                     .drop_key()
                     // filter only actual changes to component assignments
                     .filter_map(move |(x, component)| {
