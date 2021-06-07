@@ -32,6 +32,17 @@ pub(crate) struct StreamEnvironmentInner {
 
 /// Streaming environment from which it's possible to register new streams and start the
 /// computation.
+///
+/// This is the entrypoint for the library: construct an environment providing an
+/// [`EnvironmentConfig`], then you can ask new streams providing the source from where to read from.
+///
+/// If you want to use a distributed environment (i.e. using remote workers) you have to spawn them
+/// using [`spawn_remote_workers`](StreamEnvironment::spawn_remote_workers) before asking for some stream.
+///
+/// When all the stream have been registered you have to call [`execute`](StreamEnvironment::execute) that will consume the
+/// environment and start the computation. This function will return when the computation ends.
+///
+/// TODO: example usage
 pub struct StreamEnvironment {
     /// Reference to the actual content of the environment.
     inner: Rc<RefCell<StreamEnvironmentInner>>,

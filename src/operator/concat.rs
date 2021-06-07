@@ -15,6 +15,26 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Concatenate the items of this stream with the items of another stream with the same type.
+    ///
+    /// **Note**: the order of the resulting items is not specified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env.stream(IteratorSource::new((0..10)));
+    /// let s2 = env.stream(IteratorSource::new((10..20)));
+    /// let res = s1.concat(s2).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), (0..20).collect::<Vec<_>>());
+    /// ```
     pub fn concat<OperatorChain2>(
         self,
         oth: Stream<Out, OperatorChain2>,
@@ -55,6 +75,28 @@ impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Ou
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Concatenate the items of this stream with the items of another stream with the same type.
+    ///
+    /// **Note**: the order of the resulting items is not specified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let s2 = env.stream(IteratorSource::new((3..5))).group_by(|&n| n % 2);
+    /// let res = s1.concat(s2).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable(); // the output order is nondeterministic
+    /// assert_eq!(res, vec![(0, 0), (0, 2), (0, 4), (1, 1), (1, 3)]);
+    /// ```
     pub fn concat<OperatorChain2>(
         self,
         oth: KeyedStream<Key, Out, OperatorChain2>,

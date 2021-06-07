@@ -7,6 +7,12 @@ use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::{ExchangeData, StreamElement};
 
 /// Which policy to use for batching the messages before sending them.
+///
+/// Avoid constructing directly this enumeration, please use [`BatchMode::fixed()`] and
+/// [`BatchMode::adaptive()`] constructors.
+///
+/// The default batch mode is `Adaptive(1000, 50ms)`, meaning that a batch is flushed either when
+/// it has at least 1000 messages, or no message has been received in the last 50ms.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BatchMode {
     /// A batch is flushed only when the specified number of messages is present.

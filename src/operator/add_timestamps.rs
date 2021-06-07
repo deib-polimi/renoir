@@ -83,6 +83,34 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Given a stream without timestamps nor watermarks, tag each item with a timestamp and insert
+    /// watermarks.
+    ///
+    /// The two functions given to this operator are the following:
+    /// - `timestamp_gen` returns the timestamp assigned to the provided element of the stream
+    /// - `watermark_gen` returns an optional watermark to add after the provided element
+    ///
+    /// Note that the two functions **must** follow the watermark semantics.
+    /// TODO: link to watermark semantics
+    ///
+    /// ## Example
+    ///
+    /// In this example the stream contains the integers from 0 to 9, each will be tagged with a
+    /// timestamp with the value of the item as milliseconds, and after each even number a watermark
+    /// will be inserted.
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// use rstream::operator::Timestamp;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    ///
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// s.add_timestamps(
+    ///     |&n| Timestamp::from_millis(n),
+    ///     |&n, &ts| if n % 2 == 0 { Some(ts) } else { None }
+    /// );
+    /// ```
     pub fn add_timestamps<TimestampGen, WatermarkGen>(
         self,
         timestamp_gen: TimestampGen,

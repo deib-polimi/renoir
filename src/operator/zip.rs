@@ -113,6 +113,29 @@ impl<Out1: ExchangeData, OperatorChain1> Stream<Out1, OperatorChain1>
 where
     OperatorChain1: Operator<Out1> + 'static,
 {
+    /// Given two [`Stream`]s, zip their elements together: the resulting stream will be a stream of
+    /// pairs, each of which is an element from both streams respectively.
+    ///
+    /// **Note**: all the elements after the end of one of the streams are discarded (i.e. the
+    /// resulting stream will have a number of elements that is the minimum between the lengths of
+    /// the two input streams).
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env.stream(IteratorSource::new(vec!['A', 'B', 'C', 'D'].into_iter()));
+    /// let s2 = env.stream(IteratorSource::new(vec![1, 2, 3].into_iter()));
+    /// let res = s1.zip(s2).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![('A', 1), ('B', 2), ('C', 3)]);
+    /// ```
     pub fn zip<Out2: ExchangeData, OperatorChain2>(
         self,
         oth: Stream<Out2, OperatorChain2>,

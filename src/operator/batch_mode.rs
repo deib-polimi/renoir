@@ -6,6 +6,22 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Change the batch mode for this stream.
+    ///
+    /// This change will be propagated to all the operators following, even of the next blocks,
+    /// until it's changed again.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// use rstream::BatchMode;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    ///
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// s.batch_mode(BatchMode::fixed(1024));
+    /// ```
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {
         self.block.batch_mode = batch_mode;
         self
@@ -16,6 +32,22 @@ impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Change the batch mode for this stream.
+    ///
+    /// This change will be propagated to all the operators following, even of the next blocks,
+    /// until it's changed again.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// use rstream::BatchMode;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    ///
+    /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);
+    /// s.batch_mode(BatchMode::fixed(1024));
+    /// ```
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {
         self.0.block.batch_mode = batch_mode;
         self

@@ -69,6 +69,23 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Remove from the stream all the elements for which the provided predicate returns `false`.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::filter`](std::iter::Iterator::filter)
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let res = s.filter(|&n| n % 2 == 0).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![0, 2, 4, 6, 8])
+    /// ```
     pub fn filter<Predicate>(self, predicate: Predicate) -> Stream<Out, impl Operator<Out>>
     where
         Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
@@ -81,6 +98,25 @@ impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Remove from the stream all the elements for which the provided predicate returns `false`.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::filter`](std::iter::Iterator::filter)
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);
+    /// let res = s.filter(|&(_key, n)| n % 3 == 0).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 0), (0, 6), (1, 3), (1, 9)]);
+    /// ```
     pub fn filter<Predicate>(
         self,
         predicate: Predicate,

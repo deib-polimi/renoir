@@ -17,10 +17,12 @@ use crate::operator::{Data, ExchangeData, KeyerFn, Operator};
 pub type BlockId = usize;
 
 /// On keyed streams, this is the type of the items of the stream.
+///
+/// For now it's just a type alias, maybe downstream it can become a richer struct.
 pub type KeyValue<Key, Value> = (Key, Value);
 
 /// A Stream represents a chain of operators that work on a flow of data. The type of the elements
-/// entering the stream is `In`, while the type of the outgoing elements is `Out`.
+/// that is leaving the stream is `Out`.
 ///
 /// Internally a stream is composed by a chain of blocks, each of which can be seen as a simpler
 /// stream with input and output types.
@@ -39,9 +41,9 @@ where
     pub(crate) env: Rc<RefCell<StreamEnvironmentInner>>,
 }
 
-/// A `KeyedStream` is like a set of `Stream`s, each of which partitioned by some `Key`. Internally
+/// A [`KeyedStream`] is like a set of [`Stream`]s, each of which partitioned by some `Key`. Internally
 /// it's just a stream whose elements are `KeyValue` pairs and the operators behave following the
-/// `KeyedStream` semantics.
+/// [`KeyedStream`] semantics.
 ///
 /// The type of the `Key` must be a valid key inside an hashmap.
 pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(
@@ -50,8 +52,8 @@ pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(
 where
     OperatorChain: Operator<KeyValue<Key, Out>>;
 
-/// A `WindowedStream` is a data stream where elements are divided in multiple groups called
-/// windows. Internally, a `WindowedStream` is just a `KeyedWindowedStream` where each element is
+/// A [`WindowedStream`] is a data stream where elements are divided in multiple groups called
+/// windows. Internally, a [`WindowedStream`] is just a [`KeyedWindowedStream`] where each element is
 /// assigned to the same key `()`.
 pub struct WindowedStream<Out: Data, OperatorChain, WinOut: Data, WinDescr>
 where
@@ -61,7 +63,7 @@ where
     pub(crate) inner: KeyedWindowedStream<(), Out, OperatorChain, WinOut, WinDescr>,
 }
 
-/// A `KeyedWindowedStream` is a data stream partitioned by `Key`, where elements of each partition
+/// A [`KeyedWindowedStream`] is a data stream partitioned by `Key`, where elements of each partition
 /// are divided in groups called windows.
 /// Windows are handled independently for each partition of the stream.
 pub struct KeyedWindowedStream<Key: DataKey, Out: Data, OperatorChain, WinOut: Data, WinDescr>

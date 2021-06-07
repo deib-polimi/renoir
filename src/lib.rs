@@ -1,3 +1,10 @@
+//! TODO:
+//!
+//!  - describe what rstream2 is for
+//!  - explain briefly the internals (job graph, execution graph, scheduler, blocks, operators,
+//!    timestamps, watermarks, ...)
+//!  - simple examples
+
 #[macro_use]
 extern crate derivative;
 #[macro_use]

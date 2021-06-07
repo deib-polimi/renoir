@@ -1,3 +1,9 @@
+//! Operators that can be applied to a stream.
+//!
+//! The actual operator list can be found from the implemented methods of [`Stream`](crate::Stream),
+//! [`KeyedStream`](crate::KeyedStream), [`WindowedStream`](crate::WindowedStream) and
+//! [`KeyedWindowedStream`](crate::KeyedWindowedStream).
+
 use std::hash::Hash;
 use std::time::Duration;
 

@@ -72,6 +72,28 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
+    /// replicas sends the items to.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
+    /// ```
     pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {
         let output = StreamOutputRef::default();
         self.max_parallelism(1)
@@ -89,6 +111,32 @@ impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Ou
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
+    /// replicas sends the items to.
+    ///
+    /// **Note**: the collected items are the pairs `(key, value)`.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable(); // the output order is nondeterministic
+    /// assert_eq!(res, vec![(0, 0), (0, 2), (1, 1)]);
+    /// ```
     pub fn collect_vec(self) -> StreamOutput<Vec<(Key, Out)>> {
         self.unkey().collect_vec()
     }
