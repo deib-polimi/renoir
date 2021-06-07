@@ -1,5 +1,6 @@
 use rstream::operator::source::IteratorSource;
-use rstream::operator::{EventTimeWindow, Timestamp};
+use rstream::operator::window::EventTimeWindow;
+use rstream::operator::Timestamp;
 use rstream::test::TestHelper;
 
 #[test]

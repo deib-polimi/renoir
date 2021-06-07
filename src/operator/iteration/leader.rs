@@ -3,9 +3,10 @@ use std::sync::Arc;
 
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkSender};
+use crate::operator::iteration::NewIterationState;
 use crate::operator::source::Source;
 use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock, StartBlockReceiver};
-use crate::operator::{ExchangeData, NewIterationState, Operator, StreamElement};
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::profiler::{get_profiler, Profiler};
 use crate::scheduler::ExecutionMetadata;
 

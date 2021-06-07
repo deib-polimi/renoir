@@ -1,16 +1,17 @@
+use std::sync::mpsc::Receiver;
+
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::channel::BoundedChannelReceiver;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 pub struct ChannelSource<Out: Data> {
-    receiver: BoundedChannelReceiver<StreamElement<Out>>,
+    receiver: Receiver<StreamElement<Out>>,
     terminated: bool,
 }
 
 impl<Out: Data> ChannelSource<Out> {
-    pub fn new(receiver: BoundedChannelReceiver<StreamElement<Out>>) -> Self {
+    pub fn new(receiver: Receiver<StreamElement<Out>>) -> Self {
         Self {
             receiver,
             terminated: false,

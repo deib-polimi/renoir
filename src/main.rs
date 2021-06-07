@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate log;
 
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
 use rstream::operator::source::IteratorSource;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 fn main() {
     env_logger::init();

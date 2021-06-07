@@ -1,8 +1,8 @@
-pub use crate::operator::source::csv::*;
 pub use channel::*;
 pub use file::*;
 pub use iterator::*;
 
+pub use crate::operator::source::csv::*;
 use crate::operator::{Data, Operator};
 
 mod channel;

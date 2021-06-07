@@ -1,8 +1,9 @@
+use std::marker::PhantomData;
+
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use std::marker::PhantomData;
 
 #[derive(Clone)]
 struct Filter<Out: Data, PreviousOperator, Predicate>

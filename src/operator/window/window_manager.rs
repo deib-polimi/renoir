@@ -4,7 +4,8 @@ use std::fmt::{Display, Formatter};
 use hashbrown::hash_map::IterMut;
 use hashbrown::HashMap;
 
-use crate::operator::{Data, DataKey, StreamElement, WindowDescription, WindowGenerator};
+use crate::operator::window::{WindowDescription, WindowGenerator};
+use crate::operator::{Data, DataKey, StreamElement};
 use crate::stream::KeyValue;
 
 /// Wrapper used to return either a single or multiple `WindowGenerator`.

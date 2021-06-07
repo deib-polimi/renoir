@@ -1,6 +1,7 @@
+use std::ops::{AddAssign, Div};
+
 use crate::operator::{ExchangeData, ExchangeDataKey, KeyerFn, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use std::ops::{AddAssign, Div};
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where

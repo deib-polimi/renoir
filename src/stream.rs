@@ -6,11 +6,12 @@ use std::sync::Arc;
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
+use crate::operator::end::EndBlock;
+use crate::operator::iteration::IterationStateLock;
+use crate::operator::window::WindowDescription;
 use crate::operator::DataKey;
 use crate::operator::StartBlock;
-use crate::operator::{
-    Data, EndBlock, ExchangeData, IterationStateLock, KeyerFn, Operator, WindowDescription,
-};
+use crate::operator::{Data, ExchangeData, KeyerFn, Operator};
 
 /// Identifier of a block in the job graph.
 pub type BlockId = usize;

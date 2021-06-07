@@ -2,8 +2,8 @@ use std::fmt::{Debug, Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
-pub use receiver::*;
-pub use sender::*;
+pub(crate) use receiver::*;
+pub(crate) use sender::*;
 pub(crate) use topology::*;
 
 use crate::operator::StreamElement;

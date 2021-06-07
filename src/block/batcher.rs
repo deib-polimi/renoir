@@ -1,10 +1,10 @@
 use std::num::NonZeroUsize;
 use std::time::Duration;
 
+use coarsetime::Instant;
+
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::{ExchangeData, StreamElement};
-
-use coarsetime::Instant;
 
 /// Which policy to use for batching the messages before sending them.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

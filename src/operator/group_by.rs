@@ -1,6 +1,7 @@
 use crate::block::NextStrategy;
-use crate::operator::{DataKey, EndBlock, ExchangeData};
-use crate::operator::{KeyBy, Operator};
+use crate::operator::end::EndBlock;
+use crate::operator::key_by::KeyBy;
+use crate::operator::{DataKey, ExchangeData, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>

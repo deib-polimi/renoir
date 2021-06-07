@@ -1,6 +1,7 @@
 use itertools::Itertools;
+
 use rstream::operator::source::IteratorSource;
-use rstream::operator::CountWindow;
+use rstream::operator::window::CountWindow;
 use rstream::test::TestHelper;
 
 #[test]

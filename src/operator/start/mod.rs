@@ -9,9 +9,10 @@ pub(crate) use single::*;
 use crate::block::BlockStructure;
 use crate::channel::RecvTimeoutError;
 use crate::network::{Coord, NetworkMessage};
+use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::start::watermark_frontier::WatermarkFrontier;
-use crate::operator::{timestamp_max, ExchangeData, IterationStateLock, Operator, StreamElement};
+use crate::operator::{timestamp_max, ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 

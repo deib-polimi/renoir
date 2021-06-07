@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use rstream::operator::source::IteratorSource;
-use rstream::operator::ProcessingTimeWindow;
+use rstream::operator::window::ProcessingTimeWindow;
 use rstream::test::TestHelper;
 
 #[test]

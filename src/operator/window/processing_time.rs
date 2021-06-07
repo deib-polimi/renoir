@@ -2,7 +2,8 @@ use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::time::UNIX_EPOCH;
 
-use crate::operator::{Data, DataKey, StreamElement, Timestamp, Window, WindowGenerator};
+use crate::operator::window::{Window, WindowGenerator};
+use crate::operator::{Data, DataKey, StreamElement, Timestamp};
 
 /// Wrapper of a `WindowGenerator` that converts every `StreamElement::Item` into
 /// a `StreamElement::Timestamped`.

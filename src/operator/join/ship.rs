@@ -5,8 +5,9 @@ use std::marker::PhantomData;
 use crate::block::NextStrategy;
 use crate::operator::join::local_hash::JoinStreamLocalHash;
 use crate::operator::join::local_sort_merge::JoinStreamLocalSortMerge;
+use crate::operator::join::JoinStream;
 use crate::operator::start::{MultipleStartBlockReceiverOperator, StartBlock, TwoSidesItem};
-use crate::operator::{Data, DataKey, ExchangeData, JoinStream, KeyerFn, Operator};
+use crate::operator::{Data, DataKey, ExchangeData, KeyerFn, Operator};
 use crate::stream::Stream;
 
 /// Marker type for remembering that hash is the selected ship strategy.

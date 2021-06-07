@@ -13,7 +13,7 @@ use crate::profiler::{get_profiler, Profiler};
 /// connection internally this points to the multiplexer that handles the remote channel.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct NetworkSender<Out: ExchangeData> {
+pub(crate) struct NetworkSender<Out: ExchangeData> {
     /// The ReceiverEndpoint of the recipient.
     pub receiver_endpoint: ReceiverEndpoint,
     /// The generic sender that will send the message either locally or remotely.

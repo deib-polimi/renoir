@@ -2,8 +2,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStructure};
+use crate::operator::iteration::IterationStateLock;
 use crate::operator::start::{MultipleStartBlockReceiverOperator, StartBlock, TwoSidesItem};
-use crate::operator::{ExchangeData, IterationStateLock, Operator, StreamElement};
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
 

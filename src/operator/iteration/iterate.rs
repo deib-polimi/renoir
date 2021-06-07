@@ -6,14 +6,13 @@ use std::sync::Arc;
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure};
 use crate::environment::StreamEnvironmentInner;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
+use crate::operator::end::EndBlock;
 use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
+use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
 use crate::operator::start::StartBlock;
-use crate::operator::{
-    EndBlock, ExchangeData, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
-    StreamElement,
-};
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{BlockId, Stream};
 

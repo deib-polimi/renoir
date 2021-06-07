@@ -1,11 +1,11 @@
 //! Wrapper to in-memory channels.
 //!
 //! This module exists to ease the transition between channel libraries.
+#![allow(dead_code)]
 
 use std::time::Duration;
 
 use anyhow::Result;
-
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
 use crossbeam_channel::{
     bounded, select, unbounded, Receiver, RecvError as ExtRecvError,
@@ -33,14 +33,6 @@ pub enum SelectResult<In1, In2> {
     B(Result<In2, RecvError>),
 }
 
-/// The result of a `select_any`.
-pub struct SelectAnyResult<In> {
-    /// The actual value returned by the select.
-    pub result: Result<In, RecvError>,
-    /// The index of the receiver this result refers to.
-    pub index: usize,
-}
-
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
 #[macro_use]
 mod select_impl {
@@ -59,63 +51,6 @@ mod select_impl {
                 recv($self.0) -> elem => Ok(SelectResult::A(elem)),
                 recv($other.0) -> elem => Ok(SelectResult::B(elem)),
                 default($timeout) => Err(RecvTimeoutError::Timeout),
-            }
-        };
-    }
-
-    macro_rules! select_any_impl {
-        ($receivers:expr) => {
-            // select is pretty expensive, when there is only one receiver select == recv
-            if $receivers.len() == 1 {
-                SelectAnyResult {
-                    result: $receivers.nth(0).unwrap().0.recv(),
-                    index: 0,
-                }
-            } else {
-                let mut select = Select::new();
-                // need to clone the iterator to avoid consuming it
-                let iter = $receivers.clone();
-                for receiver in iter {
-                    select.recv(&receiver.0);
-                }
-                let index = select.ready();
-                SelectAnyResult {
-                    index,
-                    result: $receivers.nth(index).unwrap().0.recv(),
-                }
-            }
-        };
-    }
-
-    macro_rules! select_any_timeout_impl {
-        ($receivers:expr, $timeout:expr) => {
-            // select is pretty expensive, when there is only one receiver select == recv
-            if $receivers.len() == 1 {
-                match $receivers.nth(0).unwrap().0.recv_timeout($timeout) {
-                    Ok(res) => Ok(SelectAnyResult {
-                        result: Ok(res),
-                        index: 0,
-                    }),
-                    Err(RecvTimeoutError::Disconnected) => Ok(SelectAnyResult {
-                        result: Err(RecvError {}),
-                        index: 0,
-                    }),
-                    Err(RecvTimeoutError::Timeout) => Err(RecvTimeoutError::Timeout),
-                }
-            } else {
-                let mut select = Select::new();
-                // need to clone the iterator to avoid consuming it
-                let iter = $receivers.clone();
-                for receiver in iter {
-                    select.recv(&receiver.0);
-                }
-                let index = select
-                    .ready_timeout($timeout)
-                    .map_err(|_| RecvTimeoutError::Timeout)?;
-                Ok(SelectAnyResult {
-                    index,
-                    result: $receivers.nth(index).unwrap().0.recv(),
-                })
             }
         };
     }
@@ -142,65 +77,14 @@ mod select_impl {
                 .map_err(|_| RecvTimeoutError::Timeout)
         };
     }
-
-    macro_rules! select_any_impl {
-        ($receivers:expr) => {
-            // select is pretty expensive, when there is only one receiver select == recv
-            if $receivers.len() == 1 {
-                SelectAnyResult {
-                    result: $receivers.nth(0).unwrap().0.recv(),
-                    index: 0,
-                }
-            } else {
-                let mut select = flume::Selector::new();
-                for (index, receiver) in $receivers.enumerate() {
-                    select = select.recv(&receiver.0, move |elem| SelectAnyResult {
-                        result: elem,
-                        index,
-                    });
-                }
-                select.wait()
-            }
-        };
-    }
-
-    macro_rules! select_any_timeout_impl {
-        ($receivers:expr, $timeout:expr) => {
-            // select is pretty expensive, when there is only one receiver select == recv
-            if $receivers.len() == 1 {
-                match $receivers.nth(0).unwrap().0.recv_timeout($timeout) {
-                    Ok(res) => Ok(SelectAnyResult {
-                        result: Ok(res),
-                        index: 0,
-                    }),
-                    Err(RecvTimeoutError::Disconnected) => Ok(SelectAnyResult {
-                        result: Err(RecvError::Disconnected),
-                        index: 0,
-                    }),
-                    Err(RecvTimeoutError::Timeout) => Err(RecvTimeoutError::Timeout),
-                }
-            } else {
-                let mut select = flume::Selector::new();
-                for (index, receiver) in $receivers.enumerate() {
-                    select = select.recv(&receiver.0, move |elem| SelectAnyResult {
-                        result: elem,
-                        index,
-                    });
-                }
-                select
-                    .wait_timeout($timeout)
-                    .map_err(|_| RecvTimeoutError::Timeout)
-            }
-        };
-    }
 }
 
 /// A wrapper on a bounded channel sender.
 #[derive(Debug, Clone)]
-pub struct BoundedChannelSender<T: ChannelItem>(Sender<T>);
+pub(crate) struct BoundedChannelSender<T: ChannelItem>(Sender<T>);
 /// A wrapper on a bounded channel receiver.
 #[derive(Debug)]
-pub struct BoundedChannelReceiver<T: ChannelItem>(Receiver<T>);
+pub(crate) struct BoundedChannelReceiver<T: ChannelItem>(Receiver<T>);
 
 impl<T: ChannelItem> BoundedChannelSender<T> {
     /// Send a message in the channel, blocking if it's full.
@@ -262,37 +146,14 @@ impl<T: ChannelItem> BoundedChannelReceiver<T> {
     ) -> Result<SelectResult<T, T2>, RecvTimeoutError> {
         select_timeout_impl!(self, other, timeout)
     }
-
-    /// Same as `select`, but takes multiple receivers to select from.
-    #[allow(clippy::unnecessary_mut_passed)]
-    #[inline]
-    pub fn select_any<'a, I>(mut receivers: I) -> SelectAnyResult<T>
-    where
-        I: ExactSizeIterator + Iterator<Item = &'a BoundedChannelReceiver<T>> + Clone,
-    {
-        select_any_impl!(&mut receivers)
-    }
-
-    /// Same as `select_timeout`, but takes multiple receivers to select from.
-    #[allow(clippy::unnecessary_mut_passed)]
-    #[inline]
-    pub fn select_any_timeout<'a, I>(
-        mut receivers: I,
-        timeout: Duration,
-    ) -> Result<SelectAnyResult<T>, RecvTimeoutError>
-    where
-        I: ExactSizeIterator + Iterator<Item = &'a BoundedChannelReceiver<T>> + Clone,
-    {
-        select_any_timeout_impl!(&mut receivers, timeout)
-    }
 }
 
 /// A wrapper on an unbounded channel sender.
 #[derive(Debug, Clone)]
-pub struct UnboundedChannelSender<T: ChannelItem>(Sender<T>);
+pub(crate) struct UnboundedChannelSender<T: ChannelItem>(Sender<T>);
 /// A wrapper on an unbounded channel receiver.
 #[derive(Debug)]
-pub struct UnboundedChannelReceiver<T: ChannelItem>(Receiver<T>);
+pub(crate) struct UnboundedChannelReceiver<T: ChannelItem>(Receiver<T>);
 
 impl<T: ChannelItem> UnboundedChannelSender<T> {
     /// Send a message in the channel.
@@ -347,29 +208,6 @@ impl<T: ChannelItem> UnboundedChannelReceiver<T> {
         timeout: Duration,
     ) -> Result<SelectResult<T, T2>, RecvTimeoutError> {
         select_timeout_impl!(self, other, timeout)
-    }
-
-    /// Same as `select`, but takes multiple receivers to select from.
-    #[allow(clippy::unnecessary_mut_passed)]
-    #[inline]
-    pub fn select_any<'a, I>(mut receivers: I) -> SelectAnyResult<T>
-    where
-        I: ExactSizeIterator + Iterator<Item = &'a BoundedChannelReceiver<T>> + Clone,
-    {
-        select_any_impl!(&mut receivers)
-    }
-
-    /// Same as `select_timeout`, but takes multiple receivers to select from.
-    #[allow(clippy::unnecessary_mut_passed)]
-    #[inline]
-    pub fn select_any_timeout<'a, I>(
-        mut receivers: I,
-        timeout: Duration,
-    ) -> Result<SelectAnyResult<T>, RecvTimeoutError>
-    where
-        I: ExactSizeIterator + Iterator<Item = &'a BoundedChannelReceiver<T>> + Clone,
-    {
-        select_any_timeout_impl!(&mut receivers, timeout)
     }
 }
 
@@ -503,65 +341,5 @@ mod tests {
         }
         // if more than 5% of the tries failed, this test fails
         assert!(100 * failures < 5 * tries);
-    }
-
-    #[test]
-    fn test_select_any_local() {
-        let (sender1, receiver1) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
-        let (sender2, receiver2) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
-
-        let receivers = vec![receiver1, receiver2];
-
-        sender1.send(123).unwrap();
-
-        let elem1 = BoundedChannelReceiver::select_any(receivers.iter());
-        assert_eq!(elem1.index, 0);
-        assert_eq!(elem1.result, Ok(123));
-
-        sender2.send(456).unwrap();
-
-        let elem1 = BoundedChannelReceiver::select_any(receivers.iter());
-        assert_eq!(elem1.index, 1);
-        assert_eq!(elem1.result, Ok(456));
-
-        drop(sender1);
-        drop(sender2);
-
-        let err = BoundedChannelReceiver::select_any(receivers.iter());
-        assert!(err.result.is_err());
-    }
-
-    #[test]
-    fn test_select_any_timeout_local() {
-        let (sender1, receiver1) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
-        let (sender2, receiver2) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
-
-        let receivers = vec![receiver1, receiver2];
-
-        sender1.send(123).unwrap();
-
-        let elem1 =
-            BoundedChannelReceiver::select_any_timeout(receivers.iter(), Duration::from_millis(1))
-                .unwrap();
-        assert_eq!(elem1.index, 0);
-        assert_eq!(elem1.result, Ok(123));
-
-        let timeout =
-            BoundedChannelReceiver::select_any_timeout(receivers.iter(), Duration::from_millis(50));
-        assert!(timeout.is_err());
-
-        sender2.send(456).unwrap();
-
-        let elem1 =
-            BoundedChannelReceiver::select_any_timeout(receivers.iter(), Duration::from_millis(1))
-                .unwrap();
-        assert_eq!(elem1.index, 1);
-        assert_eq!(elem1.result, Ok(456));
-
-        drop(sender1);
-        drop(sender2);
-
-        let err = BoundedChannelReceiver::select_any(receivers.iter());
-        assert!(err.result.is_err());
     }
 }

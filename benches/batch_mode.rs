@@ -1,12 +1,13 @@
+use std::time::Duration;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 
-use rstream::block::BatchMode;
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
 use rstream::operator::source::IteratorSource;
-use std::time::Duration;
+use rstream::BatchMode;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 fn batch_mode(batch_mode: BatchMode, dataset: &'static [u32]) {
     let config = EnvironmentConfig::local(4);

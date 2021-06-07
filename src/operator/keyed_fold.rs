@@ -5,9 +5,10 @@ use std::hash::Hasher;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorStructure};
+use crate::operator::end::EndBlock;
+use crate::operator::key_by::KeyBy;
 use crate::operator::{
-    Data, DataKey, EndBlock, ExchangeData, ExchangeDataKey, KeyBy, Operator, StreamElement,
-    Timestamp,
+    Data, DataKey, ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};

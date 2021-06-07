@@ -101,7 +101,8 @@ mod tests {
     use std::str::FromStr;
     use std::time::Duration;
 
-    use crate::operator::{Map, Operator, StreamElement};
+    use crate::operator::map::Map;
+    use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
 
     #[test]

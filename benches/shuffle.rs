@@ -2,10 +2,10 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 
-use rstream::block::BatchMode;
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
 use rstream::operator::source::IteratorSource;
+use rstream::BatchMode;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 fn shuffle(dataset: &'static [u32]) {
     let config = EnvironmentConfig::local(4);

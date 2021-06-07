@@ -1,8 +1,8 @@
 use std::time::Instant;
 
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
-use rstream::operator::source;
+use rstream::operator::source::CsvSource;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();
@@ -15,7 +15,7 @@ fn main() {
 
     env.spawn_remote_workers();
 
-    let source = source::CsvSource::<(u32, u32)>::new(path).has_headers(false);
+    let source = CsvSource::<(u32, u32)>::new(path).has_headers(false);
     let mut edges = env
         .stream(source)
         // make sure v1 is less than v2

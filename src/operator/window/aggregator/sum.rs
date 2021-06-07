@@ -1,6 +1,8 @@
-use crate::operator::{Data, DataKey, Operator, WindowDescription};
-use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 use std::iter::Sum;
+
+use crate::operator::window::WindowDescription;
+use crate::operator::{Data, DataKey, Operator};
+use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
 impl<Key: DataKey, Out: Data, WindowDescr, OperatorChain>
     KeyedWindowedStream<Key, Out, OperatorChain, Out, WindowDescr>

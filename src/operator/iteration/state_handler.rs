@@ -3,11 +3,9 @@ use std::sync::{Arc, Barrier};
 use lazy_init::Lazy;
 
 use crate::network::Coord;
+use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
 use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock};
-use crate::operator::{
-    ExchangeData, IterationStateHandle, IterationStateLock, NewIterationState, Operator,
-    StreamElement,
-};
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
 

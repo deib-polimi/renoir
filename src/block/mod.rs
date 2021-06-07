@@ -8,7 +8,8 @@ pub(crate) use graph_generator::*;
 pub(crate) use next_strategy::*;
 pub(crate) use structure::*;
 
-use crate::operator::{Data, IterationStateLock, Operator};
+use crate::operator::iteration::IterationStateLock;
+use crate::operator::{Data, Operator};
 use crate::stream::BlockId;
 
 mod batcher;

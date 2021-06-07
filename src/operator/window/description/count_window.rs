@@ -121,9 +121,9 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
 mod tests {
     use std::time::Duration;
 
-    use crate::operator::{
-        CountWindow, CountWindowGenerator, StreamElement, WindowDescription, WindowGenerator,
-    };
+    use crate::operator::window::description::count_window::{CountWindow, CountWindowGenerator};
+    use crate::operator::window::{WindowDescription, WindowGenerator};
+    use crate::operator::StreamElement;
 
     #[test]
     fn count_window_watermark() {

@@ -1,9 +1,10 @@
+use std::marker::PhantomData;
+
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::Sink;
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use std::marker::PhantomData;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]

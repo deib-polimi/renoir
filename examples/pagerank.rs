@@ -1,8 +1,8 @@
 use std::time::Instant;
 
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
-use rstream::operator::source;
+use rstream::operator::source::CsvSource;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 const EPS: f64 = 1e-4;
 const DAMPENING: f64 = 0.85;
@@ -21,8 +21,8 @@ fn main() {
 
     env.spawn_remote_workers();
 
-    let pages_source = source::CsvSource::<u64>::new(path_pages).has_headers(false);
-    let links_source = source::CsvSource::<(u64, u64)>::new(path_links)
+    let pages_source = CsvSource::<u64>::new(path_pages).has_headers(false);
+    let links_source = CsvSource::<(u64, u64)>::new(path_links)
         .delimiter(b' ')
         .has_headers(false);
 

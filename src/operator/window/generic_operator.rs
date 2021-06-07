@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 
 use crate::block::{BlockStructure, OperatorStructure};
+use crate::operator::reorder::Reorder;
 use crate::operator::window::window_manager::KeyedWindowManager;
-use crate::operator::{
-    Data, DataKey, Operator, Reorder, StreamElement, Window, WindowDescription, WindowGenerator,
-};
+use crate::operator::window::{Window, WindowDescription, WindowGenerator};
+use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream};
 

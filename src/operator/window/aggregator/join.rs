@@ -1,4 +1,6 @@
-use crate::operator::{ConcatElement, ExchangeData, ExchangeDataKey, Operator, WindowDescription};
+use crate::operator::concat::ConcatElement;
+use crate::operator::window::WindowDescription;
+use crate::operator::{ExchangeData, ExchangeDataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
 impl<Key: ExchangeDataKey, Out: ExchangeData, Out2: ExchangeData, WindowDescr, OperatorChain>

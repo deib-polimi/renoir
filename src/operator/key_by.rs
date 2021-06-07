@@ -90,7 +90,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::operator::{KeyBy, Operator, StreamElement};
+    use crate::operator::key_by::KeyBy;
+    use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
 
     #[test]

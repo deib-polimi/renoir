@@ -1,7 +1,12 @@
 use std::collections::VecDeque;
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
+use std::sync::mpsc::RecvTimeoutError;
 use std::sync::Arc;
+use std::time::Duration;
+
+use itertools::{process_results, Itertools};
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
@@ -9,10 +14,6 @@ use crate::environment::StreamEnvironment;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use itertools::{process_results, Itertools};
-use std::str::FromStr;
-use std::sync::mpsc::RecvTimeoutError;
-use std::time::Duration;
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;

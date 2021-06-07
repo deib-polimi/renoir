@@ -12,9 +12,8 @@ import sys
 import tempfile
 
 import coloredlogs
-import ruamel.yaml
 import paramiko
-
+import ruamel.yaml
 
 logger = logging.getLogger("benchmark")
 verbosity = 0

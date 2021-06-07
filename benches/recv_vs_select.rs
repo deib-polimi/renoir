@@ -1,8 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 
-use rstream::network::{Coord, NetworkMessage, NetworkReceiver, ReceiverEndpoint};
-use rstream::operator::StreamElement;
-
 const CHANNEL_CAPACITY: usize = 10;
 
 fn crossbeam_run(size: usize, body: impl FnOnce(crossbeam_channel::Receiver<usize>)) {
@@ -60,39 +57,6 @@ fn flume_select(size: usize) {
     });
 }
 
-fn run(size: usize, body: impl FnOnce(NetworkReceiver<usize>)) {
-    let mut receiver = NetworkReceiver::new(ReceiverEndpoint::new(Coord::new(0, 0, 0), 0));
-    let sender = receiver.sender().unwrap();
-    let join_handle = std::thread::Builder::new()
-        .name("recv producer".to_string())
-        .spawn(move || {
-            for i in 0..size {
-                sender
-                    .send(NetworkMessage::new(
-                        vec![StreamElement::Item(i)],
-                        Coord::default(),
-                    ))
-                    .unwrap();
-            }
-        })
-        .unwrap();
-    body(receiver);
-    join_handle.join().unwrap();
-}
-
-fn recv(size: usize) {
-    run(size, |recv| while recv.recv().is_ok() {});
-}
-
-fn select(size: usize) {
-    run(size, |recv| {
-        let recv = vec![recv];
-        for _ in 0..size {
-            NetworkReceiver::select_any(&recv).result.unwrap();
-        }
-    });
-}
-
 fn recv_vs_select_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("recv_vs_select");
     const ELEMENTS: usize = 100_000;
@@ -107,8 +71,6 @@ fn recv_vs_select_benchmark(c: &mut Criterion) {
     group.bench_function("flume_select", |b| {
         b.iter(|| flume_select(black_box(ELEMENTS)))
     });
-    group.bench_function("recv", |b| b.iter(|| recv(black_box(ELEMENTS))));
-    group.bench_function("select", |b| b.iter(|| select(black_box(ELEMENTS))));
     group.finish();
 }
 

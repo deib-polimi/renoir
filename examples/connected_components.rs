@@ -3,9 +3,9 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
-use rstream::operator::source;
+use rstream::operator::source::CsvSource;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 struct State {
@@ -40,8 +40,8 @@ fn main() {
 
     env.spawn_remote_workers();
 
-    let vertices_source = source::CsvSource::<u64>::new(path_vertices).has_headers(false);
-    let edges_source = source::CsvSource::<(u64, u64)>::new(path_edges)
+    let vertices_source = CsvSource::<u64>::new(path_vertices).has_headers(false);
+    let edges_source = CsvSource::<(u64, u64)>::new(path_edges)
         .delimiter(b' ')
         .has_headers(false);
 

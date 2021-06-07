@@ -1,18 +1,16 @@
 #![allow(clippy::type_complexity)]
 
+use std::collections::VecDeque;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
+use crate::operator::join::{InnerJoinTuple, JoinVariant, LeftJoinTuple, OuterJoinTuple};
 use crate::operator::start::{MultipleStartBlockReceiverOperator, TwoSidesItem};
-use crate::operator::{
-    Data, ExchangeData, InnerJoinTuple, JoinVariant, KeyerFn, LeftJoinTuple, Operator,
-    OuterJoinTuple, StreamElement,
-};
+use crate::operator::{Data, ExchangeData, KeyerFn, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 use crate::worker::replica_coord;
-use std::collections::VecDeque;
 
 /// This operator performs the join using the local sort-merge strategy.
 ///

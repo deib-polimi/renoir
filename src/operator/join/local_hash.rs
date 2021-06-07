@@ -6,11 +6,9 @@ use std::marker::PhantomData;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::network::Coord;
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
+use crate::operator::join::{InnerJoinTuple, JoinVariant, LeftJoinTuple, OuterJoinTuple};
 use crate::operator::start::{MultipleStartBlockReceiverOperator, TwoSidesItem};
-use crate::operator::{
-    DataKey, ExchangeData, InnerJoinTuple, JoinVariant, KeyerFn, LeftJoinTuple, Operator,
-    OuterJoinTuple, StreamElement,
-};
+use crate::operator::{DataKey, ExchangeData, KeyerFn, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 

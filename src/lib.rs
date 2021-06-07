@@ -5,31 +5,36 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "mimalloc")]
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 use std::ops::{Add, AddAssign};
 
 use serde::{Deserialize, Serialize};
+
+pub use block::BatchMode;
+pub use config::EnvironmentConfig;
+pub use environment::StreamEnvironment;
+pub use stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
 use crate::block::BlockStructure;
 use crate::network::Coord;
 use crate::profiler::ProfilerResult;
 
-pub mod block;
-pub mod channel;
-pub mod config;
-pub mod environment;
-pub mod network;
+#[cfg(feature = "mimalloc")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+pub(crate) mod block;
+pub(crate) mod channel;
+pub(crate) mod config;
+pub(crate) mod environment;
+pub(crate) mod network;
 pub mod operator;
 mod profiler;
-pub mod runner;
-pub mod scheduler;
-pub mod stream;
+pub(crate) mod runner;
+pub(crate) mod scheduler;
+pub(crate) mod stream;
 #[doc(hidden)]
 pub mod test;
-pub mod worker;
+pub(crate) mod worker;
 
 /// Tracing information of the current execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

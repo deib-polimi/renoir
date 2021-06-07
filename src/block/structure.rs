@@ -203,7 +203,7 @@ where
 }
 
 /// Wait the structural information from all the replicas and then print the DOT format to the log.
-pub fn wait_structure(
+pub(crate) fn wait_structure(
     receiver: UnboundedChannelReceiver<(Coord, BlockStructure)>,
 ) -> Vec<(Coord, BlockStructure)> {
     let mut job_graph_generator = JobGraphGenerator::new();

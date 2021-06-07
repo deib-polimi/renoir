@@ -156,7 +156,8 @@ mod tests {
     use crate::operator::window::description::session_window::{
         SessionEventTimeWindowDescr, SessionWindowGenerator,
     };
-    use crate::operator::{StreamElement, WindowDescription, WindowGenerator};
+    use crate::operator::window::{WindowDescription, WindowGenerator};
+    use crate::operator::StreamElement;
 
     #[test]
     fn session_window_watermark() {

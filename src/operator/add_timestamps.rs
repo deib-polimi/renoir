@@ -1,8 +1,9 @@
+use std::marker::PhantomData;
+
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
-use std::marker::PhantomData;
 
 #[derive(Clone)]
 pub struct AddTimestamp<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
@@ -97,7 +98,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::operator::{AddTimestamp, Operator, StreamElement, Timestamp};
+    use crate::operator::add_timestamps::AddTimestamp;
+    use crate::operator::{Operator, StreamElement, Timestamp};
     use crate::test::FakeOperator;
 
     #[test]

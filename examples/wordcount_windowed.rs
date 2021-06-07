@@ -2,10 +2,11 @@ use std::time::{Duration, Instant};
 
 use regex::Regex;
 
-use rstream::block::BatchMode;
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
-use rstream::operator::{source, CountWindow};
+use rstream::operator::source::FileSource;
+use rstream::operator::window::CountWindow;
+use rstream::BatchMode;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();
@@ -18,7 +19,7 @@ fn main() {
 
     env.spawn_remote_workers();
 
-    let source = source::FileSource::new(path);
+    let source = FileSource::new(path);
     let tokenizer = Tokenizer::new();
     env.stream(source)
         .batch_mode(BatchMode::adaptive(1000, Duration::from_millis(100)))

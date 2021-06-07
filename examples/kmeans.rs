@@ -6,9 +6,9 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
-use rstream::operator::source;
+use rstream::operator::source::CsvSource;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 struct Point {
@@ -151,7 +151,7 @@ fn main() {
     assert_eq!(centroids.len(), num_centroids);
     let initial_state = State::new(centroids);
 
-    let source = source::CsvSource::<Point>::new(path).has_headers(false);
+    let source = CsvSource::<Point>::new(path).has_headers(false);
     let res = env
         .stream(source)
         .replay(

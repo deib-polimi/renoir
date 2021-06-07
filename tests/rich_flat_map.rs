@@ -1,4 +1,5 @@
 use itertools::{repeat_n, Itertools};
+
 use rstream::operator::source::IteratorSource;
 use rstream::test::TestHelper;
 

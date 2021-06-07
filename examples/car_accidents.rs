@@ -6,12 +6,13 @@ use std::time::Instant;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use rstream::block::BatchMode;
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
 use rstream::operator::sink::StreamOutput;
-use rstream::operator::{source, Operator};
-use rstream::stream::Stream;
+use rstream::operator::source::CsvSource;
+use rstream::operator::Operator;
+use rstream::BatchMode;
+use rstream::EnvironmentConfig;
+use rstream::Stream;
+use rstream::StreamEnvironment;
 
 const DAYS_BEFORE: [u16; 13] = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 
@@ -64,7 +65,7 @@ fn query1<P: Into<PathBuf>>(
     env: &mut StreamEnvironment,
     path: P,
 ) -> StreamOutput<Vec<(Week, u32)>> {
-    let source = source::CsvSource::<Accident>::new(path).has_headers(true);
+    let source = CsvSource::<Accident>::new(path).has_headers(true);
     let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
     query1_with_source(source)
 }
@@ -146,7 +147,7 @@ fn query2<P: Into<PathBuf>>(
     env: &mut StreamEnvironment,
     path: P,
 ) -> StreamOutput<Vec<(String, i32, u32)>> {
-    let source = source::CsvSource::<Accident>::new(path).has_headers(true);
+    let source = CsvSource::<Accident>::new(path).has_headers(true);
     let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
     query2_with_source(source)
 }
@@ -239,7 +240,7 @@ fn query3<P: Into<PathBuf>>(
     StreamOutput<Vec<(String, Week, i32, u32)>>,
     StreamOutput<Vec<((String, u16), (i32, u32, f64))>>,
 ) {
-    let source = source::CsvSource::<Accident>::new(path).has_headers(true);
+    let source = CsvSource::<Accident>::new(path).has_headers(true);
     let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
     query3_with_source(source)
 }
@@ -321,7 +322,7 @@ fn main() {
     env.spawn_remote_workers();
 
     let (query1, query2, query3) = if share_source {
-        let source = source::CsvSource::<Accident>::new(path).has_headers(true);
+        let source = CsvSource::<Accident>::new(path).has_headers(true);
         let mut splits = env
             .stream(source)
             .batch_mode(BatchMode::fixed(1000))

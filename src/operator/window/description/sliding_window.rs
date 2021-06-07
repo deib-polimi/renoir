@@ -3,10 +3,8 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use crate::operator::window::processing_time::ProcessingTimeWindowGenerator;
-use crate::operator::{
-    timestamp_max, Data, DataKey, StreamElement, Timestamp, Window, WindowDescription,
-    WindowGenerator,
-};
+use crate::operator::window::{Window, WindowDescription, WindowGenerator};
+use crate::operator::{timestamp_max, Data, DataKey, StreamElement, Timestamp};
 
 /// Window description for sliding event time windows
 #[derive(Clone, Debug)]
@@ -198,8 +196,8 @@ mod tests {
     use itertools::Itertools;
 
     use crate::operator::window::description::sliding_window::SlidingWindowGenerator;
-    use crate::operator::window::EventTimeWindow;
-    use crate::operator::{StreamElement, Timestamp, WindowDescription, WindowGenerator};
+    use crate::operator::window::{EventTimeWindow, WindowDescription, WindowGenerator};
+    use crate::operator::{StreamElement, Timestamp};
 
     #[test]
     fn sliding_event_time() {

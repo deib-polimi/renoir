@@ -1,14 +1,16 @@
-use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::operator::source::Source;
-use crate::operator::{Data, Operator, StreamElement};
-use crate::scheduler::ExecutionMetadata;
-use csv::{Reader, ReaderBuilder, Terminator, Trim};
-use serde::Deserialize;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::path::PathBuf;
+
+use csv::{Reader, ReaderBuilder, Terminator, Trim};
+use serde::Deserialize;
+
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
+use crate::operator::source::Source;
+use crate::operator::{Data, Operator, StreamElement};
+use crate::scheduler::ExecutionMetadata;
 
 /// Wrapper that limits the bytes that can be read from a type that implements `io::Read`.
 struct LimitedReader<R: Read> {
@@ -312,13 +314,15 @@ impl<Out: Data + for<'a> Deserialize<'a>> Clone for CsvSource<Out> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
+    use itertools::Itertools;
+    use serde::{Deserialize, Serialize};
+    use tempfile::NamedTempFile;
+
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;
     use crate::operator::source::CsvSource;
-    use itertools::Itertools;
-    use serde::{Deserialize, Serialize};
-    use std::io::Write;
-    use tempfile::NamedTempFile;
 
     #[test]
     fn csv_without_headers() {

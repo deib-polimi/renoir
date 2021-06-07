@@ -2,9 +2,6 @@ use std::cell::UnsafeCell;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Condvar, Mutex};
 
-pub use iterate::*;
-pub use replay::*;
-
 mod iterate;
 mod iteration_end;
 mod leader;
@@ -142,7 +139,7 @@ impl<T> Debug for IterationStateHandle<T> {
 /// This means that locking and unlocking the state increments the generation by 2.
 #[derive(Debug, Default)]
 #[allow(clippy::mutex_atomic)]
-pub struct IterationStateLock {
+pub(crate) struct IterationStateLock {
     /// The index of the generation.
     generation: Mutex<usize>,
     /// A conditional variable for notifying the downstream operators that the state got unlocked.

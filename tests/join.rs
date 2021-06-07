@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use itertools::Itertools;
 
-use rstream::block::BatchMode;
 use rstream::operator::source::IteratorSource;
 use rstream::test::TestHelper;
+use rstream::BatchMode;
 
 macro_rules! run_test {
     ($env:expr, $n1:expr, $n2:expr, $m:expr, $ship:tt, $local:tt, $variant:tt) => {{

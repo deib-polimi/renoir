@@ -2,7 +2,6 @@ use itertools::Itertools;
 
 use rstream::operator::source::IteratorSource;
 use rstream::test::TestHelper;
-use rstream::worker::replica_coord;
 
 fn check_result(n: u64, n_iter: usize, state: Option<Vec<u64>>, items: Option<Vec<u64>>) {
     if let Some(res) = state {
@@ -77,32 +76,11 @@ fn test_iterate_with_shuffle() {
                 |s, state| {
                     s.shuffle().map(move |x| {
                         let state = *state.get();
-                        println!(
-                            "XX: Map at {} has state {}",
-                            replica_coord().unwrap(),
-                            state
-                        );
                         x + state
                     })
                 },
-                |delta: &mut u64, x| {
-                    println!(
-                        "XX: Local reduce at {}: {} + {}",
-                        replica_coord().unwrap(),
-                        delta,
-                        x
-                    );
-                    *delta += x
-                },
-                |old_state, delta| {
-                    println!(
-                        "XX: Global reduce at {}: {} + {}",
-                        replica_coord().unwrap(),
-                        old_state,
-                        delta
-                    );
-                    *old_state += delta
-                },
+                |delta: &mut u64, x| *delta += x,
+                |old_state, delta| *old_state += delta,
                 |state| {
                     println!("XX: End of iteration: state is {}", state);
                     true

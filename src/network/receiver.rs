@@ -3,8 +3,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 
 use crate::channel::{
-    BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectAnyResult, SelectResult,
-    TryRecvError,
+    BoundedChannelReceiver, BoundedChannelSender, RecvTimeoutError, SelectResult, TryRecvError,
 };
 use crate::network::{NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::ExchangeData;
@@ -24,7 +23,7 @@ const CHANNEL_CAPACITY: usize = 10;
 /// socket and send to the same in-memory channel the received messages.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct NetworkReceiver<In: ExchangeData> {
+pub(crate) struct NetworkReceiver<In: ExchangeData> {
     /// The ReceiverEndpoint of the current receiver.
     pub receiver_endpoint: ReceiverEndpoint,
     /// The actual receiver where the users of this struct will wait upon.
@@ -111,24 +110,5 @@ impl<In: ExchangeData> NetworkReceiver<In> {
         timeout: Duration,
     ) -> Result<SelectResult<NetworkMessage<In>, NetworkMessage<In2>>, RecvTimeoutError> {
         self.receiver.select_timeout(&other.receiver, timeout)
-    }
-
-    /// Same as `select`, but takes multiple receivers to select from.
-    pub fn select_any(receivers: &[NetworkReceiver<In>]) -> SelectAnyResult<NetworkMessage<In>> {
-        let mut res = BoundedChannelReceiver::select_any(receivers.iter().map(|r| &r.receiver));
-        res.result = receivers[res.index].profile_message(res.result);
-        res
-    }
-
-    /// Same as `select_timeout`, but takes multiple receivers to select from.
-    pub fn select_any_timeout(
-        receivers: &[NetworkReceiver<In>],
-        timeout: Duration,
-    ) -> Result<SelectAnyResult<NetworkMessage<In>>, RecvTimeoutError> {
-        BoundedChannelReceiver::select_any_timeout(receivers.iter().map(|r| &r.receiver), timeout)
-            .map(|mut res| {
-                res.result = receivers[res.index].profile_message(res.result);
-                res
-            })
     }
 }

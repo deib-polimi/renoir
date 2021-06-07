@@ -1,12 +1,14 @@
+use std::collections::{HashMap, VecDeque};
+use std::time::Duration;
+
 use crate::block::{BlockStructure, OperatorStructure};
+use crate::operator::concat::ConcatElement;
 use crate::operator::reorder::Reorder;
 use crate::operator::{
-    timestamp_max, ConcatElement, ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp,
+    timestamp_max, ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
-use std::collections::{HashMap, VecDeque};
-use std::time::Duration;
 
 type OutputElement<Key, Out, Out2> = KeyValue<Key, (Out, Out2)>;
 

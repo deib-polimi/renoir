@@ -3,10 +3,11 @@ use std::time::Duration;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 
-use rstream::config::EnvironmentConfig;
-use rstream::environment::StreamEnvironment;
 use rstream::operator::source::IteratorSource;
-use rstream::operator::{EventTimeWindow, Timestamp};
+use rstream::operator::window::EventTimeWindow;
+use rstream::operator::Timestamp;
+use rstream::EnvironmentConfig;
+use rstream::StreamEnvironment;
 
 fn random_topic(t: u64) -> (Timestamp, String) {
     let mut rng = rand::thread_rng();

@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-pub use count_window::*;
+pub use count_window::CountWindow;
 
-use crate::operator::window::description::session_window::{
+pub use crate::operator::window::description::session_window::{
     SessionEventTimeWindowDescr, SessionProcessingTimeWindowDescr,
 };
-use crate::operator::window::description::sliding_window::{
+pub use crate::operator::window::description::sliding_window::{
     SlidingEventTimeWindowDescr, SlidingProcessingTimeWindowDescr,
 };
 
