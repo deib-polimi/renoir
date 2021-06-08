@@ -192,30 +192,23 @@ where
     }
 }
 
-impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
-where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
-{
-    pub fn interval_join<Out2, OperatorChain2>(
-        self,
-        right: KeyedStream<Key, Out2, OperatorChain2>,
-        lower_bound: Duration,
-        upper_bound: Duration,
-    ) -> KeyedStream<Key, (Out, Out2), impl Operator<KeyValue<Key, (Out, Out2)>>>
-    where
-        Out2: ExchangeData,
-        OperatorChain2: Operator<KeyValue<Key, Out2>> + 'static,
-    {
-        self.map_concat(right)
-            .add_operator(Reorder::new)
-            .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
-    }
-}
-
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Given two streams **with timestamps** join them according to an interval centered around the
+    /// timestamp of the left side.
+    ///
+    /// This means that an element on the left side with timestamp T will be joined to all the
+    /// elements on the right with timestamp Q such that `T - lower_bound <= Q <= T + upper_bound`.
+    ///
+    /// **Note**: this operator is not parallelized, all the elements are sent to a single node to
+    /// perform the join.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    /// TODO: example
     pub fn interval_join<Out2, OperatorChain2>(
         self,
         right: Stream<Out2, OperatorChain2>,
@@ -233,5 +226,36 @@ where
             .add_operator(Reorder::new)
             .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
             .drop_key()
+    }
+}
+
+impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+where
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+{
+    /// Given two streams **with timestamps** join them according to an interval centered around the
+    /// timestamp of the left side.
+    ///
+    /// This means that an element on the left side with timestamp T will be joined to all the
+    /// elements on the right with timestamp Q such that `T - lower_bound <= Q <= T + upper_bound`.
+    /// Only items with the same key can be joined together.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    /// TODO: example
+    pub fn interval_join<Out2, OperatorChain2>(
+        self,
+        right: KeyedStream<Key, Out2, OperatorChain2>,
+        lower_bound: Duration,
+        upper_bound: Duration,
+    ) -> KeyedStream<Key, (Out, Out2), impl Operator<KeyValue<Key, (Out, Out2)>>>
+    where
+        Out2: ExchangeData,
+        OperatorChain2: Operator<KeyValue<Key, Out2>> + 'static,
+    {
+        self.map_concat(right)
+            .add_operator(Reorder::new)
+            .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
     }
 }

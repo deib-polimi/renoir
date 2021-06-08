@@ -7,6 +7,10 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Change the maximum parallelism of the following operators.
+    ///
+    /// **Note**: this operator is pretty advanced, some operators may need to be fully replicated
+    /// and will fail otherwise.
     pub fn max_parallelism(self, max_parallelism: usize) -> Stream<Out, impl Operator<Out>> {
         assert!(max_parallelism > 0, "Cannot set the parallelism to zero");
 

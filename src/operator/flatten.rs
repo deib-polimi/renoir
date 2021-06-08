@@ -204,7 +204,7 @@ where
     /// Apply a mapping operation to each element of the stream, the resulting stream will be the
     /// flattened values of the result of the mapping.
     ///
-    /// **Note**: this is very similar to [`Iteartor::flat_map`](std::iter::Iterator::flat_map)
+    /// **Note**: this is very similar to [`Iteartor::flat_map`](std::iter::Iterator::flat_map).
     ///
     /// ## Example
     ///

@@ -7,6 +7,20 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Perform a network shuffle sending the messages to a random replica.
+    ///
+    /// This can be useful if for some reason the load is very unbalanced (e.g. after a very
+    /// unbalanced [`Stream::group_by`]).
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s.shuffle();
+    /// ```
     pub fn shuffle(self) -> Stream<Out, impl Operator<Out>> {
         self.add_block(EndBlock::new, NextStrategy::random())
     }
