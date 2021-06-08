@@ -63,6 +63,19 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Apply the given function to all the elements of the stream, consuming the stream.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// s.for_each(|n| println!("Item: {}", n));
+    ///
+    /// env.execute();
+    /// ```
     pub fn for_each<F>(self, f: F)
     where
         F: Fn(Out) + Send + Clone + 'static,
@@ -80,6 +93,19 @@ impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Apply the given function to all the elements of the stream, consuming the stream.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
+    /// s.for_each(|key, n| println!("Item: {} has key {}", n, key));
+    ///
+    /// env.execute();
+    /// ```
     pub fn for_each<F>(self, f: F)
     where
         F: Fn(Key, Out) + Send + Clone + 'static,

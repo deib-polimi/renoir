@@ -127,6 +127,41 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Fold the stream into a stream that emits a single value.
+    ///
+    /// The folding operator consists in adding to the current accumulation value (initially the
+    /// value provided as `init`) the value of the current item in the stream.
+    ///
+    /// The folding function is provided with a mutable reference to the current accumulator and the
+    /// owned item of the stream. The function should modify the accumulator without returning
+    /// anything.
+    ///
+    /// Note that the output type may be different from the input type. Consider using
+    /// [`Stream::reduce`] if the output type is the same as the input type.
+    ///
+    /// **Note**: this operator will retain all the messages of the stream and emit the values only
+    /// when the stream ends. Therefore this is not properly _streaming_.
+    ///
+    /// **Note**: this operator is not parallelized, it creates a bottleneck where all the stream
+    /// elements are sent to and the folding is done using a single thread.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::fold`](std::iter::Iterator::fold).
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s.fold(0, |acc, value| *acc += value).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
+    /// ```
     pub fn fold<NewOut: Data, F>(self, init: NewOut, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
         Out: ExchangeData,
@@ -136,6 +171,42 @@ where
             .add_operator(|prev| Fold::new(prev, init, f))
     }
 
+    /// Fold the stream into a stream that emits a single value.
+    ///
+    /// The folding operator consists in adding to the current accumulation value (initially the
+    /// value provided as `init`) the value of the current item in the stream.
+    ///
+    /// This method is very similary to [`Stream::fold`], but performs the folding distributely. To
+    /// do so the folding function must be _associative_, in particular the folding process is
+    /// performed in 2 steps:
+    ///
+    /// - `local`: the local function is used to fold the elements present in each replica of the
+    ///   stream independently. All those replicas will start with the same `init` value.
+    /// - `global`: all the partial results (the elements produced by the `local` step) have to be
+    ///   aggregated into a single result. This is done using the `global` folding function.
+    ///
+    /// Note that the output type may be different from the input type, therefore requireing
+    /// different function for the aggregation. Consider using [`Stream::reduce_assoc`] if the
+    /// output type is the same as the input type.
+    ///
+    /// **Note**: this operator will retain all the messages of the stream and emit the values only
+    /// when the stream ends. Therefore this is not properly _streaming_.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s.fold_assoc(0, |acc, value| *acc += value, |acc, value| *acc += value).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
+    /// ```
     pub fn fold_assoc<NewOut: ExchangeData, Local, Global>(
         self,
         init: NewOut,

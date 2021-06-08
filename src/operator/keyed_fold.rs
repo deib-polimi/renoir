@@ -148,6 +148,46 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Perform the folding operation separately for each key.
+    ///
+    /// This is equivalent of partitioning the stream using the `keyer` function, and then applying
+    /// [`Stream::fold_assoc`] to each partition separately.
+    ///
+    /// Note however that there is a difference between `stream.group_by(keyer).fold(...)` and
+    /// `stream.group_by_fold(keyer, ...)`. The first performs the network shuffle of every item in
+    /// the stream, and **later** performs the folding (i.e. nearly all the elements will be sent to
+    /// the network). The latter avoids sending the items by performing first a local reduction on
+    /// each host, and then send only the locally folded results (i.e. one message per replica, per
+    /// key); then the global step is performed aggregating the results.
+    ///
+    /// The resulting stream will still be keyed and will contain only a single message per key (the
+    /// final result).
+    ///
+    /// Note that the output type may be different from the input type, therefore requireing
+    /// different function for the aggregation. Consider using [`Stream::group_by_reduce`] if the
+    /// output type is the same as the input type.
+    ///
+    /// **Note**: this operator will retain all the messages of the stream and emit the values only
+    /// when the stream ends. Therefore this is not properly _streaming_.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .group_by_fold(|&n| n % 2, 0, |acc, value| *acc += value, |acc, value| *acc += value)
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 0 + 2 + 4), (1, 1 + 3)]);
+    /// ```
     pub fn group_by_fold<Key: ExchangeDataKey, NewOut: ExchangeData, Keyer, Local, Global>(
         self,
         keyer: Keyer,
@@ -188,6 +228,43 @@ impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Perform the folding operation separately for each key.
+    ///
+    /// Note that there is a difference between `stream.group_by(keyer).fold(...)` and
+    /// `stream.group_by_fold(keyer, ...)`. The first performs the network shuffle of every item in
+    /// the stream, and **later** performs the folding (i.e. nearly all the elements will be sent to
+    /// the network). The latter avoids sending the items by performing first a local reduction on
+    /// each host, and then send only the locally folded results (i.e. one message per replica, per
+    /// key); then the global step is performed aggregating the results.
+    ///
+    /// The resulting stream will still be keyed and will contain only a single message per key (the
+    /// final result).
+    ///
+    /// Note that the output type may be different from the input type. Consider using
+    /// [`KeyedStream::reduce`] if the output type is the same as the input type.
+    ///
+    /// **Note**: this operator will retain all the messages of the stream and emit the values only
+    /// when the stream ends. Therefore this is not properly _streaming_.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
+    /// let res = s
+    ///     .fold(0, |acc, value| *acc += value)
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 0 + 2 + 4), (1, 1 + 3)]);
+    /// ```
     pub fn fold<NewOut: Data, F>(
         self,
         init: NewOut,

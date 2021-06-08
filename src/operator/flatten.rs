@@ -100,6 +100,27 @@ where
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Transform this stream of containers into a stream of all the contained values.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::flatten`](std::iter::Iterator::flatten)
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new(vec![
+    ///     vec![1, 2, 3],
+    ///     vec![],
+    ///     vec![4, 5],
+    /// ].into_iter()));
+    /// let res = s.flatten().collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![1, 2, 3, 4, 5]);
+    /// ```
     pub fn flatten(self) -> Stream<NewOut, impl Operator<NewOut>> {
         self.add_operator(|prev| Flatten::new(prev, |x| x.into_iter()))
     }
@@ -109,6 +130,24 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Apply a mapping operation to each element of the stream, the resulting stream will be the
+    /// flattened values of the result of the mapping.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::flat_map`](std::iter::Iterator::flat_map)
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..3)));
+    /// let res = s.flat_map(|n| vec![n, n]).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![0, 0, 1, 1, 2, 2]);
+    /// ```
     pub fn flat_map<MapOut: Data, NewOut: Data, F>(
         self,
         f: F,
@@ -128,6 +167,31 @@ where
     <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Transform this stream of containers into a stream of all the contained values.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::flatten`](std::iter::Iterator::flatten)
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env
+    ///     .stream(IteratorSource::new(vec![
+    ///         vec![0, 1, 2],
+    ///         vec![3, 4, 5],
+    ///         vec![6, 7]
+    ///     ].into_iter()))
+    ///     .group_by(|v| v[0] % 2);
+    /// let res = s.flatten().collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 0), (0, 1), (0, 2), (0, 6), (0, 7), (1, 3), (1, 4), (1, 5)]);
+    /// ```
     pub fn flatten(self) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
         self.add_operator(|prev| Flatten::new(prev, |(k, x)| repeat(k).zip(x.into_iter())))
     }
@@ -137,6 +201,26 @@ impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Apply a mapping operation to each element of the stream, the resulting stream will be the
+    /// flattened values of the result of the mapping.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::flat_map`](std::iter::Iterator::flat_map)
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let res = s.flat_map(|(_key, n)| vec![n, n]).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 0), (0, 0), (0, 2), (0, 2), (1, 1), (1, 1)]);
+    /// ```
     pub fn flat_map<NewOut: Data, MapOut: Data, F>(
         self,
         f: F,

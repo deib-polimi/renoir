@@ -33,7 +33,9 @@ where
     ///
     /// env.execute();
     ///
-    /// assert_eq!(res.get().unwrap(), (0..20).collect::<Vec<_>>());
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, (0..20).collect::<Vec<_>>());
     /// ```
     pub fn concat<OperatorChain2>(
         self,
