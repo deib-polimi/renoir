@@ -8,6 +8,31 @@ where
     WindowDescr: WindowDescription<Key, Out> + Clone + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Takes a closure used to transform each window into a new element.
+    /// The closure is called once for each window, passing an iterator over the elements of
+    /// the window as argument.
+    ///
+    /// Returns a [`KeyedStream`] containing all the values returned by the closure.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::CountWindow;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .group_by(|&n| n % 2)
+    ///     .window(CountWindow::tumbling(2))
+    ///     .map(|window| *window.last().unwrap())
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 2), (0, 4), (1, 3)]);
+    /// ```
     pub fn map<NewOut: Data, F>(
         self,
         map_func: F,
