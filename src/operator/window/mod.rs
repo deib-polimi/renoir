@@ -66,6 +66,30 @@ impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Apply a window to the stream.
+    ///
+    /// Returns a [`KeyedWindowedStream`], with windows created following the behavior specified
+    /// by the passed [`WindowDescription`].
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::CountWindow;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .group_by(|&n| n % 2)
+    ///     .window(CountWindow::sliding(3, 2))
+    ///     .sum()
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 4), (0, 0 + 2 + 4), (1, 1 + 3)]);
+    /// ```
     pub fn window<WinOut: Data, WinDescr: WindowDescription<Key, WinOut>>(
         self,
         descr: WinDescr,
@@ -82,6 +106,31 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Apply a window to the stream.
+    ///
+    /// Returns a [`WindowedStream`], with windows created following the behavior specified
+    /// by the passed [`WindowDescription`].
+    ///
+    /// **Note**: this operator cannot be parallelized, so all the stream elements are sent to a
+    /// single node where the creation and aggregation of the windows are done.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::CountWindow;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .window_all(CountWindow::tumbling(2))
+    ///     .sum()
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// assert_eq!(res, vec![0 + 1, 2 + 3, 4]);
+    /// ```
     pub fn window_all<WinOut: Data, WinDescr: WindowDescription<(), WinOut>>(
         self,
         descr: WinDescr,
