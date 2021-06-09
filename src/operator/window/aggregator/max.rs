@@ -42,6 +42,25 @@ where
     WindowDescr: WindowDescription<(), Out> + Clone + 'static,
     OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
+    /// Returns the maximum element of each window.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::CountWindow;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .window_all(CountWindow::sliding(3, 2))
+    ///     .max()
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// assert_eq!(res, vec![0.max(1).max(2), 2.max(3).max(4), 4]);
+    /// ```
     pub fn max(self) -> Stream<Out, impl Operator<Out>> {
         self.inner.max().drop_key()
     }

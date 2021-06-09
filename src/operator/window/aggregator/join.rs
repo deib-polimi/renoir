@@ -96,6 +96,48 @@ where
     WindowDescr: WindowDescription<(), ConcatElement<Out, Out2>> + Clone + 'static,
     OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
+    /// Joins the elements coming from two streams into pairs.
+    ///
+    /// Joins on windows are equivalent to:
+    /// 1. Merging the two streams into a single one.
+    /// 2. Grouping the elements in windows, following the rules of the passed window description.
+    /// 3. For each window, generating a tuple for each pair of elements coming from the two streams.
+    ///
+    /// This join behaves as an inner join.
+    ///
+    /// Also see [`Stream::interval_join`].
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::{CountWindow, EventTimeWindow};
+    /// # use std::time::Duration;
+    /// # use rstream::operator::Timestamp;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env
+    ///     .stream(IteratorSource::new((0..4)))
+    ///     .add_timestamps(
+    ///         |&n| Timestamp::from_millis(n),
+    ///         |&n, &ts| Some(ts)
+    ///     );
+    /// let s2 = env
+    ///     .stream(IteratorSource::new((4..8)))
+    ///     .add_timestamps(
+    ///         |&n| Timestamp::from_millis(n - 4),
+    ///         |&n, &ts| Some(ts)
+    ///     );
+    /// let res = s1
+    ///     .window_all(EventTimeWindow::tumbling(Duration::from_millis(2)))
+    ///     .join(s2)
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 4), (0, 5), (1, 4), (1, 5), (2, 6), (2, 7), (3, 6), (3, 7)]);
+    /// ```
     pub fn join<OperatorChain2>(
         self,
         right: Stream<Out2, OperatorChain2>,

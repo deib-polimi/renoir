@@ -59,6 +59,32 @@ where
     WindowDescr: WindowDescription<(), Out> + Clone + 'static,
     OperatorChain: Operator<KeyValue<(), Out>> + 'static,
 {
+    /// Folds the elements of each window into an accumulator value
+    ///
+    /// `fold()` takes two arguments: the initial value of the accumulator and a closure used to
+    /// accumulate the elements of each window.
+    ///
+    /// The closure is called once for each element of each window with two arguments: a mutable
+    /// reference to the accumulator and the element of the window. The closure should modify
+    /// the accumulator, without returning anything.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::CountWindow;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .window_all(CountWindow::sliding(3, 2))
+    ///     .fold(1, |acc, &n| *acc *= n)
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// assert_eq!(res, vec![(0 * 1 * 2), (2 * 3 * 4), (4)]);
+    /// ```
     pub fn fold<NewOut: Data, F>(
         self,
         init: NewOut,

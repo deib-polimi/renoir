@@ -44,6 +44,25 @@ where
     OperatorChain: Operator<KeyValue<(), Out>> + 'static,
     for<'a> Out: Sum<&'a Out>,
 {
+    /// Sums all the elements of each window.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::CountWindow;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .window_all(CountWindow::sliding(3, 2))
+    ///     .sum()
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// assert_eq!(res, vec![0 + 1 + 2, 2 + 3 + 4, 4]);
+    /// ```
     pub fn sum(self) -> Stream<Out, impl Operator<Out>> {
         self.inner.sum().drop_key()
     }
