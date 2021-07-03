@@ -4,7 +4,7 @@ use rstream::operator::source::CsvSource;
 use rstream::EnvironmentConfig;
 use rstream::StreamEnvironment;
 
-const EPS: f64 = 1e-4;
+const EPS: f64 = 1e-8;
 const DAMPENING: f64 = 0.85;
 
 fn main() {
@@ -56,7 +56,7 @@ fn main() {
                     .map(|(x, _, rank)| (x, rank))
                     .join(adj_list, |(x, _rank)| *x, |(x, _adj)| *x)
                     .flat_map(|(_, ((_x, rank), (_, adj)))| {
-                        // distribuite the rank of the page between the connected pages
+                        // distribute the rank of the page between the connected pages
                         let rank_to_distribute = rank / adj.len() as f64;
                         adj.into_iter().map(move |y| (y, rank_to_distribute))
                     })
@@ -72,7 +72,9 @@ fn main() {
                     .map(|(y, (old, new))| (y, old, new))
             },
             // a new iteration is needed if at least one page's rank has changed
-            |changed: &mut bool, (_x, old, new)| *changed = *changed || (new - old).abs() > EPS,
+            |changed: &mut bool, (_x, old, new)| {
+                *changed = *changed || (new - old).abs() / new > EPS
+            },
             |state, changed| *state = *state || changed,
             |state| {
                 let condition = *state;
