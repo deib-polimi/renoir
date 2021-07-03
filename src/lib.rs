@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 pub use block::BatchMode;
 pub use config::EnvironmentConfig;
 pub use environment::StreamEnvironment;
+pub use operator::iteration::IterationStateHandle;
 pub use stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
 use crate::block::BlockStructure;

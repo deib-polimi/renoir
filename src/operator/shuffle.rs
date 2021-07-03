@@ -12,6 +12,8 @@ where
     /// This can be useful if for some reason the load is very unbalanced (e.g. after a very
     /// unbalanced [`Stream::group_by`]).
     ///
+    /// **Note**: this operator will split the current block.
+    ///
     /// ## Example
     ///
     /// ```

@@ -76,6 +76,32 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Given two stream, create a stream with all the pairs (left item from the left stream, right
+    /// item from the right), such that the key obtained with `keyer1` on an item from the left is
+    /// equal to the key obtained with `keyer2` on an item from the right.
+    ///
+    /// This is an inner join, very similarly to `SELECT a, b FROM a JOIN b ON keyer1(a) = keyer2(b)`.
+    ///
+    /// This is a shortcut for: `self.join_with(...).ship_hash().local_hash().inner()`.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env.stream(IteratorSource::new(0..5u8));
+    /// let s2 = env.stream(IteratorSource::new(0..5i32));
+    /// let res = s1.join(s2, |n| (n % 5) as i32, |n| n % 2).drop_key().collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 0), (0, 2), (0, 4), (1, 1), (1, 3)]);
+    /// ```
     pub fn join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
         rhs: Stream<Out2, OperatorChain2>,
@@ -98,6 +124,36 @@ where
             .inner()
     }
 
+    /// Given two stream, create a stream with all the pairs (left item from the left stream, right
+    /// item from the right), such that the key obtained with `keyer1` on an item from the left is
+    /// equal to the key obtained with `keyer2` on an item from the right.
+    ///
+    /// This is a **left** join, meaning that if an item from the left does not find and element
+    /// from the right with which make a pair, an extra pair `(left, None)` is generated. If you
+    /// want to have a _right_ join, you just need to switch the two sides and use a left join.
+    ///
+    /// This is very similarly to `SELECT a, b FROM a LEFT JOIN b ON keyer1(a) = keyer2(b)`.
+    ///
+    /// This is a shortcut for: `self.join_with(...).ship_hash().local_hash().left()`.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env.stream(IteratorSource::new(0..5u8));
+    /// let s2 = env.stream(IteratorSource::new(0..5i32));
+    /// let res = s1.left_join(s2, |n| (n % 5) as i32, |n| n % 2).drop_key().collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, Some(0)), (0, Some(2)), (0, Some(4)), (1, Some(1)), (1, Some(3)), (2, None), (3, None), (4, None)]);
+    /// ```
     pub fn left_join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
         rhs: Stream<Out2, OperatorChain2>,
@@ -120,6 +176,37 @@ where
             .left()
     }
 
+    /// Given two stream, create a stream with all the pairs (left item from the left stream, right
+    /// item from the right), such that the key obtained with `keyer1` on an item from the left is
+    /// equal to the key obtained with `keyer2` on an item from the right.
+    ///
+    /// This is a **full-outer** join, meaning that if an item from the left does not find and element
+    /// from the right with which make a pair, an extra pair `(left, None)` is generated. Similarly
+    /// if an element from the right does not appear in any pair, a new one is generated with
+    /// `(None, right)`.
+    ///
+    /// This is very similarly to `SELECT a, b FROM a FULL OUTER JOIN b ON keyer1(a) = keyer2(b)`.
+    ///
+    /// This is a shortcut for: `self.join_with(...).ship_hash().local_hash().outer()`.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env.stream(IteratorSource::new(0..5u8));
+    /// let s2 = env.stream(IteratorSource::new(0..5i32));
+    /// let res = s1.outer_join(s2, |n| (n % 5) as i32, |n| n % 2).drop_key().collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(Some(0), Some(0)), (Some(0), Some(2)), (Some(0), Some(4)), (Some(1), Some(1)), (Some(1), Some(3)), (Some(2), None), (Some(3), None), (Some(4), None)]);
+    /// ```
     pub fn outer_join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
         rhs: Stream<Out2, OperatorChain2>,
