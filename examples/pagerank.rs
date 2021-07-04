@@ -23,7 +23,7 @@ fn main() {
 
     let pages_source = CsvSource::<u64>::new(path_pages).has_headers(false);
     let links_source = CsvSource::<(u64, u64)>::new(path_links)
-        .delimiter(b' ')
+        .delimiter(b',')
         .has_headers(false);
 
     let adj_list = env

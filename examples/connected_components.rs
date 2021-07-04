@@ -42,7 +42,7 @@ fn main() {
 
     let vertices_source = CsvSource::<u64>::new(path_vertices).has_headers(false);
     let edges_source = CsvSource::<(u64, u64)>::new(path_edges)
-        .delimiter(b' ')
+        .delimiter(b',')
         .has_headers(false);
 
     let edges = env

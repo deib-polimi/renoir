@@ -17,7 +17,7 @@ fn main() {
     env.spawn_remote_workers();
 
     let edges_source = CsvSource::<(u64, u64)>::new(path_edges)
-        .delimiter(b' ')
+        .delimiter(b',')
         .has_headers(false);
 
     let mut edges = env.stream(edges_source).split(2);
