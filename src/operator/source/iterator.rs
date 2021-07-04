@@ -3,6 +3,9 @@ use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
+/// Source that consumes an iterator and emits all its elements into the stream.
+///
+/// The iterator will be consumed **only from one replica**, therefore this source is not parallel.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct IteratorSource<Out: Data, It>

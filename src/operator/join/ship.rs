@@ -89,10 +89,16 @@ where
         }
     }
 
+    /// Select _local hash_ as local strategy.
+    ///
+    /// An hash-table will be used to generate the join tuples.
     pub fn local_hash(self) -> JoinStreamLocalHash<Key, Out1, Out2, Keyer1, Keyer2, ShipHash> {
         JoinStreamLocalHash::new(self.inner, self.keyer1, self.keyer2)
     }
 
+    /// Select _sort-merge_ as local strategy.
+    ///
+    /// The tuples will be collected and sorted, then the tuples are generated.
     pub fn local_sort_merge(
         self,
     ) -> JoinStreamLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, ShipHash>
@@ -132,6 +138,9 @@ where
         }
     }
 
+    /// Select _local hash_ as local strategy.
+    ///
+    /// An hash-table will be used to generate the join tuples.
     pub fn local_hash(
         self,
     ) -> JoinStreamLocalHash<Key, Out1, Out2, Keyer1, Keyer2, ShipBroadcastRight>
@@ -141,6 +150,9 @@ where
         JoinStreamLocalHash::new(self.inner, self.keyer1, self.keyer2)
     }
 
+    /// Select _sort-merge_ as local strategy.
+    ///
+    /// The tuples will be collected and sorted, then the tuples are generated.
     pub fn local_sort_merge(
         self,
     ) -> JoinStreamLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, ShipBroadcastRight>

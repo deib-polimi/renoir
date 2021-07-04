@@ -1,6 +1,15 @@
+//! Some utility structures for building the join operators.
+//!
+//! The actual operators are [`Stream::join`], [`Stream::left_join`], [`Stream::outer_join`] and
+//! [`Stream::join_with`].
+
 use std::marker::PhantomData;
 
-use crate::operator::join::ship::{JoinStreamShipBroadcastRight, JoinStreamShipHash};
+pub use local_hash::JoinStreamLocalHash;
+pub use local_sort_merge::JoinStreamLocalSortMerge;
+pub use ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
+
+pub use crate::operator::join::ship::{JoinStreamShipBroadcastRight, JoinStreamShipHash};
 use crate::operator::{Data, DataKey, ExchangeData, KeyerFn, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
@@ -80,7 +89,7 @@ where
     /// item from the right), such that the key obtained with `keyer1` on an item from the left is
     /// equal to the key obtained with `keyer2` on an item from the right.
     ///
-    /// This is an inner join, very similarly to `SELECT a, b FROM a JOIN b ON keyer1(a) = keyer2(b)`.
+    /// This is an inner join, very similar to `SELECT a, b FROM a JOIN b ON keyer1(a) = keyer2(b)`.
     ///
     /// This is a shortcut for: `self.join_with(...).ship_hash().local_hash().inner()`.
     ///
@@ -132,7 +141,7 @@ where
     /// from the right with which make a pair, an extra pair `(left, None)` is generated. If you
     /// want to have a _right_ join, you just need to switch the two sides and use a left join.
     ///
-    /// This is very similarly to `SELECT a, b FROM a LEFT JOIN b ON keyer1(a) = keyer2(b)`.
+    /// This is very similar to `SELECT a, b FROM a LEFT JOIN b ON keyer1(a) = keyer2(b)`.
     ///
     /// This is a shortcut for: `self.join_with(...).ship_hash().local_hash().left()`.
     ///
@@ -185,7 +194,7 @@ where
     /// if an element from the right does not appear in any pair, a new one is generated with
     /// `(None, right)`.
     ///
-    /// This is very similarly to `SELECT a, b FROM a FULL OUTER JOIN b ON keyer1(a) = keyer2(b)`.
+    /// This is very similar to `SELECT a, b FROM a FULL OUTER JOIN b ON keyer1(a) = keyer2(b)`.
     ///
     /// This is a shortcut for: `self.join_with(...).ship_hash().local_hash().outer()`.
     ///
@@ -229,6 +238,43 @@ where
             .outer()
     }
 
+    /// Given two streams, start building a join operator.
+    ///
+    /// The returned type allows you to customize the behaviour of the join. You can select which
+    /// ship strategy and which local strategy to use.
+    ///
+    /// **Ship strategies**
+    ///
+    /// - _hash_: the hash of the key is used to select where to send the elements
+    /// - _broadcast right_: the left stream is left locally, while the right stream is broadcasted
+    ///
+    /// **Local strategies**
+    ///
+    /// - _hash_: build an hashmap to match the tuples
+    /// - _sort and merge_: collect all the tuples, sort them by key and merge them
+    ///
+    /// The first strategy to select is the _ship strategy_. After choosing that you have to select
+    /// the local strategy.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env.stream(IteratorSource::new(0..5u8));
+    /// let s2 = env.stream(IteratorSource::new(0..5i32));
+    /// let j = s1.join_with(s2, |n| (n % 5) as i32, |n| n % 2).ship_hash();
+    /// ```
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s1 = env.stream(IteratorSource::new(0..5u8));
+    /// let s2 = env.stream(IteratorSource::new(0..5i32));
+    /// let j = s1.join_with(s2, |n| (n % 5) as i32, |n| n % 2).ship_broadcast_right();
+    /// ```
     pub fn join_with<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
         rhs: Stream<Out2, OperatorChain2>,

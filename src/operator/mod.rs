@@ -28,7 +28,7 @@ pub(crate) mod fold;
 pub(crate) mod group_by;
 pub(crate) mod interval_join;
 pub(crate) mod iteration;
-pub(crate) mod join;
+pub mod join;
 pub(crate) mod key_by;
 pub(crate) mod keyed_fold;
 pub(crate) mod keyed_reduce;

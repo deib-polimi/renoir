@@ -323,6 +323,15 @@ where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
+    /// Finalize the join operator by specifying that this is an _inner join_.
+    ///
+    /// Given two stream, create a stream with all the pairs (left item from the left stream, right
+    /// item from the right), such that the key obtained with `keyer1` on an item from the left is
+    /// equal to the key obtained with `keyer2` on an item from the right.
+    ///
+    /// This is an inner join, very similarly to `SELECT a, b FROM a JOIN b ON keyer1(a) = keyer2(b)`.
+    ///
+    /// **Note**: this operator will split the current block.
     pub fn inner(
         self,
     ) -> KeyedStream<
@@ -338,6 +347,19 @@ where
         KeyedStream(inner).map(|(_key, (lhs, rhs))| (lhs.unwrap(), rhs.unwrap()))
     }
 
+    /// Finalize the join operator by specifying that this is a _left join_.
+    ///
+    /// Given two stream, create a stream with all the pairs (left item from the left stream, right
+    /// item from the right), such that the key obtained with `keyer1` on an item from the left is
+    /// equal to the key obtained with `keyer2` on an item from the right.
+    ///
+    /// This is a **left** join, meaning that if an item from the left does not find and element
+    /// from the right with which make a pair, an extra pair `(left, None)` is generated. If you
+    /// want to have a _right_ join, you just need to switch the two sides and use a left join.
+    ///
+    /// This is very similar to `SELECT a, b FROM a LEFT JOIN b ON keyer1(a) = keyer2(b)`.    
+    ///
+    /// **Note**: this operator will split the current block.
     pub fn left(
         self,
     ) -> KeyedStream<
@@ -353,6 +375,20 @@ where
         KeyedStream(inner).map(|(_key, (lhs, rhs))| (lhs.unwrap(), rhs))
     }
 
+    /// Finalize the join operator by specifying that this is an _outer join_.
+    ///
+    /// Given two stream, create a stream with all the pairs (left item from the left stream, right
+    /// item from the right), such that the key obtained with `keyer1` on an item from the left is
+    /// equal to the key obtained with `keyer2` on an item from the right.
+    ///
+    /// This is a **full-outer** join, meaning that if an item from the left does not find and element
+    /// from the right with which make a pair, an extra pair `(left, None)` is generated. Similarly
+    /// if an element from the right does not appear in any pair, a new one is generated with
+    /// `(None, right)`.
+    ///
+    /// This is very similar to `SELECT a, b FROM a FULL OUTER JOIN b ON keyer1(a) = keyer2(b)`.
+    ///
+    /// **Note**: this operator will split the current block.
     pub fn outer(
         self,
     ) -> KeyedStream<
@@ -375,6 +411,15 @@ where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
+    /// Finalize the join operator by specifying that this is an _inner join_.
+    ///
+    /// Given two stream, create a stream with all the pairs (left item from the left stream, right
+    /// item from the right), such that the key obtained with `keyer1` on an item from the left is
+    /// equal to the key obtained with `keyer2` on an item from the right.
+    ///
+    /// This is an inner join, very similarly to `SELECT a, b FROM a JOIN b ON keyer1(a) = keyer2(b)`.
+    ///
+    /// **Note**: this operator will split the current block.
     pub fn inner(
         self,
     ) -> Stream<
@@ -388,6 +433,19 @@ where
             .map(|(key, (lhs, rhs))| (key, (lhs.unwrap(), rhs.unwrap())))
     }
 
+    /// Finalize the join operator by specifying that this is a _left join_.
+    ///
+    /// Given two stream, create a stream with all the pairs (left item from the left stream, right
+    /// item from the right), such that the key obtained with `keyer1` on an item from the left is
+    /// equal to the key obtained with `keyer2` on an item from the right.
+    ///
+    /// This is a **left** join, meaning that if an item from the left does not find and element
+    /// from the right with which make a pair, an extra pair `(left, None)` is generated. If you
+    /// want to have a _right_ join, you just need to switch the two sides and use a left join.
+    ///
+    /// This is very similar to `SELECT a, b FROM a LEFT JOIN b ON keyer1(a) = keyer2(b)`.    
+    ///
+    /// **Note**: this operator will split the current block.
     pub fn left(
         self,
     ) -> Stream<

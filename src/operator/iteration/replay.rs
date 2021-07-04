@@ -67,6 +67,52 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Construct an iterative dataflow where the input stream is repeatedly fed inside a cycle,
+    /// i.e. what comes into the cycle is _replayed_ at every iteration.
+    ///
+    /// This iteration is stateful, this means that all the replicas have a read-only access to the
+    /// _iteration state_. The initial value of the state is given as parameter. When an iteration
+    /// ends all the elements are reduced locally at each replica producing a `DeltaUpdate`. Those
+    /// delta updates are later reduced on a single node that, using the `global_fold` function will
+    /// compute the state for the next iteration. This state is also used in `loop_condition` to
+    /// check whether the next iteration should start or not. `loop_condition` is also allowed to
+    /// mutate the state.
+    ///
+    /// The initial value of `DeltaUpdate` is initialized with [`Default::default()`].
+    ///
+    /// The content of the loop has a new scope: it's defined by the `body` function that takes as
+    /// parameter the stream of data coming inside the iteration and a reference to the state. This
+    /// function should return the stream of the data that exits from the loop (that will be fed
+    /// back).
+    ///
+    /// This construct produces a single stream with a single element: the final state of the
+    /// iteration.
+    ///
+    /// **Note**: due to an internal limitation, it's not currently possible to add an iteration
+    /// operator when the stream has limited parallelism. This means, for example, that after a
+    /// non-parallel source you have to add a shuffle.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new(0..3)).shuffle();
+    /// let state = s.replay(
+    ///     3, // at most 3 iterations
+    ///     0, // the initial state is zero
+    ///     |s, state| s.map(|n| n + 10),
+    ///     |delta: &mut i32, n| *delta += n,
+    ///     |state, delta| *state += delta,
+    ///     |_state| true,
+    /// );
+    /// let state = state.collect_vec();
+    /// env.execute();
+    ///
+    /// assert_eq!(state.get().unwrap(), vec![3 * (10 + 11 + 12)]);
+    /// ```
     pub fn replay<Body, DeltaUpdate: ExchangeData + Default, State: ExchangeData, OperatorChain2>(
         self,
         num_iterations: usize,

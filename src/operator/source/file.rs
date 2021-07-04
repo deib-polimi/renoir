@@ -9,6 +9,9 @@ use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
+/// Source that reads a text file line-by-line.
+///
+/// The file is divided in chunks and is read concurrently by multiple replicas.
 #[derive(Debug)]
 pub struct FileSource {
     path: PathBuf,
