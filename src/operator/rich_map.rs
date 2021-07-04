@@ -85,6 +85,61 @@ impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
+    /// Map the elements of the stream into new elements. The mapping function can be stateful.
+    ///
+    /// This is equivalent to [`Stream::map`] but with a stateful function.
+    ///
+    /// Since the mapping function can be stateful, it is a `FnMut`. This allows expressing simple
+    /// algorithms with very few lines of code (see examples).
+    ///
+    /// The mapping function is _cloned_ inside each replica, and they will not share state between
+    /// each other. If you want that only a single replica handles all the items you may want to
+    /// change the parallelism of this operator with [`Stream::max_parallelism`].
+    ///
+    /// ## Examples
+    ///
+    /// This is a simple implementation of the prefix-sum using a single replica (i.e. each element
+    /// is mapped to the sum of all the elements up to that point). Note that this won't work if
+    /// there are more replicas.
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((1..=5)));
+    /// let res = s.rich_map({
+    ///     let mut sum = 0;
+    ///     move |x| {
+    ///         sum += x;
+    ///         sum
+    ///     }
+    /// }).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![1, 1 + 2, 1 + 2 + 3, 1 + 2 + 3 + 4, 1 + 2 + 3 + 4 + 5]);
+    /// ```    
+    ///
+    /// This will enumerate all the elements that reach a replica. This is basically equivalent to
+    /// the `enumerate` function in Python.
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((1..=5)));
+    /// let res = s.rich_map({
+    ///     let mut id = 0;
+    ///     move |x| {
+    ///         id += 1;
+    ///         (id - 1, x)
+    ///     }
+    /// }).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)]);
+    /// ```
     pub fn rich_map<NewOut: Data, F>(self, mut f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
         F: FnMut(Out) -> NewOut + Send + Clone + 'static,
@@ -99,6 +154,10 @@ impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
+    /// Map the elements of the stream into new elements. The mapping function can be stateful.
+    ///
+    /// This is exactly like [`Stream::rich_map`], but the function is cloned for each key. This
+    /// means that each key will have a unique mapping function (and therefore a unique state).
     pub fn rich_map<NewOut: Data, F>(
         self,
         f: F,
