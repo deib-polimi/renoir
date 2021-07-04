@@ -92,8 +92,13 @@ class Flink(System):
         System.__init__(self, "flink", "total")
 
 
+class MPI(System):
+    def __init__(self):
+        System.__init__(self, "mpi", "total")
+
+
 def main(args):
-    systems = [RStream1(), RStream2(), Flink()]
+    systems = [RStream1(), RStream2(), Flink(), MPI()]
 
     for row in csv.DictReader(sys.stdin):
         system = row["system"]
@@ -103,6 +108,8 @@ def main(args):
             systems[1].add(row)
         elif system == "flink":
             systems[2].add(row)
+        elif system == "mpi":
+            systems[3].add(row)
         else:
             raise ValueError("Unsupported system: " + system)
 

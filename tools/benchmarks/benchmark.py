@@ -362,6 +362,7 @@ def sync_on(host, local_path, remote_path):
         [
             "rsync",
             "-a",
+            "--copy-links",
             "--exclude",
             "target",
             "--exclude",
