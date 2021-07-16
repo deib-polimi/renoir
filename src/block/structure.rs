@@ -1,3 +1,6 @@
+//! This `mod` contains the types and function that model the structure of the blocks and operators
+//! for debugging purposes only.
+
 use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
@@ -54,8 +57,11 @@ pub struct OperatorStructure {
 /// This value can be used for customizing the look of the operator.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum OperatorKind {
+    /// This operator is a normal operator.
     Operator,
+    /// This operator is a sink, i.e. no message will leave it.
     Sink,
+    /// This operator is a source, i.e. no message will enter it.
     Source,
 }
 
@@ -144,6 +150,7 @@ impl Display for DataType {
 }
 
 impl BlockStructure {
+    /// Add a new operator inside this block.
     pub fn add_operator(mut self, operator: OperatorStructure) -> Self {
         self.operators.push(operator);
         self
@@ -151,6 +158,7 @@ impl BlockStructure {
 }
 
 impl OperatorStructure {
+    /// Crate a new [`OperatorStructure`] with the given title that produces the given elements.
     pub fn new<Out: ?Sized, S: Into<String>>(title: S) -> Self {
         Self {
             title: title.into(),
@@ -164,6 +172,7 @@ impl OperatorStructure {
 }
 
 impl OperatorReceiver {
+    /// Crate a new [`OperatorReceiver`] with the given type that will receive from the given block.
     pub fn new<T: ?Sized>(previous_block_id: BlockId) -> Self {
         Self {
             previous_block_id,

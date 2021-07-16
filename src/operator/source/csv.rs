@@ -97,6 +97,38 @@ pub struct CsvSource<Out: Data + for<'a> Deserialize<'a>> {
 }
 
 impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
+    /// Create a new source that reads and parse the lines of a CSV file.
+    ///
+    /// The file is partitioned into as many chunks as replicas, each replica has to have the
+    /// **same** file in the same path. It is guaranteed that each line of the file is emitted by
+    /// exactly one replica.
+    ///
+    /// After creating the source it's possible to customize its behaviour using one of the
+    /// available methods. By default it is assumed that the delimiter is `,` and the CSV has
+    /// headers.
+    ///
+    /// Each line will be deserialized into the type `Out`, so the structure of the CSV must be
+    /// valid for that deserialization. The [`csv`](https://crates.io/crates/csv) crate is used for
+    /// the parsing.
+    ///
+    /// **Note**: the file must be readable and its size must be available. This means that only
+    /// regular files can be read.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::CsvSource;
+    /// # use serde::{Deserialize, Serialize};
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// #[derive(Clone, Deserialize, Serialize)]
+    /// struct Thing {
+    ///     what: String,
+    ///     count: u64,
+    /// }
+    /// let source = CsvSource::<Thing>::new("/datasets/huge.csv");
+    /// let s = env.stream(source);
+    /// ```
     pub fn new<P: Into<PathBuf>>(path: P) -> Self {
         Self {
             path: path.into(),
@@ -107,51 +139,111 @@ impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
         }
     }
 
+    /// The comment character to use when parsing CSV.
+    ///
+    /// If the start of a record begins with the byte given here, then that line is ignored by the
+    /// CSV parser.
+    ///
+    /// This is disabled by default.
     pub fn comment(mut self, comment: Option<u8>) -> Self {
         self.options.comment = comment;
         self
     }
 
+    /// The field delimiter to use when parsing CSV.
+    ///
+    /// The default is `,`.
     pub fn delimiter(mut self, delimiter: u8) -> Self {
         self.options.delimiter = delimiter;
         self
     }
 
+    /// Enable double quote escapes.
+    ///
+    /// This is enabled by default, but it may be disabled. When disabled, doubled quotes are not
+    /// interpreted as escapes.
     pub fn double_quote(mut self, double_quote: bool) -> Self {
         self.options.double_quote = double_quote;
         self
     }
 
+    /// The escape character to use when parsing CSV.
+    ///
+    /// In some variants of CSV, quotes are escaped using a special escape character like `\`
+    /// (instead of escaping quotes by doubling them).
+    ///
+    /// By default, recognizing these idiosyncratic escapes is disabled.
     pub fn escape(mut self, escape: Option<u8>) -> Self {
         self.options.escape = escape;
         self
     }
 
+    /// Whether the number of fields in records is allowed to change or not.
+    ///
+    /// When disabled (which is the default), parsing CSV data will return an error if a record is
+    /// found with a number of fields different from the number of fields in a previous record.
+    ///
+    /// When enabled, this error checking is turned off.
     pub fn flexible(mut self, flexible: bool) -> Self {
         self.options.flexible = flexible;
         self
     }
 
+    /// The quote character to use when parsing CSV.
+    ///
+    /// The default is `"`.
     pub fn quote(mut self, quote: u8) -> Self {
         self.options.quote = quote;
         self
     }
 
+    /// Enable or disable quoting.
+    ///
+    /// This is enabled by default, but it may be disabled. When disabled, quotes are not treated
+    /// specially.
     pub fn quoting(mut self, quoting: bool) -> Self {
         self.options.quoting = quoting;
         self
     }
 
+    /// The record terminator to use when parsing CSV.
+    ///
+    /// A record terminator can be any single byte. The default is a special value,
+    /// `Terminator::CRLF`, which treats any occurrence of `\r`, `\n` or `\r\n` as a single record
+    /// terminator.
     pub fn terminator(mut self, terminator: Terminator) -> Self {
         self.options.terminator = terminator;
         self
     }
 
+    /// Whether fields are trimmed of leading and trailing whitespace or not.
+    ///
+    /// By default, no trimming is performed. This method permits one to override that behavior and
+    /// choose one of the following options:
+    ///
+    /// 1. `Trim::Headers` trims only header values.
+    /// 2. `Trim::Fields` trims only non-header or "field" values.
+    /// 3. `Trim::All` trims both header and non-header values.
+    ///
+    /// A value is only interpreted as a header value if this CSV reader is configured to read a
+    /// header record (which is the default).
+    ///
+    /// When reading string records, characters meeting the definition of Unicode whitespace are
+    /// trimmed. When reading byte records, characters meeting the definition of ASCII whitespace
+    /// are trimmed. ASCII whitespace characters correspond to the set `[\t\n\v\f\r ]`.
     pub fn trim(mut self, trim: Trim) -> Self {
         self.options.trim = trim;
         self
     }
 
+    /// Whether to treat the first row as a special header row.
+    ///
+    /// By default, the first row is treated as a special header row, which means the header is
+    /// never returned by any of the record reading methods or iterators. When this is disabled
+    /// (`yes` set to `false`), the first row is not treated specially.
+    ///
+    /// Note that the `headers` and `byte_headers` methods are unaffected by whether this is set.
+    /// Those methods always return the first record.
     pub fn has_headers(mut self, has_headers: bool) -> Self {
         self.options.has_headers = has_headers;
         self

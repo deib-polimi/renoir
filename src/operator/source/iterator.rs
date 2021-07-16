@@ -21,6 +21,22 @@ impl<Out: Data, It> IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
+    /// Create a new source that reads the items from the iterator provided as input.
+    ///
+    /// **Note**: this source is **not parallel**, the iterator will be consumed only on a single
+    /// replica, on all the others no item will be read from the iterator. If you want to achieve
+    /// parallelism you need to add an operator that shuffles the data (e.g.
+    /// [`Stream::shuffle`](crate::Stream::shuffle)).
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let source = IteratorSource::new((0..5));
+    /// let s = env.stream(source);
+    /// ```
     pub fn new(inner: It) -> Self {
         Self {
             inner,

@@ -1,3 +1,7 @@
+//! The types for constructing the configuration of the environment.
+//!
+//! See the documentation of [`EnvironmentConfig`] for more details.
+
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 use std::path::PathBuf;
@@ -20,7 +24,46 @@ use crate::scheduler::HostId;
 /// using ssh. The configuration of the remote environment should be specified via a YAML
 /// configuration file.
 ///
-/// TODO: example
+/// ## Local environment
+///
+/// ```
+/// # use rstream::{StreamEnvironment, EnvironmentConfig};
+/// let config = EnvironmentConfig::local(1);
+/// let mut env = StreamEnvironment::new(config);
+/// ```
+///
+/// ## Remote environment
+///
+/// ```
+/// # use rstream::{StreamEnvironment, EnvironmentConfig};
+/// # use std::fs::File;
+/// # use std::io::Write;
+/// let config = r"
+/// hosts:
+///   - address: host1
+///     base_port: 9500
+///     num_cores: 16
+///   - address: host2
+///     base_port: 9500
+///     num_cores: 24
+/// ";
+/// let mut file = File::create("config.yaml").unwrap();
+/// file.write_all(config.as_bytes());
+///
+/// let config = EnvironmentConfig::remote("config.yaml").expect("cannot read config file");
+/// let mut env = StreamEnvironment::new(config);
+/// ```
+///
+/// ## From command line arguments
+/// This reads from `std::env::args()` and reads the most common options (`--local`, `--remote`,
+/// `--verbose`). All the unparsed options will be returned into `args`. You can use `--help` to see
+/// their docs.
+///
+/// ```no_run
+/// # use rstream::{EnvironmentConfig, StreamEnvironment};
+/// let (config, args) = EnvironmentConfig::from_args();
+/// let mut env = StreamEnvironment::new(config);
+/// ```
 #[derive(Debug, Clone)]
 pub struct EnvironmentConfig {
     /// Which runtime to use for the environment.

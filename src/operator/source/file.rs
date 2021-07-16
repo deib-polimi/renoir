@@ -23,6 +23,24 @@ pub struct FileSource {
 }
 
 impl FileSource {
+    /// Create a new source that reads the lines from a text file.
+    ///
+    /// The file is partitioned into as many chunks as replicas, each replica has to have the
+    /// **same** file in the same path. It is guaranteed that each line of the file is emitted by
+    /// exactly one replica.
+    ///
+    /// **Note**: the file must be readable and its size must be available. This means that only
+    /// regular files can be read.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::FileSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let source = FileSource::new("/datasets/huge.txt");
+    /// let s = env.stream(source);
+    /// ```
     pub fn new<P>(path: P) -> Self
     where
         P: Into<PathBuf>,
