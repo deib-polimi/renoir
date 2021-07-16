@@ -16,10 +16,12 @@ use std::ops::{Add, AddAssign};
 
 use serde::{Deserialize, Serialize};
 
+pub use block::structure;
 pub use block::BatchMode;
 pub use config::EnvironmentConfig;
 pub use environment::StreamEnvironment;
 pub use operator::iteration::IterationStateHandle;
+pub use scheduler::ExecutionMetadata;
 pub use stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
 use crate::block::BlockStructure;
@@ -32,7 +34,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 pub(crate) mod block;
 pub(crate) mod channel;
-pub(crate) mod config;
+pub mod config;
 pub(crate) mod environment;
 pub(crate) mod network;
 pub mod operator;
@@ -40,8 +42,8 @@ mod profiler;
 pub(crate) mod runner;
 pub(crate) mod scheduler;
 pub(crate) mod stream;
-#[doc(hidden)]
-pub mod test;
+#[cfg(test)]
+pub(crate) mod test;
 pub(crate) mod worker;
 
 /// Tracing information of the current execution.

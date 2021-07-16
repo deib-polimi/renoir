@@ -3,7 +3,9 @@ use std::str::FromStr;
 use itertools::Itertools;
 
 use rstream::operator::source::IteratorSource;
-use rstream::test::TestHelper;
+use utils::TestHelper;
+
+mod utils;
 
 #[test]
 fn map_stream() {

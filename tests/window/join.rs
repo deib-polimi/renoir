@@ -1,7 +1,8 @@
 use rstream::operator::source::IteratorSource;
 use rstream::operator::window::EventTimeWindow;
 use rstream::operator::Timestamp;
-use rstream::test::TestHelper;
+
+use super::utils::TestHelper;
 
 #[test]
 fn window_join() {

@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use rstream::operator::source::IteratorSource;
 use rstream::operator::window::ProcessingTimeWindow;
-use rstream::test::TestHelper;
+
+use super::utils::TestHelper;
 
 #[test]
 fn tumbling_processing_time() {

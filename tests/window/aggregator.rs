@@ -2,7 +2,8 @@ use itertools::Itertools;
 
 use rstream::operator::source::IteratorSource;
 use rstream::operator::window::CountWindow;
-use rstream::test::TestHelper;
+
+use super::utils::TestHelper;
 
 #[test]
 fn test_first_window() {

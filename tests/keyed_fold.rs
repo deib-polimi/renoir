@@ -1,5 +1,7 @@
 use rstream::operator::source::IteratorSource;
-use rstream::test::TestHelper;
+use utils::TestHelper;
+
+mod utils;
 
 #[test]
 fn group_by_fold_stream() {

@@ -15,7 +15,7 @@ use crate::stream::BlockId;
 mod batcher;
 mod graph_generator;
 mod next_strategy;
-mod structure;
+pub mod structure;
 
 /// A chain of operators that will be run inside the same host. The block takes as input elements of
 /// type `In` and produces elements of type `Out`.

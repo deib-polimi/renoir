@@ -24,15 +24,15 @@ use crate::scheduler::HostId;
 #[derive(Debug, Clone)]
 pub struct EnvironmentConfig {
     /// Which runtime to use for the environment.
-    pub(crate) runtime: ExecutionRuntime,
+    pub runtime: ExecutionRuntime,
     /// In a remote execution this field represents the identifier of the host, i.e. the index
     /// inside the host list in the config.
-    pub(crate) host_id: Option<HostId>,
+    pub host_id: Option<HostId>,
 }
 
 /// Which kind of environment to use for the execution.
 #[derive(Debug, Clone)]
-pub(crate) enum ExecutionRuntime {
+pub enum ExecutionRuntime {
     /// Use only local threads.
     Local(LocalRuntimeConfig),
     /// Use both local threads and remote workers.
@@ -41,63 +41,63 @@ pub(crate) enum ExecutionRuntime {
 
 /// This environment uses only local threads.
 #[derive(Debug, Clone)]
-pub(crate) struct LocalRuntimeConfig {
+pub struct LocalRuntimeConfig {
     /// The number of CPU cores of this host.
     ///
     /// A thread will be spawned for each core, for each block in the job graph.
-    pub(crate) num_cores: usize,
+    pub num_cores: usize,
 }
 
 /// This environment uses local threads and remote hosts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RemoteRuntimeConfig {
+pub struct RemoteRuntimeConfig {
     /// The set of remote hosts to use.
-    pub(crate) hosts: Vec<RemoteHostConfig>,
+    pub hosts: Vec<RemoteHostConfig>,
     /// If specified some debug information will be stored inside this directory.
-    pub(crate) tracing_dir: Option<PathBuf>,
+    pub tracing_dir: Option<PathBuf>,
 }
 
 /// The configuration of a single remote host.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RemoteHostConfig {
+pub struct RemoteHostConfig {
     /// The IP address or domain name to use for connecting to this remote host.
     ///
     /// This must be reachable from all the hosts in the cluster.
-    pub(crate) address: String,
+    pub address: String,
     /// The first port to use for inter-host communication.
     ///
     /// This port and the following ones will be bound by the host, one for each connection between
     /// blocks of the job graph..
-    pub(crate) base_port: u16,
+    pub base_port: u16,
     /// The number of cores of the remote host.
     ///
     /// This is the same as `LocalRuntimeConfig::num_cores`.
-    pub(crate) num_cores: usize,
+    pub num_cores: usize,
     /// The configuration to use to connect via SSH to the remote host.
     #[serde(default)]
-    pub(crate) ssh: RemoteHostSSHConfig,
+    pub ssh: RemoteHostSSHConfig,
     /// If specified the remote worker will be spawned under `perf`, and its output will be stored
     /// at this location.
-    pub(crate) perf_path: Option<PathBuf>,
+    pub perf_path: Option<PathBuf>,
 }
 
 /// The information used to connect to a remote host via SSH.
 #[derive(Debug, Clone, Serialize, Deserialize, Derivative)]
 #[derivative(Default)]
 #[allow(clippy::upper_case_acronyms)]
-pub(crate) struct RemoteHostSSHConfig {
+pub struct RemoteHostSSHConfig {
     /// The SSH port this host listens to.
     #[derivative(Default(value = "22"))]
     #[serde(default = "ssh_default_port")]
-    pub(crate) ssh_port: u16,
+    pub ssh_port: u16,
     /// The username of the remote host. Defaulted to the local username.
-    pub(crate) username: Option<String>,
+    pub username: Option<String>,
     /// The password of the remote host. If not specified ssh-agent will be used for the connection.
-    pub(crate) password: Option<String>,
+    pub password: Option<String>,
     /// The path to the private key to use for authenticating to the remote host.
-    pub(crate) key_file: Option<PathBuf>,
+    pub key_file: Option<PathBuf>,
     /// The passphrase for decrypting the private SSH key.
-    pub(crate) key_passphrase: Option<String>,
+    pub key_passphrase: Option<String>,
 }
 
 #[derive(Debug, StructOpt)]

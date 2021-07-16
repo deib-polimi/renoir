@@ -1,3 +1,5 @@
+use super::utils;
+
 mod aggregator;
 mod aggregator_keyed;
 mod event_time;

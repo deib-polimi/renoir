@@ -5,7 +5,9 @@ use itertools::Itertools;
 
 use rstream::operator::source::IteratorSource;
 use rstream::operator::Timestamp;
-use rstream::test::{TestHelper, WatermarkChecker};
+use utils::{TestHelper, WatermarkChecker};
+
+mod utils;
 
 #[test]
 fn concat_stream() {

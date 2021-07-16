@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use rstream::operator::source::IteratorSource;
 use rstream::operator::Timestamp;
-use rstream::test::TestHelper;
+use utils::TestHelper;
+
+mod utils;
 
 #[test]
 fn interval_join_keyed_stream() {

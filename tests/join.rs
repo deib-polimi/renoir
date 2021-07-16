@@ -6,9 +6,10 @@ use std::time::Duration;
 use itertools::Itertools;
 
 use rstream::operator::source::IteratorSource;
-use rstream::test::TestHelper;
 use rstream::BatchMode;
+use utils::TestHelper;
 
+mod utils;
 macro_rules! run_test {
     ($env:expr, $n1:expr, $n2:expr, $m:expr, $ship:tt, $local:tt, $variant:tt) => {{
         let s1 = $env.stream(IteratorSource::new(0..$n1));

@@ -1,7 +1,9 @@
 use itertools::Itertools;
 
 use rstream::operator::source::IteratorSource;
-use rstream::test::TestHelper;
+use utils::TestHelper;
+
+mod utils;
 
 #[test]
 fn test_zip_no_shuffle() {

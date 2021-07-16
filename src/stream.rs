@@ -116,7 +116,9 @@ where
     /// `get_operator` is a function that is given the previous chain of operators and should return
     /// the new chain of operators. The new chain cannot be simply passed as argument since it is
     /// required to do a partial move of the `InnerBlock` structure.
-    #[doc(hidden)]
+    ///
+    /// **Note**: this is an advanced function that manipulates the block structure. Probably it is
+    /// not what you are looking for.
     pub fn add_operator<NewOut: Data, Op, GetOp>(self, get_operator: GetOp) -> Stream<NewOut, Op>
     where
         Op: Operator<NewOut> + 'static,

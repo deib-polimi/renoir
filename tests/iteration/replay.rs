@@ -1,6 +1,7 @@
 use rstream::operator::sink::StreamOutput;
 use rstream::operator::source::IteratorSource;
-use rstream::test::TestHelper;
+
+use super::utils::TestHelper;
 
 #[test]
 fn test_replay_no_blocks_in_between() {

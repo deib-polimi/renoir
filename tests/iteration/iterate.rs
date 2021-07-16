@@ -1,7 +1,8 @@
 use itertools::Itertools;
 
 use rstream::operator::source::IteratorSource;
-use rstream::test::TestHelper;
+
+use super::utils::TestHelper;
 
 fn check_result(n: u64, n_iter: usize, state: Option<Vec<u64>>, items: Option<Vec<u64>>) {
     if let Some(res) = state {

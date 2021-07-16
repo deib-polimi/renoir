@@ -24,17 +24,17 @@ pub type ReplicaId = usize;
 #[derive(Clone, Debug)]
 pub struct ExecutionMetadata {
     /// The coordinate of the block (it's id, replica id, ...).
-    pub(crate) coord: Coord,
+    pub coord: Coord,
     /// The list of replicas of this block.
-    pub(crate) replicas: Vec<Coord>,
+    pub replicas: Vec<Coord>,
     /// The global identifier of the replica (from 0 to `replicas.len()-1`)
-    pub(crate) global_id: usize,
+    pub global_id: usize,
     /// The total number of previous blocks inside the execution graph.
-    pub(crate) prev: Vec<(Coord, TypeId)>,
+    pub prev: Vec<(Coord, TypeId)>,
     /// A reference to the `NetworkTopology` that keeps the state of the network.
     pub(crate) network: Arc<Mutex<NetworkTopology>>,
     /// The batching mode to use inside this block.
-    pub(crate) batch_mode: BatchMode,
+    pub batch_mode: BatchMode,
 }
 
 /// Handle that the scheduler uses to start the computation of a block.
