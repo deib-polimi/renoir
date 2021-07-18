@@ -57,14 +57,17 @@ where
 /// assigned to the same key `()`.
 ///
 /// These are the windows supported out-of-the-box:
-///  - [`EventTimeWindow::sliding`][crate::operator::window::EventTimeWindow::sliding]
-///  - [`EventTimeWindow::tumbling`][crate::operator::window::EventTimeWindow::tumbling]
-///  - [`EventTimeWindow::session`][crate::operator::window::EventTimeWindow::session]
-///  - [`ProcessingTimeWindow::sliding`][crate::operator::window::ProcessingTimeWindow::sliding]
-///  - [`ProcessingTimeWindow::tumbling`][crate::operator::window::ProcessingTimeWindow::tumbling]
-///  - [`ProcessingTimeWindow::session`][crate::operator::window::ProcessingTimeWindow::session]
-///  - [`CountWindow::sliding`][crate::operator::window::CountWindow::sliding]
-///  - [`CountWindow::tumbling`][crate::operator::window::CountWindow::tumbling]
+///  - [`EventTimeWindow`][crate::operator::window::EventTimeWindow]
+///     - [`EventTimeWindow::sliding`][crate::operator::window::EventTimeWindow::sliding]
+///     - [`EventTimeWindow::tumbling`][crate::operator::window::EventTimeWindow::tumbling]
+///     - [`EventTimeWindow::session`][crate::operator::window::EventTimeWindow::session]
+///  - [`ProcessingTimeWindow`][crate::operator::window::ProcessingTimeWindow]
+///     - [`ProcessingTimeWindow::sliding`][crate::operator::window::ProcessingTimeWindow::sliding]
+///     - [`ProcessingTimeWindow::tumbling`][crate::operator::window::ProcessingTimeWindow::tumbling]
+///     - [`ProcessingTimeWindow::session`][crate::operator::window::ProcessingTimeWindow::session]
+///  - [`CountWindow`][crate::operator::window::CountWindow]
+///     - [`CountWindow::sliding`][crate::operator::window::CountWindow::sliding]
+///     - [`CountWindow::tumbling`][crate::operator::window::CountWindow::tumbling]
 ///
 /// To apply a window to a [`Stream`], see [`Stream::window_all`].
 pub struct WindowedStream<Out: Data, OperatorChain, WinOut: Data, WinDescr>
@@ -86,14 +89,17 @@ where
 /// grouped into windows.
 ///
 /// These are the windows supported out-of-the-box:
-///  - [`EventTimeWindow::sliding`][crate::operator::window::EventTimeWindow::sliding]
-///  - [`EventTimeWindow::tumbling`][crate::operator::window::EventTimeWindow::tumbling]
-///  - [`EventTimeWindow::session`][crate::operator::window::EventTimeWindow::session]
-///  - [`ProcessingTimeWindow::sliding`][crate::operator::window::ProcessingTimeWindow::sliding]
-///  - [`ProcessingTimeWindow::tumbling`][crate::operator::window::ProcessingTimeWindow::tumbling]
-///  - [`ProcessingTimeWindow::session`][crate::operator::window::ProcessingTimeWindow::session]
-///  - [`CountWindow::sliding`][crate::operator::window::CountWindow::sliding]
-///  - [`CountWindow::tumbling`][crate::operator::window::CountWindow::tumbling]
+///  - [`EventTimeWindow`][crate::operator::window::EventTimeWindow]
+///     - [`EventTimeWindow::sliding`][crate::operator::window::EventTimeWindow::sliding]
+///     - [`EventTimeWindow::tumbling`][crate::operator::window::EventTimeWindow::tumbling]
+///     - [`EventTimeWindow::session`][crate::operator::window::EventTimeWindow::session]
+///  - [`ProcessingTimeWindow`][crate::operator::window::ProcessingTimeWindow]
+///     - [`ProcessingTimeWindow::sliding`][crate::operator::window::ProcessingTimeWindow::sliding]
+///     - [`ProcessingTimeWindow::tumbling`][crate::operator::window::ProcessingTimeWindow::tumbling]
+///     - [`ProcessingTimeWindow::session`][crate::operator::window::ProcessingTimeWindow::session]
+///  - [`CountWindow`][crate::operator::window::CountWindow]
+///     - [`CountWindow::sliding`][crate::operator::window::CountWindow::sliding]
+///     - [`CountWindow::tumbling`][crate::operator::window::CountWindow::tumbling]
 ///
 /// To apply a window to a [`KeyedStream`], see [`KeyedStream::window`].
 pub struct KeyedWindowedStream<Key: DataKey, Out: Data, OperatorChain, WinOut: Data, WinDescr>
