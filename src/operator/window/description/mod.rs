@@ -123,8 +123,6 @@ impl ProcessingTimeWindow {
 ///  - [`EventTimeWindow::tumbling`]
 ///  - [`EventTimeWindow::session`]
 ///
-/// Event-time windows are aligned to the epoch.
-/// This means that the first and oldest window will start at timestamp zero.
 /// Windows have an inclusive start timestamp and an exclusive end timestamp.
 pub struct EventTimeWindow {}
 
@@ -203,9 +201,12 @@ impl EventTimeWindow {
     /// Event-time session windows do not have a fixed size and do not overlap.
     ///
     /// If there is no window open and a new element arrives, then a new window is created.
-    /// Otherwise, the element is added to the currently open window.
+    /// Otherwise, the element is added to the currently open window if and only if the time
+    /// difference between its timestamp and the timestamp of the last element added to the window
+    /// is less than `gap`.
     ///
-    /// When new elements do not arrive for `gap` amount of time, the currently open window is closed.
+    /// This is equivalent to say that two consecutive elements belong to the same window if and
+    /// only if they are at most `gap` amount of time apart.
     ///
     /// ## Example
     /// ```
