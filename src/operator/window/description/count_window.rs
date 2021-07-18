@@ -5,6 +5,13 @@ use std::num::NonZeroUsize;
 use crate::operator::window::{Window, WindowDescription, WindowGenerator};
 use crate::operator::{Data, DataKey, StreamElement, Timestamp};
 
+/// Count windows divide elements into windows by counting them.
+/// They can be used with both timestamped and non-timestamped streams.
+/// When used with timestamped streams, elements are ordered according to their timestamps.
+///
+/// There are two different kinds of count windows:
+///  - [`CountWindow::sliding`]
+///  - [`CountWindow::tumbling`]
 #[derive(Clone, Debug)]
 pub struct CountWindow {
     size: NonZeroUsize,
@@ -12,6 +19,29 @@ pub struct CountWindow {
 }
 
 impl CountWindow {
+    /// With sliding count windows, the first window contains the first `size` elements.
+    /// From then on, each window contains the same elements of the previous one, except that the
+    /// oldest `step` elements are replaced with new ones.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::CountWindow;
+    /// # use std::time::Duration;
+    /// # use itertools::Itertools;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .window_all(CountWindow::sliding(3, 2))
+    ///     .map(|window| window.cloned().collect_vec())
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// assert_eq!(res, vec![vec![0, 1, 2], vec![2, 3, 4], vec![4]]);
+    /// ```
     pub fn sliding(size: usize, step: usize) -> Self {
         Self {
             size: NonZeroUsize::new(size).expect("CountWindow size must be positive"),
@@ -19,6 +49,27 @@ impl CountWindow {
         }
     }
 
+    /// Tumbling count windows are equivalent to sliding count windows with `step` equal to `size`.
+    ///
+    /// ## Example
+    /// ```
+    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
+    /// # use rstream::operator::source::IteratorSource;
+    /// # use rstream::operator::window::CountWindow;
+    /// # use std::time::Duration;
+    /// # use itertools::Itertools;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .window_all(CountWindow::tumbling(3))
+    ///     .map(|window| window.cloned().collect_vec())
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// assert_eq!(res, vec![vec![0, 1, 2], vec![3, 4]]);
+    /// ```
     pub fn tumbling(size: usize) -> Self {
         CountWindow::sliding(size, size)
     }
