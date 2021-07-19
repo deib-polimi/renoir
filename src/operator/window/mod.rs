@@ -1,3 +1,5 @@
+//! The types related to the windowed streams.
+
 use std::collections::VecDeque;
 
 pub use aggregator::*;
@@ -20,6 +22,7 @@ pub trait WindowDescription<Key: DataKey, Out: Data>: Send {
     /// Construct a new window generator, ready to handle elements.
     fn new_generator(&self) -> Self::Generator;
 
+    /// String representation of the description.
     fn to_string(&self) -> String;
 }
 

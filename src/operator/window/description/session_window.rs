@@ -13,6 +13,7 @@ pub struct SessionEventTimeWindowDescr {
 }
 
 impl SessionEventTimeWindowDescr {
+    /// Create a new session window with the given minimum gap of time between two windows.
     pub fn new(gap: Duration) -> Self {
         Self { gap }
     }
@@ -36,6 +37,7 @@ pub struct SessionProcessingTimeWindowDescr {
 }
 
 impl SessionProcessingTimeWindowDescr {
+    /// Create a new session window with the given minimum gap of time between two windows.
     pub fn new(gap: Duration) -> Self {
         Self { gap }
     }

@@ -14,6 +14,10 @@ pub struct SlidingEventTimeWindowDescr {
 }
 
 impl SlidingEventTimeWindowDescr {
+    /// Create a new sliding window.
+    ///
+    /// Each window has the given size, and will slide with the given steps. The first window is
+    /// aligned with the epoch time.
     pub fn new(size: Duration, step: Duration) -> Self {
         assert!(step <= size);
         assert_ne!(size, Duration::new(0, 0));
