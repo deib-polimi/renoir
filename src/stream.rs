@@ -1,8 +1,6 @@
 use std::any::TypeId;
-use std::cell::RefCell;
 use std::marker::PhantomData;
-use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
@@ -38,7 +36,7 @@ where
     /// The last block inside the stream.
     pub(crate) block: InnerBlock<Out, OperatorChain>,
     /// A reference to the environment this stream lives in.
-    pub(crate) env: Rc<RefCell<StreamEnvironmentInner>>,
+    pub(crate) env: Arc<Mutex<StreamEnvironmentInner>>,
 }
 
 /// A [`KeyedStream`] is like a set of [`Stream`]s, each of which partitioned by some `Key`. Internally
@@ -168,7 +166,7 @@ where
         let mut old_stream =
             self.add_operator(|prev| get_end_operator(prev, next_strategy.clone(), batch_mode));
         old_stream.block.is_only_one_strategy = matches!(next_strategy, NextStrategy::OnlyOne);
-        let mut env = old_stream.env.borrow_mut();
+        let mut env = old_stream.env.lock().unwrap();
         let old_id = old_stream.block.id;
         let new_id = env.new_block();
         let scheduler = env.scheduler_mut();
@@ -264,7 +262,7 @@ where
         old_stream1.block.is_only_one_strategy = is_only_one1;
         old_stream2.block.is_only_one_strategy = is_only_one2;
 
-        let mut env = old_stream1.env.borrow_mut();
+        let mut env = old_stream1.env.lock().unwrap();
         let old_id1 = old_stream1.block.id;
         let old_id2 = old_stream2.block.id;
         let new_id = env.new_block();
@@ -305,7 +303,7 @@ where
     /// Clone the given block, taking care of connecting the new block to the same previous blocks
     /// of the original one.
     pub(crate) fn clone(&mut self) -> Self {
-        let mut env = self.env.borrow_mut();
+        let mut env = self.env.lock().unwrap();
         let prev_nodes = env.scheduler_mut().prev_blocks(self.block.id).unwrap();
         let new_id = env.new_block();
 
@@ -325,7 +323,7 @@ where
     /// Like `add_block` but without creating a new block. Therefore this closes the current stream
     /// and just add the last block to the scheduler.
     pub(crate) fn finalize_block(self) {
-        let mut env = self.env.borrow_mut();
+        let mut env = self.env.lock().unwrap();
         info!("Finalizing block id={}", self.block.id);
         env.scheduler_mut().add_block(self.block);
     }

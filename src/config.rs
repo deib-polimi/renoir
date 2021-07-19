@@ -64,17 +64,20 @@ use crate::scheduler::HostId;
 /// let (config, args) = EnvironmentConfig::from_args();
 /// let mut env = StreamEnvironment::new(config);
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct EnvironmentConfig {
     /// Which runtime to use for the environment.
     pub runtime: ExecutionRuntime,
     /// In a remote execution this field represents the identifier of the host, i.e. the index
     /// inside the host list in the config.
     pub host_id: Option<HostId>,
+    /// Skip the check that prevents two remote environments with different environments to be
+    /// constructed.
+    pub skip_single_remote_check: bool,
 }
 
 /// Which kind of environment to use for the execution.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ExecutionRuntime {
     /// Use only local threads.
     Local(LocalRuntimeConfig),
@@ -83,7 +86,7 @@ pub enum ExecutionRuntime {
 }
 
 /// This environment uses only local threads.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LocalRuntimeConfig {
     /// The number of CPU cores of this host.
     ///
@@ -92,7 +95,7 @@ pub struct LocalRuntimeConfig {
 }
 
 /// This environment uses local threads and remote hosts.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct RemoteRuntimeConfig {
     /// The set of remote hosts to use.
     pub hosts: Vec<RemoteHostConfig>,
@@ -101,7 +104,7 @@ pub struct RemoteRuntimeConfig {
 }
 
 /// The configuration of a single remote host.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct RemoteHostConfig {
     /// The IP address or domain name to use for connecting to this remote host.
     ///
@@ -125,7 +128,7 @@ pub struct RemoteHostConfig {
 }
 
 /// The information used to connect to a remote host via SSH.
-#[derive(Debug, Clone, Serialize, Deserialize, Derivative)]
+#[derive(Debug, Clone, Serialize, Deserialize, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct RemoteHostSSHConfig {
@@ -189,6 +192,7 @@ impl EnvironmentConfig {
         EnvironmentConfig {
             runtime: ExecutionRuntime::Local(LocalRuntimeConfig { num_cores }),
             host_id: Some(0),
+            skip_single_remote_check: false,
         }
     }
 
@@ -221,6 +225,7 @@ impl EnvironmentConfig {
         Ok(EnvironmentConfig {
             runtime: ExecutionRuntime::Remote(config),
             host_id,
+            skip_single_remote_check: false,
         })
     }
 

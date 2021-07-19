@@ -271,7 +271,7 @@ where
         feedback_end.block.is_only_one_strategy = true;
         let feedback_end_block_id = feedback_end.block.id;
 
-        let mut env = env.borrow_mut();
+        let mut env = env.lock().unwrap();
         let scheduler = env.scheduler_mut();
         scheduler.add_block(delta_update_end.block);
         scheduler.add_block(feedback_end.block);

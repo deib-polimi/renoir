@@ -173,6 +173,7 @@ impl TestHelper {
             let config = EnvironmentConfig {
                 runtime: runtime.clone(),
                 host_id: Some(host_id),
+                skip_single_remote_check: true,
             };
             let body = body.clone();
             join_handles.push(
