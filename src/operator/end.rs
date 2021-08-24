@@ -114,7 +114,7 @@ where
                 }
             }
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
-                let index = self.next_strategy.index(&item);
+                let index = self.next_strategy.index(item);
                 for sender in self.sender_groups.iter().skip(1) {
                     let index = index % sender.0.len();
                     self.senders

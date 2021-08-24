@@ -106,7 +106,7 @@ fn select_nearest(point: Point, old_centroids: &[Point]) -> Point {
     let mut selected_distance = f64::MAX;
     let mut selected_centroid = Point::new(0.0, 0.0);
     for centroid in old_centroids {
-        let distance = point.distance_to(&centroid);
+        let distance = point.distance_to(centroid);
         if distance < selected_distance {
             selected_distance = distance;
             selected_centroid = *centroid;

@@ -261,7 +261,7 @@ impl Scheduler {
         let mut topology = "Job graph:".to_string();
         for (block_id, block) in self.block_info.iter() {
             topology += &format!("\n  {}: {}", block_id, block.repr);
-            if let Some(next) = &self.next_blocks.get(&block_id) {
+            if let Some(next) = &self.next_blocks.get(block_id) {
                 let sorted = next
                     .iter()
                     .map(|(x, _, fragile)| format!("{}{}", x, if *fragile { "*" } else { "" }))

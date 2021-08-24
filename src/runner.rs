@@ -226,10 +226,7 @@ fn spawn_remote_worker(
         "Removing temporary binary file at host {}: {}",
         host_id, remote_path
     );
-    let remove_binary = format!(
-        "rm -f {}",
-        shell_escape::escape(Cow::Borrowed(&remote_path))
-    );
+    let remove_binary = format!("rm -f {}", shell_escape::escape(Cow::Borrowed(remote_path)));
     let (_, exit_code) = run_remote_command(&mut session, &remove_binary);
     assert_eq!(
         exit_code, 0,

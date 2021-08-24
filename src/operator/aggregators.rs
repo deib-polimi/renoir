@@ -46,7 +46,7 @@ where
         GetValue: KeyerFn<Value, Out> + Fn(&Out) -> Value,
     {
         self.group_by_reduce(keyer, move |out, value| {
-            if get_value(&value) < get_value(&out) {
+            if get_value(&value) < get_value(out) {
                 *out = value;
             }
         })
@@ -96,7 +96,7 @@ where
         GetValue: KeyerFn<Value, Out> + Fn(&Out) -> Value,
     {
         self.group_by_reduce(keyer, move |out, value| {
-            if get_value(&value) > get_value(&out) {
+            if get_value(&value) > get_value(out) {
                 *out = value;
             }
         })

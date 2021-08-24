@@ -79,11 +79,11 @@ fn fold_vs_reduce_benchmark(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(
         (DATASET_SIZE * std::mem::size_of::<u32>()) as u64,
     ));
-    group.bench_function("fold", |b| b.iter(|| fold(black_box(&dataset))));
-    group.bench_function("fold-assoc", |b| b.iter(|| fold_assoc(black_box(&dataset))));
-    group.bench_function("reduce", |b| b.iter(|| reduce(black_box(&dataset))));
+    group.bench_function("fold", |b| b.iter(|| fold(black_box(dataset))));
+    group.bench_function("fold-assoc", |b| b.iter(|| fold_assoc(black_box(dataset))));
+    group.bench_function("reduce", |b| b.iter(|| reduce(black_box(dataset))));
     group.bench_function("reduce-assoc", |b| {
-        b.iter(|| reduce_assoc(black_box(&dataset)))
+        b.iter(|| reduce_assoc(black_box(dataset)))
     });
     group.finish();
 }

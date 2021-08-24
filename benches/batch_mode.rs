@@ -39,13 +39,13 @@ fn batch_mode_benchmark(c: &mut Criterion) {
         (DATASET_SIZE * std::mem::size_of::<u32>()) as u64,
     ));
     group.bench_function("fixed", |b| {
-        b.iter(|| batch_mode(BatchMode::fixed(1024), black_box(&dataset)))
+        b.iter(|| batch_mode(BatchMode::fixed(1024), black_box(dataset)))
     });
     group.bench_function("adaptive-5ms", |b| {
         b.iter(|| {
             batch_mode(
                 BatchMode::adaptive(1024, Duration::from_millis(5)),
-                black_box(&dataset),
+                black_box(dataset),
             )
         })
     });
@@ -53,7 +53,7 @@ fn batch_mode_benchmark(c: &mut Criterion) {
         b.iter(|| {
             batch_mode(
                 BatchMode::adaptive(1024, Duration::from_millis(50)),
-                black_box(&dataset),
+                black_box(dataset),
             )
         })
     });
@@ -61,7 +61,7 @@ fn batch_mode_benchmark(c: &mut Criterion) {
         b.iter(|| {
             batch_mode(
                 BatchMode::adaptive(1024, Duration::from_millis(5000)),
-                black_box(&dataset),
+                black_box(dataset),
             )
         })
     });

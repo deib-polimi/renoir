@@ -43,7 +43,7 @@ fn shuffle_benchmark(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(
         (DATASET_SIZE * std::mem::size_of::<u32>()) as u64,
     ));
-    group.bench_function("shuffle", |b| b.iter(|| shuffle(black_box(&dataset))));
+    group.bench_function("shuffle", |b| b.iter(|| shuffle(black_box(dataset))));
     group.finish();
 }
 
