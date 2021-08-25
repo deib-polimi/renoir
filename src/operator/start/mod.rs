@@ -296,50 +296,9 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Source<Out>
 
 #[cfg(test)]
 mod tests {
-    use std::any::TypeId;
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
-
-    use crate::block::BatchMode;
-    use crate::config::EnvironmentConfig;
-    use crate::network::{Coord, NetworkMessage, NetworkSender, NetworkTopology, ReceiverEndpoint};
+    use crate::network::NetworkMessage;
     use crate::operator::{Operator, StartBlock, StreamElement, Timestamp, TwoSidesItem};
-    use crate::scheduler::ExecutionMetadata;
-
-    #[allow(clippy::type_complexity)]
-    fn build_topology(
-        num_prev_blocks: usize,
-        num_replicas: usize,
-    ) -> (ExecutionMetadata, Vec<Vec<(Coord, NetworkSender<i32>)>>) {
-        let config = EnvironmentConfig::local(1);
-        let mut topology = NetworkTopology::new(config);
-        let dest = Coord::new(0, 0, 0);
-        let typ = TypeId::of::<i32>();
-
-        let mut senders = vec![];
-        let mut prev = vec![];
-        for block_id in 1..num_prev_blocks + 1 {
-            let mut block_senders = vec![];
-            for replica_id in 0..num_replicas {
-                let coord = Coord::new(block_id, 0, replica_id);
-                topology.connect(coord, dest, typ, false);
-                let sender = topology.get_sender(ReceiverEndpoint::new(dest, block_id));
-                block_senders.push((coord, sender));
-                prev.push((coord, typ));
-            }
-            senders.push(block_senders);
-        }
-
-        let metadata = ExecutionMetadata {
-            coord: dest,
-            replicas: vec![dest],
-            global_id: 0,
-            prev,
-            network: Arc::new(Mutex::new(topology)),
-            batch_mode: BatchMode::adaptive(100, Duration::from_millis(100)),
-        };
-        (metadata, senders)
-    }
+    use crate::test::FakeNetworkTopology;
 
     fn ts(millis: u64) -> Timestamp {
         Timestamp::from_millis(millis)
@@ -347,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_single() {
-        let (metadata, mut senders) = build_topology(1, 2);
+        let (metadata, mut senders) = FakeNetworkTopology::single_replica(1, 2);
         let (from1, sender1) = senders[0].pop().unwrap();
         let (from2, sender2) = senders[0].pop().unwrap();
 
@@ -386,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_single_watermark() {
-        let (metadata, mut senders) = build_topology(1, 2);
+        let (metadata, mut senders) = FakeNetworkTopology::single_replica(1, 2);
         let (from1, sender1) = senders[0].pop().unwrap();
         let (from2, sender2) = senders[0].pop().unwrap();
 
@@ -434,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_multiple_no_cache() {
-        let (metadata, mut senders) = build_topology(2, 1);
+        let (metadata, mut senders) = FakeNetworkTopology::single_replica(2, 1);
         let (from1, sender1) = senders[0].pop().unwrap();
         let (from2, sender2) = senders[1].pop().unwrap();
 
@@ -504,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_multiple_cache() {
-        let (metadata, mut senders) = build_topology(2, 1);
+        let (metadata, mut senders) = FakeNetworkTopology::single_replica(2, 1);
         let (from1, sender1) = senders[0].pop().unwrap();
         let (from2, sender2) = senders[1].pop().unwrap();
 
