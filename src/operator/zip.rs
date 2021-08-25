@@ -71,9 +71,17 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1
                 // bigger than this watermark since the start block will keep the frontier valid.
                 StreamElement::Watermark(_) => return item.map(|_| unreachable!()),
 
-                StreamElement::FlushBatch
-                | StreamElement::Terminate
-                | StreamElement::FlushAndRestart => return item.map(|_| unreachable!()),
+                // Both sides are done, we may still have unmatched items in one of the two side.
+                // Forget them since the stream ended.
+                StreamElement::FlushAndRestart => {
+                    self.stash1.clear();
+                    self.stash2.clear();
+                    return item.map(|_| unreachable!());
+                }
+
+                StreamElement::FlushBatch | StreamElement::Terminate => {
+                    return item.map(|_| unreachable!())
+                }
             }
         }
         let item1 = self.stash1.pop_front().unwrap();
@@ -152,5 +160,53 @@ where
         // if the zip operator is partitioned there could be some loss of data
         new_stream.block.scheduler_requirements.max_parallelism(1);
         new_stream
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::network::{Coord, NetworkMessage, NetworkSender};
+    use crate::operator::zip::Zip;
+    use crate::operator::{Operator, StreamElement};
+    use crate::test::FakeNetworkTopology;
+
+    #[test]
+    fn zip() {
+        let (metadata, mut senders) = FakeNetworkTopology::single_replica(2, 1);
+        let (coord_l, sender_l) = senders[0].pop().unwrap();
+        let (coord_r, sender_r) = senders[1].pop().unwrap();
+
+        let mut zip = Zip::<i32, i32>::new(coord_l.block_id, coord_r.block_id, false, false, None);
+        zip.setup(metadata);
+
+        let send = |sender: &NetworkSender<i32>, from: Coord, data: Vec<StreamElement<i32>>| {
+            sender.send(NetworkMessage::new(data, from)).unwrap();
+        };
+
+        // Stream content:
+        // L:   1    2  FnR  3
+        // R:   100  -  FnR  300
+        // zip: *       *    *
+        //
+        // "2" has no counterpart in right, so it is discarded
+
+        send(
+            &sender_l,
+            coord_l,
+            vec![StreamElement::Item(1), StreamElement::Item(2)],
+        );
+        send(&sender_r, coord_r, vec![StreamElement::Item(100)]);
+
+        assert_eq!(zip.next(), StreamElement::Item((1, 100)));
+
+        send(&sender_l, coord_l, vec![StreamElement::FlushAndRestart]);
+        send(&sender_r, coord_r, vec![StreamElement::FlushAndRestart]);
+
+        assert_eq!(zip.next(), StreamElement::FlushAndRestart);
+
+        send(&sender_l, coord_l, vec![StreamElement::Item(3)]);
+        send(&sender_r, coord_r, vec![StreamElement::Item(300)]);
+
+        assert_eq!(zip.next(), StreamElement::Item((3, 300)));
     }
 }
