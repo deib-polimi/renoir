@@ -1,0 +1,14 @@
+[package]
+name = "latency"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+rstream = { path = "../../.." }
+
+[[bin]]
+path = "src/main.rs"
+name = "latency"
