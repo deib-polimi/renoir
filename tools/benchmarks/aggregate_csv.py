@@ -20,15 +20,21 @@ class Experiment:
     def row_ids(self):
         return set(self.times.keys())
 
+    def get_data(self, row_id):
+        if row_id not in self.times:
+            return None
+        data = self.times[row_id]
+        delta = (max(data) - min(data)) / 2
+        avg = sum(data) / len(data)
+        return avg, delta
+
     def get_row(self, row_id, human):
         if row_id not in self.times:
             if human:
                 return [""]
             else:
                 return ["", ""]
-        data = self.times[row_id]
-        delta = (max(data) - min(data)) / 2
-        avg = sum(data) / len(data)
+        avg, delta = self.get_data(row_id)
         if human:
             return [f"{avg:.2f}s (± {delta:.2f}s)"]
         else:
@@ -97,9 +103,11 @@ class MPI(System):
         System.__init__(self, "mpi", "total")
 
 
-def main(args):
-    systems = [RStream1(), RStream2(), Flink(), MPI()]
+def get_systems():
+    return [RStream1(), RStream2(), Flink(), MPI()]
 
+
+def parse_stdin(systems):
     for row in csv.DictReader(sys.stdin):
         system = row["system"]
         if system == "rstream":
@@ -112,6 +120,11 @@ def main(args):
             systems[3].add(row)
         else:
             raise ValueError("Unsupported system: " + system)
+
+
+def main(args):
+    systems = get_systems()
+    parse_stdin(systems)
 
     experiments = set()
     for system in systems:
@@ -141,6 +154,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Aggregate the output of gen_csv.py")
-    parser.add_argument("--no-human", action="store_true", help="Do not print human-friendly values")
+    parser.add_argument(
+        "--no-human", action="store_true", help="Do not print human-friendly values"
+    )
     args = parser.parse_args()
     main(args)
