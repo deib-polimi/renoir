@@ -60,9 +60,6 @@ impl<State> IterationStateRef<State> {
 /// We grant that the user of this structs has put enough synchronization to avoid undefined
 /// behaviour.
 unsafe impl<State: Send + Sync> Send for IterationStateRef<State> {}
-/// We grant that the user of this structs has put enough synchronization to avoid undefined
-/// behaviour.
-unsafe impl<State: Send + Sync> Sync for IterationStateRef<State> {}
 
 /// Handle to the state of the iteration.
 #[derive(Clone)]

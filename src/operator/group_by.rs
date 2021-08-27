@@ -35,7 +35,7 @@ where
         keyer: Keyer,
     ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
-        Keyer: Fn(&Out) -> Key + Send + Clone + Sync + 'static,
+        Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
     {
         let next_strategy = NextStrategy::group_by(keyer.clone());
         let new_stream = self

@@ -49,8 +49,8 @@ pub mod window;
 pub(crate) mod zip;
 
 /// Marker trait that all the types inside a stream should implement.
-pub trait Data: Clone + Send + Sync + 'static {}
-impl<T: Clone + Send + Sync + 'static> Data for T {}
+pub trait Data: Clone + Send + 'static {}
+impl<T: Clone + Send + 'static> Data for T {}
 
 /// Marker trait for data types that are used to communicate between different blocks.
 pub trait ExchangeData: Data + Serialize + for<'a> Deserialize<'a> {}
@@ -65,8 +65,8 @@ pub trait ExchangeDataKey: DataKey + ExchangeData {}
 impl<T: DataKey + ExchangeData> ExchangeDataKey for T {}
 
 /// Marker trait for the function that extracts the key out of a type.
-pub trait KeyerFn<Key, Out>: Fn(&Out) -> Key + Clone + Send + Sync + 'static {}
-impl<Key, Out, T: Fn(&Out) -> Key + Clone + Send + Sync + 'static> KeyerFn<Key, Out> for T {}
+pub trait KeyerFn<Key, Out>: Fn(&Out) -> Key + Clone + Send + 'static {}
+impl<Key, Out, T: Fn(&Out) -> Key + Clone + Send + 'static> KeyerFn<Key, Out> for T {}
 
 /// When using timestamps and watermarks, this type expresses the timestamp of a message or of a
 /// watermark.

@@ -5,7 +5,8 @@
 
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
 use crossbeam_channel::{
     bounded, select, unbounded, Receiver, RecvError as ExtRecvError,
@@ -17,8 +18,8 @@ use flume::{
     RecvTimeoutError as ExtRecvTimeoutError, Sender, TryRecvError as ExtTryRecvError,
 };
 
-pub trait ChannelItem: Send + Sync + 'static {}
-impl<T: Send + Sync + 'static> ChannelItem for T {}
+pub trait ChannelItem: Send + 'static {}
+impl<T: Send + 'static> ChannelItem for T {}
 
 pub type RecvError = ExtRecvError;
 pub type RecvTimeoutError = ExtRecvTimeoutError;
@@ -90,7 +91,9 @@ impl<T: ChannelItem> BoundedChannelSender<T> {
     /// Send a message in the channel, blocking if it's full.
     #[inline]
     pub fn send(&self, item: T) -> Result<()> {
-        Ok(self.0.send(item)?)
+        self.0
+            .send(item)
+            .map_err(|_| anyhow!("Error while sending"))
     }
 }
 
@@ -159,7 +162,9 @@ impl<T: ChannelItem> UnboundedChannelSender<T> {
     /// Send a message in the channel.
     #[inline]
     pub fn send(&self, item: T) -> Result<()> {
-        Ok(self.0.send(item)?)
+        self.0
+            .send(item)
+            .map_err(|_| anyhow!("Error while sending"))
     }
 }
 

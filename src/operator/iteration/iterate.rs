@@ -144,7 +144,12 @@ where
     /// assert_eq!(state.get().unwrap(), vec![10 + 11 + 12 + 20 + 21 + 22 + 30 + 31 + 32]);
     /// assert_eq!(items.get().unwrap(), vec![30, 31, 32]);
     /// ```
-    pub fn iterate<Body, DeltaUpdate: ExchangeData + Default, State: ExchangeData, OperatorChain2>(
+    pub fn iterate<
+        Body,
+        DeltaUpdate: ExchangeData + Default,
+        State: ExchangeData + Sync,
+        OperatorChain2,
+    >(
         self,
         num_iterations: usize,
         initial_state: State,
@@ -317,7 +322,7 @@ where
     }
 }
 
-impl<Out: ExchangeData, State: ExchangeData, OperatorChain> Operator<Out>
+impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Operator<Out>
     for Iterate<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,

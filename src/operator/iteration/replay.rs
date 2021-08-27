@@ -113,7 +113,12 @@ where
     ///
     /// assert_eq!(state.get().unwrap(), vec![3 * (10 + 11 + 12)]);
     /// ```
-    pub fn replay<Body, DeltaUpdate: ExchangeData + Default, State: ExchangeData, OperatorChain2>(
+    pub fn replay<
+        Body,
+        DeltaUpdate: ExchangeData + Default,
+        State: ExchangeData + Sync,
+        OperatorChain2,
+    >(
         self,
         num_iterations: usize,
         initial_state: State,
@@ -213,7 +218,7 @@ where
     }
 }
 
-impl<Out: Data, State: ExchangeData, OperatorChain> Operator<Out>
+impl<Out: Data, State: ExchangeData + Sync, OperatorChain> Operator<Out>
     for Replay<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,
