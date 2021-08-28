@@ -10,7 +10,7 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 #[derivative(Debug)]
 pub struct ForEachSink<Out: Data, F, PreviousOperators>
 where
-    F: Fn(Out) + Send + Clone,
+    F: FnMut(Out) + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
     prev: PreviousOperators,
@@ -21,7 +21,7 @@ where
 
 impl<Out: Data, F, PreviousOperators> Operator<()> for ForEachSink<Out, F, PreviousOperators>
 where
-    F: Fn(Out) + Send + Clone,
+    F: FnMut(Out) + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
@@ -54,7 +54,7 @@ where
 
 impl<Out: Data, F, PreviousOperators> Sink for ForEachSink<Out, F, PreviousOperators>
 where
-    F: Fn(Out) + Send + Clone,
+    F: FnMut(Out) + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
 }
@@ -78,7 +78,7 @@ where
     /// ```
     pub fn for_each<F>(self, f: F)
     where
-        F: Fn(Out) + Send + Clone + 'static,
+        F: FnMut(Out) + Send + Clone + 'static,
     {
         self.add_operator(|prev| ForEachSink {
             prev,
@@ -106,9 +106,9 @@ where
     ///
     /// env.execute();
     /// ```
-    pub fn for_each<F>(self, f: F)
+    pub fn for_each<F>(self, mut f: F)
     where
-        F: Fn(Key, Out) + Send + Clone + 'static,
+        F: FnMut(Key, Out) + Send + Clone + 'static,
     {
         self.0.for_each(move |(key, out)| f(key, out))
     }
