@@ -98,7 +98,7 @@ mod with_profiler {
     type ProfilerReceiver = UnboundedChannelReceiver<ProfilerResult>;
 
     /// Get the sender for sending the profiler results.
-    pub fn get_sender() -> ProfilerSender {
+    pub(crate) fn get_sender() -> ProfilerSender {
         let channels = CHANNEL.lock().unwrap();
         channels.0.clone().expect("Profiler sender already dropped")
     }
