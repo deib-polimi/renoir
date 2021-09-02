@@ -43,7 +43,8 @@ class MPI(Benchmark):
         "0",
         "--map-by",
         #"NUMA:PE=4",
-        "node",
+        "hwthread",
+        #"node",
         "-display-map",
         "--mca",
         "mpi_yield_when_idle",
@@ -61,10 +62,10 @@ class MPI(Benchmark):
             source += "/"
 
         logger.info("Copying source files from %s to %s", source, compiler_host)
-        compilation_dir = self.config["compilation_dir"]
+        compilation_dir = self.config["compilation_dir"] + "/" + args.experiment
         sync_on(compiler_host, source, compilation_dir)
 
-        logger.info("Compinging using cmake")
+        logger.info("Compiling using cmake")
         run_on(compiler_host, "mkdir", "-p", "%s/build" % compilation_dir)
         run_on(
             compiler_host,
@@ -149,7 +150,7 @@ class RStream(Benchmark):
         run_on(compiler_host, "mkdir -p %s" % compilation_dir, shell=True)
         sync_on(compiler_host, source, compilation_dir)
 
-        logger.info("Compinging using cargo")
+        logger.info("Compiling using cargo")
         run_on(
             compiler_host,
             "cd %s && cargo build --release --example %s"
@@ -252,7 +253,7 @@ class Flink(Benchmark):
         compilation_dir = self.config["compilation_dir"]
         sync_on(compiler_host, source, compilation_dir)
 
-        logger.info("Compinging using mvn")
+        logger.info("Compiling using mvn")
         run_on(
             compiler_host,
             "cd %s && mvn package" % compilation_dir,
@@ -367,6 +368,8 @@ def sync_on(host, local_path, remote_path):
             "target",
             "--exclude",
             "build",
+            "--exclude",
+            "data",
             local_path,
             remote,
         ],

@@ -45,6 +45,7 @@ def extract_dict(path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--verbose", help="Verbose output", action="store_true")
     parser.add_argument("results_dir", help="Directory where the results are stored", nargs="+")
     parser.add_argument(
         "-o",
@@ -57,7 +58,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     coloredlogs.install(
-        "INFO",
+        "INFO" if args.verbose else "WARNING",
         milliseconds=True,
         logger=logger,
         fmt="%(asctime)s,%(msecs)03d %(levelname)s %(message)s",
