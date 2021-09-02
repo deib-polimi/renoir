@@ -181,6 +181,7 @@ def main(args):
     plt.title(title)
     plt.legend()
     if args.output:
+        plt.tight_layout()
         plt.savefig(args.output)
     else:
         plt.show()
