@@ -1,19 +1,20 @@
 use std::time::{Duration, SystemTime};
 
-use rstream::operator::source::IteratorSource;
+use rstream::operator::source::ParallelIteratorSource;
 use rstream::{BatchMode, EnvironmentConfig, StreamEnvironment};
 
 use latency::repeat;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();
-    if args.len() != 4 {
+    if args.len() != 5 {
         panic!(
-            "\n\nUsage: num_items items_per_sec batch_size batch_timeout\n\
+            "\n\nUsage: num_items items_per_sec batch_size batch_timeout num_threads\n\
             - num_items: number of items to put in the stream\n\
-            - items_per_sec: number of items to generate per second\n\
+            - items_per_sec: number of items to generate per second (0 = as fast as possible)\n\
             - batch_size: the size of the BatchMode::Fixed or BatchMode::Adaptive\n\
-            - batch_timeout: 0 => BatchMode::Fixed, n > 0 => BatchMode::Adaptive (in ms)\n\n"
+            - batch_timeout: 0 => BatchMode::Fixed, n > 0 => BatchMode::Adaptive (in ms)\n\
+            - num_threads: number of generating threads\n\n"
         );
     }
 
@@ -21,8 +22,10 @@ fn main() {
     let items_per_sec: u64 = args[1].parse().expect("invalid items_per_sec");
     let batch_size: usize = args[2].parse().expect("invalid batch_size");
     let batch_timeout: u64 = args[3].parse().expect("invalid batch_timeout");
+    let num_threads: usize = args[4].parse().expect("invalid num_threads");
 
     assert!(num_items >= 1, "num_items must be at least 1");
+    assert!(num_threads >= 1, "num_threads must be at least 1");
 
     let batch_mode = if batch_timeout == 0 {
         BatchMode::fixed(batch_size)
@@ -33,12 +36,22 @@ fn main() {
     let mut env = StreamEnvironment::new(config);
     env.spawn_remote_workers();
 
-    let iter = (0..num_items).map(move |i| {
-        std::thread::sleep(Duration::from_micros(1_000_000 / items_per_sec));
-        i
+    let source = ParallelIteratorSource::new(move |id, _num_replica| {
+        let iter = if id < num_threads {
+            let to_generate = num_items / num_threads;
+            (to_generate * id)..(to_generate * (id + 1))
+        } else {
+            0..0
+        };
+        iter.map(move |i| {
+            if items_per_sec > 0 {
+                std::thread::sleep(Duration::from_micros(
+                    1_000_000 * num_threads as u64 / items_per_sec,
+                ));
+            }
+            i
+        })
     });
-
-    let source = IteratorSource::new(iter);
     let stream = env.stream(source).batch_mode(BatchMode::fixed(1));
 
     // first shuffle: move the items to a predictable host
