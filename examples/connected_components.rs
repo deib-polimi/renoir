@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use rstream::StreamEnvironment;
 #[derive(Serialize, Deserialize, Clone, Default)]
 struct State {
     /// Maps each vertex to its current component.
-    component: HashMap<u64, u64>,
+    component: Vec<u64>,
     /// Whether the state has been updated in the current iteration.
     updated: bool,
     /// Number of iterations.
@@ -18,23 +18,24 @@ struct State {
 }
 
 impl State {
-    fn new() -> Self {
-        Default::default()
-    }
-
-    fn get_component(&self, vertex: u64) -> Option<u64> {
-        self.component.get(&vertex).cloned()
+    fn new(num_vertices: usize) -> Self {
+        Self {
+            component: (0..num_vertices as u64).collect(),
+            updated: false,
+            iteration_count: 0,
+        }
     }
 }
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();
-    if args.len() != 3 {
-        panic!("Pass the number of iterations, vertex dataset and edges dataset as arguments");
+    if args.len() != 4 {
+        panic!("Pass the number of iterations, number of vertices, vertex dataset and edges dataset as arguments");
     }
     let num_iterations: usize = args[0].parse().expect("Invalid number of iterations");
-    let path_vertices = &args[1];
-    let path_edges = &args[2];
+    let num_vertices: usize = args[1].parse().expect("Invalid number of vertices");
+    let path_vertices = &args[2];
+    let path_edges = &args[3];
 
     let mut env = StreamEnvironment::new(config);
 
@@ -56,7 +57,7 @@ fn main() {
         .map(|x| (x, x))
         .iterate(
             num_iterations,
-            State::new(),
+            State::new(num_vertices),
             move |s, state| {
                 // propagate the component changes of the last iteration
                 s.join(edges, |(x, _component)| *x, |(x, _y)| *x)
@@ -69,10 +70,11 @@ fn main() {
                     .drop_key()
                     // filter only actual changes to component assignments
                     .filter_map(move |(x, component)| {
-                        let old_component = state.get().get_component(x);
-                        match old_component {
-                            Some(old_component) if old_component <= component => None,
-                            _ => Some((x, component)),
+                        let old_component = state.get().component[x as usize];
+                        if old_component <= component {
+                            None
+                        } else {
+                            Some((x, component))
                         }
                     })
             },
@@ -84,7 +86,7 @@ fn main() {
                 // apply all changes
                 state.updated = state.updated || !changes.is_empty();
                 for (x, component) in changes {
-                    state.component.insert(x, component);
+                    state.component[x as usize] = component;
                 }
             },
             |state| {
@@ -106,11 +108,11 @@ fn main() {
     if let Some(res) = result.get() {
         let final_state = &res[0];
         if cfg!(debug_assertions) {
-            for (x, component) in &final_state.component {
+            for (x, component) in final_state.component.iter().enumerate() {
                 eprintln!("{} -> {}", x, component);
             }
         }
-        let components = final_state.component.values().collect::<HashSet<_>>().len();
+        let components = final_state.component.iter().collect::<HashSet<_>>().len();
         eprintln!("Number of components: {:?}", components);
         eprintln!("Iterations: {:?}", final_state.iteration_count);
     }
