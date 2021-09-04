@@ -3,9 +3,22 @@
 import argparse
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 from aggregate_csv import get_systems, parse_stdin
+
+SYSTEM_NAMES = {
+    "mpi": "MPI",
+    "rstream1": "RStream",
+    "rstream2": "TBD",
+    "flink": "Flink",
+}
+
+SYSTEM_COLORS = {
+    "mpi": "blue",
+    "rstream1": "red",
+    "rstream2": "green",
+    "flink": "orange",
+}
 
 
 def get_ids(systems):
@@ -33,68 +46,34 @@ def make_time_plot(args, systems):
                     times.append(data[0])
                     errors.append(data[1])
 
-            if len(exp) == 1:
-                label = system.system
-            else:
-                label = f"{system.system} ({experiment})"
+            color = SYSTEM_COLORS[system.system]
+            label = SYSTEM_NAMES[system.system]
+            linestyle = None
+            if len(exp) > 1:
+                if experiment == args.base_experiment:
+                    label = SYSTEM_NAMES[system.system]
+                elif experiment == args.extra_experiment:
+                    label = f"{label} ({args.extra_experiment_name})"
+                    linestyle = "--"
+                else:
+                    raise RuntimeError(
+                        f"Experiment {experiment} not passed to --extra-experiment"
+                    )
             plt.errorbar(
                 x,
                 times,
                 yerr=errors,
                 capsize=3,
                 label=label,
+                color=color,
+                linestyle=linestyle,
             )
 
+    plt.gca().set_ylim(bottom=0)
     plt.xlabel("Number of cores")
     plt.xticks(cores)
     plt.grid()
     plt.ylabel("Execution time (s)")
-
-
-def make_throughput_plot(args, systems):
-    ids, cores = get_ids(systems)
-    assert args.size is not None, "throughput requires --size"
-    for system in systems:
-        exp = system.get_experiments()
-        for experiment in exp:
-            throughput = []
-            ideal_slope = None
-            for num_cores, id in zip(cores, ids):
-                data = system.experiments[experiment].get_data(id)
-                if data is None:
-                    throughput.append(None)
-                else:
-                    throughput.append(args.size / data[0])
-                    if ideal_slope is None:
-                        ideal_slope = args.size / data[0] / num_cores
-            ideal = [core * ideal_slope for core in cores]
-
-            if len(exp) == 1:
-                label = system.system
-            else:
-                label = f"{system.system} ({experiment})"
-            l = plt.plot(
-                cores,
-                throughput,
-                label=label,
-            )
-            color = l[0].get_color()
-            if args.ideal:
-                plt.plot(
-                    cores,
-                    ideal,
-                    color=color,
-                    linestyle="--",
-                    linewidth=0.5,
-                )
-
-    plt.xlabel("Number of cores")
-    plt.xticks(cores)
-    plt.grid()
-    if args.unit:
-        plt.ylabel(f"Throughput ({args.unit}/s)")
-    else:
-        plt.ylabel("Throughput")
 
 
 def make_scaling_plot(args, systems):
@@ -127,16 +106,27 @@ def make_scaling_plot(args, systems):
                     scale.append(s)
                     error.append(e)
 
-            if len(exp) == 1:
-                label = system.system
-            else:
-                label = f"{system.system} ({experiment})"
+            color = SYSTEM_COLORS[system.system]
+            label = SYSTEM_NAMES[system.system]
+            linestyle = None
+            if len(exp) > 1:
+                if experiment == args.base_experiment:
+                    label = SYSTEM_NAMES[system.system]
+                elif experiment == args.extra_experiment:
+                    label = f"{label} ({args.extra_experiment_name})"
+                    linestyle = "--"
+                else:
+                    raise RuntimeError(
+                        f"Experiment {experiment} not passed to --extra-experiment"
+                    )
             plt.errorbar(
                 x,
                 scale,
                 yerr=error,
                 capsize=3,
                 label=label,
+                color=color,
+                linestyle=linestyle,
             )
     if args.ideal:
         ideal = [c / cores[0] for c in cores]
@@ -171,8 +161,6 @@ def main(args):
 
     if args.variant == "time":
         make_time_plot(args, systems)
-    elif args.variant == "throughput":
-        make_throughput_plot(args, systems)
     elif args.variant == "scaling":
         make_scaling_plot(args, systems)
     else:
@@ -191,7 +179,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Aggregate the output of gen_csv.py and produce a plot"
     )
-    parser.add_argument("variant", choices=["time", "throughput", "scaling"])
+    parser.add_argument("variant", choices=["time", "scaling"])
     parser.add_argument("--output", "-o", help="Where to save the plot")
     parser.add_argument("--title", "-t", help="Title of the plot")
     parser.add_argument(
@@ -202,5 +190,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--unit", "-u", help="Unit of the size")
     parser.add_argument("--ideal", help="Display the ideal line", action="store_true")
+    parser.add_argument("--base-experiment", help="Name of the base experiment")
+    parser.add_argument("--extra-experiment", help="Name of the extra experiment")
+    parser.add_argument(
+        "--extra-experiment-name", help="Name to give to the extra experiment"
+    )
     args = parser.parse_args()
     main(args)

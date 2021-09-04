@@ -1,3 +1,5 @@
 config.yaml
 results*
 temp
+plots
+__pycache__
