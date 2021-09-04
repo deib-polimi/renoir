@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use rand::prelude::*;
 
@@ -100,9 +100,13 @@ impl ThroughputTester {
         if self.count > self.limit {
             let elapsed = self.last.elapsed();
             eprintln!(
-                "{}: {:10.2}/s",
+                "{}: {:10.2}/s @ {}",
                 self.name,
-                self.count as f64 / elapsed.as_secs_f64()
+                self.count as f64 / elapsed.as_secs_f64(),
+                SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
             );
             self.count = 0;
             self.last = Instant::now();
@@ -132,7 +136,7 @@ struct TopicSource {
 impl TopicSource {
     fn new(id: u64, num_replicas: u64) -> Self {
         Self {
-            tester: ThroughputTester::new(format!("source{}", id), 100_000),
+            tester: ThroughputTester::new(format!("source{}", id), 50_000),
             start: Instant::now(),
             id,
             num_replicas,
