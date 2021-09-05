@@ -73,10 +73,10 @@ fn test_iterate_side_input() {
             0u64,
             |s, state| {
                 s.join(side, |(x, _)| *x, |x| *x)
-                    .map(move |(key, ((x, y), _x))| (x, y + *state.get()))
+                    .map(move |(_key, ((x, y), _x))| (x, y + *state.get()))
                     .drop_key()
             },
-            |delta: &mut u64, (x, y)| *delta += y,
+            |delta: &mut u64, (_x, y)| *delta += y,
             |old_state, delta| *old_state += delta,
             |_state| true,
         );
