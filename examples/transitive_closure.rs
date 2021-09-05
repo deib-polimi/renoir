@@ -22,10 +22,10 @@ fn main() {
 
     let mut edges = env.stream(edges_source).split(2);
 
-    let (dropme, result) = edges.pop().unwrap().iterate(
+    let (state, result) = edges.pop().unwrap().iterate(
         num_iterations,
         // (old, new) count of paths in the transitive closure
-        (0, 0),
+        (0, 0, 0),
         move |s, _| {
             let mut paths = s.split(2);
             paths
@@ -42,8 +42,9 @@ fn main() {
                 .drop_key()
         },
         |count: &mut u64, _| *count += 1,
-        |(_old, new), count| *new += count,
-        |(old, new)| {
+        |(_old, new, _iter), count| *new += count,
+        |(old, new, iter)| {
+            *iter += 1;
             let condition = old != new;
             *old = *new;
             *new = 0;
@@ -53,7 +54,7 @@ fn main() {
 
     // we are interested in the stream output
     let result = result.collect_vec();
-    dropme.for_each(|_| {});
+    state.for_each(|(_, _, iter)| eprintln!("Iterations: {}", iter));
 
     let start = Instant::now();
     env.execute();
