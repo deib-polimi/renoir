@@ -42,9 +42,9 @@ class MPI(Benchmark):
         "btl_base_warn_component_unused",
         "0",
         "--map-by",
-        #"NUMA:PE=4",
+        # "NUMA:PE=4",
         "hwthread",
-        #"node",
+        # "node",
         "-display-map",
         "--mca",
         "mpi_yield_when_idle",
@@ -118,8 +118,8 @@ class MPI(Benchmark):
             )
             cmd = [
                 "mpirun",
-                #"-x",
-                #"LD_PRELOAD=/usr/bin/libmimalloc.so",
+                # "-x",
+                # "LD_PRELOAD=/usr/bin/libmimalloc.so",
                 "-np",
                 str(num_proc),
                 "-hostfile",
@@ -209,12 +209,16 @@ class RStream(Benchmark):
             ]
             return run_benchmark(cmd, cwd=args.directory)
 
+
 class RStream2(RStream):
     compilation_suffix = "rstream2"
+
     def run(self, args, hyperparameters, run_index):
         num_hosts = hyperparameters["num_hosts"]
         procs_per_host = hyperparameters["procs_per_host"]
-        with tempfile.NamedTemporaryFile("w", dir=self.config["temp_dir"]) as configfile:
+        with tempfile.NamedTemporaryFile(
+            "w", dir=self.config["temp_dir"]
+        ) as configfile:
             config_content = "hosts:\n"
             for i, host in enumerate(self.config["known_hosts"][:num_hosts]):
                 config_content += " - address: %s\n" % host
@@ -235,6 +239,82 @@ class RStream2(RStream):
                 *extra_args,
             ]
             return run_benchmark(cmd)
+
+
+class TimelyDataflow(Benchmark):
+    exec_path = "/tmp/timelybin"
+    hostfile_path = "/tmp/timely.hosts"
+    compilation_suffix = "timely"
+    port_number = 2101
+
+    def __init__(self, config):
+        self.config = config
+
+    def prepare(self, args):
+        logger.info("Preparing Timely Dataflow")
+        compiler_host = self.config["known_hosts"][0]
+        source = args.directory
+        if not source.endswith("/"):
+            source += "/"
+
+        logger.info("Copying source files from %s to %s", source, compiler_host)
+        compilation_dir = self.config["compilation_dir"] + "/" + self.compilation_suffix
+        run_on(compiler_host, "mkdir -p %s" % compilation_dir, shell=True)
+        sync_on(compiler_host, source, compilation_dir)
+
+        logger.info("Compiling using cargo")
+        run_on(
+            compiler_host,
+            "cd %s && cargo build --release --bin %s" % (compilation_dir, args.bin),
+            shell=True,
+        )
+        remote_path = "%s/target/release/%s" % (compilation_dir, args.bin)
+        logger.info("Executable compiled at %s on %s" % (remote_path, compiler_host))
+
+        logger.info("Copying executable to this machine")
+        self.local_path = "%s/%s/timely/%s" % (
+            self.config["temp_dir"],
+            args.experiment,
+            args.bin,
+        )
+        base = os.path.dirname(self.local_path)
+        os.makedirs(base, exist_ok=True)
+        sync_from(compiler_host, remote_path, self.local_path)
+
+        logger.info("Copying executable to all the hosts")
+        for host in self.config["known_hosts"]:
+            sync_on(host, self.local_path, self.exec_path)
+
+    def run(self, args, hyperparameters, run_index):
+        num_hosts = hyperparameters["num_hosts"]
+        hosts = self.config["known_hosts"][:num_hosts]
+        procs_per_host = hyperparameters["procs_per_host"]
+        with tempfile.NamedTemporaryFile("w", dir=self.config["temp_dir"]) as hostfile:
+            hostfile_content = ""
+            for host in hosts:
+                hostfile_content += "%s:%d\n" % (host, self.port_number)
+            hostfile.write(hostfile_content)
+            hostfile.flush()
+            logger.debug("Hostfile at %s:\n%s", hostfile.name, hostfile_content)
+
+            logger.info("Copying hostfile to all the hosts")
+            for host in hosts:
+                sync_on(host, hostfile.name, self.hostfile_path)
+
+            extra_args = " ".join(
+                map(
+                    lambda arg: replace_vars(arg, hyperparameters),
+                    args.extra_args,
+                )
+            )
+
+            bash = ""
+            for i, host in enumerate(hosts):
+                bash += f"ssh {host} {self.exec_path} {extra_args} -w {procs_per_host} -n {num_hosts} -p {i} -h {self.hostfile_path} &\n"
+            bash += f"wait\n"
+
+            cmd = ["bash", "-c", bash]
+            return run_benchmark(cmd, cwd=args.directory)
 
 
 class Flink(Benchmark):
@@ -547,6 +627,21 @@ if __name__ == "__main__":
         nargs="*",
     )
 
+    timely = subparsers.add_parser("timely")
+    timely.add_argument(
+        "directory",
+        help="Local path to the folder with the Timely benchmark crate",
+    )
+    timely.add_argument(
+        "bin",
+        help="Name of the bin to compile and run",
+    )
+    timely.add_argument(
+        "extra_args",
+        help="Additional arguments to pass to the executable",
+        nargs="*",
+    )
+
     args = parser.parse_args()
 
     verbosity = args.verbose
@@ -580,6 +675,8 @@ if __name__ == "__main__":
         runner = RStream2(config)
     elif args.system == "flink":
         runner = Flink(config)
+    elif args.system == "timely":
+        runner = TimelyDataflow(config)
     else:
         raise ValueError("%s is not supported yet" % args.system)
 
