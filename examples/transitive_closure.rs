@@ -40,6 +40,7 @@ fn main() {
                 // delete duplicated paths
                 .group_by_reduce(|(x, y)| (*x, *y), |_, _| {})
                 .drop_key()
+                .filter(|(x, y)| x != y)
         },
         |count: &mut u64, _| *count += 1,
         |(_old, new, _iter), count| *new += count,
