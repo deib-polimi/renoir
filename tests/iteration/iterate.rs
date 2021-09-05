@@ -61,6 +61,34 @@ fn test_iterate_no_blocks_in_between() {
 }
 
 #[test]
+fn test_iterate_side_input() {
+    TestHelper::local_remote_env(|mut env| {
+        let n = 5u64;
+        let n_iter = 5;
+
+        let source = IteratorSource::new(0..n);
+        let side = env.stream(IteratorSource::new(0..n));
+        let (state, res) = env.stream(source).map(|x| (x, x)).shuffle().iterate(
+            n_iter,
+            0u64,
+            |s, state| {
+                s.join(side, |(x, _)| *x, |x| *x)
+                    .map(move |(key, ((x, y), _x))| (x, y + *state.get()))
+                    .drop_key()
+            },
+            |delta: &mut u64, (x, y)| *delta += y,
+            |old_state, delta| *old_state += delta,
+            |_state| true,
+        );
+        let state = state.collect_vec();
+        let res = res.map(|(_, y)| y).collect_vec();
+        env.execute();
+
+        check_result(n, n_iter, state.get(), res.get());
+    });
+}
+
+#[test]
 fn test_iterate_with_shuffle() {
     TestHelper::local_remote_env(|mut env| {
         let n = 5u64;
