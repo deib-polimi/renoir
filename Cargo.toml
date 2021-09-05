@@ -14,7 +14,7 @@ profiler = []
 
 [dependencies]
 # for logging to the console
-log = "0.4"
+log = { version = "0.4", features = ["release_max_level_info"] }
 env_logger = "0.8"
 
 # used by the network for storing type-generic structures
