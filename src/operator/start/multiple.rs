@@ -36,6 +36,8 @@ struct SideReceiver<Out: ExchangeData, Item: ExchangeData> {
     num_replicas: usize,
     /// How many replicas from this side has not yet sent `StreamElement::FlushAndRestart`.
     missing_flush_and_restart: usize,
+    /// How many replicas from this side has not yet sent `StreamElement::Terminate`.
+    missing_terminate: usize,
     /// Whether this side is cached (i.e. after it is fully read, it's just replayed indefinitely).
     cached: bool,
     /// The content of the cache, if any.
@@ -52,6 +54,7 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
             receiver: SingleStartBlockReceiver::new(previous_block_id),
             num_replicas: 0,
             missing_flush_and_restart: 0,
+            missing_terminate: 0,
             cached,
             cache: Default::default(),
             cache_full: false,
@@ -63,6 +66,7 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
         self.receiver.setup(metadata);
         self.num_replicas = self.receiver.prev_replicas().len();
         self.missing_flush_and_restart = self.num_replicas;
+        self.missing_terminate = self.num_replicas;
     }
 
     fn recv(&mut self, timeout: Option<Duration>) -> Result<NetworkMessage<Out>, RecvTimeoutError> {
@@ -81,9 +85,18 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
         }
     }
 
-    /// There is nothing more to read from this side (even from the cache).
+    /// There is nothing more to read from this side for this iteration.
     fn is_ended(&self) -> bool {
-        self.missing_flush_and_restart == 0
+        if self.cached {
+            self.is_terminated()
+        } else {
+            self.missing_flush_and_restart == 0
+        }
+    }
+
+    /// No more data can come from this side ever again.
+    fn is_terminated(&self) -> bool {
+        self.missing_terminate == 0
     }
 
     /// All the cached items have already been read.
@@ -95,6 +108,8 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
     fn next_cached_item(&mut self) -> NetworkMessage<Item> {
         self.cache_pointer += 1;
         if self.cache_finished() {
+            // Items are simply returned, so flush and restarts are not counted properly. Just make
+            // sure that when the cache ends the counter is zero.
             self.missing_flush_and_restart = 0;
         }
         self.cache[self.cache_pointer - 1].clone()
@@ -151,9 +166,12 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
                 if matches!(item, StreamElement::FlushAndRestart) {
                     side.missing_flush_and_restart -= 1;
                     // make sure to add this message before `FlushAndRestart`
-                    if side.is_ended() {
+                    if side.missing_flush_and_restart == 0 {
                         res.push(StreamElement::Item(end.clone()));
                     }
+                }
+                if matches!(item, StreamElement::Terminate) {
+                    side.missing_terminate -= 1;
                 }
                 // StreamElement::Terminate should not be put in the cache
                 if !side.cached || !matches!(item, StreamElement::Terminate) {
@@ -165,6 +183,8 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
         let message = NetworkMessage::new(data, sender);
         if side.cached {
             side.cache.push(message.clone());
+            // the elements are already out, ignore the cache for this round
+            side.cache_pointer = side.cache.len();
         }
         message
     }
@@ -177,8 +197,32 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
         &mut self,
         timeout: Option<Duration>,
     ) -> Result<NetworkMessage<TwoSidesItem<OutL, OutR>>, RecvTimeoutError> {
+        // both sides received all the `StreamElement::Terminate`, but the cached ones have never
+        // been emitted
+        if self.left.is_terminated() && self.right.is_terminated() {
+            let num_terminates = if self.left.cached {
+                self.left.num_replicas
+            } else if self.right.cached {
+                self.right.num_replicas
+            } else {
+                0
+            };
+            if num_terminates > 0 {
+                return Ok(NetworkMessage::new(
+                    (0..num_terminates)
+                        .map(|_| StreamElement::Terminate)
+                        .collect(),
+                    Default::default(),
+                ));
+            }
+        }
+
         // both left and right received all the FlushAndRestart, prepare for the next iteration
-        if self.left.is_ended() && self.right.is_ended() {
+        if self.left.is_ended()
+            && self.right.is_ended()
+            && self.left.cache_finished()
+            && self.right.cache_finished()
+        {
             self.left.reset();
             self.right.reset();
             self.first_message = true;

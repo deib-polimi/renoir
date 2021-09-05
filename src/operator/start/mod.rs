@@ -164,7 +164,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
 
         let prev_replicas = self.receiver.prev_replicas();
         self.num_previous_replicas = prev_replicas.len();
-        self.missing_terminate = self.num_previous_replicas - self.receiver.cached_replicas();
+        self.missing_terminate = self.num_previous_replicas;
         self.missing_flush_and_restart = self.num_previous_replicas;
         self.watermark_frontier = WatermarkFrontier::new(prev_replicas);
 
@@ -532,6 +532,64 @@ mod tests {
         assert_eq!(StreamElement::Item(TwoSidesItem::Right(6969)), recv[2]);
         assert_eq!(StreamElement::Item(TwoSidesItem::LeftEnd), recv[3]);
         assert_eq!(StreamElement::Item(TwoSidesItem::RightEnd), recv[4]);
+
+        assert_eq!(StreamElement::FlushAndRestart, start_block.next());
+
+        sender2
+            .send(NetworkMessage::new(vec![StreamElement::Terminate], from2))
+            .unwrap();
+
+        assert_eq!(StreamElement::Terminate, start_block.next());
+    }
+
+    #[test]
+    fn test_multiple_cache_other_side() {
+        let (metadata, mut senders) = FakeNetworkTopology::single_replica(2, 1);
+        let (from1, sender1) = senders[0].pop().unwrap();
+        let (from2, sender2) = senders[1].pop().unwrap();
+
+        let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
+            from1.block_id,
+            from2.block_id,
+            false,
+            true,
+            None,
+        );
+        start_block.setup(metadata);
+
+        sender1
+            .send(NetworkMessage::new(vec![StreamElement::Item(42)], from1))
+            .unwrap();
+        sender1
+            .send(NetworkMessage::new(vec![StreamElement::Item(43)], from1))
+            .unwrap();
+        sender2
+            .send(NetworkMessage::new(vec![StreamElement::Item(69)], from2))
+            .unwrap();
+
+        let mut recv = [start_block.next(), start_block.next(), start_block.next()];
+        recv.sort(); // those messages can arrive unordered
+        assert_eq!(StreamElement::Item(TwoSidesItem::Left(42)), recv[0]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::Left(43)), recv[1]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::Right(69)), recv[2]);
+
+        sender1
+            .send(NetworkMessage::new(
+                vec![StreamElement::FlushAndRestart, StreamElement::Terminate],
+                from1,
+            ))
+            .unwrap();
+        sender2
+            .send(NetworkMessage::new(
+                vec![StreamElement::FlushAndRestart],
+                from2,
+            ))
+            .unwrap();
+
+        let mut recv = [start_block.next(), start_block.next()];
+        recv.sort(); // those messages can arrive unordered
+        assert_eq!(StreamElement::Item(TwoSidesItem::LeftEnd), recv[0]);
+        assert_eq!(StreamElement::Item(TwoSidesItem::RightEnd), recv[1]);
 
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
 
