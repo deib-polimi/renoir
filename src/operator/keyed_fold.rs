@@ -26,6 +26,7 @@ where
     init: NewOut,
     accumulators: HashMap<Key, NewOut>,
     timestamps: HashMap<Key, Timestamp>,
+    ready: Vec<StreamElement<KeyValue<Key, NewOut>>>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
     received_end_iter: bool,
@@ -44,6 +45,7 @@ where
             init,
             accumulators: Default::default(),
             timestamps: Default::default(),
+            ready: Default::default(),
             max_watermark: None,
             received_end: false,
             received_end_iter: false,
@@ -102,14 +104,23 @@ where
             }
         }
 
-        if let Some(k) = self.accumulators.keys().next() {
-            let key = k.clone();
-            let (key, value) = self.accumulators.remove_entry(&key).unwrap();
-            return if let Some(ts) = self.timestamps.remove(&key) {
-                StreamElement::Timestamped((key, value), ts)
-            } else {
-                StreamElement::Item((key, value))
-            };
+        // move all the accumulators into a faster vec
+        if !self.accumulators.is_empty() {
+            // take a reference to move into the closure, avoiding moving "self"
+            let timestamps = &mut self.timestamps;
+            self.ready
+                .extend(self.accumulators.drain().map(|(key, value)| {
+                    if let Some(ts) = timestamps.remove(&key) {
+                        StreamElement::Timestamped((key, value), ts)
+                    } else {
+                        StreamElement::Item((key, value))
+                    }
+                }));
+        }
+
+        // consume the ready items
+        if let Some(elem) = self.ready.pop() {
+            return elem;
         }
 
         if let Some(ts) = self.max_watermark.take() {
