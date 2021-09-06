@@ -11,6 +11,7 @@ SYSTEM_NAMES = {
     "rstream1": "RStream",
     "rstream2": "TBD",
     "flink": "Flink",
+    "timely": "Timely",
 }
 
 SYSTEM_COLORS = {
@@ -18,6 +19,7 @@ SYSTEM_COLORS = {
     "rstream1": "red",
     "rstream2": "green",
     "flink": "orange",
+    "timely": "#03f4fc",
 }
 
 

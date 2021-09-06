@@ -105,8 +105,13 @@ class MPI(System):
         System.__init__(self, "mpi", "total")
 
 
+class Timely(System):
+    def __init__(self):
+        System.__init__(self, "timely", "total")
+
+
 def get_systems():
-    return [RStream1(), RStream2(), Flink(), MPI()]
+    return [RStream1(), RStream2(), Flink(), MPI(), Timely()]
 
 
 def parse_stdin(systems):
@@ -120,6 +125,8 @@ def parse_stdin(systems):
             systems[2].add(row)
         elif system == "mpi":
             systems[3].add(row)
+        elif system == "timely":
+            systems[4].add(row)
         else:
             raise ValueError("Unsupported system: " + system)
 

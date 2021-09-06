@@ -6,7 +6,9 @@ EXPERIMENTS = \
 	connected-components \
 	enum-triangles \
 	kmeans \
+	kmeans-noflink \
 	pagerank \
+	transitive-closure \
 	wordcount-gutenberg wordcount-randomwords \
 	wordcount-assoc-gutenberg \
 	wordcount-windowed-gutenberg wordcount-windowed-randomwords
@@ -21,7 +23,7 @@ DEP_connected-components := $(RESULTS)/connected-components
 TITLE_connected-components := "Connected Components"
 BASE_connected-components := connected-components
 
-DEP_enum-triangles := $(RESULTS)/enum-triangles
+DEP_enum-triangles := $(RESULTS)/enum-triangles/{flink,rstream2} $(RESULTS)/enum-triangles-new
 TITLE_enum-triangles := "Enum Triangles"
 BASE_enum-triangles := enum-triangles
 
@@ -29,11 +31,19 @@ DEP_kmeans := $(RESULTS)/kmeans-30c-15it-200M
 TITLE_kmeans := "K-Means (k = 30, h = 15, n = 10M)"
 BASE_kmeans := kmeans
 
+DEP_kmeans-noflink := $(RESULTS)/kmeans-30c-15it-200M/{mpi,rstream*}
+TITLE_kmeans-noflink := "K-Means (k = 30, h = 15, n = 10M)"
+BASE_kmeans-noflink := kmeans
+
 DEP_pagerank := $(RESULTS)/pagerank
 TITLE_pagerank := "PageRank"
 BASE_pagerank := pagerank
 
-DEP_wordcount-gutenberg := $(RESULTS)/wordcount/rstream2 $(RESULTS)/wordcount-fixed-new
+DEP_transitive-closure := $(RESULTS)/transitive-closure
+TITLE_transitive-closure := "Transitive Closure"
+BASE_transitive-closure := transitive-closure
+
+DEP_wordcount-gutenberg := $(RESULTS)/wordcount/{rstream2,timely} $(RESULTS)/wordcount-fixed-new
 TITLE_wordcount-gutenberg := "Non-associative Wordcount (Gutenberg)"
 BASE_wordcount-gutenberg := wordcount
 
