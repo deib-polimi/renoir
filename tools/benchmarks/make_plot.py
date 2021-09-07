@@ -9,7 +9,7 @@ from aggregate_csv import get_systems, parse_stdin
 SYSTEM_NAMES = {
     "mpi": "MPI",
     "rstream1": "RStream",
-    "rstream2": "TBD",
+    "rstream2": "Noir",
     "flink": "Flink",
     "timely": "Timely",
 }
@@ -17,9 +17,9 @@ SYSTEM_NAMES = {
 SYSTEM_COLORS = {
     "mpi": "blue",
     "rstream1": "red",
-    "rstream2": "green",
+    "rstream2": "black",
     "flink": "orange",
-    "timely": "#03f4fc",
+    "timely": "green",
 }
 
 
