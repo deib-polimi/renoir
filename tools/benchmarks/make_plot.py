@@ -161,6 +161,10 @@ def main(args):
     else:
         title = " ".join(experiments)
 
+    plt.rc("font", size=14)
+    plt.rc("axes", titlesize=16)
+    plt.rc("axes", labelsize=16)
+
     if args.variant == "time":
         make_time_plot(args, systems)
     elif args.variant == "scaling":
