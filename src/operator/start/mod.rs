@@ -227,9 +227,8 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
 
             // use watermarks to update the frontier
             let watermark_frontier = &mut self.watermark_frontier;
-            self.buffer = batch
-                .into_iter()
-                .filter_map(|item| match item {
+            self.buffer
+                .extend(batch.into_iter().filter_map(|item| match item {
                     StreamElement::Watermark(ts) => {
                         // update the frontier and return a watermark if necessary
                         watermark_frontier
@@ -242,8 +241,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                         Some(item)
                     }
                     _ => Some(item),
-                })
-                .collect();
+                }));
         }
 
         let message = self

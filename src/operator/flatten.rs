@@ -61,12 +61,13 @@ where
         while self.buffer.is_empty() {
             match self.prev.next() {
                 StreamElement::Item(item) => {
-                    self.buffer = (self.make_iter)(item).map(StreamElement::Item).collect()
+                    self.buffer
+                        .extend((self.make_iter)(item).map(StreamElement::Item));
                 }
                 StreamElement::Timestamped(item, ts) => {
-                    self.buffer = (self.make_iter)(item)
-                        .map(|value| StreamElement::Timestamped(value, ts))
-                        .collect()
+                    self.buffer.extend(
+                        (self.make_iter)(item).map(|value| StreamElement::Timestamped(value, ts)),
+                    );
                 }
                 StreamElement::Watermark(ts) => return StreamElement::Watermark(ts),
                 StreamElement::Terminate => return StreamElement::Terminate,
