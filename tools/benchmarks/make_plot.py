@@ -35,6 +35,7 @@ def get_ids(systems):
 
 def make_time_plot(args, systems):
     ids, cores = get_ids(systems)
+    lines = dict(l.rsplit(":", 1) for l in args.lines)
     for system in systems:
         exp = system.get_experiments()
         for experiment in exp:
@@ -50,6 +51,7 @@ def make_time_plot(args, systems):
 
             color = SYSTEM_COLORS[system.system]
             label = SYSTEM_NAMES[system.system]
+            nlines = lines.get(f"{system.system}:{experiment}", None)
             linestyle = None
             if len(exp) > 1:
                 if experiment == args.base_experiment:
@@ -61,7 +63,9 @@ def make_time_plot(args, systems):
                     raise RuntimeError(
                         f"Experiment {experiment} not passed to --extra-experiment"
                     )
-            plt.errorbar(
+            if nlines is not None:
+                label += f" [{nlines}]"
+            p = plt.errorbar(
                 x,
                 times,
                 yerr=errors,
@@ -70,6 +74,7 @@ def make_time_plot(args, systems):
                 color=color,
                 linestyle=linestyle,
             )
+            p.id = f"{system.system}:{experiment}"
 
     plt.gca().set_ylim(bottom=0)
     plt.xlabel("Number of cores")
@@ -173,7 +178,20 @@ def main(args):
         raise ValueError(f"Unknown variant: {args.variant}")
 
     plt.title(title)
-    plt.legend()
+    if not args.order:
+        plt.legend()
+    else:
+        handles, labels = plt.gca().get_legend_handles_labels()
+        reorder = [args.order.index(h.id) for h in handles]
+        reorder_rev = [0 for _ in reorder]
+        for i, r in enumerate(reorder):
+            reorder_rev[r] = i
+        plt.legend([handles[i] for i in reorder_rev], [labels[i] for i in reorder_rev])
+
+    # for h in handles:
+    #     print(h.id)
+    # print(handles)
+    # print(labels)
     if args.output:
         plt.tight_layout()
         plt.savefig(args.output)
@@ -199,7 +217,20 @@ if __name__ == "__main__":
     parser.add_argument("--base-experiment", help="Name of the base experiment")
     parser.add_argument("--extra-experiment", help="Name of the extra experiment")
     parser.add_argument(
-        "--extra-experiment-name", help="Name to give to the extra experiment"
+        "--extra-experiment-name",
+        help="Name to give to the extra experiment",
+    )
+    parser.add_argument(
+        "--lines",
+        help="<system>:<exp>:<lines> lines of code for experiment <exp> in system <system>",
+        nargs="+",
+        default=[],
+    )
+    parser.add_argument(
+        "--order",
+        help="<system>:<exp> in the order of the legend",
+        nargs="+",
+        default=[],
     )
     args = parser.parse_args()
     main(args)
