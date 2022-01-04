@@ -48,12 +48,8 @@ pub(crate) struct StartHandle {
 /// Information about a block in the job graph.
 #[derive(Debug, Clone)]
 struct SchedulerBlockInfo {
-    /// The identifier of the current block.
-    block_id: BlockId,
     /// String representation of the block.
     repr: String,
-    /// The total number of replicas of the block.
-    num_replicas: usize,
     /// All the replicas, grouped by host.
     replicas: HashMap<HostId, Vec<Coord>>,
     /// All the global ids, grouped by coordinate.
@@ -320,9 +316,7 @@ impl Scheduler {
         let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
         let global_ids = (0..num_replicas).map(|r| (Coord::new(block.id, host_id, r), r));
         SchedulerBlockInfo {
-            block_id: block.id,
             repr: block.to_string(),
-            num_replicas,
             replicas: vec![(host_id, replicas.collect())].into_iter().collect(),
             global_ids: global_ids.into_iter().collect(),
             batch_mode: block.batch_mode,
@@ -371,9 +365,7 @@ impl Scheduler {
             num_replicas += num_host_replicas;
         }
         SchedulerBlockInfo {
-            block_id: block.id,
             repr: block.to_string(),
-            num_replicas,
             replicas,
             global_ids,
             batch_mode: block.batch_mode,

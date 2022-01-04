@@ -222,7 +222,7 @@ impl TestHelper {
         if content.is_empty() {
             return Some(Vec::new());
         }
-        let values = content.split(',').map(|s| usize::from_str(s)).collect_vec();
+        let values = content.split(',').map(usize::from_str).collect_vec();
         process_results(values.into_iter(), |values| values.collect_vec()).ok()
     }
 
