@@ -185,8 +185,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s
@@ -262,8 +262,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
     /// let res = s

@@ -540,6 +540,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "noir"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "chrono",
+ "coarsetime",
+ "criterion",
+ "crossbeam-channel",
+ "csv",
+ "derivative",
+ "env_logger",
+ "fake",
+ "flume",
+ "hashbrown",
+ "itertools 0.10.1",
+ "lazy-init",
+ "lazy_static",
+ "log",
+ "mimalloc",
+ "rand",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "shell-escape",
+ "ssh2",
+ "structopt",
+ "tempfile",
+ "typemap",
+ "whoami",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -839,40 +873,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 dependencies = [
  "winapi",
-]
-
-[[package]]
-name = "rstream"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "chrono",
- "coarsetime",
- "criterion",
- "crossbeam-channel",
- "csv",
- "derivative",
- "env_logger",
- "fake",
- "flume",
- "hashbrown",
- "itertools 0.10.1",
- "lazy-init",
- "lazy_static",
- "log",
- "mimalloc",
- "rand",
- "regex",
- "serde",
- "serde_json",
- "serde_yaml",
- "shell-escape",
- "ssh2",
- "structopt",
- "tempfile",
- "typemap",
- "whoami",
 ]
 
 [[package]]

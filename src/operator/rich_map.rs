@@ -103,8 +103,8 @@ where
     /// there are more replicas.
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new((1..=5)));
     /// let res = s.rich_map({
@@ -124,8 +124,8 @@ where
     /// the `enumerate` function in Python.
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new((1..=5)));
     /// let res = s.rich_map({

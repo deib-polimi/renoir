@@ -98,8 +98,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s1 = env.stream(IteratorSource::new(0..5u8));
     /// let s2 = env.stream(IteratorSource::new(0..5i32));
@@ -150,8 +150,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s1 = env.stream(IteratorSource::new(0..5u8));
     /// let s2 = env.stream(IteratorSource::new(0..5i32));
@@ -203,8 +203,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s1 = env.stream(IteratorSource::new(0..5u8));
     /// let s2 = env.stream(IteratorSource::new(0..5i32));
@@ -259,8 +259,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s1 = env.stream(IteratorSource::new(0..5u8));
     /// let s2 = env.stream(IteratorSource::new(0..5i32));
@@ -268,8 +268,8 @@ where
     /// ```
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s1 = env.stream(IteratorSource::new(0..5u8));
     /// let s2 = env.stream(IteratorSource::new(0..5i32));

@@ -1,6 +1,6 @@
-use rstream::operator::source::IteratorSource;
-use rstream::operator::window::EventTimeWindow;
-use rstream::operator::Timestamp;
+use noir::operator::source::IteratorSource;
+use noir::operator::window::EventTimeWindow;
+use noir::operator::Timestamp;
 
 use super::utils::TestHelper;
 

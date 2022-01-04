@@ -27,7 +27,7 @@ use crate::scheduler::HostId;
 /// ## Local environment
 ///
 /// ```
-/// # use rstream::{StreamEnvironment, EnvironmentConfig};
+/// # use noir::{StreamEnvironment, EnvironmentConfig};
 /// let config = EnvironmentConfig::local(1);
 /// let mut env = StreamEnvironment::new(config);
 /// ```
@@ -35,7 +35,7 @@ use crate::scheduler::HostId;
 /// ## Remote environment
 ///
 /// ```
-/// # use rstream::{StreamEnvironment, EnvironmentConfig};
+/// # use noir::{StreamEnvironment, EnvironmentConfig};
 /// # use std::fs::File;
 /// # use std::io::Write;
 /// let config = r"
@@ -60,7 +60,7 @@ use crate::scheduler::HostId;
 /// their docs.
 ///
 /// ```no_run
-/// # use rstream::{EnvironmentConfig, StreamEnvironment};
+/// # use noir::{EnvironmentConfig, StreamEnvironment};
 /// let (config, args) = EnvironmentConfig::from_args();
 /// let mut env = StreamEnvironment::new(config);
 /// ```

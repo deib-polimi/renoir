@@ -36,9 +36,9 @@ impl ProcessingTimeWindow {
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::ProcessingTimeWindow;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::ProcessingTimeWindow;
     /// # use std::time::Duration;
     /// # use itertools::Itertools;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
@@ -66,9 +66,9 @@ impl ProcessingTimeWindow {
     /// The first window starts at timestamp zero (included) and ends at timestamp `2s` (excluded).
     /// The second windows starts at timestamp `2s` and ends at timestamp `4s`, and so on.
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::ProcessingTimeWindow;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::ProcessingTimeWindow;
     /// # use std::time::Duration;
     /// # use itertools::Itertools;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
@@ -94,9 +94,9 @@ impl ProcessingTimeWindow {
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::ProcessingTimeWindow;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::ProcessingTimeWindow;
     /// # use std::time::Duration;
     /// # use itertools::Itertools;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
@@ -136,10 +136,10 @@ impl EventTimeWindow {
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::{CountWindow, EventTimeWindow};
-    /// # use rstream::operator::Timestamp;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::{CountWindow, EventTimeWindow};
+    /// # use noir::operator::Timestamp;
     /// # use std::time::Duration;
     /// # use itertools::Itertools;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
@@ -172,10 +172,10 @@ impl EventTimeWindow {
     /// The first window starts at timestamp zero (included) and ends at timestamp `2s` (excluded).
     /// The second windows starts at timestamp `2s` and ends at timestamp `4s`, and so on.
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::{CountWindow, EventTimeWindow};
-    /// # use rstream::operator::Timestamp;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::{CountWindow, EventTimeWindow};
+    /// # use noir::operator::Timestamp;
     /// # use std::time::Duration;
     /// # use itertools::Itertools;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
@@ -210,10 +210,10 @@ impl EventTimeWindow {
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::{CountWindow, EventTimeWindow};
-    /// # use rstream::operator::Timestamp;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::{CountWindow, EventTimeWindow};
+    /// # use noir::operator::Timestamp;
     /// # use std::time::Duration;
     /// # use itertools::Itertools;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));

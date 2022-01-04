@@ -1,5 +1,5 @@
-use rstream::operator::sink::StreamOutput;
-use rstream::operator::source::IteratorSource;
+use noir::operator::sink::StreamOutput;
+use noir::operator::source::IteratorSource;
 
 use super::utils::TestHelper;
 

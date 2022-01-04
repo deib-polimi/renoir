@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use rstream::operator::source::IteratorSource;
+use noir::operator::source::IteratorSource;
 
 use super::utils::TestHelper;
 

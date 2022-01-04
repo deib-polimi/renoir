@@ -35,8 +35,8 @@ impl FileSource {
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::FileSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::FileSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let source = FileSource::new("/datasets/huge.txt");
     /// let s = env.stream(source);

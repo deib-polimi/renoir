@@ -6,13 +6,13 @@ use std::time::Instant;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use rstream::operator::sink::StreamOutput;
-use rstream::operator::source::CsvSource;
-use rstream::operator::Operator;
-use rstream::BatchMode;
-use rstream::EnvironmentConfig;
-use rstream::Stream;
-use rstream::StreamEnvironment;
+use noir::operator::sink::StreamOutput;
+use noir::operator::source::CsvSource;
+use noir::operator::Operator;
+use noir::BatchMode;
+use noir::EnvironmentConfig;
+use noir::Stream;
+use noir::StreamEnvironment;
 
 const DAYS_BEFORE: [u16; 13] = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 

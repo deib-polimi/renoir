@@ -1,4 +1,4 @@
-use rstream::operator::source::IteratorSource;
+use noir::operator::source::IteratorSource;
 use utils::TestHelper;
 
 mod utils;

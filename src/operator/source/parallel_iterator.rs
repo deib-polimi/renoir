@@ -93,8 +93,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::ParallelIteratorSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::ParallelIteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// // generate the numbers from 0 to 99 using multiple replicas
     /// let n = 100;

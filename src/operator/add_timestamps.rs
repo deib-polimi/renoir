@@ -100,9 +100,9 @@ where
     /// will be inserted.
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// use rstream::operator::Timestamp;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// use noir::operator::Timestamp;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     ///
     /// let s = env.stream(IteratorSource::new((0..10)));

@@ -1,5 +1,5 @@
 [package]
-name = "rstream"
+name = "noir"
 version = "0.1.0"
 authors = [
     "Edoardo Morassutto <edoardo.morassutto@gmail.com>",

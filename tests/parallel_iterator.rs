@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rstream::operator::source::ParallelIteratorSource;
+use noir::operator::source::ParallelIteratorSource;
 use utils::TestHelper;
 
 mod utils;

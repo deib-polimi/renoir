@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
-use rstream::operator::source::ParallelIteratorSource;
-use rstream::{BatchMode, EnvironmentConfig, StreamEnvironment};
+use noir::operator::source::ParallelIteratorSource;
+use noir::{BatchMode, EnvironmentConfig, StreamEnvironment};
 
 use latency::repeat;
 

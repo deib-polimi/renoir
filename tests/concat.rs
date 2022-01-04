@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 
-use rstream::operator::source::IteratorSource;
-use rstream::operator::Timestamp;
+use noir::operator::source::IteratorSource;
+use noir::operator::Timestamp;
 use utils::{TestHelper, WatermarkChecker};
 
 mod utils;

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 
-use rstream::operator::source::IteratorSource;
+use noir::operator::source::IteratorSource;
 use utils::TestHelper;
 
 mod utils;

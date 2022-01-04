@@ -2,10 +2,10 @@ use std::time::Instant;
 
 use regex::Regex;
 
-use rstream::operator::source::FileSource;
-use rstream::BatchMode;
-use rstream::EnvironmentConfig;
-use rstream::StreamEnvironment;
+use noir::operator::source::FileSource;
+use noir::BatchMode;
+use noir::EnvironmentConfig;
+use noir::StreamEnvironment;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();

@@ -117,8 +117,8 @@ impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::CsvSource;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::CsvSource;
     /// # use serde::{Deserialize, Serialize};
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// #[derive(Clone, Deserialize, Serialize)]

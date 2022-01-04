@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use rstream::operator::source::IteratorSource;
-use rstream::operator::Timestamp;
+use noir::operator::source::IteratorSource;
+use noir::operator::Timestamp;
 use utils::TestHelper;
 
 mod utils;

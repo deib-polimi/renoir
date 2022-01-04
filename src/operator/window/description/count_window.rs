@@ -25,9 +25,9 @@ impl CountWindow {
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::CountWindow;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::CountWindow;
     /// # use std::time::Duration;
     /// # use itertools::Itertools;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
@@ -53,9 +53,9 @@ impl CountWindow {
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::CountWindow;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::CountWindow;
     /// # use std::time::Duration;
     /// # use itertools::Itertools;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));

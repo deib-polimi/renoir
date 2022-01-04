@@ -10,11 +10,11 @@ use std::time::Duration;
 use itertools::{process_results, Itertools};
 use log::*;
 
-use rstream::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
-use rstream::operator::{Data, Operator, StreamElement, Timestamp};
-use rstream::structure::BlockStructure;
-use rstream::ExecutionMetadata;
-use rstream::{EnvironmentConfig, StreamEnvironment};
+use noir::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
+use noir::operator::{Data, Operator, StreamElement, Timestamp};
+use noir::structure::BlockStructure;
+use noir::ExecutionMetadata;
+use noir::{EnvironmentConfig, StreamEnvironment};
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;

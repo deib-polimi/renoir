@@ -252,7 +252,7 @@ impl Scheduler {
             profilers,
         };
         debug!(
-            "__RSTREAM2_TRACING_DATA__ {}",
+            "__noir2_TRACING_DATA__ {}",
             serde_json::to_string(&data).unwrap()
         );
     }

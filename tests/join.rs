@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use itertools::Itertools;
 
-use rstream::operator::source::IteratorSource;
-use rstream::BatchMode;
+use noir::operator::source::IteratorSource;
+use noir::BatchMode;
 use utils::TestHelper;
 
 mod utils;

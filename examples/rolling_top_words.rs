@@ -2,10 +2,10 @@ use std::time::{Duration, Instant, SystemTime};
 
 use rand::prelude::*;
 
-use rstream::operator::source::ParallelIteratorSource;
-use rstream::operator::window::EventTimeWindow;
-use rstream::EnvironmentConfig;
-use rstream::StreamEnvironment;
+use noir::operator::source::ParallelIteratorSource;
+use noir::operator::window::EventTimeWindow;
+use noir::EnvironmentConfig;
+use noir::StreamEnvironment;
 
 const TOPICS: [&str; 50] = [
     "#love",

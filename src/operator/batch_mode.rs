@@ -14,9 +14,9 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// use rstream::BatchMode;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// use noir::BatchMode;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     ///
     /// let s = env.stream(IteratorSource::new((0..10)));
@@ -40,9 +40,9 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// use rstream::BatchMode;
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// use noir::BatchMode;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     ///
     /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);

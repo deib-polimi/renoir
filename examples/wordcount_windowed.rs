@@ -2,11 +2,11 @@ use std::time::{Duration, Instant};
 
 use regex::Regex;
 
-use rstream::operator::source::FileSource;
-use rstream::operator::window::CountWindow;
-use rstream::BatchMode;
-use rstream::EnvironmentConfig;
-use rstream::StreamEnvironment;
+use noir::operator::source::FileSource;
+use noir::operator::window::CountWindow;
+use noir::BatchMode;
+use noir::EnvironmentConfig;
+use noir::StreamEnvironment;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();

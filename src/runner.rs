@@ -16,16 +16,16 @@ use crate::TracingData;
 
 /// Environment variable set by the runner with the host id of the process. If it's missing the
 /// process will have to spawn the processes by itself.
-pub(crate) const HOST_ID_ENV_VAR: &str = "RSTREAM_HOST_ID";
+pub(crate) const HOST_ID_ENV_VAR: &str = "noir_HOST_ID";
 /// Environment variable set by the runner with the content of the config file so that it's not
 /// required to have it on all the hosts.
-pub(crate) const CONFIG_ENV_VAR: &str = "RSTREAM_CONFIG";
+pub(crate) const CONFIG_ENV_VAR: &str = "noir_CONFIG";
 /// Size of the buffer used to send the executable file via SCP.
 pub(crate) const SCP_BUFFER_SIZE: usize = 512 * 1024;
 
 /// Execution results returned by a remote worker.
 struct HostExecutionResult {
-    /// Tracing data if rstream is compiled with tracing enabled.
+    /// Tracing data if noir is compiled with tracing enabled.
     tracing: Option<TracingData>,
     /// Time spent for sending the binary file to the remote worker.
     sync_time: Duration,
@@ -164,8 +164,7 @@ fn spawn_remote_worker(
 
     let sync_start = Instant::now();
     // generate a temporary file on remote host
-    let (remote_path, exit_code) =
-        run_remote_command(&mut session, "mktemp -p '' rstream2.XXXXXXXX");
+    let (remote_path, exit_code) = run_remote_command(&mut session, "mktemp -p '' noir2.XXXXXXXX");
     let remote_path = remote_path.trim();
     assert_eq!(
         exit_code, 0,
@@ -204,8 +203,8 @@ fn spawn_remote_worker(
     let reader = BufReader::new(channel.stderr());
     let mut tracing_data = None;
     for line in reader.lines().flatten() {
-        if let Some(pos) = line.find("__RSTREAM2_TRACING_DATA__") {
-            let json_data = &line[(pos + "__RSTREAM2_TRACING_DATA__ ".len())..];
+        if let Some(pos) = line.find("__noir2_TRACING_DATA__") {
+            let json_data = &line[(pos + "__noir2_TRACING_DATA__ ".len())..];
             match serde_json::from_str(json_data) {
                 Ok(data) => tracing_data = Some(data),
                 Err(err) => {

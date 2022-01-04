@@ -1,8 +1,8 @@
 use std::time::Instant;
 
-use rstream::operator::source::CsvSource;
-use rstream::EnvironmentConfig;
-use rstream::StreamEnvironment;
+use noir::operator::source::CsvSource;
+use noir::EnvironmentConfig;
+use noir::StreamEnvironment;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();

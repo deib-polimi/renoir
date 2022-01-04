@@ -1,8 +1,8 @@
 use std::time::Instant;
 
-use rstream::operator::source::IteratorSource;
-use rstream::EnvironmentConfig;
-use rstream::StreamEnvironment;
+use noir::operator::source::IteratorSource;
+use noir::EnvironmentConfig;
+use noir::StreamEnvironment;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();

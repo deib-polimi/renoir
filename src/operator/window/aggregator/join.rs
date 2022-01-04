@@ -22,11 +22,11 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::{CountWindow, EventTimeWindow};
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::{CountWindow, EventTimeWindow};
     /// # use std::time::Duration;
-    /// # use rstream::operator::Timestamp;
+    /// # use noir::operator::Timestamp;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s1 = env
     ///     .stream(IteratorSource::new((0..4)))
@@ -109,11 +109,11 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use rstream::{StreamEnvironment, EnvironmentConfig};
-    /// # use rstream::operator::source::IteratorSource;
-    /// # use rstream::operator::window::{CountWindow, EventTimeWindow};
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # use noir::operator::window::{CountWindow, EventTimeWindow};
     /// # use std::time::Duration;
-    /// # use rstream::operator::Timestamp;
+    /// # use noir::operator::Timestamp;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s1 = env
     ///     .stream(IteratorSource::new((0..4)))

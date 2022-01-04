@@ -3,13 +3,13 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use rstream::operator::sink::StreamOutput;
-use rstream::operator::source::CsvSource;
-use rstream::operator::window::{CountWindow, EventTimeWindow};
-use rstream::operator::{Operator, Timestamp};
-use rstream::EnvironmentConfig;
-use rstream::Stream;
-use rstream::StreamEnvironment;
+use noir::operator::sink::StreamOutput;
+use noir::operator::source::CsvSource;
+use noir::operator::window::{CountWindow, EventTimeWindow};
+use noir::operator::{Operator, Timestamp};
+use noir::EnvironmentConfig;
+use noir::Stream;
+use noir::StreamEnvironment;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Auction {

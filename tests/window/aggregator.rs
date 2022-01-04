@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
-use rstream::operator::source::IteratorSource;
-use rstream::operator::window::CountWindow;
+use noir::operator::source::IteratorSource;
+use noir::operator::window::CountWindow;
 
 use super::utils::TestHelper;
 

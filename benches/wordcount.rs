@@ -8,10 +8,10 @@ use itertools::Itertools;
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
-use rstream::operator::source::FileSource;
-use rstream::BatchMode;
-use rstream::EnvironmentConfig;
-use rstream::StreamEnvironment;
+use noir::operator::source::FileSource;
+use noir::BatchMode;
+use noir::EnvironmentConfig;
+use noir::StreamEnvironment;
 
 fn wordcount_fold(path: &Path) {
     let config = EnvironmentConfig::local(4);
