@@ -1,6 +1,6 @@
 //! TODO:
 //!
-//!  - describe what rstream2 is for
+//!  - describe what noir is for
 //!  - explain briefly the internals (job graph, execution graph, scheduler, blocks, operators,
 //!    timestamps, watermarks, ...)
 //!  - simple examples

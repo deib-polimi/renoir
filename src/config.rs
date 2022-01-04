@@ -147,7 +147,7 @@ pub struct RemoteHostSSHConfig {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "rstream2", about = "RStream on steroids!")]
+#[structopt(name = "noir", about = "Network of Operators In Rust")]
 struct CommandLineOptions {
     /// Enable verbose output.
     #[structopt(short, long)]

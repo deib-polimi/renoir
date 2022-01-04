@@ -31,7 +31,7 @@ impl JobGraphGenerator {
     pub fn finalize(self) -> String {
         let attributes = vec!["ranksep=0.1"];
         format!(
-            "digraph rstream2 {{\n{attributes}\n{subgraphs}\n{connections}\n}}",
+            "digraph noir {{\n{attributes}\n{subgraphs}\n{connections}\n}}",
             attributes = attributes
                 .into_iter()
                 .map(|s| format!("  {};", s))
