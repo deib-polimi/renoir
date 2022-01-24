@@ -230,9 +230,9 @@ where
             panic!(
                 "The parallelism of the 2 blocks coming inside a Y connection must be equal. \
                 On the left ({}) is {:?}, on the right ({}) is {:?}",
-                self.block.to_string(),
+                self.block,
                 scheduler_requirements1.max_parallelism,
-                oth.block.to_string(),
+                oth.block,
                 scheduler_requirements2.max_parallelism
             );
         }

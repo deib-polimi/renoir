@@ -118,7 +118,7 @@ where
         format!(
             "{} -> {} -> GenericOperator[{}]<{}>",
             self.prev.to_string(),
-            self.manager.to_string(),
+            self.manager,
             self.name,
             std::any::type_name::<NewOut>(),
         )

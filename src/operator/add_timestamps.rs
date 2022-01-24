@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{Stream, KeyedStream, KeyValue};
+use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone)]
 pub struct AddTimestamp<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
@@ -124,11 +124,11 @@ where
     }
 }
 
-impl<Key, Out, OperatorChain: > KeyedStream<Key, Out, OperatorChain>
+impl<Key, Out, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
     Key: DataKey,
     Out: Data,
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
     /// Given a keyed stream without timestamps nor watermarks, tag each item with a timestamp and insert
     /// watermarks.
@@ -167,7 +167,8 @@ where
     ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
         TimestampGen: FnMut(&KeyValue<Key, Out>) -> Timestamp + Clone + Send + 'static,
-        WatermarkGen: FnMut(&KeyValue<Key, Out>, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+        WatermarkGen:
+            FnMut(&KeyValue<Key, Out>, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
     {
         self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
     }
