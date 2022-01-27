@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, Operator, StreamElement, Timestamp};
+use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::Stream;
+use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone)]
 pub struct AddTimestamp<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
@@ -119,6 +119,56 @@ where
     where
         TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
         WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+    {
+        self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
+    }
+}
+
+impl<Key, Out, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+where
+    Key: DataKey,
+    Out: Data,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+{
+    /// Given a keyed stream without timestamps nor watermarks, tag each item with a timestamp and insert
+    /// watermarks.
+    ///
+    /// The two functions given to this operator are the following:
+    /// - `timestamp_gen` returns the timestamp assigned to the provided element of the stream
+    /// - `watermark_gen` returns an optional watermark to add after the provided element
+    ///
+    /// Note that the two functions **must** follow the watermark semantics.
+    /// TODO: link to watermark semantics
+    ///
+    /// ## Example
+    ///
+    /// In this example the stream contains the integers from 0 to 9 and group them by parity, each will be tagged with a
+    /// timestamp with the value of the item as milliseconds, and after each even number a watermark
+    /// will be inserted.
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// use noir::operator::Timestamp;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    ///
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// s
+    ///     .group_by(|i| i % 2)
+    ///     .add_timestamps(
+    ///     |&(_k, n)| Timestamp::from_millis(n),
+    ///     |&(_k, n), &ts| if n % 2 == 0 { Some(ts) } else { None }
+    /// );
+    /// ```
+    pub fn add_timestamps<TimestampGen, WatermarkGen>(
+        self,
+        timestamp_gen: TimestampGen,
+        watermark_gen: WatermarkGen,
+    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    where
+        TimestampGen: FnMut(&KeyValue<Key, Out>) -> Timestamp + Clone + Send + 'static,
+        WatermarkGen:
+            FnMut(&KeyValue<Key, Out>, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
     {
         self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
     }
