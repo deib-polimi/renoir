@@ -15,7 +15,7 @@ profiler = []
 [dependencies]
 # for logging to the console
 log = { version = "0.4", features = ["release_max_level_info"] }
-env_logger = "0.8"
+env_logger = "0.9"
 
 # used by the network for storing type-generic structures
 typemap = "0.3"
@@ -55,7 +55,7 @@ crossbeam-channel = { version = "0.5", optional = true }
 flume = { version = "0.10", optional = true }
 
 # Used for KeyedWindowManager
-hashbrown = "0.11"
+hashbrown = "0.12"
 
 # used for csv file source
 csv = "1.1"
@@ -71,6 +71,9 @@ coarsetime = "0.1"
 
 # faster allocator
 mimalloc = { version = "*", optional = true }
+
+tokio = { version = "1.16", features = ["sync", "rt"] }
+futures = "0.3"
 
 [dev-dependencies]
 # for the tests
