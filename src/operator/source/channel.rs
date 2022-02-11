@@ -1,4 +1,4 @@
-use tokio::sync::mpsc::Receiver;
+use flume::{Receiver, bounded, Sender};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
@@ -13,7 +13,7 @@ use crate::scheduler::ExecutionMetadata;
 #[derivative(Debug)]
 pub struct ChannelSource<Out: Data> {
     #[derivative(Debug = "ignore")]
-    inner: Receiver<Out>,
+    rx: Receiver<Out>,
     terminated: bool,
 }
 
@@ -34,21 +34,24 @@ impl<Out: Data> ChannelSource<Out> {
     /// let source = ChannelSource::new((0..5));
     /// let R = env.stream(source);
     /// ```
-    pub fn new(inner: Receiver<Out>) -> Self {
-        Self {
-            inner,
+    pub fn new(channel_size: usize) -> (Sender<Out>, Self) {
+        let (tx, rx) = bounded(channel_size);
+        let s = Self {
+            rx,
             terminated: false,
-        }
+        };
+
+        (tx, s)
     }
 }
-
-impl<Out: Data> Source<Out> for ChannelSource<Out> {
+// TODO: remove Debug requirement
+impl<Out: Data + core::fmt::Debug> Source<Out> for ChannelSource<Out> {
     fn get_max_parallelism(&self) -> Option<usize> {
         Some(1)
     }
 }
 
-impl<Out: Data> Operator<Out> for ChannelSource<Out> {
+impl<Out: Data + core::fmt::Debug> Operator<Out> for ChannelSource<Out> {
     fn setup(&mut self, _metadata: ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {
@@ -56,12 +59,15 @@ impl<Out: Data> Operator<Out> for ChannelSource<Out> {
             return StreamElement::Terminate;
         }
         // TODO: with adaptive batching this does not work since R never emits FlushBatch messages
-        let rt = tokio::runtime::Handle::current();
-        match rt.block_on(self.inner.recv()) {
-            Some(t) => StreamElement::Item(t),
-            None => {
+        log::warn!("waiting for value on channel");
+        match self.rx.recv() {
+            Ok(t) => {
+                log::warn!("received value, forwarding");
+                StreamElement::Item(t)
+            },
+            Err(e) => {
                 self.terminated = true;
-                log::warn!("Error in source stream"); // TODO change
+                log::error!("Error in source stream: {e}"); // TODO change
                 StreamElement::FlushAndRestart
             }
         }

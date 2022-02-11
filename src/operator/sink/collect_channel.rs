@@ -24,8 +24,10 @@ where
     }
 
     fn next(&mut self) -> StreamElement<()> {
+        log::warn!("sink waiting for value");
         match self.prev.next() {
             StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
+                log::warn!("sink received value, sending");
                 let _ = self.tx.as_ref().map(|tx| tx.send(t));
                 StreamElement::Item(())
             }

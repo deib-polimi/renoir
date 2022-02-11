@@ -1,6 +1,12 @@
 name: Rust
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - 'master'
+      - 'staging'
+  pull_request:
+
 
 env:
   RUST_BACKTRACE: full
