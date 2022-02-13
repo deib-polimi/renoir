@@ -1,6 +1,4 @@
 use core::iter::{IntoIterator, Iterator};
-use std::collections::VecDeque;
-use std::iter::repeat;
 use std::marker::PhantomData;
 use std::time::Duration;
 

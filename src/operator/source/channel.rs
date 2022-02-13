@@ -1,4 +1,4 @@
-use flume::{Receiver, bounded, Sender};
+use flume::{Receiver, bounded, Sender, TryRecvError};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
@@ -15,6 +15,7 @@ pub struct ChannelSource<Out: Data> {
     #[derivative(Debug = "ignore")]
     rx: Receiver<Out>,
     terminated: bool,
+    flushed:bool,
 }
 
 impl<Out: Data> ChannelSource<Out> {
@@ -39,6 +40,7 @@ impl<Out: Data> ChannelSource<Out> {
         let s = Self {
             rx,
             terminated: false,
+            flushed: false,
         };
 
         (tx, s)
@@ -58,16 +60,30 @@ impl<Out: Data + core::fmt::Debug> Operator<Out> for ChannelSource<Out> {
         if self.terminated {
             return StreamElement::Terminate;
         }
-        // TODO: with adaptive batching this does not work since R never emits FlushBatch messages
-        log::warn!("waiting for value on channel");
-        match self.rx.recv() {
-            Ok(t) => {
-                log::warn!("received value, forwarding");
-                StreamElement::Item(t)
-            },
-            Err(e) => {
+        let result = self.rx.try_recv();
+
+        match result {
+            Ok(t) => StreamElement::Item(t),
+            Err(TryRecvError::Empty) if !self.flushed => {
+                log::debug!("no values ready, sending flush");
+                self.flushed = true;
+                StreamElement::FlushBatch
+            }
+            Err(TryRecvError::Empty) => {
+                log::debug!("flushed and no values ready, blocking");
+                self.flushed = false;
+                match self.rx.recv() {
+                    Ok(t) => StreamElement::Item(t),
+                    Err(e) => {
+                        self.terminated = true;
+                        log::error!("Error in source stream: {e}");
+                        StreamElement::FlushAndRestart
+                    }
+                }
+            }
+            Err(TryRecvError::Disconnected) => {
                 self.terminated = true;
-                log::error!("Error in source stream: {e}"); // TODO change
+                log::error!("Stream disconnected");
                 StreamElement::FlushAndRestart
             }
         }

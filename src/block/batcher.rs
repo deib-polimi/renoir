@@ -116,6 +116,6 @@ impl BatchMode {
 
 impl Default for BatchMode {
     fn default() -> Self {
-        BatchMode::adaptive(1000, Duration::from_millis(50))
+        BatchMode::adaptive(1000, Duration::from_millis(2))
     }
 }

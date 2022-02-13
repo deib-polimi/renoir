@@ -47,7 +47,7 @@ impl<Out: ExchangeData> NextStrategy<Out> {
     {
         NextStrategy::GroupBy(
             move |item: &Out| {
-                let mut s = DefaultHasher::new();
+                let mut s = ahash::AHasher::default();
                 keyer(item).hash(&mut s);
                 s.finish() as usize
             },
