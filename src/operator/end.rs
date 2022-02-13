@@ -70,7 +70,7 @@ where
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata.clone());
 
-        let senders = metadata.network.lock().unwrap().get_senders(metadata.coord);
+        let senders = metadata.network.lock().get_senders(metadata.coord);
         // remove the ignored destinations
         let senders = senders
             .into_iter()

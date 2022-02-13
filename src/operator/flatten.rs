@@ -2,6 +2,7 @@ use core::iter::{IntoIterator, Iterator};
 use std::collections::VecDeque;
 use std::iter::repeat;
 use std::marker::PhantomData;
+use std::time::Duration;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
@@ -10,96 +11,109 @@ use crate::stream::{KeyValue, KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Flatten<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators>
+pub struct Flatten<In, Out, InnerIterator, PreviousOperators>
 where
-    IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
-    MakeIter: Fn(Out) -> IterOut + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<In>,
+    In: Data + IntoIterator<Item = Out>,
+    Out: Data,
+    InnerIterator: Iterator,
 {
     prev: PreviousOperators,
     // used to store elements that have not been returned by next() yet
-    buffer: VecDeque<StreamElement<NewOut>>,
+    // buffer: VecDeque<StreamElement<NewOut>>,
     // Make an element of type `Out` iterable
     // This is used to make `Flatten` behave differently when applied to `Stream` or `KeyedStream`
     // Takes `Out` as input, returns an `Iterator` with items of type `NewOut`
     #[derivative(Debug = "ignore")]
-    make_iter: MakeIter,
-    _out: PhantomData<Out>,
+    frontiter: Option<InnerIterator>,
+    timestamp: Option<Duration>,
+    _out: PhantomData<In>,
     _iter_out: PhantomData<Out>,
 }
 
-impl<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators>
-    Flatten<Out, IterOut, MakeIter, NewOut, PreviousOperators>
+impl<In, Out, InnerIterator, PreviousOperators>
+    Flatten<In, Out, InnerIterator, PreviousOperators>
 where
-    IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
-    MakeIter: Fn(Out) -> IterOut + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<In>,
+    In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
+    Out: Data + Clone,
+    InnerIterator: Iterator<Item = Out> + Clone + Send,
 {
-    fn new(prev: PreviousOperators, make_iter: MakeIter) -> Self {
+    fn new(prev: PreviousOperators) -> Self {
         Self {
             prev,
-            buffer: Default::default(),
-            make_iter,
+            frontiter: None,
+            timestamp: None,
             _out: Default::default(),
             _iter_out: Default::default(),
         }
     }
 }
 
-impl<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators> Operator<NewOut>
-    for Flatten<Out, IterOut, MakeIter, NewOut, PreviousOperators>
+impl<In, Out, InnerIterator, PreviousOperators> Operator<Out>
+    for Flatten<In, Out, InnerIterator, PreviousOperators>
 where
-    IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
-    MakeIter: Fn(Out) -> IterOut + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<In>,
+    In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
+    Out: Data + Clone,
+    InnerIterator: Iterator<Item = Out> + Clone + Send,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
-    fn next(&mut self) -> StreamElement<NewOut> {
-        while self.buffer.is_empty() {
-            match self.prev.next() {
-                StreamElement::Item(item) => {
-                    self.buffer
-                        .extend((self.make_iter)(item).map(StreamElement::Item));
+    fn next(&mut self) -> StreamElement<Out> {
+        loop {
+            if let Some(ref mut inner) = self.frontiter {
+                match inner.next() {
+                    None => self.frontiter = None,
+                    Some(item) => {
+                        match self.timestamp {
+                            None => return StreamElement::Item(item),
+                            Some(ts) => return StreamElement::Timestamped(item, ts),
+                        }
+                    }
                 }
-                StreamElement::Timestamped(item, ts) => {
-                    self.buffer.extend(
-                        (self.make_iter)(item).map(|value| StreamElement::Timestamped(value, ts)),
-                    );
+            }
+            match self.prev.next() {
+                StreamElement::Item(inner) => {
+                    self.frontiter = Some(inner.into_iter());
+                    self.timestamp = None;
+                }
+                StreamElement::Timestamped(inner, ts) => {
+                    self.frontiter = Some(inner.into_iter());
+                    self.timestamp = Some(ts);
                 }
                 StreamElement::Watermark(ts) => return StreamElement::Watermark(ts),
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
                 StreamElement::Terminate => return StreamElement::Terminate,
                 StreamElement::FlushAndRestart => return StreamElement::FlushAndRestart,
-                StreamElement::FlushBatch => return StreamElement::FlushBatch,
             }
         }
-
-        self.buffer.pop_front().unwrap()
     }
 
     fn to_string(&self) -> String {
         format!(
             "{} -> Flatten<{} -> {}>",
             self.prev.to_string(),
-            std::any::type_name::<Out>(),
-            std::any::type_name::<NewOut>()
+            std::any::type_name::<In>(),
+            std::any::type_name::<Out>()
         )
     }
 
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<NewOut, _>("Flatten"))
+            .add_operator(OperatorStructure::new::<Out, _>("Flatten"))
     }
 }
 
-impl<Out: Data, OperatorChain, NewOut: Data> Stream<Out, OperatorChain>
+impl<In, Out, InnerIterator, OperatorChain> Stream<In, OperatorChain>
 where
-    Out: IntoIterator<Item = NewOut>,
-    <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
-    OperatorChain: Operator<Out> + 'static,
+    OperatorChain: Operator<In> + 'static,
+    InnerIterator: Iterator<Item = Out> + Clone + Send + 'static,
+    In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
+    Out: Data + Clone,
 {
     /// Transform this stream of containers into a stream of all the contained values.
     ///
@@ -122,8 +136,8 @@ where
     ///
     /// assert_eq!(res.get().unwrap(), vec![1, 2, 3, 4, 5]);
     /// ```
-    pub fn flatten(self) -> Stream<NewOut, impl Operator<NewOut>> {
-        self.add_operator(|prev| Flatten::new(prev, |x| x.into_iter()))
+    pub fn flatten(self) -> Stream<Out, impl Operator<Out>> {
+        self.add_operator(|prev| Flatten::new(prev))
     }
 }
 
@@ -162,11 +176,119 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
 where
-    Out: IntoIterator<Item = NewOut>,
-    <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    Key: DataKey,
+    PreviousOperators: Operator<KeyValue<Key, In>>,
+    In: Data + IntoIterator<Item = Out>,
+    Out: Data,
+    InnerIterator: Iterator,
+{
+    prev: PreviousOperators,
+    // used to store elements that have not been returned by next() yet
+    // buffer: VecDeque<StreamElement<NewOut>>,
+    // Make an element of type `Out` iterable
+    // This is used to make `Flatten` behave differently when applied to `Stream` or `KeyedStream`
+    // Takes `Out` as input, returns an `Iterator` with items of type `NewOut`
+    #[derivative(Debug = "ignore")]
+    frontiter: Option<(Key, InnerIterator)>,
+    timestamp: Option<Duration>,
+    _key: PhantomData<Key>,
+    _in: PhantomData<In>,
+    _iter_out: PhantomData<Out>,
+}
+
+impl<Key, In, Out, InnerIterator, PreviousOperators>
+    KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
+where
+    Key: DataKey,
+    PreviousOperators: Operator<KeyValue<Key, In>>,
+    In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
+    Out: Data + Clone,
+    InnerIterator: Iterator<Item = Out> + Clone + Send,
+{
+    fn new(prev: PreviousOperators) -> Self {
+        Self {
+            prev,
+            frontiter: None,
+            timestamp: None,
+            _key: Default::default(),
+            _in: Default::default(),
+            _iter_out: Default::default(),
+        }
+    }
+}
+
+impl<Key, In, Out, InnerIterator, PreviousOperators> Operator<KeyValue<Key, Out>>
+    for KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
+where
+    Key: DataKey,
+    PreviousOperators: Operator<KeyValue<Key, In>>,
+    In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
+    Out: Data + Clone,
+    InnerIterator: Iterator<Item = Out> + Clone + Send,
+{
+    fn setup(&mut self, metadata: ExecutionMetadata) {
+        self.prev.setup(metadata);
+    }
+
+    fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
+        loop {
+            if let Some((ref key, ref mut inner)) = self.frontiter {
+                match inner.next() {
+                    None => self.frontiter = None,
+                    Some(item) => {
+                        match self.timestamp {
+                            None => return StreamElement::Item((key.clone(), item)),
+                            Some(ts) => return StreamElement::Timestamped((key.clone(), item), ts),
+                        }
+                    }
+                }
+            }
+            match self.prev.next() {
+                StreamElement::Item((key, inner)) => {
+                    self.frontiter = Some((key, inner.into_iter()));
+                    self.timestamp = None;
+                }
+                StreamElement::Timestamped((key, inner), ts) => {
+                    self.frontiter = Some((key, inner.into_iter()));
+                    self.timestamp = Some(ts);
+                }
+                StreamElement::Watermark(ts) => return StreamElement::Watermark(ts),
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
+                StreamElement::Terminate => return StreamElement::Terminate,
+                StreamElement::FlushAndRestart => return StreamElement::FlushAndRestart,
+            }
+        }
+    }
+
+    fn to_string(&self) -> String {
+        format!(
+            "{} -> KeyedFlatten<{} -> {}>",
+            self.prev.to_string(),
+            std::any::type_name::<In>(),
+            std::any::type_name::<Out>()
+        )
+    }
+
+    fn structure(&self) -> BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<Out, _>("KeyedFlatten"))
+    }
+}
+
+
+impl<Key: DataKey, In, Out, InnerIterator, OperatorChain> KeyedStream<Key, In, OperatorChain>
+where
+    Key: DataKey,
+    OperatorChain: Operator<KeyValue<Key, In>> + 'static,
+    InnerIterator: Iterator<Item = Out> + Clone + Send + 'static,
+    In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
+    Out: Data + Clone,
 {
     /// Transform this stream of containers into a stream of all the contained values.
     ///
@@ -193,8 +315,8 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0), (0, 1), (0, 2), (0, 6), (0, 7), (1, 3), (1, 4), (1, 5)]);
     /// ```
-    pub fn flatten(self) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
-        self.add_operator(|prev| Flatten::new(prev, |(k, x)| repeat(k).zip(x.into_iter())))
+    pub fn flatten(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
+        self.add_operator(|prev| KeyedFlatten::new(prev))
     }
 }
 
@@ -256,7 +378,7 @@ mod tests {
             ]
             .into_iter(),
         );
-        let mut flatten = Flatten::new(fake_operator, |x| x.into_iter());
+        let mut flatten = Flatten::new(fake_operator);
         for i in 0..=7 {
             assert_eq!(flatten.next(), StreamElement::Item(i));
         }
@@ -275,7 +397,7 @@ mod tests {
         fake_operator.push(StreamElement::Timestamped(vec![], Duration::from_secs(3)));
         fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
 
-        let mut flatten = Flatten::new(fake_operator, |x| x.into_iter());
+        let mut flatten = Flatten::new(fake_operator);
 
         assert_eq!(
             flatten.next(),

@@ -55,7 +55,7 @@ where
     OperatorChain: Operator<DeltaUpdate>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
-        let mut network = metadata.network.lock().unwrap();
+        let mut network = metadata.network.lock();
 
         let replicas = network.replicas(self.leader_block_id);
         assert_eq!(

@@ -75,6 +75,8 @@ mimalloc = { version = "*", optional = true }
 tokio = { version = "1.16", features = ["sync", "rt"] }
 futures = "0.3"
 
+parking_lot = { version = "0.12", features = ["deadlock_detection"] }
+
 [dev-dependencies]
 # for the tests
 tempfile = "3.2"
@@ -113,3 +115,7 @@ harness = false
 
 [profile.release]
 lto = "thin"
+
+[[bin]]
+name = "collatz"
+path = "examples/collatz.rs"

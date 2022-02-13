@@ -410,7 +410,7 @@ mod tests {
 
     use itertools::Itertools;
     use serde::{Deserialize, Serialize};
-    use tempfile::NamedTempFile;
+    // use tempfile::NamedTempFile;
 
     use crate::config::EnvironmentConfig;
     use crate::environment::StreamEnvironment;

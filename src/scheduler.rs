@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use std::thread::JoinHandle;
 
 use itertools::Itertools;
@@ -110,10 +111,10 @@ impl Scheduler {
         let block_id = block.id;
         let info = self.block_info(&block);
         info!(
-            "Adding new block id={}: {} {:?}",
+            "Adding new block id={}: {}",
             block_id,
             block.to_string(),
-            info
+            // info
         );
 
         // duplicate the block in the execution graph
@@ -189,7 +190,7 @@ impl Scheduler {
                 coord,
                 replicas,
                 global_id,
-                prev: network.lock().unwrap().prev(coord),
+                prev: network.lock().prev(coord),
                 network: network.clone(),
                 batch_mode: block_info.batch_mode,
             };
@@ -200,7 +201,7 @@ impl Scheduler {
         for handle in join {
             handle.join().unwrap();
         }
-        network.lock().unwrap().stop_and_wait();
+        network.lock().stop_and_wait();
 
         drop(self.block_structure_sender);
         let block_structures = wait_structure(self.block_structure_receiver);

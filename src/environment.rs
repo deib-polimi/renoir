@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};
@@ -63,7 +64,7 @@ impl StreamEnvironment {
     where
         S: Source<Out> + Send + 'static,
     {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let config = &inner.config;
         if config.host_id.is_none() {
             match config.runtime {
@@ -84,7 +85,7 @@ impl StreamEnvironment {
     /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
     /// is already a spawned process nothing is done.
     pub fn spawn_remote_workers(&self) {
-        match &self.inner.lock().unwrap().config.runtime {
+        match &self.inner.lock().config.runtime {
             ExecutionRuntime::Local(_) => {}
             ExecutionRuntime::Remote(remote) => {
                 spawn_remote_workers(remote.clone());
@@ -96,7 +97,7 @@ impl StreamEnvironment {
     pub fn execute(self) {
         drop(self.build_time);
         let _stopwatch = Stopwatch::new("execution");
-        let mut env = self.inner.lock().unwrap();
+        let mut env = self.inner.lock();
         info!("Starting execution of {} blocks", env.block_count);
         let scheduler = env.scheduler.take().unwrap();
         scheduler.start(env.block_count);
@@ -104,7 +105,7 @@ impl StreamEnvironment {
 
     /// Get the total number of processing cores in the cluster.
     pub fn parallelism(&self) -> usize {
-        match &self.inner.lock().unwrap().config.runtime {
+        match &self.inner.lock().config.runtime {
             ExecutionRuntime::Local(local) => local.num_cores,
             ExecutionRuntime::Remote(remote) => remote.hosts.iter().map(|h| h.num_cores).sum(),
         }
@@ -114,7 +115,7 @@ impl StreamEnvironment {
     /// remote environments use the same config.
     fn single_remote_environment_check(config: &EnvironmentConfig) {
         if let ExecutionRuntime::Remote(config) = &config.runtime {
-            let mut prev = LAST_REMOTE_CONFIG.lock().unwrap();
+            let mut prev = LAST_REMOTE_CONFIG.lock();
             match &*prev {
                 Some(prev) => {
                     if prev != config {
@@ -145,7 +146,7 @@ impl StreamEnvironmentInner {
     where
         S: Source<Out> + Send + 'static,
     {
-        let mut env = env_rc.lock().unwrap();
+        let mut env = env_rc.lock();
         if matches!(env.config.runtime, ExecutionRuntime::Remote(_)) {
             // calling .spawn_remote_workers() will exit so it wont reach this point
             if env.config.host_id.is_none() {

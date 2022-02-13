@@ -189,7 +189,7 @@ where
         let iter_end = iter_end.add_operator(|prev| IterationEndBlock::new(prev, leader_block_id));
         let iteration_end_block_id = iter_end.block.id;
 
-        let mut env = iter_end.env.lock().unwrap();
+        let mut env = iter_end.env.lock();
         let scheduler = env.scheduler_mut();
         scheduler.add_block(iter_end.block);
         // connect the IterationEndBlock to the IterationLeader

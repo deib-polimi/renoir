@@ -31,7 +31,7 @@ impl<Out: ExchangeData> StartBlockReceiver<Out> for SingleStartBlockReceiver<Out
     fn setup(&mut self, metadata: ExecutionMetadata) {
         let in_type = TypeId::of::<Out>();
 
-        let mut network = metadata.network.lock().unwrap();
+        let mut network = metadata.network.lock();
         let endpoint = ReceiverEndpoint::new(metadata.coord, self.previous_block_id);
         self.receiver = Some(network.get_receiver(endpoint));
         drop(network);

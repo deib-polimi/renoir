@@ -112,7 +112,7 @@ where
     LoopCond: Fn(&mut State) -> bool + Send + Clone,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
-        let mut network = metadata.network.lock().unwrap();
+        let mut network = metadata.network.lock();
         self.coord = metadata.coord;
         self.new_state_senders = network
             .get_senders(metadata.coord)

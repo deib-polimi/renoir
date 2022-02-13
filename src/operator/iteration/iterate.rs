@@ -276,7 +276,7 @@ where
         feedback_end.block.is_only_one_strategy = true;
         let feedback_end_block_id = feedback_end.block.id;
 
-        let mut env = env.lock().unwrap();
+        let mut env = env.lock();
         let scheduler = env.scheduler_mut();
         scheduler.add_block(delta_update_end.block);
         scheduler.add_block(feedback_end.block);
@@ -330,7 +330,7 @@ where
     fn setup(&mut self, metadata: ExecutionMetadata) {
         self.coord = metadata.coord;
 
-        let mut network = metadata.network.lock().unwrap();
+        let mut network = metadata.network.lock();
         let feedback_end_block_id = self.feedback_end_block_id.load(Ordering::Acquire);
         let feedback_endpoint = ReceiverEndpoint::new(metadata.coord, feedback_end_block_id);
         self.feedback_receiver = Some(network.get_receiver(feedback_endpoint));
