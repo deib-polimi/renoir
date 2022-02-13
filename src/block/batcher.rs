@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 use std::time::Duration;
 
-use std::time::Instant;
+use coarsetime::Instant;
 
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::{ExchangeData, StreamElement};
@@ -58,7 +58,7 @@ impl<Out: ExchangeData> Batcher<Out> {
         let timeout_elapsed = max_delay
             .map(|max_delay| self.last_send.elapsed() > max_delay.into())
             .unwrap_or(false);
-        if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed {
+        if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed || self.remote_sender.inner().is_some() { // TODO: change, workaround to detect local sender
             self.flush();
         }
     }
