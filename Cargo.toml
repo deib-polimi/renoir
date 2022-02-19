@@ -84,7 +84,7 @@ ahash = "0.7"
 
 [dev-dependencies]
 # for the tests
-tempfile = "3.2"
+tempfile = "3.3"
 criterion = { version = "0.3", features = ["html_reports"] }
 fake = "2.4"
 

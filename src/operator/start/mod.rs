@@ -1,7 +1,7 @@
-use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
+use std::vec::IntoIter;
 
 pub(crate) use multiple::*;
 pub(crate) use single::*;
@@ -69,8 +69,9 @@ pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out
 
     /// The actual receiver able to fetch messages from the network.
     receiver: Receiver,
-    /// A stash of the received messages ready to be returned.
-    buffer: VecDeque<StreamElement<Out>>,
+
+    /// Inner iterator over batch items, contains coordinate of the sender
+    batch_iter: Option<(Coord, IntoIter<StreamElement<Out>>)>,
 
     /// The number of `StreamElement::Terminate` messages yet to be received. When this value
     /// reaches zero this operator will emit the terminate.
@@ -135,7 +136,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out
             metadata: Default::default(),
 
             receiver,
-            buffer: Default::default(),
+            batch_iter: None,
 
             missing_terminate: Default::default(),
             missing_flush_and_restart: Default::default(),
@@ -198,81 +199,79 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
             return StreamElement::FlushAndRestart;
         }
 
-        while self.buffer.is_empty() {
-            let max_delay = metadata.batch_mode.max_delay();
-            let buf = match (self.already_timed_out, max_delay) {
-                // check the timeout only if there is one and the last time we didn't timed out
-                (false, Some(max_delay)) => {
-                    match self.receiver.recv_timeout(max_delay) {
-                        Ok(buf) => buf,
-                        Err(_) => {
-                            // timed out: tell the block to flush the current batch
-                            // next time we wait indefinitely without the timeout since the batch is
-                            // currently empty
-                            self.already_timed_out = true;
-                            // this is a fake batch, and its sender is meaningless and will be
-                            // forget immediately
-                            NetworkMessage::new(vec![StreamElement::FlushBatch], Default::default())
-                        }
-                    }
+        let max_delay = metadata.batch_mode.max_delay();
+
+        if let Some((sender, ref mut inner)) = self.batch_iter {
+            let msg = match inner.next() {
+                None => {
+                    // Current batch is finished
+                    self.batch_iter = None;
+                    return self.next()
                 }
-                _ => {
-                    self.already_timed_out = false;
-                    self.receiver.recv()
+                Some(item) => {
+                    match item {
+                        StreamElement::Watermark(ts) => {
+                            // update the frontier and return a watermark if necessary
+                            match self.watermark_frontier.update(sender, ts) {
+                                Some(ts) => StreamElement::Watermark(ts), // ts is safe
+                                None => return self.next()
+                            }
+                        }
+                        StreamElement::FlushAndRestart => {
+                            // mark this replica as ended and let the frontier ignore it from now on
+                            self.watermark_frontier.update(sender, timestamp_max());
+                            self.missing_flush_and_restart -= 1;
+                            return self.next()
+                        }
+                        StreamElement::Terminate => {
+                            self.missing_terminate -= 1;
+                            debug!(
+                                "{} received a Terminate, {} more to come",
+                                metadata.coord, self.missing_terminate
+                            );
+                            return self.next()
+                        }
+                        _ => item,
+                    }
                 }
             };
 
-            let sender = buf.sender();
-            let batch = buf.batch();
-
-            // use watermarks to update the frontier
-            let watermark_frontier = &mut self.watermark_frontier;
-            self.buffer
-                .extend(batch.into_iter().filter_map(|item| match item {
-                    StreamElement::Watermark(ts) => {
-                        // update the frontier and return a watermark if necessary
-                        watermark_frontier
-                            .update(sender, ts)
-                            .map(StreamElement::Watermark)
-                    }
-                    StreamElement::FlushAndRestart => {
-                        // mark this replica as ended and let the frontier ignore it from now on
-                        watermark_frontier.update(sender, timestamp_max());
-                        Some(item)
-                    }
-                    _ => Some(item),
-                }));
-        }
-
-        let message = self
-            .buffer
-            .pop_front()
-            .expect("Previous block sent an empty message");
-        if matches!(message, StreamElement::FlushAndRestart) {
-            self.missing_flush_and_restart -= 1;
-            debug!(
-                "{} received an FlushAndRestart, {} more to come",
-                metadata.coord, self.missing_flush_and_restart
-            );
-            return self.next();
-        }
-        if matches!(message, StreamElement::Terminate) {
-            self.missing_terminate -= 1;
-            debug!(
-                "{} received a Terminate, {} more to come",
-                metadata.coord, self.missing_terminate
-            );
-            return self.next();
-        }
-        // the previous iteration has ended, this message refers to the new iteration: we need to be
-        // sure the state is set before we let this message pass
-        if self.wait_for_state {
-            if let Some(lock) = self.state_lock.as_ref() {
-                lock.wait_for_update(self.state_generation);
+            // the previous iteration has ended, this message refers to the new iteration: we need to be
+            // sure the state is set before we let this message pass
+            if self.wait_for_state {
+                if let Some(lock) = self.state_lock.as_ref() {
+                    lock.wait_for_update(self.state_generation);
+                }
+                self.wait_for_state = false;
             }
-            self.wait_for_state = false;
+            return msg;
         }
-        message
+
+        // Receive next batch
+        let net_msg = match (self.already_timed_out, max_delay) {
+            // check the timeout only if there is one and the last time we didn't timed out
+            (false, Some(max_delay)) => {
+                match self.receiver.recv_timeout(max_delay) {
+                    Ok(net_msg) => net_msg,
+                    Err(_) => {
+                        // timed out: tell the block to flush the current batch
+                        // next time we wait indefinitely without the timeout since the batch is
+                        // currently empty
+                        self.already_timed_out = true;
+                        // this is a fake batch, and its sender is meaningless and will be
+                        // forget immediately
+                        NetworkMessage::new(vec![StreamElement::FlushBatch], Default::default())
+                    }
+                }
+            }
+            _ => {
+                self.already_timed_out = false;
+                self.receiver.recv()
+            }
+        };
+
+        self.batch_iter = Some((net_msg.sender(), net_msg.batch().into_iter()));
+        self.next()
     }
 
     fn to_string(&self) -> String {

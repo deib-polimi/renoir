@@ -37,7 +37,8 @@ where
     /// # use noir::{StreamEnvironment, EnvironmentConfig};
     /// # use noir::operator::source::AsyncStreamSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let source = AsyncStreamSource::new((0..5));
+    /// let stream = futures::stream::iter(0..10u32);
+    /// let source = AsyncStreamSource::new(stream);
     /// let s = env.stream(source);
     /// ```
     pub fn new(inner: S) -> Self {

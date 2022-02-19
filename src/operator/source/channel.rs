@@ -32,8 +32,10 @@ impl<Out: Data> ChannelSource<Out> {
     /// # use noir::{StreamEnvironment, EnvironmentConfig};
     /// # use noir::operator::source::ChannelSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let source = ChannelSource::new((0..5));
+    /// let (tx_channel, source) = ChannelSource::new(4);
     /// let R = env.stream(source);
+    /// tx_channel.send(1);
+    /// tx_channel.send(2);
     /// ```
     pub fn new(channel_size: usize) -> (Sender<Out>, Self) {
         let (tx, rx) = bounded(channel_size);

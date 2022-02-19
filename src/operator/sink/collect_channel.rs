@@ -83,7 +83,7 @@ where
     /// # use noir::{StreamEnvironment, EnvironmentConfig};
     /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream(IteratorSource::new((0..10u32)));
     /// let rx = s.collect_channel();
     ///
     /// env.execute();
@@ -91,7 +91,7 @@ where
     /// while let Ok(x) = rx.recv() {
     ///     v.push(x)
     /// }
-    /// assert_eq!(v, (0..10).collect::<Vec>());
+    /// assert_eq!(v, (0..10u32).collect::<Vec<_>>());
     /// ```
     pub fn collect_channel(self) -> Receiver<Out> {
         let (tx, rx) = unbounded();
