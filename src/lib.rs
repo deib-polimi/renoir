@@ -28,10 +28,6 @@ use crate::block::BlockStructure;
 use crate::network::Coord;
 use crate::profiler::ProfilerResult;
 
-#[cfg(feature = "mimalloc")]
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 pub(crate) mod block;
 pub(crate) mod channel;
 pub mod config;

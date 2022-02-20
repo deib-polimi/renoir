@@ -45,7 +45,7 @@ lazy_static = "1.4"
 
 # used for spawning the remote workers
 ssh2 = { version = "0.9", features = ["vendored-openssl"] }
-whoami = "1.1"
+whoami = "1.2"
 shell-escape = "0.1"
 
 # command line parsing utility
@@ -70,14 +70,10 @@ chrono = "0.4"
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
 coarsetime = "0.1"
 
-# faster allocator
-mimalloc = { version = "*", optional = true }
-
-tokio = { version = "1.16", features = ["sync", "rt"] }
+tokio = { version = "1", features = ["sync", "rt"] }
 futures = "0.3"
 
-parking_lot = { version = "0.12", features = ["deadlock_detection"] }
-
+parking_lot = "0.12"
 once_cell = "1.9"
 
 ahash = "0.7"
