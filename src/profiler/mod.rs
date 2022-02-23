@@ -48,7 +48,7 @@ impl Stopwatch {
 
     /// Print a timing information in a recognizable format.
     pub fn print(name: &str, elapsed: Duration) {
-        eprintln!("timens:{}:{}", name, elapsed.as_nanos())
+        log::info!("timens:{}:{}", name, elapsed.as_nanos())
     }
 }
 

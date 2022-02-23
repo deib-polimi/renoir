@@ -1,5 +1,5 @@
 use core::iter::Iterator;
-use std::collections::hash_map::{DefaultHasher, Entry};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hasher;
 use std::marker::PhantomData;
@@ -24,8 +24,8 @@ where
     #[derivative(Debug = "ignore")]
     fold: F,
     init: NewOut,
-    accumulators: HashMap<Key, NewOut>,
-    timestamps: HashMap<Key, Timestamp>,
+    accumulators: HashMap<Key, NewOut, ahash::RandomState>,
+    timestamps: HashMap<Key, Timestamp, ahash::RandomState>,
     ready: Vec<StreamElement<KeyValue<Key, NewOut>>>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
@@ -214,7 +214,7 @@ where
         // GroupBy based on key
         let next_strategy = NextStrategy::GroupBy(
             move |(key, _out): &(Key, NewOut)| {
-                let mut s = DefaultHasher::new();
+                let mut s = ahash::AHasher::default();
                 key.hash(&mut s);
                 s.finish() as usize
             },

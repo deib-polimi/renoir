@@ -10,7 +10,7 @@ use crate::stream::BlockId;
 #[derive(Clone, Debug)]
 pub struct JobGraphGenerator {
     /// The list of known blocks, indexed by block id.
-    blocks: HashMap<BlockId, BlockStructure>,
+    blocks: HashMap<BlockId, BlockStructure, ahash::RandomState>,
 }
 
 impl JobGraphGenerator {
@@ -106,7 +106,7 @@ impl JobGraphGenerator {
 
     /// Generate the connections between the operators in different blocks,
     fn gen_connections(&self) -> String {
-        let mut receivers: HashMap<(BlockId, BlockId), (usize, DataType)> = Default::default();
+        let mut receivers: HashMap<(BlockId, BlockId), (usize, DataType), ahash::RandomState> = Default::default();
         for (&block_id, block) in &self.blocks {
             for (index, operator) in block.operators.iter().enumerate() {
                 for receiver in &operator.receivers {

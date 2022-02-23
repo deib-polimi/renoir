@@ -3,7 +3,12 @@ use crate::operator::sink::Sink;
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
+
+#[cfg(feature = "crossbeam")]
+use crossbeam_channel::{unbounded, Receiver, Sender};
+#[cfg(not(feature = "crossbeam"))]
 use flume::{unbounded, Receiver, Sender};
+
 
 #[derive(Debug)]
 pub struct CollectChannelSink<Out: ExchangeData, PreviousOperators>

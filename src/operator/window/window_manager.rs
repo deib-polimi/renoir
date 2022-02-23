@@ -46,7 +46,7 @@ pub(crate) struct KeyedWindowManager<
     /// The description that is used for generating the windows.
     descr: WindowDescr,
     /// The set of all the generators, indexed by key.
-    generators: HashMap<Key, WindowDescr::Generator>,
+    generators: HashMap<Key, WindowDescr::Generator, ahash::RandomState>,
     /// The list of additional items to return downstream.
     ///
     /// This list will include the `Watermark`s, `Terminate`, and other non-data items.

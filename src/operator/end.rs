@@ -21,7 +21,7 @@ where
     batch_mode: BatchMode,
     sender_groups: Vec<SenderList>,
     #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
-    senders: HashMap<ReceiverEndpoint, Batcher<Out>>,
+    senders: HashMap<ReceiverEndpoint, Batcher<Out>, ahash::RandomState>,
     feedback_id: Option<BlockId>,
     ignore_block_ids: Vec<BlockId>,
 }

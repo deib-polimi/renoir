@@ -18,7 +18,7 @@ struct SideHashMap<Key: DataKey, Out> {
     /// The actual items on this side, grouped by key.
     ///
     /// Note that when the other side ends this map is emptied.
-    data: HashMap<Key, Vec<Out>>,
+    data: HashMap<Key, Vec<Out>, ahash::RandomState>,
     /// The set of all the keys seen.
     ///
     /// Note that when this side ends this set is emptied since it won't be used again.

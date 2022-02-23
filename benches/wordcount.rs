@@ -100,7 +100,7 @@ fn wordcount_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("wordcount");
     group.sample_size(10);
     group.throughput(Throughput::Bytes(size));
-    group.warm_up_time(Duration::from_secs(10));
+    group.warm_up_time(Duration::from_secs(4));
     group.bench_function("wordcount-fold", |b| {
         b.iter(|| wordcount_fold(black_box(path)))
     });

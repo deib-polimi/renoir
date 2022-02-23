@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use ahash::RandomState;
-
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -15,7 +13,7 @@ where
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
     prev: OperatorChain,
-    maps_fn: HashMap<Key, F, RandomState>,
+    maps_fn: HashMap<Key, F, ahash::RandomState>,
     init_map: F,
     _out: PhantomData<Out>,
     _new_out: PhantomData<NewOut>,

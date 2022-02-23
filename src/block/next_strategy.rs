@@ -97,7 +97,7 @@ where
                 .collect();
         }
 
-        let mut by_block_id: HashMap<_, Vec<_>> = HashMap::new();
+        let mut by_block_id: HashMap<_, Vec<_>, ahash::RandomState> = HashMap::default();
         for (coord, sender) in senders {
             by_block_id
                 .entry(coord.coord.block_id)

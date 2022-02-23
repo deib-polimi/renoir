@@ -51,9 +51,9 @@ impl<Out: ExchangeData> Batcher<Out> {
 
     /// Put a message in the batch queue, it won't be sent immediately.
     pub(crate) fn enqueue(&mut self, message: StreamElement<Out>) {
-        if let Some(chan) = self.remote_sender.inner() { // Local channel, send immediately
-            chan.send(NetworkMessage::new_single(message, self.coord)).unwrap();
-        } else {
+        // if let Some(chan) = self.remote_sender.inner() { // Local channel, send immediately
+        //     chan.send(NetworkMessage::new_single(message, self.coord)).unwrap();
+        // } else {
             self.buffer.push(message);
             // max capacity has been reached, send and flush the buffer
             // if too much time elapsed since the last flush, flush the buffer
@@ -64,7 +64,7 @@ impl<Out: ExchangeData> Batcher<Out> {
             if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed {
                 self.flush();
             }
-        }
+        // }
     }
 
     /// Flush the internal buffer if it's not empty.
