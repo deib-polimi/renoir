@@ -1,14 +1,13 @@
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
-use std::vec::IntoIter;
 
 pub(crate) use multiple::*;
 pub(crate) use single::*;
 
 use crate::block::BlockStructure;
 use crate::channel::RecvTimeoutError;
-use crate::network::{Coord, NetworkMessage};
+use crate::network::{Coord, NetworkMessage, NetworkDataIterator};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::start::watermark_frontier::WatermarkFrontier;
@@ -71,7 +70,7 @@ pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out
     receiver: Receiver,
 
     /// Inner iterator over batch items, contains coordinate of the sender
-    batch_iter: Option<(Coord, IntoIter<StreamElement<Out>>)>,
+    batch_iter: Option<(Coord, NetworkDataIterator<StreamElement<Out>>)>,
 
     /// The number of `StreamElement::Terminate` messages yet to be received. When this value
     /// reaches zero this operator will emit the terminate.
@@ -260,7 +259,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                         self.already_timed_out = true;
                         // this is a fake batch, and its sender is meaningless and will be
                         // forget immediately
-                        NetworkMessage::new(vec![StreamElement::FlushBatch], Default::default())
+                        NetworkMessage::new_single(StreamElement::FlushBatch, Default::default())
                     }
                 }
             }
@@ -270,7 +269,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
             }
         };
 
-        self.batch_iter = Some((net_msg.sender(), net_msg.batch().into_iter()));
+        self.batch_iter = Some((net_msg.sender(), net_msg.into_iter()));
         self.next()
     }
 
@@ -312,7 +311,7 @@ mod tests {
         start_block.setup(metadata);
 
         sender1
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::Item(42), StreamElement::FlushAndRestart],
                 from1,
             ))
@@ -322,7 +321,7 @@ mod tests {
         assert_eq!(StreamElement::FlushBatch, start_block.next());
 
         sender2
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::FlushAndRestart],
                 from2,
             ))
@@ -331,10 +330,10 @@ mod tests {
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
 
         sender1
-            .send(NetworkMessage::new(vec![StreamElement::Terminate], from1))
+            .send(NetworkMessage::new_single(StreamElement::Terminate, from1))
             .unwrap();
         sender2
-            .send(NetworkMessage::new(vec![StreamElement::Terminate], from2))
+            .send(NetworkMessage::new_single(StreamElement::Terminate, from2))
             .unwrap();
 
         assert_eq!(StreamElement::Terminate, start_block.next());
@@ -351,7 +350,7 @@ mod tests {
         start_block.setup(metadata);
 
         sender1
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![
                     StreamElement::Timestamped(42, ts(10)),
                     StreamElement::Watermark(ts(20)),
@@ -364,7 +363,7 @@ mod tests {
         assert_eq!(StreamElement::FlushBatch, start_block.next());
 
         sender2
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::Watermark(ts(100))],
                 from2,
             ))
@@ -374,13 +373,13 @@ mod tests {
         assert_eq!(StreamElement::FlushBatch, start_block.next());
 
         sender1
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::FlushAndRestart],
                 from1,
             ))
             .unwrap();
         sender2
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::Watermark(ts(110))],
                 from2,
             ))
@@ -404,7 +403,7 @@ mod tests {
         start_block.setup(metadata);
 
         sender1
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![
                     StreamElement::Timestamped(42, ts(10)),
                     StreamElement::Watermark(ts(20)),
@@ -420,7 +419,7 @@ mod tests {
         assert_eq!(StreamElement::FlushBatch, start_block.next());
 
         sender2
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![
                     StreamElement::Timestamped(69, ts(10)),
                     StreamElement::Watermark(ts(20)),
@@ -436,7 +435,7 @@ mod tests {
         assert_eq!(StreamElement::Watermark(ts(20)), start_block.next());
 
         sender1
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::FlushAndRestart],
                 from1,
             ))
@@ -446,7 +445,7 @@ mod tests {
             start_block.next()
         );
         sender2
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::FlushAndRestart],
                 from2,
             ))
@@ -474,13 +473,13 @@ mod tests {
         start_block.setup(metadata);
 
         sender1
-            .send(NetworkMessage::new(vec![StreamElement::Item(42)], from1))
+            .send(NetworkMessage::new_single(StreamElement::Item(42), from1))
             .unwrap();
         sender1
-            .send(NetworkMessage::new(vec![StreamElement::Item(43)], from1))
+            .send(NetworkMessage::new_single(StreamElement::Item(43), from1))
             .unwrap();
         sender2
-            .send(NetworkMessage::new(vec![StreamElement::Item(69)], from2))
+            .send(NetworkMessage::new_single(StreamElement::Item(69), from2))
             .unwrap();
 
         let mut recv = [start_block.next(), start_block.next(), start_block.next()];
@@ -490,13 +489,13 @@ mod tests {
         assert_eq!(StreamElement::Item(TwoSidesItem::Right(69)), recv[2]);
 
         sender1
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::FlushAndRestart, StreamElement::Terminate],
                 from1,
             ))
             .unwrap();
         sender2
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::FlushAndRestart],
                 from2,
             ))
@@ -510,7 +509,7 @@ mod tests {
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
 
         sender2
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::Item(6969), StreamElement::FlushAndRestart],
                 from2,
             ))
@@ -533,7 +532,7 @@ mod tests {
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
 
         sender2
-            .send(NetworkMessage::new(vec![StreamElement::Terminate], from2))
+            .send(NetworkMessage::new_single(StreamElement::Terminate, from2))
             .unwrap();
 
         assert_eq!(StreamElement::Terminate, start_block.next());
@@ -555,13 +554,13 @@ mod tests {
         start_block.setup(metadata);
 
         sender1
-            .send(NetworkMessage::new(vec![StreamElement::Item(42)], from1))
+            .send(NetworkMessage::new_single(StreamElement::Item(42), from1))
             .unwrap();
         sender1
-            .send(NetworkMessage::new(vec![StreamElement::Item(43)], from1))
+            .send(NetworkMessage::new_single(StreamElement::Item(43), from1))
             .unwrap();
         sender2
-            .send(NetworkMessage::new(vec![StreamElement::Item(69)], from2))
+            .send(NetworkMessage::new_single(StreamElement::Item(69), from2))
             .unwrap();
 
         let mut recv = [start_block.next(), start_block.next(), start_block.next()];
@@ -571,13 +570,13 @@ mod tests {
         assert_eq!(StreamElement::Item(TwoSidesItem::Right(69)), recv[2]);
 
         sender1
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::FlushAndRestart, StreamElement::Terminate],
                 from1,
             ))
             .unwrap();
         sender2
-            .send(NetworkMessage::new(
+            .send(NetworkMessage::new_batch(
                 vec![StreamElement::FlushAndRestart],
                 from2,
             ))
@@ -591,7 +590,7 @@ mod tests {
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
 
         sender2
-            .send(NetworkMessage::new(vec![StreamElement::Terminate], from2))
+            .send(NetworkMessage::new_single(StreamElement::Terminate, from2))
             .unwrap();
 
         assert_eq!(StreamElement::Terminate, start_block.next());

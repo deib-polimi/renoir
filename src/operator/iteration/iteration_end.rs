@@ -82,7 +82,7 @@ where
         let elem = self.prev.next();
         match &elem {
             StreamElement::Item(_) => {
-                let message = NetworkMessage::new(vec![elem], self.coord);
+                let message = NetworkMessage::new_single(elem, self.coord);
                 self.leader_sender.as_ref().unwrap().send(message).unwrap();
                 self.has_received_item = true;
                 StreamElement::Item(())
@@ -94,7 +94,7 @@ where
                 if !self.has_received_item {
                     let update = Default::default();
                     let message =
-                        NetworkMessage::new(vec![StreamElement::Item(update)], self.coord);
+                        NetworkMessage::new_single(StreamElement::Item(update), self.coord);
                     let sender = self.leader_sender.as_ref().unwrap();
                     sender.send(message).unwrap();
                 }
@@ -102,7 +102,7 @@ where
                 StreamElement::FlushAndRestart
             }
             StreamElement::Terminate => {
-                let message = NetworkMessage::new(vec![StreamElement::Terminate], self.coord);
+                let message = NetworkMessage::new_single(StreamElement::Terminate, self.coord);
                 self.leader_sender.as_ref().unwrap().send(message).unwrap();
                 StreamElement::Terminate
             }

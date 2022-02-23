@@ -51,15 +51,19 @@ impl<Out: ExchangeData> Batcher<Out> {
 
     /// Put a message in the batch queue, it won't be sent immediately.
     pub(crate) fn enqueue(&mut self, message: StreamElement<Out>) {
-        self.buffer.push(message);
-        // max capacity has been reached, send and flush the buffer
-        // if too much time elapsed since the last flush, flush the buffer
-        let max_delay = self.mode.max_delay();
-        let timeout_elapsed = max_delay
-            .map(|max_delay| self.last_send.elapsed() > max_delay.into())
-            .unwrap_or(false);
-        if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed || self.remote_sender.inner().is_some() { // TODO: change, workaround to detect local sender
-            self.flush();
+        if let Some(chan) = self.remote_sender.inner() { // Local channel, send immediately
+            chan.send(NetworkMessage::new_single(message, self.coord)).unwrap();
+        } else {
+            self.buffer.push(message);
+            // max capacity has been reached, send and flush the buffer
+            // if too much time elapsed since the last flush, flush the buffer
+            let max_delay = self.mode.max_delay();
+            let timeout_elapsed = max_delay
+                .map(|max_delay| self.last_send.elapsed() > max_delay.into())
+                .unwrap_or(false);
+            if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed {
+                self.flush();
+            }
         }
     }
 
@@ -68,7 +72,7 @@ impl<Out: ExchangeData> Batcher<Out> {
         if !self.buffer.is_empty() {
             let mut batch = Vec::with_capacity(self.mode.max_capacity());
             std::mem::swap(&mut self.buffer, &mut batch);
-            let message = NetworkMessage::new(batch, self.coord);
+            let message = NetworkMessage::new_batch(batch, self.coord);
             self.remote_sender.send(message).unwrap();
             self.last_send = Instant::now();
         }
@@ -78,7 +82,7 @@ impl<Out: ExchangeData> Batcher<Out> {
     pub(crate) fn end(self) {
         // Send the remaining messages
         if !self.buffer.is_empty() {
-            let message = NetworkMessage::new(self.buffer, self.coord);
+            let message = NetworkMessage::new_batch(self.buffer, self.coord);
             self.remote_sender.send(message).unwrap();
         }
     }

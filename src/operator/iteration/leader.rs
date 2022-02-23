@@ -189,8 +189,8 @@ where
 
             let new_state_message = (should_continue, self.state.clone().unwrap());
             for sender in &self.new_state_senders {
-                let message = NetworkMessage::new(
-                    vec![StreamElement::Item(new_state_message.clone())],
+                let message = NetworkMessage::new_single(
+                    StreamElement::Item(new_state_message.clone()),
                     self.coord,
                 );
                 sender.send(message).unwrap();

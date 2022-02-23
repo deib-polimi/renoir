@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::channel::{RecvTimeoutError, SelectResult};
-use crate::network::{Batch, Coord, NetworkMessage};
+use crate::network::{Coord, NetworkMessage};
 use crate::operator::start::{SingleStartBlockReceiver, StartBlockReceiver};
 use crate::operator::{Data, ExchangeData, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -159,7 +159,6 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
     ) -> NetworkMessage<TwoSidesItem<OutL, OutR>> {
         let sender = message.sender();
         let data = message
-            .batch()
             .into_iter()
             .flat_map(|item| {
                 let mut res = Vec::new();
@@ -179,8 +178,8 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
                 }
                 res
             })
-            .collect::<Batch<_>>();
-        let message = NetworkMessage::new(data, sender);
+            .collect::<Vec<_>>();
+        let message = NetworkMessage::new_batch(data, sender);
         if side.cached {
             side.cache.push(message.clone());
             // the elements are already out, ignore the cache for this round
@@ -208,7 +207,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
                 0
             };
             if num_terminates > 0 {
-                return Ok(NetworkMessage::new(
+                return Ok(NetworkMessage::new_batch(
                     (0..num_terminates)
                         .map(|_| StreamElement::Terminate)
                         .collect(),

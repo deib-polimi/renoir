@@ -10,7 +10,7 @@ use crate::operator::ExchangeData;
 use crate::profiler::{get_profiler, Profiler};
 
 /// The capacity of the in-buffer.
-const CHANNEL_CAPACITY: usize = 10;
+const CHANNEL_CAPACITY: usize = 64;
 
 /// The receiving end of a connection between two replicas.
 ///

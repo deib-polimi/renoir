@@ -354,7 +354,7 @@ where
     fn next(&mut self) -> StreamElement<Out> {
         // try to make progress on the feedback
         while let Ok(message) = self.feedback_receiver.as_ref().unwrap().try_recv() {
-            self.next_content.append(&mut message.batch().into());
+            self.next_content.extend(&mut message.into_iter());
         }
 
         if !self.has_input_ended {
@@ -377,7 +377,7 @@ where
                 | StreamElement::FlushBatch => item,
                 StreamElement::Terminate => {
                     debug!("Iterate at {} is terminating", self.coord);
-                    let message = NetworkMessage::new(vec![StreamElement::Terminate], self.coord);
+                    let message = NetworkMessage::new_single(StreamElement::Terminate, self.coord);
                     self.output_sender.as_ref().unwrap().send(message).unwrap();
                     item
                 }
@@ -397,7 +397,7 @@ where
             Some(StreamElement::FlushAndRestart)
         ) {
             let message = self.feedback_receiver.as_ref().unwrap().recv().unwrap();
-            self.next_content.append(&mut message.batch().into());
+            self.next_content.extend(&mut message.into_iter());
         }
 
         debug!("Iterate at {} has ended the iteration", self.coord);
@@ -419,7 +419,7 @@ where
             // cleanup so that if this is a nested iteration next time we'll be good to start again
             self.has_input_ended = false;
 
-            let message = NetworkMessage::new(self.content.drain(..).collect(), self.coord);
+            let message = NetworkMessage::new_batch(self.content.drain(..).collect(), self.coord);
             self.output_sender.as_ref().unwrap().send(message).unwrap();
         }
 

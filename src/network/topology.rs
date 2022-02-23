@@ -462,7 +462,7 @@ mod tests {
     use super::*;
 
     fn build_message<T>(t: T) -> NetworkMessage<T> {
-        NetworkMessage::new(vec![StreamElement::Item(t)], Coord::default())
+        NetworkMessage::new_single(StreamElement::Item(t), Coord::default())
     }
 
     #[test]
@@ -499,19 +499,19 @@ mod tests {
 
         let rx1 = topology.get_receiver::<i32>(endpoint1);
         assert_eq!(
-            rx1.recv().unwrap().batch(),
+            rx1.recv().unwrap().into_iter().collect::<Vec<_>>(),
             vec![StreamElement::Item(123i32)]
         );
 
         let rx2 = topology.get_receiver::<u64>(endpoint2);
         assert_eq!(
-            rx2.recv().unwrap().batch(),
+            rx2.recv().unwrap().into_iter().collect::<Vec<_>>(),
             vec![StreamElement::Item(666u64)]
         );
 
         let rx3 = topology.get_receiver::<u64>(endpoint3);
         assert_eq!(
-            rx3.recv().unwrap().batch(),
+            rx3.recv().unwrap().into_iter().collect::<Vec<_>>(),
             vec![StreamElement::Item(42u64)]
         );
     }
@@ -641,7 +641,7 @@ mod tests {
 
     fn receiver<T: ExchangeData + Ord + Debug>(receiver: NetworkReceiver<T>, expected: Vec<T>) {
         let res = (0..expected.len())
-            .map(|_| receiver.recv().unwrap().batch())
+            .map(|_| receiver.recv().unwrap().into_iter())
             .flatten()
             .sorted()
             .collect_vec();
@@ -679,13 +679,13 @@ mod tests {
 
         let rx1 = topology.get_receiver::<i32>(endpoint1);
         assert_eq!(
-            rx1.recv().unwrap().batch(),
+            rx1.recv().unwrap().into_iter().collect::<Vec<_>>(),
             vec![StreamElement::Item(123i32)]
         );
 
         let rx2 = topology.get_receiver::<u64>(endpoint2);
         assert_eq!(
-            rx2.recv().unwrap().batch(),
+            rx2.recv().unwrap().into_iter().collect::<Vec<_>>(),
             vec![StreamElement::Item(666u64)]
         );
     }

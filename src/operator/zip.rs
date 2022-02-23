@@ -180,7 +180,7 @@ mod tests {
         zip.setup(metadata);
 
         let send = |sender: &NetworkSender<i32>, from: Coord, data: Vec<StreamElement<i32>>| {
-            sender.send(NetworkMessage::new(data, from)).unwrap();
+            sender.send(NetworkMessage::new_batch(data, from)).unwrap();
         };
 
         // Stream content:
