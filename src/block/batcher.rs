@@ -20,6 +20,9 @@ pub enum BatchMode {
     /// A batch is flushed only when the specified number of messages is present or a timeout
     /// expires.
     Adaptive(NonZeroUsize, Duration),
+
+    /// Send each message infdividually
+    Single,
 }
 
 /// A `Batcher` wraps a sender and sends the messages in batches to reduce the network overhead.
@@ -51,26 +54,31 @@ impl<Out: ExchangeData> Batcher<Out> {
 
     /// Put a message in the batch queue, it won't be sent immediately.
     pub(crate) fn enqueue(&mut self, message: StreamElement<Out>) {
-        // if let Some(chan) = self.remote_sender.inner() { // Local channel, send immediately
-        //     chan.send(NetworkMessage::new_single(message, self.coord)).unwrap();
-        // } else {
-            self.buffer.push(message);
-            // max capacity has been reached, send and flush the buffer
-            // if too much time elapsed since the last flush, flush the buffer
-            let max_delay = self.mode.max_delay();
-            let timeout_elapsed = max_delay
-                .map(|max_delay| self.last_send.elapsed() > max_delay.into())
-                .unwrap_or(false);
-            if self.buffer.len() >= self.mode.max_capacity() || timeout_elapsed {
-                self.flush();
+        match self.mode {
+            BatchMode::Adaptive(n, max_delay) => {
+                self.buffer.push(message);
+                let timeout_elapsed = self.last_send.elapsed() > max_delay.into();
+                if self.buffer.len() >= n.get() || timeout_elapsed {
+                    self.flush()
+                }
             }
-        // }
+            BatchMode::Fixed(n) => {
+                self.buffer.push(message);
+                if self.buffer.len() >= n.get() {
+                    self.flush()
+                }
+            }
+            BatchMode::Single => {
+                let message = NetworkMessage::new_single(message, self.coord);
+                self.remote_sender.send(message).unwrap();
+            }
+        }
     }
 
     /// Flush the internal buffer if it's not empty.
     pub(crate) fn flush(&mut self) {
         if !self.buffer.is_empty() {
-            let mut batch = Vec::with_capacity(self.mode.max_capacity());
+            let mut batch = Vec::with_capacity(self.buffer.capacity());
             std::mem::swap(&mut self.buffer, &mut batch);
             let message = NetworkMessage::new_batch(batch, self.coord);
             self.remote_sender.send(message).unwrap();
@@ -102,18 +110,15 @@ impl BatchMode {
         )
     }
 
-    /// Size of the batch in this mode.
-    pub fn max_capacity(&self) -> usize {
-        match self {
-            BatchMode::Fixed(cap) | BatchMode::Adaptive(cap, _) => cap.get(),
-        }
+    /// Construct a new `BatchMode::Single`.
+    pub fn single() -> BatchMode {
+        BatchMode::Single
     }
 
-    /// Maximum delay this mode allows, if any.
     pub fn max_delay(&self) -> Option<Duration> {
-        match self {
-            BatchMode::Fixed(_) => None,
+        match &self {
             BatchMode::Adaptive(_, max_delay) => Some(*max_delay),
+            BatchMode::Fixed(_) | BatchMode::Single => None,
         }
     }
 }
