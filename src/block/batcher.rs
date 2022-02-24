@@ -11,8 +11,8 @@ use crate::operator::{ExchangeData, StreamElement};
 /// Avoid constructing directly this enumeration, please use [`BatchMode::fixed()`] and
 /// [`BatchMode::adaptive()`] constructors.
 ///
-/// The default batch mode is `Adaptive(1000, 50ms)`, meaning that a batch is flushed either when
-/// it has at least 1000 messages, or no message has been received in the last 50ms.
+/// The default batch mode is `Adaptive(1024, 50ms)`, meaning that a batch is flushed either when
+/// it has at least 1024 messages, or no message has been received in the last 50ms.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BatchMode {
     /// A batch is flushed only when the specified number of messages is present.
@@ -120,6 +120,6 @@ impl BatchMode {
 
 impl Default for BatchMode {
     fn default() -> Self {
-        BatchMode::adaptive(1000, Duration::from_millis(2))
+        BatchMode::adaptive(1024, Duration::from_millis(50))
     }
 }

@@ -48,6 +48,26 @@ fn wordcount_fold_assoc(path: &Path) {
     env.execute();
 }
 
+fn wordcount_fold_assoc_kstring(path: &Path) {
+    let config = EnvironmentConfig::local(4);
+    let mut env = StreamEnvironment::new(config);
+
+    let source = FileSource::new(path);
+    let stream = env
+        .stream(source)
+        .batch_mode(BatchMode::fixed(1024))
+        .flat_map(move |line| line.split(' ').map(|s| kstring::KString::from_ref(s)).collect_vec())
+        .group_by_fold(
+            |w| w.clone(),
+            0,
+            |count, _word| *count += 1,
+            |count1, count2| *count1 += count2,
+        )
+        .unkey();
+    let _result = stream.collect_vec();
+    env.execute();
+}
+
 fn wordcount_reduce(path: &Path) {
     let config = EnvironmentConfig::local(4);
     let mut env = StreamEnvironment::new(config);
@@ -106,6 +126,9 @@ fn wordcount_benchmark(c: &mut Criterion) {
     });
     group.bench_function("wordcount-fold-assoc", |b| {
         b.iter(|| wordcount_fold_assoc(black_box(path)))
+    });
+    group.bench_function("wordcount-fold-kstring", |b| {
+        b.iter(|| wordcount_fold_assoc_kstring(black_box(path)))
     });
     group.bench_function("wordcount-reduce", |b| {
         b.iter(|| wordcount_reduce(black_box(path)))

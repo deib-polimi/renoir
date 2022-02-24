@@ -6,7 +6,7 @@ authors = [
     "Edoardo Morassutto <edoardo.morassutto@gmail.com>",
     "Marco Donadoni <marco.donadoni@mail.polimi.it>"
 ]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["flume"]
@@ -91,6 +91,7 @@ regex = "1.4.3"
 crossbeam-channel = "0.5"
 flume = "0.10"
 
+kstring = "1.0"
 
 # The list of benchmarks, all of them require "harness = false" in order to
 # work with criterion.rs. Cannot set `[lib] harness = false` because the tests
@@ -116,7 +117,3 @@ harness = false
 
 [profile.release]
 lto = "thin"
-
-[[bin]]
-name = "collatz"
-path = "examples/collatz.rs"

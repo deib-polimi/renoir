@@ -1,13 +1,15 @@
 
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
-use crossbeam_channel::{Receiver, bounded, Sender, TryRecvError};
+use crossbeam_channel::{Receiver, bounded, Sender, TryRecvError, RecvError};
 #[cfg(all(feature = "flume", not(feature = "crossbeam")))]
-use flume::{Receiver, bounded, Sender, TryRecvError};
+use flume::{Receiver, bounded, Sender, TryRecvError, RecvError};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
+
+const MAX_RETRY: u8 = 8;
 
 /// Source that consumes an iterator and emits all its elements into the stream.
 ///
@@ -19,7 +21,7 @@ pub struct ChannelSource<Out: Data> {
     #[derivative(Debug = "ignore")]
     rx: Receiver<Out>,
     terminated: bool,
-    flushed:bool,
+    retry_count: u8,
 }
 
 impl<Out: Data> ChannelSource<Out> {
@@ -46,7 +48,7 @@ impl<Out: Data> ChannelSource<Out> {
         let s = Self {
             rx,
             terminated: false,
-            flushed: false,
+            retry_count: 0,
         };
 
         (tx, s)
@@ -68,28 +70,37 @@ impl<Out: Data + core::fmt::Debug> Operator<Out> for ChannelSource<Out> {
         }
         let result = self.rx.try_recv();
 
+        log::debug!("Channel received stuff");
         match result {
-            Ok(t) => StreamElement::Item(t),
-            Err(TryRecvError::Empty) if !self.flushed => {
-                log::debug!("no values ready, sending flush");
-                self.flushed = true;
+            Ok(t) => {
+                self.retry_count = 0;
+                StreamElement::Item(t)
+            }
+            Err(TryRecvError::Empty) if self.retry_count < MAX_RETRY => {
+                // Spin before blocking
+                self.retry_count += 1;
+                self.next()
+            }
+            Err(TryRecvError::Empty) if self.retry_count == MAX_RETRY => {
+                log::debug!("no values ready after {MAX_RETRY} tries, sending flush");
+                self.retry_count += 1;
                 StreamElement::FlushBatch
             }
             Err(TryRecvError::Empty) => {
                 log::debug!("flushed and no values ready, blocking");
-                self.flushed = false;
+                self.retry_count = 0;
                 match self.rx.recv() {
                     Ok(t) => StreamElement::Item(t),
-                    Err(e) => {
+                    Err(RecvError::Disconnected) => {
                         self.terminated = true;
-                        log::error!("Error in source stream: {e}");
+                        log::info!("Stream disconnected");
                         StreamElement::FlushAndRestart
                     }
                 }
             }
             Err(TryRecvError::Disconnected) => {
                 self.terminated = true;
-                log::error!("Stream disconnected");
+                log::info!("Stream disconnected");
                 StreamElement::FlushAndRestart
             }
         }
