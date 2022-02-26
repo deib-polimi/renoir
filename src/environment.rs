@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use parking_lot::Mutex;
+use std::sync::Arc;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};

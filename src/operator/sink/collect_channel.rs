@@ -9,7 +9,6 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 #[cfg(not(feature = "crossbeam"))]
 use flume::{unbounded, Receiver, Sender};
 
-
 #[derive(Debug)]
 pub struct CollectChannelSink<Out: ExchangeData, PreviousOperators>
 where

@@ -3,13 +3,13 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use parking_lot::Mutex;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::network::{Coord, NetworkSender, NetworkTopology, ReceiverEndpoint};
 use crate::operator::source::Source;
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::{BatchMode, EnvironmentConfig};
+use parking_lot::Mutex;
 
 /// A fake operator that can be used to unit-test the operators.
 #[derive(Debug, Clone)]

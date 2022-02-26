@@ -1,7 +1,7 @@
+use parking_lot::Mutex;
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::Mutex;
 use std::thread::JoinHandle;
 
 use itertools::Itertools;

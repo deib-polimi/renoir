@@ -1,8 +1,7 @@
-
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
-use crossbeam_channel::{Receiver, bounded, Sender, TryRecvError, RecvError};
+use crossbeam_channel::{bounded, Receiver, RecvError, Sender, TryRecvError};
 #[cfg(all(feature = "flume", not(feature = "crossbeam")))]
-use flume::{Receiver, bounded, Sender, TryRecvError, RecvError};
+use flume::{bounded, Receiver, RecvError, Sender, TryRecvError};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;

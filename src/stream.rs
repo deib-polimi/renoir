@@ -1,7 +1,7 @@
+use parking_lot::Mutex;
 use std::any::TypeId;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use parking_lot::Mutex;
 
 use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;

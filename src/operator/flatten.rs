@@ -29,8 +29,7 @@ where
     _iter_out: PhantomData<Out>,
 }
 
-impl<In, Out, InnerIterator, PreviousOperators>
-    Flatten<In, Out, InnerIterator, PreviousOperators>
+impl<In, Out, InnerIterator, PreviousOperators> Flatten<In, Out, InnerIterator, PreviousOperators>
 where
     PreviousOperators: Operator<In>,
     In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
@@ -65,12 +64,10 @@ where
             if let Some(ref mut inner) = self.frontiter {
                 match inner.next() {
                     None => self.frontiter = None,
-                    Some(item) => {
-                        match self.timestamp {
-                            None => return StreamElement::Item(item),
-                            Some(ts) => return StreamElement::Timestamped(item, ts),
-                        }
-                    }
+                    Some(item) => match self.timestamp {
+                        None => return StreamElement::Item(item),
+                        Some(ts) => return StreamElement::Timestamped(item, ts),
+                    },
                 }
             }
             match self.prev.next() {
@@ -174,7 +171,6 @@ where
     }
 }
 
-
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub struct KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
@@ -238,12 +234,10 @@ where
             if let Some((ref key, ref mut inner)) = self.frontiter {
                 match inner.next() {
                     None => self.frontiter = None,
-                    Some(item) => {
-                        match self.timestamp {
-                            None => return StreamElement::Item((key.clone(), item)),
-                            Some(ts) => return StreamElement::Timestamped((key.clone(), item), ts),
-                        }
-                    }
+                    Some(item) => match self.timestamp {
+                        None => return StreamElement::Item((key.clone(), item)),
+                        Some(ts) => return StreamElement::Timestamped((key.clone(), item), ts),
+                    },
                 }
             }
             match self.prev.next() {
@@ -278,7 +272,6 @@ where
             .add_operator(OperatorStructure::new::<Out, _>("KeyedFlatten"))
     }
 }
-
 
 impl<Key: DataKey, In, Out, InnerIterator, OperatorChain> KeyedStream<Key, In, OperatorChain>
 where

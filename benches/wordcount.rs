@@ -56,7 +56,11 @@ fn wordcount_fold_assoc_kstring(path: &Path) {
     let stream = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
-        .flat_map(move |line| line.split(' ').map(|s| kstring::KString::from_ref(s)).collect_vec())
+        .flat_map(move |line| {
+            line.split(' ')
+                .map(kstring::KString::from_ref)
+                .collect_vec()
+        })
         .group_by_fold(
             |w| w.clone(),
             0,

@@ -106,7 +106,8 @@ impl JobGraphGenerator {
 
     /// Generate the connections between the operators in different blocks,
     fn gen_connections(&self) -> String {
-        let mut receivers: HashMap<(BlockId, BlockId), (usize, DataType), ahash::RandomState> = Default::default();
+        let mut receivers: HashMap<(BlockId, BlockId), (usize, DataType), ahash::RandomState> =
+            Default::default();
         for (&block_id, block) in &self.blocks {
             for (index, operator) in block.operators.iter().enumerate() {
                 for receiver in &operator.receivers {

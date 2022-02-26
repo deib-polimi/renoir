@@ -641,8 +641,7 @@ mod tests {
 
     fn receiver<T: ExchangeData + Ord + Debug>(receiver: NetworkReceiver<T>, expected: Vec<T>) {
         let res = (0..expected.len())
-            .map(|_| receiver.recv().unwrap().into_iter())
-            .flatten()
+            .flat_map(|_| receiver.recv().unwrap().into_iter())
             .sorted()
             .collect_vec();
         assert_eq!(

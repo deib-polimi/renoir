@@ -7,7 +7,7 @@ pub(crate) use single::*;
 
 use crate::block::BlockStructure;
 use crate::channel::RecvTimeoutError;
-use crate::network::{Coord, NetworkMessage, NetworkDataIterator};
+use crate::network::{Coord, NetworkDataIterator, NetworkMessage};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::start::watermark_frontier::WatermarkFrontier;
@@ -205,7 +205,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                 None => {
                     // Current batch is finished
                     self.batch_iter = None;
-                    return self.next()
+                    return self.next();
                 }
                 Some(item) => {
                     match item {
@@ -213,14 +213,14 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                             // update the frontier and return a watermark if necessary
                             match self.watermark_frontier.update(sender, ts) {
                                 Some(ts) => StreamElement::Watermark(ts), // ts is safe
-                                None => return self.next()
+                                None => return self.next(),
                             }
                         }
                         StreamElement::FlushAndRestart => {
                             // mark this replica as ended and let the frontier ignore it from now on
                             self.watermark_frontier.update(sender, timestamp_max());
                             self.missing_flush_and_restart -= 1;
-                            return self.next()
+                            return self.next();
                         }
                         StreamElement::Terminate => {
                             self.missing_terminate -= 1;
@@ -228,7 +228,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                                 "{} received a Terminate, {} more to come",
                                 metadata.coord, self.missing_terminate
                             );
-                            return self.next()
+                            return self.next();
                         }
                         _ => item,
                     }
