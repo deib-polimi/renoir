@@ -78,7 +78,9 @@ impl<Out: ExchangeData> Batcher<Out> {
     /// Flush the internal buffer if it's not empty.
     pub(crate) fn flush(&mut self) {
         if !self.buffer.is_empty() {
-            let mut batch = Vec::with_capacity(self.buffer.capacity());
+            let cap = self.buffer.capacity();
+            let new_cap = if self.buffer.len() < cap / 4 { cap / 2 } else { cap };
+            let mut batch = Vec::with_capacity(new_cap);
             std::mem::swap(&mut self.buffer, &mut batch);
             let message = NetworkMessage::new_batch(batch, self.coord);
             self.remote_sender.send(message).unwrap();
