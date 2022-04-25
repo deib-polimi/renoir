@@ -91,13 +91,16 @@ regex = "1.4.3"
 crossbeam-channel = "0.5"
 flume = "0.10"
 
-kstring = "1.0"
+kstring = { version = "2.0", features = ["serde"] }
 
 # The list of benchmarks, all of them require "harness = false" in order to
 # work with criterion.rs. Cannot set `[lib] harness = false` because the tests
 # require the harness.
 [[bench]]
 name = "wordcount"
+harness = false
+[[bench]]
+name = "wordcount_by_line"
 harness = false
 [[bench]]
 name = "shuffle"

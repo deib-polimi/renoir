@@ -13,6 +13,9 @@ use noir::BatchMode;
 use noir::EnvironmentConfig;
 use noir::StreamEnvironment;
 
+mod common;
+use common::*;
+
 fn wordcount_fold(path: &Path) {
     let config = EnvironmentConfig::local(4);
     let mut env = StreamEnvironment::new(config);
@@ -118,13 +121,12 @@ fn wordcount_benchmark(c: &mut Criterion) {
     }
 
     let path = file.path();
-    let metadata = path.metadata().unwrap();
-    let size = metadata.len();
 
     let mut group = c.benchmark_group("wordcount");
-    group.sample_size(10);
-    group.throughput(Throughput::Bytes(size));
-    group.warm_up_time(Duration::from_secs(4));
+    group.sample_size(30);
+    group.throughput(Throughput::Elements(N_LINES as u64));
+    group.warm_up_time(Duration::from_secs(3));
+    group.measurement_time(Duration::from_secs(12));
     group.bench_function("wordcount-fold", |b| {
         b.iter(|| wordcount_fold(black_box(path)))
     });
