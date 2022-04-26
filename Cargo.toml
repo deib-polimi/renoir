@@ -83,6 +83,7 @@ ahash = "0.7"
 tempfile = "3.3"
 criterion = { version = "0.3", features = ["html_reports"] }
 fake = "2.4"
+mimalloc = { version = "0.1", default-features = false }
 
 # for the examples
 regex = "1.4.3"

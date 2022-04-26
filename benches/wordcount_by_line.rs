@@ -15,6 +15,9 @@ use noir::StreamEnvironment;
 mod common;
 use common::*;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn make_file(lines: usize) -> tempfile::NamedTempFile {
     let mut file = tempfile::NamedTempFile::new().unwrap();
     let seed = b"By imDema, edomora97 and mark03.".to_owned();
