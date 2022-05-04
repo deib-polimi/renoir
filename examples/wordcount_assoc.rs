@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use itertools::Itertools;
 use regex::Regex;
 
 use noir::operator::source::FileSource;
@@ -8,6 +9,8 @@ use noir::EnvironmentConfig;
 use noir::StreamEnvironment;
 
 fn main() {
+    tracing_subscriber::fmt::init();
+
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the dataset path as an argument");
@@ -31,6 +34,7 @@ fn main() {
     let elapsed = start.elapsed();
     if let Some(res) = result.get() {
         eprintln!("Output: {:?}", res.len());
+        eprintln!("{:?}", res.iter().sorted_by_key(|t| t.1).rev().take(10).collect::<Vec<_>>())
     }
     eprintln!("Elapsed: {:?}", elapsed);
 }
@@ -43,15 +47,13 @@ struct Tokenizer {
 impl Tokenizer {
     fn new() -> Self {
         Self {
-            re: Regex::new(r"[^A-Za-z]+").unwrap(),
+            re: Regex::new(r"[A-Za-z]+").unwrap(),
         }
     }
     fn tokenize(&self, value: String) -> Vec<String> {
         self.re
-            .replace_all(&value, " ")
-            .split_ascii_whitespace()
-            .filter(|word| !word.is_empty())
-            .map(|t| t.to_lowercase())
+            .find_iter(&value)
+            .map(|t| t.as_str().to_lowercase())
             .collect()
     }
 }

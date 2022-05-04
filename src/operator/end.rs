@@ -12,7 +12,7 @@ use crate::stream::BlockId;
 #[derivative(Clone, Debug)]
 pub struct EndBlock<Out: ExchangeData, OperatorChain, IndexFn>
 where
-    IndexFn: KeyerFn<usize, Out>,
+    IndexFn: KeyerFn<u64, Out>,
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
@@ -28,7 +28,7 @@ where
 
 impl<Out: ExchangeData, OperatorChain, IndexFn> EndBlock<Out, OperatorChain, IndexFn>
 where
-    IndexFn: KeyerFn<usize, Out>,
+    IndexFn: KeyerFn<u64, Out>,
     OperatorChain: Operator<Out>,
 {
     pub(crate) fn new(
@@ -64,7 +64,7 @@ where
 impl<Out: ExchangeData, OperatorChain, IndexFn> Operator<()>
     for EndBlock<Out, OperatorChain, IndexFn>
 where
-    IndexFn: KeyerFn<usize, Out>,
+    IndexFn: KeyerFn<u64, Out>,
     OperatorChain: Operator<Out>,
 {
     fn setup(&mut self, metadata: ExecutionMetadata) {
