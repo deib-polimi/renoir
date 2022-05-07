@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use crate::block::{BlockStructure, InnerBlock};
-use crate::channel::{BoundedChannelReceiver, UnboundedChannelSender};
+use crate::channel::{Receiver, UnboundedSender, self};
 use crate::network::Coord;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::{ExecutionMetadata, StartHandle};
@@ -56,12 +56,12 @@ impl<F: FnOnce()> Drop for CatchPanic<F> {
 
 pub(crate) fn spawn_worker<Out: Data, OperatorChain>(
     block: InnerBlock<Out, OperatorChain>,
-    structure_sender: UnboundedChannelSender<(Coord, BlockStructure)>,
+    structure_sender: UnboundedSender<(Coord, BlockStructure)>,
 ) -> StartHandle
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    let (sender, receiver) = BoundedChannelReceiver::new(1);
+    let (sender, receiver) = channel::bounded(1);
     let join_handle = std::thread::Builder::new()
         .name(format!("Block{}", block.id))
         .spawn(move || worker(block, receiver, structure_sender))
@@ -71,8 +71,8 @@ where
 
 fn worker<Out: Data, OperatorChain>(
     mut block: InnerBlock<Out, OperatorChain>,
-    metadata_receiver: BoundedChannelReceiver<ExecutionMetadata>,
-    structure_sender: UnboundedChannelSender<(Coord, BlockStructure)>,
+    metadata_receiver: Receiver<ExecutionMetadata>,
+    structure_sender: UnboundedSender<(Coord, BlockStructure)>,
 ) where
     OperatorChain: Operator<Out> + 'static,
 {

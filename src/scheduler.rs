@@ -7,7 +7,7 @@ use std::thread::JoinHandle;
 use itertools::Itertools;
 
 use crate::block::{wait_structure, BatchMode, BlockStructure, InnerBlock};
-use crate::channel::{BoundedChannelSender, UnboundedChannelReceiver, UnboundedChannelSender};
+use crate::channel::{Sender, UnboundedReceiver, UnboundedSender, self};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
@@ -41,7 +41,7 @@ pub struct ExecutionMetadata {
 /// Handle that the scheduler uses to start the computation of a block.
 pub(crate) struct StartHandle {
     /// Sender for the `ExecutionMetadata` sent to the worker.
-    starter: BoundedChannelSender<ExecutionMetadata>,
+    starter: Sender<ExecutionMetadata>,
     /// `JoinHandle` used to wait until a block has finished working.
     join_handle: JoinHandle<()>,
 }
@@ -77,14 +77,14 @@ pub(crate) struct Scheduler {
     /// The network topology that keeps track of all the connections inside the execution graph.
     network: NetworkTopology,
     /// Receiver with the structure of the block sent by a worker.  
-    block_structure_receiver: UnboundedChannelReceiver<(Coord, BlockStructure)>,
+    block_structure_receiver: UnboundedReceiver<(Coord, BlockStructure)>,
     /// Sender to give to a worker for sending back the block structure.
-    block_structure_sender: UnboundedChannelSender<(Coord, BlockStructure)>,
+    block_structure_sender: UnboundedSender<(Coord, BlockStructure)>,
 }
 
 impl Scheduler {
     pub fn new(config: EnvironmentConfig) -> Self {
-        let (sender, receiver) = UnboundedChannelReceiver::new();
+        let (sender, receiver) = channel::unbounded();
         Self {
             next_blocks: Default::default(),
             prev_blocks: Default::default(),
@@ -377,7 +377,7 @@ impl Scheduler {
 
 impl StartHandle {
     pub(crate) fn new(
-        starter: BoundedChannelSender<ExecutionMetadata>,
+        starter: Sender<ExecutionMetadata>,
         join_handle: JoinHandle<()>,
     ) -> Self {
         Self {

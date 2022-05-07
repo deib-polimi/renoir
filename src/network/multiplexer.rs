@@ -3,9 +3,7 @@ use std::net::{Shutdown, TcpStream, ToSocketAddrs};
 use std::thread::{sleep, JoinHandle};
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
-
-use crate::channel::{BoundedChannelReceiver, BoundedChannelSender};
+use crate::channel::{Receiver, Sender, SendError, self};
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
@@ -26,7 +24,7 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 #[derive(Debug, Clone)]
 pub struct MultiplexingSender<Out: ExchangeData> {
     /// The internal sender that points to the actual multiplexed channel.
-    sender: BoundedChannelSender<(ReceiverEndpoint, NetworkMessage<Out>)>,
+    sender: Sender<(ReceiverEndpoint, NetworkMessage<Out>)>,
 }
 
 impl<Out: ExchangeData> MultiplexingSender<Out> {
@@ -34,7 +32,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
-        let (sender, receiver) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
+        let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
         let join_handle = std::thread::Builder::new()
             .name(format!("NetSender{}", coord))
             .spawn(move || Self::connect_remote(coord, address, receiver))
@@ -45,10 +43,8 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     /// Send a message to the channel.
     ///
     /// Unlikely the normal channels, the destination is required since the channel is multiplexed.
-    pub fn send(&self, destination: ReceiverEndpoint, message: NetworkMessage<Out>) -> Result<()> {
-        self.sender
-            .send((destination, message))
-            .map_err(|e| anyhow!("Failed to send to channel to {}: {:?}", destination, e))
+    pub fn send(&self, destination: ReceiverEndpoint, message: NetworkMessage<Out>) -> Result<(), SendError<(ReceiverEndpoint, NetworkMessage<Out>)>> {
+        self.sender.send((destination, message))
     }
 
     /// Connect the sender to a remote channel located at the specified address.
@@ -60,7 +56,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     fn connect_remote(
         coord: DemuxCoord,
         address: (String, u16),
-        local_receiver: BoundedChannelReceiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
+        local_receiver: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
     ) {
         let socket_addrs: Vec<_> = address
             .to_socket_addrs()
@@ -77,7 +73,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
             for address in socket_addrs.iter() {
                 match TcpStream::connect_timeout(address, CONNECT_TIMEOUT) {
                     Ok(stream) => {
-                        Self::handle_remote_connection(coord, local_receiver, stream);
+                        Self::mux_thread(coord, local_receiver, stream);
                         return;
                     }
                     Err(err) => match err.kind() {
@@ -111,9 +107,20 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     ///
     /// Waits messages from the local receiver, then serialize the message and send it to the remote
     /// replica.
-    fn handle_remote_connection(
+    /// 
+    /// # Upgrade path
+    /// 
+    /// Instead of using a single mpsc channel, use multiple channels, one per block
+    /// Use a fair (round robin?) selection from each channel when sending
+    /// 
+    /// Before popping from a channel, check that a Yield request was not received for that block
+    /// In that case, do not pop from the channel and only select from others
+    /// (this handles backpressure since the sender will block when the channel is full)
+    /// If a Resume request was received then allow popping from the channel 
+
+    fn mux_thread(
         coord: DemuxCoord,
-        local_receiver: BoundedChannelReceiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
+        local_receiver: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
         mut stream: TcpStream,
     ) {
         let address = stream
@@ -121,6 +128,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
             .map(|a| a.to_string())
             .unwrap_or_else(|_| "unknown".to_string());
         debug!("Connection to {} at {} established", coord, address);
+
         while let Ok((dest, message)) = local_receiver.recv() {
             remote_send(message, dest, &mut stream);
         }

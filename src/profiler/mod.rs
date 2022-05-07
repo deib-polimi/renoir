@@ -66,7 +66,7 @@ mod with_profiler {
     use std::sync::Mutex;
     use std::time::Instant;
 
-    use crate::channel::{UnboundedChannelReceiver, UnboundedChannelSender};
+    use crate::channel::{UnboundedReceiver, UnboundedSender};
     use crate::profiler::backend::ProfilerBackend;
     use crate::profiler::metrics::ProfilerResult;
 

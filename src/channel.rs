@@ -5,25 +5,37 @@
 
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
-
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
 use crossbeam_channel::{
-    bounded, select, unbounded, Receiver, RecvError as ExtRecvError,
-    RecvTimeoutError as ExtRecvTimeoutError, Select, Sender, TryRecvError as ExtTryRecvError,
+    bounded as bounded_ext, select, unbounded as unbounded_ext, Receiver as ReceiverExt, RecvError as ExtRecvError, SendError as SendErrorExt,
+    RecvTimeoutError as ExtRecvTimeoutError, Select, Sender as SenderExt, TryRecvError as ExtTryRecvError,
 };
 #[cfg(all(not(feature = "crossbeam"), feature = "flume"))]
 use flume::{
-    bounded, unbounded, Receiver, RecvError as ExtRecvError,
-    RecvTimeoutError as ExtRecvTimeoutError, Sender, TryRecvError as ExtTryRecvError,
+    bounded as bounded_ext, unbounded as unbounded_ext, Receiver as ReceiverExt, RecvError as ExtRecvError, SendError as SendErrorExt,
+    RecvTimeoutError as ExtRecvTimeoutError, Sender as SenderExt, TryRecvError as ExtTryRecvError,
 };
 
 pub trait ChannelItem: Send + 'static {}
 impl<T: Send + 'static> ChannelItem for T {}
 
+pub type SendError<T> = SendErrorExt<T>;
 pub type RecvError = ExtRecvError;
 pub type RecvTimeoutError = ExtRecvTimeoutError;
 pub type TryRecvError = ExtTryRecvError;
+
+/// Crate a new pair sender/receiver with limited capacity.
+pub fn bounded<T: Send + 'static>(size: usize) -> (Sender<T>, Receiver<T>) {
+    let (tx, rx) = bounded_ext(size);
+    (Sender(tx), Receiver(rx))
+}
+
+/// Crate a new pair sender/receiver with unlimited capacity.
+pub fn unbounded<T: Send + 'static>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
+    let (tx, rx) = unbounded_ext();
+    (UnboundedSender(tx), UnboundedReceiver(rx))
+}
+
 
 /// An _either_ type with the result of a select on 2 channels.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -80,33 +92,23 @@ mod select_impl {
     }
 }
 
+
 /// A wrapper on a bounded channel sender.
 #[derive(Debug, Clone)]
-pub(crate) struct BoundedChannelSender<T: ChannelItem>(Sender<T>);
+pub(crate) struct Sender<T: ChannelItem>(SenderExt<T>);
 /// A wrapper on a bounded channel receiver.
 #[derive(Debug)]
-pub(crate) struct BoundedChannelReceiver<T: ChannelItem>(Receiver<T>);
+pub(crate) struct Receiver<T: ChannelItem>(ReceiverExt<T>);
 
-impl<T: ChannelItem> BoundedChannelSender<T> {
+impl<T: ChannelItem> Sender<T> {
     /// Send a message in the channel, blocking if it's full.
     #[inline]
-    pub fn send(&self, item: T) -> Result<()> {
-        self.0
-            .send(item)
-            .map_err(|_| anyhow!("Error while sending"))
+    pub fn send(&self, item: T) -> Result<(), SendError<T>> {
+        self.0.send(item)
     }
 }
 
-impl<T: ChannelItem> BoundedChannelReceiver<T> {
-    /// Crate a new pair sender/receiver with limited capacity.
-    pub fn new(cap: usize) -> (BoundedChannelSender<T>, BoundedChannelReceiver<T>) {
-        let (sender, receiver) = bounded(cap);
-        (
-            BoundedChannelSender(sender),
-            BoundedChannelReceiver(receiver),
-        )
-    }
-
+impl<T: ChannelItem> Receiver<T> {
     /// Block until a message is present in the channel and return it when ready.
     #[inline]
     pub fn recv(&self) -> Result<T, RecvError> {
@@ -135,7 +137,7 @@ impl<T: ChannelItem> BoundedChannelReceiver<T> {
     #[inline]
     pub fn select<T2: ChannelItem>(
         &self,
-        other: &BoundedChannelReceiver<T2>,
+        other: &Receiver<T2>,
     ) -> SelectResult<T, T2> {
         select_impl!(self, other)
     }
@@ -144,7 +146,7 @@ impl<T: ChannelItem> BoundedChannelReceiver<T> {
     #[inline]
     pub fn select_timeout<T2: ChannelItem>(
         &self,
-        other: &BoundedChannelReceiver<T2>,
+        other: &Receiver<T2>,
         timeout: Duration,
     ) -> Result<SelectResult<T, T2>, RecvTimeoutError> {
         select_timeout_impl!(self, other, timeout)
@@ -153,31 +155,20 @@ impl<T: ChannelItem> BoundedChannelReceiver<T> {
 
 /// A wrapper on an unbounded channel sender.
 #[derive(Debug, Clone)]
-pub(crate) struct UnboundedChannelSender<T: ChannelItem>(Sender<T>);
+pub(crate) struct UnboundedSender<T: ChannelItem>(SenderExt<T>);
 /// A wrapper on an unbounded channel receiver.
 #[derive(Debug)]
-pub(crate) struct UnboundedChannelReceiver<T: ChannelItem>(Receiver<T>);
+pub(crate) struct UnboundedReceiver<T: ChannelItem>(ReceiverExt<T>);
 
-impl<T: ChannelItem> UnboundedChannelSender<T> {
+impl<T: ChannelItem> UnboundedSender<T> {
     /// Send a message in the channel.
     #[inline]
-    pub fn send(&self, item: T) -> Result<()> {
-        self.0
-            .send(item)
-            .map_err(|_| anyhow!("Error while sending"))
+    pub fn send(&self, item: T) -> Result<(), SendError<T>> {
+        self.0.send(item)
     }
 }
 
-impl<T: ChannelItem> UnboundedChannelReceiver<T> {
-    /// Crate a new pair sender/receiver with unlimited capacity.
-    pub fn new() -> (UnboundedChannelSender<T>, UnboundedChannelReceiver<T>) {
-        let (sender, receiver) = unbounded();
-        (
-            UnboundedChannelSender(sender),
-            UnboundedChannelReceiver(receiver),
-        )
-    }
-
+impl<T: ChannelItem> UnboundedReceiver<T> {
     /// Block until a message is present in the channel and return it when ready.
     #[inline]
     pub fn recv(&self) -> Result<T, RecvError> {
@@ -200,7 +191,7 @@ impl<T: ChannelItem> UnboundedChannelReceiver<T> {
     #[inline]
     pub fn select<T2: ChannelItem>(
         &self,
-        other: &UnboundedChannelReceiver<T2>,
+        other: &UnboundedReceiver<T2>,
     ) -> SelectResult<T, T2> {
         select_impl!(self, other)
     }
@@ -209,7 +200,7 @@ impl<T: ChannelItem> UnboundedChannelReceiver<T> {
     #[inline]
     pub fn select_timeout<T2: ChannelItem>(
         &self,
-        other: &UnboundedChannelReceiver<T2>,
+        other: &UnboundedReceiver<T2>,
         timeout: Duration,
     ) -> Result<SelectResult<T, T2>, RecvTimeoutError> {
         select_timeout_impl!(self, other, timeout)
@@ -222,13 +213,13 @@ mod tests {
 
     use itertools::Itertools;
 
-    use crate::channel::{BoundedChannelReceiver, SelectResult};
+    use crate::channel::{bounded, SelectResult};
 
     const CHANNEL_CAPACITY: usize = 10;
 
     #[test]
     fn test_recv_local() {
-        let (sender, receiver) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
+        let (sender, receiver) = bounded(CHANNEL_CAPACITY);
 
         sender.send(123).unwrap();
         sender.send(456).unwrap();
@@ -243,7 +234,7 @@ mod tests {
 
     #[test]
     fn test_recv_timeout_local() {
-        let (sender, receiver) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
+        let (sender, receiver) = bounded(CHANNEL_CAPACITY);
 
         sender.send(123).unwrap();
 
@@ -263,8 +254,8 @@ mod tests {
 
     #[test]
     fn test_select_local() {
-        let (sender1, receiver1) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
-        let (sender2, receiver2) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
+        let (sender1, receiver1) = bounded(CHANNEL_CAPACITY);
+        let (sender2, receiver2) = bounded(CHANNEL_CAPACITY);
 
         sender1.send(123).unwrap();
 
@@ -279,8 +270,8 @@ mod tests {
 
     #[test]
     fn test_select_timeout_local() {
-        let (sender1, receiver1) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
-        let (sender2, receiver2) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
+        let (sender1, receiver1) = bounded(CHANNEL_CAPACITY);
+        let (sender2, receiver2) = bounded(CHANNEL_CAPACITY);
 
         sender1.send(123).unwrap();
 
@@ -312,8 +303,8 @@ mod tests {
         let tries = 100;
         let mut failures = 0;
         for _ in 0..100 {
-            let (sender1, receiver1) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
-            let (sender2, receiver2) = BoundedChannelReceiver::new(CHANNEL_CAPACITY);
+            let (sender1, receiver1) = bounded(CHANNEL_CAPACITY);
+            let (sender2, receiver2) = bounded(CHANNEL_CAPACITY);
 
             for _ in 0..CHANNEL_CAPACITY {
                 sender1.send(1).unwrap();

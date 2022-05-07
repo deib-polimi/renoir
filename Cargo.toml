@@ -36,6 +36,7 @@ bincode = "1.3"
 
 # handy Result type
 anyhow = "1.0"
+thiserror = "1.0"
 
 # handy iterators functions
 itertools = "0.10"
