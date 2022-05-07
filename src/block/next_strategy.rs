@@ -45,7 +45,7 @@ impl<Out: ExchangeData> NextStrategy<Out> {
         Keyer: KeyerFn<Key, Out>,
     {
         NextStrategy::GroupBy(
-            move |item: &Out | group_by_hash(&keyer(item)),
+            move |item: &Out| group_by_hash(&keyer(item)),
             Default::default(),
         )
     }

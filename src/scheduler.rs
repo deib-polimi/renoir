@@ -7,7 +7,7 @@ use std::thread::JoinHandle;
 use itertools::Itertools;
 
 use crate::block::{wait_structure, BatchMode, BlockStructure, InnerBlock};
-use crate::channel::{Sender, UnboundedReceiver, UnboundedSender, self};
+use crate::channel::{self, Sender, UnboundedReceiver, UnboundedSender};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
@@ -376,10 +376,7 @@ impl Scheduler {
 }
 
 impl StartHandle {
-    pub(crate) fn new(
-        starter: Sender<ExecutionMetadata>,
-        join_handle: JoinHandle<()>,
-    ) -> Self {
+    pub(crate) fn new(starter: Sender<ExecutionMetadata>, join_handle: JoinHandle<()>) -> Self {
         Self {
             starter,
             join_handle,

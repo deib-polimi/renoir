@@ -1,6 +1,6 @@
 use criterion::black_box;
 use std::marker::PhantomData;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use noir::*;
 
@@ -19,11 +19,11 @@ where
     F: Fn() -> StreamEnvironment,
     G: Fn(u64, &mut StreamEnvironment) -> R,
 {
-    pub fn new(make_env: F, make_network: G,) -> Self {
+    pub fn new(make_env: F, make_network: G) -> Self {
         Self {
             make_env,
             make_network,
-            _result: Default::default()
+            _result: Default::default(),
         }
     }
 

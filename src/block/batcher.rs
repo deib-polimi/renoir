@@ -79,7 +79,11 @@ impl<Out: ExchangeData> Batcher<Out> {
     pub(crate) fn flush(&mut self) {
         if !self.buffer.is_empty() {
             let cap = self.buffer.capacity();
-            let new_cap = if self.buffer.len() < cap / 4 { cap / 2 } else { cap };
+            let new_cap = if self.buffer.len() < cap / 4 {
+                cap / 2
+            } else {
+                cap
+            };
             let mut batch = Vec::with_capacity(new_cap);
             std::mem::swap(&mut self.buffer, &mut batch);
             let message = NetworkMessage::new_batch(batch, self.coord);

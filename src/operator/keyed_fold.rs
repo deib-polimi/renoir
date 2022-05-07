@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use crate::block::{BlockStructure, NextStrategy, OperatorStructure, group_by_hash};
+use crate::block::{group_by_hash, BlockStructure, NextStrategy, OperatorStructure};
 use crate::operator::end::EndBlock;
 use crate::operator::key_by::KeyBy;
 use crate::operator::{

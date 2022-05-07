@@ -3,23 +3,38 @@ use std::time::Duration;
 use thiserror::Error;
 
 use crate::channel::{
-    Receiver, Sender, RecvTimeoutError, SelectResult, TryRecvError, RecvError, self
+    self, Receiver, RecvError, RecvTimeoutError, SelectResult, Sender, TryRecvError,
 };
+
 use crate::network::{NetworkMessage, ReceiverEndpoint};
-use crate::network::multiplexer::MultiplexingSender;
 use crate::operator::ExchangeData;
 use crate::profiler::{get_profiler, Profiler};
-
 
 /// The capacity of the in-buffer.
 const CHANNEL_CAPACITY: usize = 64;
 
-
-pub fn local_channel<T: ExchangeData>(size: usize) -> (NetworkSender<T>, NetworkReceiver<T>) {
+pub(crate) fn local_channel<T: ExchangeData>(
+    receiver_endpoint: ReceiverEndpoint,
+) -> (NetworkSender<T>, NetworkReceiver<T>) {
     let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
-
-    (NetworkSender::L)
+    (
+        NetworkSender{
+            receiver_endpoint,
+            sender},
+        NetworkReceiver {
+            receiver_endpoint,
+            receiver,
+        },
+    )
 }
+
+// pub(crate) fn remote_channel<In: ExchangeData>(
+//     receiver_endpoint: ReceiverEndpoint,
+//     sender: MultiplexingSender<In>,
+// ) -> NetworkSender<In> {
+//     let sender = NetworkSender{receiver_endpoint, sender};
+//     sender
+// }
 
 /// The receiving end of a connection between two replicas.
 ///
@@ -41,18 +56,6 @@ pub(crate) struct NetworkReceiver<In: ExchangeData> {
 }
 
 impl<In: ExchangeData> NetworkReceiver<In> {
-    /// Construct a new `NetworkReceiver`.
-    ///
-    /// To get its sender use `.sender()` for a `NetworkSender` or directly `.local_sender` for the
-    /// raw channel.
-    pub fn new(receiver_endpoint: ReceiverEndpoint) -> Self {
-        let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
-        Self {
-            receiver_endpoint,
-            receiver,
-        }
-    }
-
     #[inline]
     fn profile_message<E>(
         &self,
@@ -117,39 +120,10 @@ pub(crate) struct NetworkSender<Out: ExchangeData> {
     pub receiver_endpoint: ReceiverEndpoint,
     /// The generic sender that will send the message either locally or remotely.
     #[derivative(Debug = "ignore")]
-    sender: NetworkSenderImpl<Out>,
-}
-
-/// The internal sender that sends either to a local in-memory channel, or to a remote channel using
-/// a multiplexer.
-#[derive(Clone)]
-pub(crate) enum NetworkSenderImpl<Out: ExchangeData> {
-    /// The channel is local, use an in-memory channel.
-    Local(Sender<NetworkMessage<Out>>),
-    /// The channel is remote, use the multiplexer.
-    Remote(MultiplexingSender<Out>),
+    pub(super) sender: Sender<NetworkMessage<Out>>,
 }
 
 impl<Out: ExchangeData> NetworkSender<Out> {
-    /// Create a new local sender that sends the data directly to the recipient.
-    fn local(
-        receiver_endpoint: ReceiverEndpoint,
-        sender: Sender<NetworkMessage<Out>>,
-    ) -> Self {
-        Self {
-            receiver_endpoint,
-            sender: NetworkSenderImpl::Local(sender),
-        }
-    }
-
-    /// Create a new remote sender that sends the data via a multiplexer.
-    fn remote(receiver_endpoint: ReceiverEndpoint, sender: MultiplexingSender<Out>) -> Self {
-        Self {
-            receiver_endpoint,
-            sender: NetworkSenderImpl::Remote(sender),
-        }
-    }
-
     /// Send a message to a replica.
     pub fn send(&self, message: NetworkMessage<Out>) -> Result<(), NetworkSendError> {
         get_profiler().items_out(
@@ -157,22 +131,18 @@ impl<Out: ExchangeData> NetworkSender<Out> {
             self.receiver_endpoint.coord,
             message.num_items(),
         );
-        match &self.sender {
-            NetworkSenderImpl::Local(sender) => sender
-                .send(message)
-                .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint)),
-            NetworkSenderImpl::Remote(sender) => sender
-                .send(self.receiver_endpoint, message)
-                .map_err(|e| NetworkSendError::Disconnected(e.0.0)),
-        }
+        self.sender
+            .send(message)
+            .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint))
     }
 
     /// Get the inner sender if the channel is local.
     pub fn inner(&self) -> Option<&Sender<NetworkMessage<Out>>> {
-        match &self.sender {
-            NetworkSenderImpl::Local(inner) => Some(inner),
-            NetworkSenderImpl::Remote(_) => None,
-        }
+        Some(&self.sender)
+    }
+
+    pub fn clone_inner(&self) -> Sender<NetworkMessage<Out>> {
+        self.sender.clone()
     }
 }
 

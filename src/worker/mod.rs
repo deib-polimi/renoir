@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use crate::block::{BlockStructure, InnerBlock};
-use crate::channel::{Receiver, UnboundedSender, self};
+use crate::channel::{self, Receiver, UnboundedSender};
 use crate::network::Coord;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::{ExecutionMetadata, StartHandle};

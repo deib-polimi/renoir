@@ -25,7 +25,7 @@ pub(crate) struct DemultiplexingReceiver<In: ExchangeData> {
     /// The coordinate of this demultiplexer.
     coord: DemuxCoord,
     /// Tell the demultiplexer that a new receiver is present,
-    rx_endpoints: UnboundedSender<RegistryMessage<In>>,
+    registry_tx: UnboundedSender<RegistryMessage<In>>,
 }
 
 /// Message sent to the demultiplexer thread.
@@ -55,18 +55,18 @@ impl<In: ExchangeData> DemultiplexingReceiver<In> {
         address: (String, u16),
         num_clients: usize,
     ) -> (Self, JoinHandle<()>) {
-        let (demux_sender, demux_receiver) = channel::unbounded();
-        let register_receiver = demux_sender.clone();
+        let (registry_tx, registry_rx) = channel::unbounded();
+        let reg_tx = registry_tx.clone();
         let join_handle = std::thread::Builder::new()
             .name(format!("Net{}", coord))
             .spawn(move || {
-                Self::bind_remote(coord, address, demux_sender, demux_receiver, num_clients)
+                Self::bind_remote(coord, address, reg_tx, registry_rx, num_clients)
             })
             .unwrap();
         (
             Self {
                 coord,
-                rx_endpoints: register_receiver,
+                registry_tx,
             },
             join_handle,
         )
@@ -82,7 +82,7 @@ impl<In: ExchangeData> DemultiplexingReceiver<In> {
             "Registering {} to the demultiplexer of {}",
             receiver_endpoint, self.coord
         );
-        self.rx_endpoints
+        self.registry_tx
             .send(RegistryMessage::RegisterEndpoint((
                 receiver_endpoint,
                 local_sender,
@@ -94,8 +94,8 @@ impl<In: ExchangeData> DemultiplexingReceiver<In> {
     fn bind_remote(
         coord: DemuxCoord,
         address: (String, u16),
-        registry_sender: UnboundedSender<RegistryMessage<In>>,
-        demux_receiver: UnboundedReceiver<RegistryMessage<In>>,
+        registry_tx: UnboundedSender<RegistryMessage<In>>,
+        registry_rx: UnboundedReceiver<RegistryMessage<In>>,
         num_clients: usize,
     ) {
         let address = (address.0.as_ref(), address.1);
@@ -126,7 +126,7 @@ impl<In: ExchangeData> DemultiplexingReceiver<In> {
         // spawn an extra thread that keeps track of the connected clients and registered receivers
         let join_handle = std::thread::Builder::new()
             .name(format!("{}", coord))
-            .spawn(move || Self::registry_thread(coord, demux_receiver))
+            .spawn(move || Self::registry_thread(coord, registry_rx))
             .unwrap();
 
         // the list of JoinHandle of all the spawned threads, including the demultiplexer one
@@ -152,7 +152,7 @@ impl<In: ExchangeData> DemultiplexingReceiver<In> {
 
             let (client_tx_endpoints, client_rx_endpoints) =
                 channel::unbounded();
-            registry_sender
+            registry_tx
                 .send(RegistryMessage::RegisterRemoteClient(
                     client_tx_endpoints,
                 ))
@@ -170,7 +170,7 @@ impl<In: ExchangeData> DemultiplexingReceiver<In> {
             coord
         );
         // make sure the demultiplexer thread can exit
-        drop(registry_sender);
+        drop(registry_tx);
         for handle in join_handles {
             handle.join().unwrap();
         }

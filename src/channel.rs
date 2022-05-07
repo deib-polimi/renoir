@@ -7,13 +7,15 @@ use std::time::Duration;
 
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
 use crossbeam_channel::{
-    bounded as bounded_ext, select, unbounded as unbounded_ext, Receiver as ReceiverExt, RecvError as ExtRecvError, SendError as SendErrorExt,
-    RecvTimeoutError as ExtRecvTimeoutError, Select, Sender as SenderExt, TryRecvError as ExtTryRecvError,
+    bounded as bounded_ext, select, unbounded as unbounded_ext, Receiver as ReceiverExt,
+    RecvError as ExtRecvError, RecvTimeoutError as ExtRecvTimeoutError, Select,
+    SendError as SendErrorExt, Sender as SenderExt, TryRecvError as ExtTryRecvError,
 };
 #[cfg(all(not(feature = "crossbeam"), feature = "flume"))]
 use flume::{
-    bounded as bounded_ext, unbounded as unbounded_ext, Receiver as ReceiverExt, RecvError as ExtRecvError, SendError as SendErrorExt,
-    RecvTimeoutError as ExtRecvTimeoutError, Sender as SenderExt, TryRecvError as ExtTryRecvError,
+    bounded as bounded_ext, unbounded as unbounded_ext, Receiver as ReceiverExt,
+    RecvError as ExtRecvError, RecvTimeoutError as ExtRecvTimeoutError, SendError as SendErrorExt,
+    Sender as SenderExt, TryRecvError as ExtTryRecvError,
 };
 
 pub trait ChannelItem: Send + 'static {}
@@ -35,7 +37,6 @@ pub fn unbounded<T: Send + 'static>() -> (UnboundedSender<T>, UnboundedReceiver<
     let (tx, rx) = unbounded_ext();
     (UnboundedSender(tx), UnboundedReceiver(rx))
 }
-
 
 /// An _either_ type with the result of a select on 2 channels.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -92,13 +93,12 @@ mod select_impl {
     }
 }
 
-
 /// A wrapper on a bounded channel sender.
 #[derive(Debug, Clone)]
-pub(crate) struct Sender<T: ChannelItem>(SenderExt<T>);
+pub struct Sender<T: ChannelItem>(SenderExt<T>);
 /// A wrapper on a bounded channel receiver.
 #[derive(Debug)]
-pub(crate) struct Receiver<T: ChannelItem>(ReceiverExt<T>);
+pub struct Receiver<T: ChannelItem>(ReceiverExt<T>);
 
 impl<T: ChannelItem> Sender<T> {
     /// Send a message in the channel, blocking if it's full.
@@ -135,10 +135,7 @@ impl<T: ChannelItem> Receiver<T> {
     /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
     /// fairness property.
     #[inline]
-    pub fn select<T2: ChannelItem>(
-        &self,
-        other: &Receiver<T2>,
-    ) -> SelectResult<T, T2> {
+    pub fn select<T2: ChannelItem>(&self, other: &Receiver<T2>) -> SelectResult<T, T2> {
         select_impl!(self, other)
     }
 
@@ -155,10 +152,10 @@ impl<T: ChannelItem> Receiver<T> {
 
 /// A wrapper on an unbounded channel sender.
 #[derive(Debug, Clone)]
-pub(crate) struct UnboundedSender<T: ChannelItem>(SenderExt<T>);
+pub struct UnboundedSender<T: ChannelItem>(SenderExt<T>);
 /// A wrapper on an unbounded channel receiver.
 #[derive(Debug)]
-pub(crate) struct UnboundedReceiver<T: ChannelItem>(ReceiverExt<T>);
+pub struct UnboundedReceiver<T: ChannelItem>(ReceiverExt<T>);
 
 impl<T: ChannelItem> UnboundedSender<T> {
     /// Send a message in the channel.
@@ -189,10 +186,7 @@ impl<T: ChannelItem> UnboundedReceiver<T> {
     /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
     /// fairness property.
     #[inline]
-    pub fn select<T2: ChannelItem>(
-        &self,
-        other: &UnboundedReceiver<T2>,
-    ) -> SelectResult<T, T2> {
+    pub fn select<T2: ChannelItem>(&self, other: &UnboundedReceiver<T2>) -> SelectResult<T, T2> {
         select_impl!(self, other)
     }
 
@@ -205,6 +199,28 @@ impl<T: ChannelItem> UnboundedReceiver<T> {
     ) -> Result<SelectResult<T, T2>, RecvTimeoutError> {
         select_timeout_impl!(self, other, timeout)
     }
+}
+
+pub struct Selector<T: Send + 'static, K: Clone> {
+    rxs: Vec<(K, Receiver<T>)>,
+    // inner: flume::Selector<'a, Result<(K, T), RecvError>>,
+}
+
+impl<T: Send + 'static, K: Clone> Selector<T, K> {
+    pub fn new(receivers: Vec<(K, Receiver<T>)>) -> Self {
+        let rxs = receivers;
+        Self { rxs }
+    }
+
+    pub fn recv(&mut self) -> Result<(K, T), RecvError> {
+        let mut selector = flume::Selector::new();
+
+        for (k, recv) in self.rxs.iter() {
+            selector = selector.recv(&recv.0, move |r| r.map(|i| (k.clone(), i)))
+        }
+
+        selector.wait()
+    }    
 }
 
 #[cfg(test)]

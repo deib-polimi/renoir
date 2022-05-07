@@ -39,7 +39,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
     group.warm_up_time(Duration::from_secs(3));
     group.measurement_time(Duration::from_secs(12));
     group.throughput(Throughput::Elements(1));
-    
+
     group.bench_function("wordcount-fold", |b| {
         let builder = NoirBenchBuilder::new(
             noir_max_parallism_env,
@@ -55,11 +55,10 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
                     .fold(0u64, |count, _word| *count += 1)
                     .collect_vec();
                 (result, file)
-            }
+            },
         );
         b.iter_custom(|n| builder.bench(n))
     });
-
 
     group.bench_function("wordcount-fold-assoc", |b| {
         let builder = NoirBenchBuilder::new(
@@ -81,11 +80,10 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
                     .unkey()
                     .collect_vec();
                 (result, file)
-            }
+            },
         );
         b.iter_custom(|n| builder.bench(n))
     });
-
 
     group.bench_function("wordcount-fold-kstring", |b| {
         let builder = NoirBenchBuilder::new(
@@ -111,7 +109,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
                     .unkey()
                     .collect_vec();
                 (result, file)
-            }
+            },
         );
         b.iter_custom(|n| builder.bench(n))
     });
@@ -132,7 +130,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
                     .reduce(|(_w1, c1), (_w2, c2)| *c1 += c2)
                     .collect_vec();
                 (result, file)
-            }
+            },
         );
         b.iter_custom(|n| builder.bench(n))
     });
@@ -153,7 +151,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
                     .unkey()
                     .collect_vec();
                 (result, file)
-            }
+            },
         );
         b.iter_custom(|n| builder.bench(n))
     });

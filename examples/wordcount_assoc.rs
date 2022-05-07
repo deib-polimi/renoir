@@ -34,7 +34,14 @@ fn main() {
     let elapsed = start.elapsed();
     if let Some(res) = result.get() {
         eprintln!("Output: {:?}", res.len());
-        eprintln!("{:?}", res.iter().sorted_by_key(|t| t.1).rev().take(10).collect::<Vec<_>>())
+        eprintln!(
+            "{:?}",
+            res.iter()
+                .sorted_by_key(|t| t.1)
+                .rev()
+                .take(10)
+                .collect::<Vec<_>>()
+        )
     }
     eprintln!("Elapsed: {:?}", elapsed);
 }
