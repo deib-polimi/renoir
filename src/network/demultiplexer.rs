@@ -104,6 +104,8 @@ impl<In: ExchangeData> DemultiplexingReceiver<In> {
             .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
             .unwrap()
             .collect();
+
+        tracing::debug!("demux binding {}", address[0]);
         let listener = TcpListener::bind(&*address)
             .map_err(|e| {
                 anyhow!(

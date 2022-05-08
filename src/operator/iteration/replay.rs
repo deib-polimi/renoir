@@ -223,9 +223,9 @@ impl<Out: Data, State: ExchangeData + Sync, OperatorChain> Operator<Out>
 where
     OperatorChain: Operator<Out>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
-        self.prev.setup(metadata.clone());
+        self.prev.setup(metadata);
         self.state.setup(metadata);
     }
 

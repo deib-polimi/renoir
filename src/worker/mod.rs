@@ -1,10 +1,10 @@
 use std::cell::RefCell;
+use std::thread::JoinHandle;
 
 use crate::block::{BlockStructure, InnerBlock};
-use crate::channel::{self, Receiver, UnboundedSender};
 use crate::network::Coord;
 use crate::operator::{Data, Operator, StreamElement};
-use crate::scheduler::{ExecutionMetadata, StartHandle};
+use crate::scheduler::ExecutionMetadata;
 
 thread_local! {
     /// Coordinates of the replica the current worker thread is working on.
@@ -54,50 +54,41 @@ impl<F: FnOnce()> Drop for CatchPanic<F> {
     }
 }
 
-pub(crate) fn spawn_worker<Out: Data, OperatorChain>(
-    block: InnerBlock<Out, OperatorChain>,
-    structure_sender: UnboundedSender<(Coord, BlockStructure)>,
-) -> StartHandle
-where
-    OperatorChain: Operator<Out> + 'static,
-{
-    let (sender, receiver) = channel::bounded(1);
-    let join_handle = std::thread::Builder::new()
-        .name(format!("Block{}", block.id))
-        .spawn(move || worker(block, receiver, structure_sender))
-        .unwrap();
-    StartHandle::new(sender, join_handle)
-}
-
-fn worker<Out: Data, OperatorChain>(
+pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out> + 'static>(
     mut block: InnerBlock<Out, OperatorChain>,
-    metadata_receiver: Receiver<ExecutionMetadata>,
-    structure_sender: UnboundedSender<(Coord, BlockStructure)>,
-) where
-    OperatorChain: Operator<Out> + 'static,
-{
-    let metadata = metadata_receiver.recv().unwrap();
-    drop(metadata_receiver);
+    metadata: &mut ExecutionMetadata,
+) -> (JoinHandle<()>, BlockStructure) {
+    let coord = metadata.coord;
+
     info!(
         "Starting worker for {}: {}",
-        metadata.coord,
+        coord,
         block.to_string(),
     );
-    // remember in the thread-local the coordinate of this block
-    COORD.with(|x| *x.borrow_mut() = Some(metadata.coord));
-    // notify the operators that we are about to start
-    block.operators.setup(metadata.clone());
 
+    block.operators.setup(metadata);
     let structure = block.operators.structure();
-    structure_sender.send((metadata.coord, structure)).unwrap();
-    drop(structure_sender);
 
+    let join_handle = std::thread::Builder::new()
+        .name(format!("noir-block-{}", block.id))
+        .spawn(move || {
+            // remember in the thread-local the coordinate of this block
+            COORD.with(|x| *x.borrow_mut() = Some(coord));
+            do_work(block, coord)
+        })
+        .unwrap();
+
+
+    (join_handle, structure)
+}
+
+fn do_work<Out: Data, Op: Operator<Out> + 'static>(mut block: InnerBlock<Out, Op>, coord: Coord) {
     let mut catch_panic = CatchPanic::new(|| {
-        error!("Worker {} has crashed!", metadata.coord);
+        error!("Worker {} has crashed!", coord);
     });
     while !matches!(block.operators.next(), StreamElement::Terminate) {
         // nothing to do
     }
     catch_panic.defuse();
-    info!("Worker {} completed, exiting", metadata.coord);
+    info!("Worker {} completed, exiting", coord);
 }

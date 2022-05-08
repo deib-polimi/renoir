@@ -28,13 +28,11 @@ impl<Out: ExchangeData> SingleStartBlockReceiver<Out> {
 }
 
 impl<Out: ExchangeData> StartBlockReceiver<Out> for SingleStartBlockReceiver<Out> {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let in_type = TypeId::of::<Out>();
 
-        let mut network = metadata.network.lock();
         let endpoint = ReceiverEndpoint::new(metadata.coord, self.previous_block_id);
-        self.receiver = Some(network.get_receiver(endpoint));
-        drop(network);
+        self.receiver = Some(metadata.network.get_receiver(endpoint));
 
         for &(prev, typ) in metadata.prev.iter() {
             // ignore this connection because it refers to a different type, another StartBlock

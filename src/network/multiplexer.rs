@@ -3,7 +3,7 @@ use std::net::{Shutdown, TcpStream, ToSocketAddrs};
 use std::thread::{sleep, JoinHandle};
 use std::time::Duration;
 
-use crate::channel::{self, Receiver, SendError, Sender, RecvError, UnboundedSender, Selector};
+use crate::channel::{self, Receiver, RecvError, UnboundedSender, Selector};
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
@@ -11,7 +11,7 @@ use crate::operator::ExchangeData;
 use super::NetworkSender;
 
 /// Maximum number of attempts to make for connecting to a remote host.
-const CONNECT_ATTEMPTS: usize = 4;
+const CONNECT_ATTEMPTS: usize = 16;
 /// Timeout for connecting to a remote host.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(4);
 /// To avoid spamming the connections, wait this timeout before trying again. If the connection
@@ -39,6 +39,9 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         let join_handle = std::thread::Builder::new()
             .name(format!("noir-mux-{}", coord))
             .spawn(move || {
+                tracing::debug!("mux connecting to {}", address.to_socket_addrs().unwrap().nth(0).unwrap());
+                let stream = connect_remote(coord, address);
+                tracing::debug!("mux connected, waiting for receivers");
                 let mut receivers = Vec::new();
                 loop {
                     match rx.recv() {
@@ -46,7 +49,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
                         Err(RecvError::Disconnected) => break,
                     }
                 }
-                let stream = connect_remote(coord, address);
+                tracing::debug!("got receivers");
                 mux_thread::<Out>(coord, receivers, stream);
             })
             .unwrap();

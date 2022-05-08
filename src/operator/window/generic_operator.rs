@@ -69,7 +69,7 @@ where
     WindowDescr: WindowDescription<Key, Out> + Clone,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

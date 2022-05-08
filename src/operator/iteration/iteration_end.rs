@@ -54,10 +54,8 @@ where
     DeltaUpdate: Default,
     OperatorChain: Operator<DeltaUpdate>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
-        let mut network = metadata.network.lock();
-
-        let replicas = network.replicas(self.leader_block_id);
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        let replicas = metadata.network.replicas(self.leader_block_id);
         assert_eq!(
             replicas.len(),
             1,
@@ -69,10 +67,8 @@ where
             metadata.coord, leader
         );
 
-        let sender = network.get_sender(ReceiverEndpoint::new(leader, metadata.coord.block_id));
+        let sender = metadata.network.get_sender(ReceiverEndpoint::new(leader, metadata.coord.block_id));
         self.leader_sender = Some(sender);
-
-        drop(network);
 
         self.coord = metadata.coord;
         self.prev.setup(metadata);

@@ -126,7 +126,7 @@ pub trait Operator<Out: Data>: Clone + Send {
     ///
     /// It's important that each operator (except the start of a chain) calls `.setup()` recursively
     /// on the previous operators.
-    fn setup(&mut self, metadata: ExecutionMetadata);
+    fn setup(&mut self, metadata: &mut ExecutionMetadata);
 
     /// Take a value from the previous operator, process it and return it.
     fn next(&mut self) -> StreamElement<Out>;

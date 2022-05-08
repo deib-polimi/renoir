@@ -55,7 +55,7 @@ where
     Out: Data + Clone,
     InnerIterator: Iterator<Item = Out> + Clone + Send,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
@@ -225,7 +225,7 @@ where
     Out: Data + Clone,
     InnerIterator: Iterator<Item = Out> + Clone + Send,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

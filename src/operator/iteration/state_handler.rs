@@ -67,7 +67,7 @@ impl<State: ExchangeData> IterationStateHandler<State> {
         }
     }
 
-    pub(crate) fn setup(&mut self, metadata: ExecutionMetadata) {
+    pub(crate) fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let local_replicas: Vec<_> = metadata
             .replicas
             .clone()

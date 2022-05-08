@@ -18,7 +18,7 @@ impl<Out: ExchangeData, PreviousOperators> Operator<()> for CollectVecSink<Out, 
 where
     PreviousOperators: Operator<Out>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

@@ -1,6 +1,5 @@
 use std::any::TypeId;
 use std::collections::VecDeque;
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -9,7 +8,6 @@ use crate::operator::source::Source;
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::{BatchMode, EnvironmentConfig};
-use parking_lot::Mutex;
 
 /// A fake operator that can be used to unit-test the operators.
 #[derive(Debug, Clone)]
@@ -40,7 +38,7 @@ impl<Out: Data> FakeOperator<Out> {
 }
 
 impl<Out: Data> Operator<Out> for FakeOperator<Out> {
-    fn setup(&mut self, _metadata: ExecutionMetadata) {}
+    fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {
         if let Some(item) = self.buffer.pop_front() {
@@ -65,19 +63,17 @@ impl<Out: Data> Source<Out> for FakeOperator<Out> {
     }
 }
 
-pub(crate) struct FakeNetworkTopology;
+pub(crate) struct FakeNetworkTopology<T: ExchangeData> {
+    topology: NetworkTopology,
+    senders: Vec<Vec<(Coord, NetworkSender<T>)>>,
+    prev: Vec<(Coord, TypeId)>,
+}
 
-impl FakeNetworkTopology {
+impl<T: ExchangeData> FakeNetworkTopology<T> {
+
     /// Build a fake network topology for a single replica (with coord b0 h0 r0), that receives data
     /// of type `T` from `num_prev_blocks`, each with `num_replicas_per_block` replicas.
-    ///
-    /// The returned value has the metadata to pass to the `setup` of the block, and a list with the
-    /// senders indexed first by block, and then by replica.
-    #[allow(clippy::type_complexity)]
-    pub fn single_replica<T: ExchangeData>(
-        num_prev_blocks: usize,
-        num_replicas_per_block: usize,
-    ) -> (ExecutionMetadata, Vec<Vec<(Coord, NetworkSender<T>)>>) {
+    pub fn new(num_prev_blocks: usize, num_replicas_per_block: usize) -> Self {
         let config = EnvironmentConfig::local(1);
         let mut topology = NetworkTopology::new(config);
 
@@ -98,14 +94,28 @@ impl FakeNetworkTopology {
             senders.push(block_senders);
         }
 
-        let metadata = ExecutionMetadata {
+        Self {
+            topology,
+            senders,
+            prev,
+        }
+    }
+
+    pub fn metadata(&mut self) -> ExecutionMetadata<'_> {
+        let dest = Coord::new(0, 0, 0);
+        ExecutionMetadata {
             coord: dest,
             replicas: vec![dest],
             global_id: 0,
-            prev,
-            network: Arc::new(Mutex::new(topology)),
+            prev: self.prev.clone(),
+            network: &mut self.topology,
             batch_mode: BatchMode::adaptive(100, Duration::from_millis(100)),
-        };
-        (metadata, senders)
+        }
+    }
+
+    /// Get a mutable reference to the fake network topology's senders.
+    #[must_use]
+    pub(crate) fn senders_mut(&mut self) -> &mut Vec<Vec<(Coord, NetworkSender<T>)>> {
+        &mut self.senders
     }
 }

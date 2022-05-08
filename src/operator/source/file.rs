@@ -62,7 +62,7 @@ impl Source<String> for FileSource {
 }
 
 impl Operator<String> for FileSource {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let global_id = metadata.global_id;
         let num_replicas = metadata.replicas.len();
 

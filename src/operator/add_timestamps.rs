@@ -44,7 +44,7 @@ where
     TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
     WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

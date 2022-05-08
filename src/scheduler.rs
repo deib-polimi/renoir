@@ -1,13 +1,10 @@
-use parking_lot::Mutex;
 use std::any::TypeId;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use itertools::Itertools;
 
-use crate::block::{wait_structure, BatchMode, BlockStructure, InnerBlock};
-use crate::channel::{self, Sender, UnboundedReceiver, UnboundedSender};
+use crate::block::{BatchMode, BlockStructure, InnerBlock, JobGraphGenerator};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
@@ -22,8 +19,8 @@ pub type HostId = usize;
 pub type ReplicaId = usize;
 
 /// Metadata associated to a block in the execution graph.
-#[derive(Clone, Debug)]
-pub struct ExecutionMetadata {
+#[derive(Debug)]
+pub struct ExecutionMetadata<'a> {
     /// The coordinate of the block (it's id, replica id, ...).
     pub coord: Coord,
     /// The list of replicas of this block.
@@ -33,17 +30,9 @@ pub struct ExecutionMetadata {
     /// The total number of previous blocks inside the execution graph.
     pub prev: Vec<(Coord, TypeId)>,
     /// A reference to the `NetworkTopology` that keeps the state of the network.
-    pub(crate) network: Arc<Mutex<NetworkTopology>>,
+    pub(crate) network: &'a mut NetworkTopology,
     /// The batching mode to use inside this block.
     pub batch_mode: BatchMode,
-}
-
-/// Handle that the scheduler uses to start the computation of a block.
-pub(crate) struct StartHandle {
-    /// Sender for the `ExecutionMetadata` sent to the worker.
-    starter: Sender<ExecutionMetadata>,
-    /// `JoinHandle` used to wait until a block has finished working.
-    join_handle: JoinHandle<()>,
 }
 
 /// Information about a block in the job graph.
@@ -73,27 +62,23 @@ pub(crate) struct Scheduler {
     /// Information about the blocks known to the scheduler.
     block_info: HashMap<BlockId, SchedulerBlockInfo, ahash::RandomState>,
     /// The list of handles of each block in the execution graph.
-    start_handles: Vec<(Coord, StartHandle)>,
+    // start_handles: Vec<(Coord, StartHandle)>,
+
+    block_init: Vec<(Coord, Box<dyn FnOnce(&mut ExecutionMetadata) -> (JoinHandle<()>, BlockStructure) + Send>)>,
     /// The network topology that keeps track of all the connections inside the execution graph.
     network: NetworkTopology,
-    /// Receiver with the structure of the block sent by a worker.  
-    block_structure_receiver: UnboundedReceiver<(Coord, BlockStructure)>,
-    /// Sender to give to a worker for sending back the block structure.
-    block_structure_sender: UnboundedSender<(Coord, BlockStructure)>,
 }
 
 impl Scheduler {
     pub fn new(config: EnvironmentConfig) -> Self {
-        let (sender, receiver) = channel::unbounded();
         Self {
             next_blocks: Default::default(),
             prev_blocks: Default::default(),
             block_info: Default::default(),
-            start_handles: Default::default(),
+            // start_handles: Default::default(),
+            block_init: Default::default(),
             network: NetworkTopology::new(config.clone()),
             config,
-            block_structure_sender: sender,
-            block_structure_receiver: receiver,
         }
     }
 
@@ -136,8 +121,9 @@ impl Scheduler {
 
         for (coord, block) in blocks {
             // spawn the actual worker
-            let start_handle = spawn_worker(block, self.block_structure_sender.clone());
-            self.start_handles.push((coord, start_handle));
+            self.block_init.push(
+                (coord, Box::new(move |metadata| spawn_worker(block, metadata)))
+            );
         }
     }
 
@@ -175,36 +161,41 @@ impl Scheduler {
         );
 
         self.build_execution_graph();
-        self.network.finalize_topology();
-        self.network.log_topology();
+        self.network.build();
+        self.network.log();
 
         let mut join = vec![];
+        let mut block_structures = vec![];
+        let mut job_graph_generator = JobGraphGenerator::new();
 
-        let network = Arc::new(Mutex::new(self.network));
-        // start the execution
-        for (coord, handle) in self.start_handles {
+        for (coord, init_fn) in self.block_init {
             let block_info = &self.block_info[&coord.block_id];
             let replicas = block_info.replicas.values().flatten().cloned().collect();
             let global_id = block_info.global_ids[&coord];
-            let metadata = ExecutionMetadata {
+            let mut metadata = ExecutionMetadata {
                 coord,
                 replicas,
                 global_id,
-                prev: network.lock().prev(coord),
-                network: network.clone(),
+                prev: self.network.prev(coord),
+                network: &mut self.network,
                 batch_mode: block_info.batch_mode,
             };
-            handle.starter.send(metadata).unwrap();
-            join.push(handle.join_handle);
+            let (handle, structure) = init_fn(&mut metadata);
+            join.push(handle);
+            block_structures.push((coord, structure.clone()));
+            job_graph_generator.add_block(coord.block_id, structure);
         }
+
+        self.network.finalize();
 
         for handle in join {
             handle.join().unwrap();
         }
-        network.lock().stop_and_wait();
 
-        drop(self.block_structure_sender);
-        let block_structures = wait_structure(self.block_structure_receiver);
+        self.network.stop_and_wait();
+
+        let job_graph = job_graph_generator.finalize();
+        debug!("Job graph in dot format:\n{}", job_graph);
         let profiler_results = wait_profiler();
 
         Self::log_tracing_data(block_structures, profiler_results);
@@ -371,15 +362,6 @@ impl Scheduler {
             global_ids,
             batch_mode: block.batch_mode,
             is_only_one_strategy: block.is_only_one_strategy,
-        }
-    }
-}
-
-impl StartHandle {
-    pub(crate) fn new(starter: Sender<ExecutionMetadata>, join_handle: JoinHandle<()>) -> Self {
-        Self {
-            starter,
-            join_handle,
         }
     }
 }

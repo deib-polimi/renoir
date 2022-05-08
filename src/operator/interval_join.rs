@@ -127,7 +127,7 @@ where
     Out2: ExchangeData,
     OperatorChain: Operator<KeyValue<Key, ConcatElement<Out, Out2>>>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

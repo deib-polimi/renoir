@@ -55,7 +55,7 @@ impl<Out: Data, PreviousOperator: Operator<Out>> WatermarkChecker<Out, PreviousO
 impl<Out: Data, PreviousOperator: Operator<Out>> Operator<Out>
     for WatermarkChecker<Out, PreviousOperator>
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

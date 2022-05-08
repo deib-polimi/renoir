@@ -22,7 +22,7 @@ mod watermark_frontier;
 /// Trait that abstract the receiving part of the `StartBlock`.
 pub(crate) trait StartBlockReceiver<Out>: Clone {
     /// Setup the internal state of the receiver.
-    fn setup(&mut self, metadata: ExecutionMetadata);
+    fn setup(&mut self, metadata: &mut ExecutionMetadata);
 
     /// Obtain the list of all the previous replicas.
     ///
@@ -64,7 +64,9 @@ pub(crate) type SingleStartBlockReceiverOperator<Out> =
 #[derive(Clone, Debug)]
 pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> {
     /// Execution metadata of this block.
-    metadata: Option<ExecutionMetadata>,
+    max_delay: Option<Duration>,
+
+    coord: Option<Coord>,
 
     /// The actual receiver able to fetch messages from the network.
     receiver: Receiver,
@@ -132,7 +134,8 @@ impl<OutL: ExchangeData, OutR: ExchangeData>
 impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out, Receiver> {
     fn new(receiver: Receiver, state_lock: Option<Arc<IterationStateLock>>) -> Self {
         Self {
-            metadata: Default::default(),
+            coord: Default::default(),
+            max_delay: Default::default(),
 
             receiver,
             batch_iter: None,
@@ -159,8 +162,8 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out
 impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
     for StartBlock<Out, Receiver>
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.receiver.setup(metadata.clone());
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        self.receiver.setup(metadata);
 
         let prev_replicas = self.receiver.prev_replicas();
         self.num_previous_replicas = prev_replicas.len();
@@ -173,21 +176,22 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
             metadata.coord,
             std::any::type_name::<Out>()
         );
-        self.metadata = Some(metadata);
+        self.coord = Some(metadata.coord);
+        self.max_delay = metadata.batch_mode.max_delay();
     }
 
     fn next(&mut self) -> StreamElement<Out> {
-        let metadata = self.metadata.as_ref().unwrap();
+        let coord = self.coord.unwrap();
 
         // all the previous blocks sent an end: we're done
         if self.missing_terminate == 0 {
-            info!("StartBlock for {} has ended", metadata.coord);
+            info!("StartBlock for {} has ended", coord);
             return StreamElement::Terminate;
         }
         if self.missing_flush_and_restart == 0 {
             info!(
                 "StartBlock for {} is emitting flush and restart",
-                metadata.coord
+                coord
             );
 
             self.missing_flush_and_restart = self.num_previous_replicas;
@@ -197,8 +201,6 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
             self.state_generation += 2;
             return StreamElement::FlushAndRestart;
         }
-
-        let max_delay = metadata.batch_mode.max_delay();
 
         if let Some((sender, ref mut inner)) = self.batch_iter {
             let msg = match inner.next() {
@@ -226,7 +228,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                             self.missing_terminate -= 1;
                             debug!(
                                 "{} received a Terminate, {} more to come",
-                                metadata.coord, self.missing_terminate
+                                coord, self.missing_terminate
                             );
                             return self.next();
                         }
@@ -247,7 +249,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
         }
 
         // Receive next batch
-        let net_msg = match (self.already_timed_out, max_delay) {
+        let net_msg = match (self.already_timed_out, self.max_delay) {
             // check the timeout only if there is one and the last time we didn't timed out
             (false, Some(max_delay)) => {
                 match self.receiver.recv_timeout(max_delay) {
@@ -302,13 +304,13 @@ mod tests {
 
     #[test]
     fn test_single() {
-        let (metadata, mut senders) = FakeNetworkTopology::single_replica(1, 2);
-        let (from1, sender1) = senders[0].pop().unwrap();
-        let (from2, sender2) = senders[0].pop().unwrap();
+        let mut t = FakeNetworkTopology::new(1, 2);
+        let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
+        let (from2, sender2) = t.senders_mut()[0].pop().unwrap();
 
         let mut start_block =
             StartBlock::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
-        start_block.setup(metadata);
+        start_block.setup(&mut t.metadata());
 
         sender1
             .send(NetworkMessage::new_batch(
@@ -341,13 +343,13 @@ mod tests {
 
     #[test]
     fn test_single_watermark() {
-        let (metadata, mut senders) = FakeNetworkTopology::single_replica(1, 2);
-        let (from1, sender1) = senders[0].pop().unwrap();
-        let (from2, sender2) = senders[0].pop().unwrap();
+        let mut t = FakeNetworkTopology::new(1, 2);
+        let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
+        let (from2, sender2) = t.senders_mut()[0].pop().unwrap();
 
         let mut start_block =
             StartBlock::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
-        start_block.setup(metadata);
+        start_block.setup(&mut t.metadata());
 
         sender1
             .send(NetworkMessage::new_batch(
@@ -389,9 +391,9 @@ mod tests {
 
     #[test]
     fn test_multiple_no_cache() {
-        let (metadata, mut senders) = FakeNetworkTopology::single_replica(2, 1);
-        let (from1, sender1) = senders[0].pop().unwrap();
-        let (from2, sender2) = senders[1].pop().unwrap();
+        let mut t = FakeNetworkTopology::new(2, 1);
+        let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
+        let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
         let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
             from1.block_id,
@@ -400,7 +402,7 @@ mod tests {
             false,
             None,
         );
-        start_block.setup(metadata);
+        start_block.setup(&mut t.metadata());
 
         sender1
             .send(NetworkMessage::new_batch(
@@ -459,9 +461,9 @@ mod tests {
 
     #[test]
     fn test_multiple_cache() {
-        let (metadata, mut senders) = FakeNetworkTopology::single_replica(2, 1);
-        let (from1, sender1) = senders[0].pop().unwrap();
-        let (from2, sender2) = senders[1].pop().unwrap();
+        let mut t = FakeNetworkTopology::new(2, 1);
+        let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
+        let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
         let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
             from1.block_id,
@@ -470,7 +472,7 @@ mod tests {
             false,
             None,
         );
-        start_block.setup(metadata);
+        start_block.setup(&mut t.metadata());
 
         sender1
             .send(NetworkMessage::new_single(StreamElement::Item(42), from1))
@@ -540,9 +542,9 @@ mod tests {
 
     #[test]
     fn test_multiple_cache_other_side() {
-        let (metadata, mut senders) = FakeNetworkTopology::single_replica(2, 1);
-        let (from1, sender1) = senders[0].pop().unwrap();
-        let (from2, sender2) = senders[1].pop().unwrap();
+        let mut t = FakeNetworkTopology::new(2, 1);
+        let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
+        let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
         let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
             from1.block_id,
@@ -551,7 +553,7 @@ mod tests {
             true,
             None,
         );
-        start_block.setup(metadata);
+        start_block.setup(&mut t.metadata());
 
         sender1
             .send(NetworkMessage::new_single(StreamElement::Item(42), from1))

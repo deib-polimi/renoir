@@ -16,10 +16,12 @@ profiler = []
 [dependencies]
 # for logging to the console
 log = { version = "0.4", features = ["release_max_level_info"] }
+tracing = "0.1"
+tracing-log = "0.1"
 env_logger = "0.9"
 
 # used by the network for storing type-generic structures
-typemap = "0.3"
+typemap_rev = "0.1"
 
 # the shuffle() operator requires a random source
 nanorand = "0.7"
@@ -54,7 +56,7 @@ structopt = "0.3"
 
 # channel implementation
 crossbeam-channel = { version = "0.5", optional = true }
-flume = { version = "0.10", optional = true }
+flume = { version = "0.10", optional = true, features = ["eventual-fairness"] }
 
 # Used for KeyedWindowManager
 hashbrown = "0.12"

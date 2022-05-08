@@ -62,7 +62,7 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
         }
     }
 
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.receiver.setup(metadata);
         self.num_replicas = self.receiver.prev_replicas().len();
         self.missing_flush_and_restart = self.num_replicas;
@@ -299,8 +299,8 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
 impl<OutL: ExchangeData, OutR: ExchangeData> StartBlockReceiver<TwoSidesItem<OutL, OutR>>
     for MultipleStartBlockReceiver<OutL, OutR>
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.left.setup(metadata.clone());
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        self.left.setup(metadata);
         self.right.setup(metadata);
     }
 

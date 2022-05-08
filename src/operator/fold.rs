@@ -50,7 +50,7 @@ where
     F: Fn(&mut NewOut, Out) + Send + Clone,
     PreviousOperators: Operator<Out>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

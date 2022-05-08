@@ -42,7 +42,7 @@ where
     F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

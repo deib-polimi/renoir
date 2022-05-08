@@ -132,7 +132,7 @@ where
     It: Iterator<Item = Out> + Send + 'static,
     GenIt: FnOnce(usize, usize) -> It + Send + Clone,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.inner
             .generate(metadata.global_id, metadata.replicas.len());
     }

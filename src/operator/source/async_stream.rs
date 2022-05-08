@@ -62,7 +62,7 @@ impl<Out: Data, S> Operator<Out> for AsyncStreamSource<Out, S>
 where
     S: Stream<Item = Out> + Send + Unpin + 'static,
 {
-    fn setup(&mut self, _metadata: ExecutionMetadata) {}
+    fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {
         if self.terminated {

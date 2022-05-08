@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::block::{
     BatchMode, Batcher, BlockStructure, Connection, NextStrategy, OperatorStructure, SenderList,
 };
-use crate::network::ReceiverEndpoint;
+use crate::network::{ReceiverEndpoint, Coord};
 use crate::operator::{ExchangeData, KeyerFn, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
@@ -16,7 +16,7 @@ where
     OperatorChain: Operator<Out>,
 {
     prev: OperatorChain,
-    metadata: Option<ExecutionMetadata>,
+    coord: Option<Coord>,
     next_strategy: NextStrategy<Out, IndexFn>,
     batch_mode: BatchMode,
     sender_groups: Vec<SenderList>,
@@ -38,7 +38,7 @@ where
     ) -> Self {
         Self {
             prev,
-            metadata: None,
+            coord: None,
             next_strategy,
             batch_mode,
             sender_groups: Default::default(),
@@ -67,10 +67,10 @@ where
     IndexFn: KeyerFn<u64, Out>,
     OperatorChain: Operator<Out>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
-        self.prev.setup(metadata.clone());
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        self.prev.setup(metadata);
 
-        let senders = metadata.network.lock().get_senders(metadata.coord);
+        let senders = metadata.network.get_senders(metadata.coord);
         // remove the ignored destinations
         let senders = senders
             .into_iter()
@@ -84,7 +84,7 @@ where
             .into_iter()
             .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode, metadata.coord)))
             .collect();
-        self.metadata = Some(metadata);
+        self.coord = Some(metadata.coord);
     }
 
     fn next(&mut self) -> StreamElement<()> {
@@ -131,10 +131,10 @@ where
         };
 
         if matches!(to_return, StreamElement::Terminate) {
-            let metadata = self.metadata.as_ref().unwrap();
+            let coord = self.coord.unwrap();
             debug!(
                 "EndBlock at {} received Terminate, closing {} channels",
-                metadata.coord,
+                coord,
                 self.senders.len()
             );
             for (_, batcher) in self.senders.drain() {

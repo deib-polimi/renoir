@@ -58,7 +58,7 @@ impl<Out: Data, It> Operator<Out> for IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
-    fn setup(&mut self, _metadata: ExecutionMetadata) {}
+    fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {
         if self.terminated {

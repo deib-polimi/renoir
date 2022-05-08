@@ -173,7 +173,7 @@ impl<
     > Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>
     for JoinLocalHash<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
         self.prev.setup(metadata);
     }

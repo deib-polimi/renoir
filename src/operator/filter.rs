@@ -36,7 +36,7 @@ where
     Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
     PreviousOperator: Operator<Out> + 'static,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

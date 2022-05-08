@@ -111,15 +111,13 @@ where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
     LoopCond: Fn(&mut State) -> bool + Send + Clone,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
-        let mut network = metadata.network.lock();
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
-        self.new_state_senders = network
+        self.new_state_senders = metadata.network
             .get_senders(metadata.coord)
             .into_iter()
             .map(|(_, s)| s)
             .collect();
-        drop(network);
 
         // at this point the id of the block with IterationEndBlock must be known
         let feedback_block_id = self.feedback_block_id.load(Ordering::Acquire);

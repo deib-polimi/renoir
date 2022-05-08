@@ -199,6 +199,16 @@ fn spawn_remote_worker(
     let mut channel = session.channel_session().unwrap();
     channel.exec(&command).unwrap();
 
+    let reader = BufReader::new(&mut channel);
+
+    for l in reader.lines() {
+        println!(
+            "{}|{}",
+            host_id,
+            l.unwrap_or_else(|e| format!("ERROR: {}", e))
+        );
+    }
+
     // copy to stderr the output of the remote process
     let reader = BufReader::new(channel.stderr());
     let mut tracing_data = None;
@@ -215,15 +225,6 @@ fn spawn_remote_worker(
             // prefix each line with the id of the host
             eprintln!("{}|{}", host_id, line);
         }
-    }
-    let reader = BufReader::new(&mut channel);
-
-    for l in reader.lines() {
-        println!(
-            "{}|{}",
-            host_id,
-            l.unwrap_or_else(|e| format!("ERROR: {}", e))
-        );
     }
 
     channel.wait_close().unwrap();

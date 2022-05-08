@@ -142,7 +142,7 @@ impl<
     > Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>
     for JoinLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 

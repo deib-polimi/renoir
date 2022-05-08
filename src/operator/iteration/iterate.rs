@@ -327,13 +327,12 @@ impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Operator<Out>
 where
     OperatorChain: Operator<Out>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
 
-        let mut network = metadata.network.lock();
         let feedback_end_block_id = self.feedback_end_block_id.load(Ordering::Acquire);
         let feedback_endpoint = ReceiverEndpoint::new(metadata.coord, feedback_end_block_id);
-        self.feedback_receiver = Some(network.get_receiver(feedback_endpoint));
+        self.feedback_receiver = Some(metadata.network.get_receiver(feedback_endpoint));
 
         let output_block_id = self.output_block_id.load(Ordering::Acquire);
         let output_endpoint = ReceiverEndpoint::new(
@@ -344,11 +343,10 @@ where
             ),
             metadata.coord.block_id,
         );
-        self.output_sender = Some(network.get_sender(output_endpoint));
-        drop(network);
+        self.output_sender = Some(metadata.network.get_sender(output_endpoint));
 
-        self.prev.setup(metadata.clone());
-        self.state.setup(metadata.clone());
+        self.prev.setup(metadata);
+        self.state.setup(metadata);
     }
 
     fn next(&mut self) -> StreamElement<Out> {

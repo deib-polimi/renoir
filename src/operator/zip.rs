@@ -42,7 +42,7 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
 }
 
 impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
@@ -172,12 +172,13 @@ mod tests {
 
     #[test]
     fn zip() {
-        let (metadata, mut senders) = FakeNetworkTopology::single_replica(2, 1);
-        let (coord_l, sender_l) = senders[0].pop().unwrap();
-        let (coord_r, sender_r) = senders[1].pop().unwrap();
+        let mut t = FakeNetworkTopology::new(2, 1);
+
+        let (coord_l, sender_l) = t.senders_mut()[0].pop().unwrap();
+        let (coord_r, sender_r) = t.senders_mut()[1].pop().unwrap();
 
         let mut zip = Zip::<i32, i32>::new(coord_l.block_id, coord_r.block_id, false, false, None);
-        zip.setup(metadata);
+        zip.setup(&mut t.metadata());
 
         let send = |sender: &NetworkSender<i32>, from: Coord, data: Vec<StreamElement<i32>>| {
             sender.send(NetworkMessage::new_batch(data, from)).unwrap();

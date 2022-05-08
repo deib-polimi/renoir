@@ -155,7 +155,7 @@ impl<T: ChannelItem> Receiver<T> {
 pub struct UnboundedSender<T: ChannelItem>(SenderExt<T>);
 /// A wrapper on an unbounded channel receiver.
 #[derive(Debug)]
-pub struct UnboundedReceiver<T: ChannelItem>(ReceiverExt<T>);
+pub struct UnboundedReceiver<T: ChannelItem>(pub(crate) ReceiverExt<T>);
 
 impl<T: ChannelItem> UnboundedSender<T> {
     /// Send a message in the channel.
@@ -201,12 +201,12 @@ impl<T: ChannelItem> UnboundedReceiver<T> {
     }
 }
 
-pub struct Selector<T: Send + 'static, K: Clone> {
+pub struct Selector<T: Send + 'static, K: Clone + Eq> {
     rxs: Vec<(K, Receiver<T>)>,
     // inner: flume::Selector<'a, Result<(K, T), RecvError>>,
 }
 
-impl<T: Send + 'static, K: Clone> Selector<T, K> {
+impl<T: Send + 'static, K: Clone + Eq> Selector<T, K> {
     pub fn new(receivers: Vec<(K, Receiver<T>)>) -> Self {
         let rxs = receivers;
         Self { rxs }
@@ -215,11 +215,21 @@ impl<T: Send + 'static, K: Clone> Selector<T, K> {
     pub fn recv(&mut self) -> Result<(K, T), RecvError> {
         let mut selector = flume::Selector::new();
 
-        for (k, recv) in self.rxs.iter() {
-            selector = selector.recv(&recv.0, move |r| r.map(|i| (k.clone(), i)))
+        if self.rxs.is_empty() {
+            return Err(RecvError::Disconnected);
         }
 
-        selector.wait()
+        for (k, recv) in self.rxs.iter() {
+            selector = selector.recv(&recv.0, move |r| r.map(|i| (k.clone(), i)).map_err(|e| (k.clone(), e)))
+        }
+
+        match selector.wait() {
+            Ok(i) => Ok(i),
+            Err((k, RecvError::Disconnected)) => {
+                self.rxs.retain(|r| r.0 != k);
+                self.recv()
+            }
+        }
     }    
 }
 

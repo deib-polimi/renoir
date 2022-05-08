@@ -41,7 +41,7 @@ where
     Keyer: Fn(&Out) -> Key + Send + Clone,
     OperatorChain: Operator<Out>,
 {
-    fn setup(&mut self, metadata: ExecutionMetadata) {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
