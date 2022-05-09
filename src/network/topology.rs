@@ -8,7 +8,7 @@ use typemap_rev::{TypeMapKey, TypeMap};
 
 use crate::channel::Sender;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
-use crate::network::demultiplexer::DemultiplexingReceiver;
+use crate::network::demultiplexer::DemuxHandle;
 use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{
     local_channel, BlockCoord, Coord, DemuxCoord, NetworkReceiver, NetworkSender,
@@ -38,7 +38,7 @@ impl<In: ExchangeData> TypeMapKey for SenderKey<In> {
 struct DemultiplexingReceiverKey<In: ExchangeData>(PhantomData<In>);
 
 impl<In: ExchangeData> TypeMapKey for DemultiplexingReceiverKey<In> {
-    type Value = HashMap<DemuxCoord, DemultiplexingReceiver<In>, ahash::RandomState>;
+    type Value = HashMap<DemuxCoord, DemuxHandle<In>, ahash::RandomState>;
 }
 
 /// This struct is used to index inside the `typemap` with the `MultiplexingSender`s.
@@ -259,7 +259,7 @@ impl NetworkTopology {
             }
             if !prev.is_empty() {
                 let address = self.demultiplexer_addresses[&demux_coord].clone();
-                let (demux, join_handle) = DemultiplexingReceiver::new(demux_coord, address, prev.len());
+                let (demux, join_handle) = DemuxHandle::new(demux_coord, address, prev.len());
                 self.join_handles.push(join_handle);
                 demuxes.insert(demux_coord, demux);
             } else {

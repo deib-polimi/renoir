@@ -3,7 +3,7 @@ use std::net::{Shutdown, TcpStream, ToSocketAddrs};
 use std::thread::{sleep, JoinHandle};
 use std::time::Duration;
 
-use crate::channel::{self, Receiver, RecvError, UnboundedSender, Selector};
+use crate::channel::{self, Receiver, UnboundedSender, Selector};
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
@@ -43,11 +43,8 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
                 let stream = connect_remote(coord, address);
                 tracing::debug!("mux connected, waiting for receivers");
                 let mut receivers = Vec::new();
-                loop {
-                    match rx.recv() {
-                        Ok(t) => receivers.push(t),
-                        Err(RecvError::Disconnected) => break,
-                    }
+                while let Ok(t) = rx.recv() {
+                    receivers.push(t);
                 }
                 tracing::debug!("got receivers");
                 mux_thread::<Out>(coord, receivers, stream);

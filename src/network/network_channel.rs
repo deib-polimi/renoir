@@ -136,11 +136,6 @@ impl<Out: ExchangeData> NetworkSender<Out> {
             .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint))
     }
 
-    /// Get the inner sender if the channel is local.
-    pub fn inner(&self) -> Option<&Sender<NetworkMessage<Out>>> {
-        Some(&self.sender)
-    }
-
     pub fn clone_inner(&self) -> Sender<NetworkMessage<Out>> {
         self.sender.clone()
     }
