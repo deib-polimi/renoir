@@ -647,6 +647,8 @@ mod tests {
                 );
             }
 
+            topology.finalize();
+
             for handle in join_handles {
                 handle.join().unwrap();
             }

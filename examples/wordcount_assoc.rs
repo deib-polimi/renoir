@@ -1,6 +1,5 @@
 use std::time::Instant;
 
-use itertools::Itertools;
 use regex::Regex;
 
 use noir::operator::source::FileSource;
@@ -32,16 +31,14 @@ fn main() {
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();
-    if let Some(res) = result.get() {
-        eprintln!("Output: {:?}", res.len());
-        eprintln!(
-            "{:?}",
-            res.iter()
-                .sorted_by_key(|t| t.1)
-                .rev()
-                .take(10)
-                .collect::<Vec<_>>()
-        )
+
+    if let Some(_r) = result.get() {
+        println!("OK");
+        // _r.iter()
+        //     .sorted_by_key(|t| t.1)
+        //     .rev()
+        //     .take(10)
+        //     .for_each(|(k, v)| eprintln!("{:>10}:{:>10}", k, v));
     }
     eprintln!("Elapsed: {:?}", elapsed);
 }
