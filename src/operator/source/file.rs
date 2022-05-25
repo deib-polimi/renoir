@@ -5,6 +5,7 @@ use std::io::{BufReader, SeekFrom};
 use std::path::PathBuf;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
+use crate::network::Coord;
 use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -20,6 +21,7 @@ pub struct FileSource {
     current: usize,
     end: usize,
     terminated: bool,
+    coord: Option<Coord>,
 }
 
 impl FileSource {
@@ -51,6 +53,7 @@ impl FileSource {
             current: 0,
             end: 0,
             terminated: false,
+            coord: None,
         }
     }
 }
@@ -95,11 +98,13 @@ impl Operator<String> for FileSource {
                 .read_line(&mut s)
                 .expect("Cannot read line from file");
         }
+        self.coord = Some(metadata.coord);
         self.reader = Some(reader);
     }
 
     fn next(&mut self) -> StreamElement<String> {
         if self.terminated {
+            tracing::debug!("{} emitting terminate", self.coord.unwrap());
             return StreamElement::Terminate;
         }
         let element = if self.current <= self.end {
@@ -151,6 +156,7 @@ impl Clone for FileSource {
             current: 0,
             end: 0,
             terminated: false,
+            coord: None,
         }
     }
 }

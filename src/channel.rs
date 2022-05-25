@@ -230,7 +230,27 @@ impl<T: Send + 'static, K: Clone + Eq> Selector<T, K> {
                 self.recv()
             }
         }
-    }    
+    }
+
+    pub fn recv_timeout(&mut self, timeout: Duration) -> Result<(K, T), RecvTimeoutError> {
+        let mut selector = flume::Selector::new();
+
+        if self.rxs.is_empty() {
+            return Err(RecvTimeoutError::Disconnected);
+        }
+
+        for (k, recv) in self.rxs.iter() {
+            selector = selector.recv(&recv.0, move |r| r.map(|i| (k.clone(), i)).map_err(|e| (k.clone(), e)))
+        }
+
+        match selector.wait_timeout(timeout).map_err(|_| RecvTimeoutError::Timeout)? {
+            Ok(i) => Ok(i),
+            Err((k, RecvError::Disconnected)) => {
+                self.rxs.retain(|r| r.0 != k);
+                self.recv_timeout(timeout)
+            }
+        }
+    }
 }
 
 #[cfg(test)]

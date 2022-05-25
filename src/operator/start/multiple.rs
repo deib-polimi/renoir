@@ -259,19 +259,32 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
             // already been read).
             Side::Left(self.left.recv(timeout))
         } else {
+            let left_terminated = self.left.is_terminated();
+            let right_terminated = self.right.is_terminated();
             let left = self.left.receiver.receiver.as_mut().unwrap();
             let right = self.right.receiver.receiver.as_mut().unwrap();
-            let data = if let Some(timeout) = timeout {
-                left.select_timeout(right, timeout)
-            } else {
-                Ok(left.select(right))
+
+            let data = match (left_terminated, right_terminated, timeout) {
+                (false, false, Some(timeout)) => left.select_timeout(right, timeout),
+                (false, false, None) => Ok(left.select(right)),
+
+                (true, false, Some(timeout)) => right.recv_timeout(timeout)
+                    .map(|r| SelectResult::B(Ok(r))),
+                (false, true, Some(timeout)) => left.recv_timeout(timeout)
+                    .map(|r| SelectResult::A(Ok(r))),
+
+                (true, false, None) => Ok(SelectResult::B(right.recv())),
+                (false, true, None) => Ok(SelectResult::A(left.recv())),
+
+                (true, true, _) => Err(RecvTimeoutError::Disconnected),
             };
+
             match data {
                 Ok(SelectResult::A(left)) => {
-                    Side::Left(left.map_err(|_| RecvTimeoutError::Timeout))
+                    Side::Left(left.map_err(|_| RecvTimeoutError::Disconnected))
                 }
                 Ok(SelectResult::B(right)) => {
-                    Side::Right(right.map_err(|_| RecvTimeoutError::Timeout))
+                    Side::Right(right.map_err(|_| RecvTimeoutError::Disconnected))
                 }
                 // timeout
                 Err(e) => Side::Left(Err(e)),
@@ -291,7 +304,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
                 TwoSidesItem::Right,
                 TwoSidesItem::RightEnd,
             )),
-            Side::Left(Err(_)) | Side::Right(Err(_)) => Err(RecvTimeoutError::Timeout),
+            Side::Left(Err(e)) | Side::Right(Err(e)) => Err(e),
         }
     }
 }

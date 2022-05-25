@@ -462,8 +462,8 @@ impl NetworkTopology {
         self.receivers.take();
         self.senders.take();
 
-        self.multiplexers.take();
         self.demultiplexers.take();
+        self.multiplexers.take();
     }
 
     pub fn log(&self) {

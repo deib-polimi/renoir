@@ -38,10 +38,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
         let (tx_senders, rx_senders) = channel::unbounded();
         let join_handle = std::thread::Builder::new()
             .name(format!("noir-demux-reg-{}", coord))
-            .spawn(move || {
-                tracing::debug!("binding demux {}", address.to_socket_addrs().unwrap().nth(0).unwrap());
-                bind_remotes(coord, address, num_clients, rx_senders);
-            })
+            .spawn(move || bind_remotes(coord, address, num_clients, rx_senders))
             .unwrap();
         (Self { coord, tx_senders }, join_handle)
     }
@@ -53,7 +50,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
         sender: Sender<NetworkMessage<In>>,
     ) {
         debug!(
-            "Registering {} to the demultiplexer of {}",
+            "registering {} to the demultiplexer of {}",
             receiver_endpoint, self.coord
         );
         self.tx_senders
@@ -151,7 +148,7 @@ fn bind_remotes<In: ExchangeData>(
     for handle in join_handles {
         handle.join().unwrap();
     }
-    debug!("Demultiplexer of {} finished", coord);
+    debug!("all demuxes for {} finished", coord);
 }
 
 /// Handle the connection with a remote sender.
@@ -169,6 +166,7 @@ fn bind_remotes<In: ExchangeData>(
 /// + Return an enum, either Queued or Overflowed
 /// 
 /// if overflowed send a yield request through a second channel
+#[tracing::instrument(skip_all)]
 fn demux_thread<In: ExchangeData>(
     coord: DemuxCoord,
     senders: AHashMap<
@@ -181,6 +179,7 @@ fn demux_thread<In: ExchangeData>(
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
+    debug!("demultiplexer for {} at {} started", coord, address);
 
     while let Some((dest, message)) = remote_recv(coord, &mut stream) {
         let message_len = message.len();
@@ -188,10 +187,10 @@ fn demux_thread<In: ExchangeData>(
         get_profiler().net_bytes_in(message.sender, dest.coord, header_size() + message_len);
         
         if let Err(e) = senders[&dest].send(message) {
-            warn!("Failed to send message to {}: {:?}", dest, e);
+            warn!("failed to send message to {}: {:?}", dest, e);
         }
     }
 
     let _ = stream.shutdown(Shutdown::Both);
-    debug!("Remote receiver for {} at {} exited", coord, address);
+    debug!("demultiplexer for {} at {} exited", coord, address);
 }
