@@ -30,8 +30,7 @@ fn main() {
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| tokenizer.tokenize(line))
-        .group_by(|word: &String| word.clone())
-        .fold(0u64, |count, _word| *count += 1)
+        .group_by_count(|word: &String| word.clone())
         .collect_vec();
     let start = Instant::now();
     env.execute();
@@ -69,8 +68,7 @@ async fn main() {
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| tokenizer.tokenize(line))
-        .group_by(|word: &String| word.clone())
-        .fold(0u64, |count, _word| *count += 1)
+        .group_by_count(|word: &String| word.clone())
         .collect_vec();
     let start = Instant::now();
     env.execute();
