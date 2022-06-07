@@ -309,7 +309,7 @@ impl NetworkTopology {
             #[cfg(not(feature = "async-tokio"))]
             self.join_handles.push(join_handle);
             #[cfg(feature = "async-tokio")]
-            let _ = join_handle; // TODO
+            self.async_join_handles.push(join_handle);
             muxers.insert(demux_coord, mux);
         }
         muxers.get_mut(&demux_coord).unwrap().get_sender(receiver_endpoint)

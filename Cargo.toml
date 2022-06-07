@@ -9,7 +9,7 @@ authors = [
 edition = "2021"
 
 [features]
-default = ["flume"]
+default = ["flume", "fair"]
 crossbeam = ["crossbeam-channel"]
 fair = []
 profiler = []
