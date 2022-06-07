@@ -276,8 +276,8 @@ fn send_file(
     mode: i32,
 ) {
     let metadata = local_path.metadata().unwrap();
-    debug!(
-        "Sending file to host {}: {} -> {}, {} bytes",
+    tracing::info!(
+        "Sending executable to host {}: {} -> {}, {} bytes",
         host_id,
         local_path.display(),
         remote_path.display(),
@@ -287,6 +287,7 @@ fn send_file(
     let mut remote_file = session
         .scp_send(remote_path, mode, metadata.len(), None)
         .unwrap();
+
     let mut buffer = [0u8; SCP_BUFFER_SIZE];
     while let Ok(n) = local_file.read(&mut buffer) {
         if n == 0 {
@@ -298,6 +299,11 @@ fn send_file(
     remote_file.wait_eof().unwrap();
     remote_file.close().unwrap();
     remote_file.wait_close().unwrap();
+
+    tracing::info!(
+        "Sent executable to host {}",
+        host_id,
+    );
 
     // setting the file mode using scp_send seems unreliable
     let chmod = format!(

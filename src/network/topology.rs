@@ -3,6 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::thread::JoinHandle;
 
+#[cfg(feature = "async-tokio")]
+use futures::StreamExt;
 use itertools::Itertools;
 use typemap_rev::{TypeMapKey, TypeMap};
 
@@ -123,6 +125,8 @@ pub(crate) struct NetworkTopology {
 
     /// The set of join handles of the various threads spawned by the topology.
     join_handles: Vec<JoinHandle<()>>,
+
+    async_join_handles: Vec<tokio::task::JoinHandle<()>>,
 }
 
 impl NetworkTopology {
@@ -141,6 +145,7 @@ impl NetworkTopology {
             registered_receivers: Default::default(),
             demultiplexer_addresses: Default::default(),
             join_handles: Default::default(),
+            async_join_handles: Default::default(),
         }
     }
 
@@ -149,6 +154,21 @@ impl NetworkTopology {
     pub(crate) fn stop_and_wait(&mut self) {
         for handle in self.join_handles.drain(..) {
             handle.join().unwrap();
+        }
+        #[cfg(feature = "async-tokio")]
+        {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let handles = std::mem::replace(&mut self.async_join_handles, Vec::new());
+            tokio::spawn(async move {
+                handles
+                    .into_iter()
+                    .collect::<futures::stream::FuturesOrdered<_>>()
+                    .for_each(|h| futures::future::ready(h.unwrap()))
+                    .await;
+                tx.send(()).unwrap();
+            });
+    
+            rx.recv().unwrap();
         }
     }
 
@@ -260,7 +280,10 @@ impl NetworkTopology {
             if !prev.is_empty() {
                 let address = self.demultiplexer_addresses[&demux_coord].clone();
                 let (demux, join_handle) = DemuxHandle::new(demux_coord, address, prev.len());
+                #[cfg(not(feature = "async-tokio"))]
                 self.join_handles.push(join_handle);
+                #[cfg(feature = "async-tokio")]
+                self.async_join_handles.push(join_handle);
                 demuxes.insert(demux_coord, demux);
             } else {
                 debug!("Demultiplexer of {} is useless since it has no previous remote block, ignoring", demux_coord);
@@ -283,7 +306,10 @@ impl NetworkTopology {
         if !muxers.contains_key(&demux_coord) {
             let address = self.demultiplexer_addresses[&demux_coord].clone();
             let (mux, join_handle) = MultiplexingSender::new(demux_coord, address);
+            #[cfg(not(feature = "async-tokio"))]
             self.join_handles.push(join_handle);
+            #[cfg(feature = "async-tokio")]
+            let _ = join_handle; // TODO
             muxers.insert(demux_coord, mux);
         }
         muxers.get_mut(&demux_coord).unwrap().get_sender(receiver_endpoint)

@@ -1,5 +1,14 @@
+#[cfg(not(feature = "async-tokio"))]
 use std::io::Read;
+#[cfg(not(feature = "async-tokio"))]
 use std::io::Write;
+#[cfg(feature = "async-tokio")]
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+
+#[cfg(feature = "async-tokio")]
+use tokio::net::TcpStream;
+#[cfg(not(feature = "async-tokio"))]
 use std::net::TcpStream;
 
 use anyhow::Result;
@@ -45,6 +54,7 @@ struct MessageHeader {
 /// The network protocol works as follow:
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
+#[cfg(not(feature = "async-tokio"))]
 pub(crate) fn remote_send<T: ExchangeData>(
     what: NetworkMessage<T>,
     dest: ReceiverEndpoint,
@@ -90,10 +100,62 @@ pub(crate) fn remote_send<T: ExchangeData>(
     );
 }
 
+/// Serialize and send a message to a remote socket.
+///
+/// The network protocol works as follow:
+/// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
+/// - send the message
+#[cfg(feature = "async-tokio")]
+pub(crate) async fn remote_send<T: ExchangeData>(
+    what: NetworkMessage<T>,
+    dest: ReceiverEndpoint,
+    stream: &mut TcpStream,
+) {
+    let address = stream
+        .peer_addr()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+    let serialized = MESSAGE_CONFIG
+        .serialize(&what)
+        .unwrap_or_else(|e| panic!("Failed to serialize outgoing message to {}: {:?}", dest, e));
+    let header = MessageHeader {
+        size: serialized.len() as _,
+        replica_id: dest.coord.replica_id,
+        sender_block_id: dest.prev_block_id,
+    };
+    let serialized_header = HEADER_CONFIG.serialize(&header).unwrap();
+    stream.write_all(&serialized_header).await.unwrap_or_else(|e| {
+        panic!(
+            "Failed to send size of message (was {} bytes) to {} at {}: {:?}",
+            serialized.len(),
+            dest,
+            address,
+            e
+        )
+    });
+
+    stream.write_all(&serialized).await.unwrap_or_else(|e| {
+        panic!(
+            "Failed to send {} bytes to {} at {}: {:?}",
+            serialized.len(),
+            dest,
+            address,
+            e
+        )
+    });
+
+    get_profiler().net_bytes_out(
+        what.sender,
+        dest.coord,
+        serialized_header.len() + serialized.len(),
+    );
+}
+
 /// Receive a message from the remote channel. Returns `None` if there was a failure receiving the
 /// last message.
 ///
 /// The message won't be deserialized, use `deserialize()`.
+#[cfg(not(feature = "async-tokio"))]
 pub(crate) fn remote_recv(
     coord: DemuxCoord,
     stream: &mut TcpStream,
@@ -119,6 +181,44 @@ pub(crate) fn remote_recv(
         .expect("Malformed header");
     let mut buf = vec![0u8; header.size as usize];
     stream.read_exact(&mut buf).unwrap_or_else(|e| {
+        panic!(
+            "Failed to receive {} bytes to {} from {}: {:?}",
+            header.size, coord, address, e
+        )
+    });
+    let receiver_endpoint = ReceiverEndpoint::new(
+        Coord::new(coord.coord.block_id, coord.coord.host_id, header.replica_id),
+        header.sender_block_id,
+    );
+    Some((receiver_endpoint, buf))
+}
+
+#[cfg(feature = "async-tokio")]
+pub(crate) async fn remote_recv(
+    coord: DemuxCoord,
+    stream: &mut TcpStream,
+) -> Option<(ReceiverEndpoint, SerializedMessage)> {
+    let address = stream
+        .peer_addr()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+    let header_size = header_size();
+    let mut header = vec![0u8; header_size];
+    match stream.read_exact(&mut header).await {
+        Ok(_) => {}
+        Err(e) => {
+            debug!(
+                "Failed to receive {} bytes of header to {} from {}: {:?}",
+                header_size, coord, address, e
+            );
+            return None;
+        }
+    }
+    let header: MessageHeader = HEADER_CONFIG
+        .deserialize(&header)
+        .expect("Malformed header");
+    let mut buf = vec![0u8; header.size as usize];
+    stream.read_exact(&mut buf).await.unwrap_or_else(|e| {
         panic!(
             "Failed to receive {} bytes to {} from {}: {:?}",
             header.size, coord, address, e

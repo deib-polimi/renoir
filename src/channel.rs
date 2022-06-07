@@ -121,6 +121,11 @@ impl<T: ChannelItem> Receiver<T> {
         self.0.try_recv()
     }
 
+    #[inline]
+    pub async fn recv_async(&self) -> Result<T, RecvError> {
+        self.0.recv_async().await
+    }
+
     /// Block until a message is present in the channel and return it when ready.
     ///
     /// If the timeout expires an error is returned.

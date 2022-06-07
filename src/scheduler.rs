@@ -186,6 +186,9 @@ impl Scheduler {
             job_graph_generator.add_block(coord.block_id, structure);
         }
 
+        let job_graph = job_graph_generator.finalize();
+        debug!("Job graph in dot format:\n{}", job_graph);
+        
         self.network.finalize();
 
         for handle in join {
@@ -194,8 +197,6 @@ impl Scheduler {
 
         self.network.stop_and_wait();
 
-        let job_graph = job_graph_generator.finalize();
-        debug!("Job graph in dot format:\n{}", job_graph);
         let profiler_results = wait_profiler();
 
         Self::log_tracing_data(block_structures, profiler_results);
