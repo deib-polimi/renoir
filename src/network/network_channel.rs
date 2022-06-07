@@ -13,6 +13,7 @@ use crate::profiler::{get_profiler, Profiler};
 /// The capacity of the in-buffer.
 const CHANNEL_CAPACITY: usize = 64;
 
+#[cfg(feature = "fair")]
 pub(crate) fn local_channel<T: ExchangeData>(
     receiver_endpoint: ReceiverEndpoint,
 ) -> (NetworkSender<T>, NetworkReceiver<T>) {
@@ -28,13 +29,32 @@ pub(crate) fn local_channel<T: ExchangeData>(
     )
 }
 
-// pub(crate) fn remote_channel<In: ExchangeData>(
-//     receiver_endpoint: ReceiverEndpoint,
-//     sender: MultiplexingSender<In>,
-// ) -> NetworkSender<In> {
-//     let sender = NetworkSender{receiver_endpoint, sender};
-//     sender
-// }
+#[cfg(not(feature = "fair"))]
+pub(crate) fn local_channel<T: ExchangeData>(
+    receiver_endpoint: ReceiverEndpoint,
+) -> (NetworkSender<T>, NetworkReceiver<T>) {
+    let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
+    (
+        NetworkSender{
+            receiver_endpoint,
+            sender: SenderInner::Local(sender)},
+        NetworkReceiver {
+            receiver_endpoint,
+            receiver,
+        },
+    )
+}
+
+#[cfg(not(feature = "fair"))]
+pub(crate) fn mux_sender<T: ExchangeData>(
+    receiver_endpoint: ReceiverEndpoint,
+    tx: Sender<(ReceiverEndpoint, NetworkMessage<T>)>
+) -> NetworkSender<T> {
+    NetworkSender{
+        receiver_endpoint,
+        sender: SenderInner::Mux(tx),
+    }
+}
 
 /// The receiving end of a connection between two replicas.
 ///
@@ -120,11 +140,23 @@ pub(crate) struct NetworkSender<Out: ExchangeData> {
     pub receiver_endpoint: ReceiverEndpoint,
     /// The generic sender that will send the message either locally or remotely.
     #[derivative(Debug = "ignore")]
+    #[cfg(feature = "fair")]
     pub(super) sender: Sender<NetworkMessage<Out>>,
+    #[derivative(Debug = "ignore")]
+    #[cfg(not(feature = "fair"))]
+    sender: SenderInner<Out>,
+}
+
+#[derive(Clone)]
+#[cfg(not(feature = "fair"))]
+enum SenderInner<Out: ExchangeData> {
+    Mux(Sender<(ReceiverEndpoint, NetworkMessage<Out>)>),
+    Local(Sender<NetworkMessage<Out>>),
 }
 
 impl<Out: ExchangeData> NetworkSender<Out> {
     /// Send a message to a replica.
+    #[cfg(feature = "fair")]
     pub fn send(&self, message: NetworkMessage<Out>) -> Result<(), NetworkSendError> {
         get_profiler().items_out(
             message.sender,
@@ -136,8 +168,33 @@ impl<Out: ExchangeData> NetworkSender<Out> {
             .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint))
     }
 
+    #[cfg(not(feature = "fair"))]
+    pub fn send(&self, message: NetworkMessage<Out>) -> Result<(), NetworkSendError> {
+        get_profiler().items_out(
+            message.sender,
+            self.receiver_endpoint.coord,
+            message.num_items(),
+        );
+
+        match &self.sender {
+            SenderInner::Mux(tx) => tx
+                .send((self.receiver_endpoint, message))
+                .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint)),
+            SenderInner::Local(tx) => tx
+                .send(message)
+                .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint))
+        }
+    }
+
     pub fn clone_inner(&self) -> Sender<NetworkMessage<Out>> {
-        self.sender.clone()
+        #[cfg(feature = "fair")]
+        return self.sender.clone();
+
+        #[cfg(not(feature = "fair"))]
+        match &self.sender {
+            SenderInner::Mux(_) => panic!("Trying to clone mux channel. Not supported"),
+            SenderInner::Local(tx) => tx.clone(),
+        }
     }
 }
 

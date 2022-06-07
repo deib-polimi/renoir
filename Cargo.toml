@@ -11,6 +11,7 @@ edition = "2021"
 [features]
 default = ["flume"]
 crossbeam = ["crossbeam-channel"]
+fair = []
 profiler = []
 async-tokio = ["tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 

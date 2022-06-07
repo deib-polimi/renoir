@@ -55,7 +55,7 @@ impl<In: ExchangeData> TypeMapKey for MultiplexingSenderKey<In> {
 #[derivative(Debug)]
 struct SenderMetadata {
     /// This sender should connect to the remote recipient.
-    is_remote: bool,
+    to_remote: bool,
 }
 
 /// This struct keeps track of the network topology, all the registered replicas and their
@@ -335,7 +335,7 @@ impl NetworkTopology {
 
         match &self.config.runtime {
             ExecutionRuntime::Remote(_) => {
-                if sender_metadata.is_remote {
+                if sender_metadata.to_remote {
                     let sender = self.register_mux(receiver_endpoint);
 
                     self.senders.as_mut().unwrap()
@@ -422,7 +422,7 @@ impl NetworkTopology {
         // we want to connect to a remote: this sender should be remote
         if to_remote {
             let metadata = self.senders_metadata.get_mut(&receiver_endpoint).unwrap();
-            metadata.is_remote = true;
+            metadata.to_remote = true;
         }
     }
 

@@ -15,7 +15,7 @@ use tokio::time::sleep;
 #[cfg(feature = "async-tokio")]
 use std::net::ToSocketAddrs;
 
-use crate::channel::{self, Receiver, UnboundedSender};
+use crate::channel::{self, Receiver, UnboundedSender, Sender};
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
@@ -43,7 +43,10 @@ const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 pub struct MultiplexingSender<Out: ExchangeData> {
     /// The internal sender that points to the actual multiplexed channel.
     // sender: Sender<(ReceiverEndpoint, NetworkMessage<Out>)>,
-    tx: UnboundedSender<(ReceiverEndpoint, Receiver<NetworkMessage<Out>>)>
+    #[cfg(feature = "fair")]
+    tx: UnboundedSender<(ReceiverEndpoint, Receiver<NetworkMessage<Out>>)>,
+    #[cfg(not(feature = "fair"))]
+    tx: Option<Sender<(ReceiverEndpoint, NetworkMessage<Out>)>>,
 }
 
 #[cfg(not(feature = "async-tokio"))]
@@ -51,6 +54,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     /// Construct a new `MultiplexingSender` for a block.
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).
+    #[cfg(feature = "fair")]
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
         let (tx, rx) = channel::unbounded();
         let join_handle = std::thread::Builder::new()
@@ -70,6 +74,21 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         (Self { tx }, join_handle)
     }
 
+    #[cfg(not(feature = "fair"))]
+    pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
+        let (tx, rx) = channel::bounded(CHANNEL_CAPACITY);
+        
+        let join_handle = std::thread::Builder::new()
+            .name(format!("noir-mux-{}", coord))
+            .spawn(move || {
+                tracing::debug!("mux connecting to {}", address.to_socket_addrs().unwrap().nth(0).unwrap());
+                let stream = connect_remote(coord, address);
+
+                mux_thread::<Out>(coord, rx, stream);
+            })
+            .unwrap();
+        (Self { tx: Some(tx) }, join_handle)
+    }
     /// Send a message to the channel.
     ///
     /// Unlikely the normal channels, the destination is required since the channel is multiplexed.
@@ -80,11 +99,17 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     // ) -> Result<(), SendError<(ReceiverEndpoint, NetworkMessage<Out>)>> {
     //     self.sender.send((destination, message))
     // }
-
+    #[cfg(feature = "fair")]
     pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
         let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
         self.tx.send((receiver_endpoint, receiver)).unwrap();
         NetworkSender{ receiver_endpoint, sender }
+    }
+    #[cfg(not(feature = "fair"))]
+    pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
+        use super::mux_sender;
+
+        mux_sender(receiver_endpoint, self.tx.as_ref().unwrap().clone())
     }
 }
 
@@ -158,6 +183,7 @@ fn connect_remote(
 /// (this handles backpressure since the sender will block when the channel is full)
 /// If a Resume request was received then allow popping from the channel
 #[cfg(not(feature = "async-tokio"))]
+#[cfg(feature = "fair")]
 fn mux_thread<Out: ExchangeData>(
     coord: DemuxCoord,
     receivers: Vec<(ReceiverEndpoint, Receiver<NetworkMessage<Out>>)>,
@@ -172,6 +198,25 @@ fn mux_thread<Out: ExchangeData>(
     let mut selector = Selector::new(receivers);
 
     while let Ok((dest, message)) = selector.recv() {
+        remote_send(message, dest, &mut stream);
+    }
+    let _ = stream.shutdown(Shutdown::Both);
+    debug!("Remote sender for {} exited", coord);
+}
+
+#[cfg(all(not(feature = "async-tokio"), not(feature = "fair")))]
+fn mux_thread<Out: ExchangeData>(
+    coord: DemuxCoord,
+    rx: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
+    mut stream: TcpStream,
+) {
+    let address = stream
+        .peer_addr()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+    debug!("Connection to {} at {} established", coord, address);
+
+    while let Ok((dest, message)) = rx.recv() {
         remote_send(message, dest, &mut stream);
     }
     let _ = stream.shutdown(Shutdown::Both);
