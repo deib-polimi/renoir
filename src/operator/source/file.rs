@@ -93,9 +93,10 @@ impl Operator<String> for FileSource {
             .expect("seek file");
         if global_id != 0 {
             // discard first line
-            let mut s = String::new();
+            let mut v = Vec::new();
+
             self.current += reader
-                .read_line(&mut s)
+                .read_until(b'\n', &mut v)
                 .expect("Cannot read line from file");
         }
         self.coord = Some(metadata.coord);

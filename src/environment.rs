@@ -94,6 +94,18 @@ impl StreamEnvironment {
     }
 
     /// Start the computation. Await on the returned future to actually start the computation.
+    #[cfg(feature = "async-tokio")]
+    pub async fn execute(self) {
+        drop(self.build_time);
+        let _stopwatch = Stopwatch::new("execution");
+        let mut env = self.inner.lock();
+        info!("Starting execution of {} blocks", env.block_count);
+        let scheduler = env.scheduler.take().unwrap();
+        scheduler.start(env.block_count).await;
+    }
+
+    /// Start the computation. Await on the returned future to actually start the computation.
+    #[cfg(not(feature = "async-tokio"))]
     pub fn execute(self) {
         drop(self.build_time);
         let _stopwatch = Stopwatch::new("execution");

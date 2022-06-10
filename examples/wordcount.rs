@@ -7,6 +7,7 @@ use noir::BatchMode;
 use noir::EnvironmentConfig;
 use noir::StreamEnvironment;
 
+#[cfg(not(feature = "async-tokio"))]
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 1 {
@@ -30,10 +31,42 @@ fn main() {
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();
-    if let Some(res) = result.get() {
-        eprintln!("Output: {:?}", res.len());
+    if let Some(_res) = result.get() {
+        // eprintln!("Output: {:?}", _res.len());
+        eprintln!("{:?}", elapsed);
     }
-    eprintln!("Elapsed: {:?}", elapsed);
+}
+
+
+#[cfg(feature = "async-tokio")]
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    let (config, args) = EnvironmentConfig::from_args();
+    if args.len() != 1 {
+        panic!("Pass the dataset path as an argument");
+    }
+    let path = &args[0];
+
+    let mut env = StreamEnvironment::new(config);
+
+    env.spawn_remote_workers();
+
+    let source = FileSource::new(path);
+    let tokenizer = Tokenizer::new();
+    let result = env
+        .stream(source)
+        .batch_mode(BatchMode::fixed(1024))
+        .flat_map(move |line| tokenizer.tokenize(line))
+        .group_by(|word| word.clone())
+        .fold(0, |count, _word| *count += 1)
+        .collect_vec();
+    let start = Instant::now();
+    env.execute().await;
+    let elapsed = start.elapsed();
+    if let Some(_res) = result.get() {
+        // eprintln!("Output: {:?}", _res.len());
+        eprintln!("{:?}", elapsed);
+    }
 }
 
 #[derive(Clone)]

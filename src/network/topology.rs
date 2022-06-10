@@ -149,26 +149,27 @@ impl NetworkTopology {
         }
     }
 
+    #[cfg(feature = "async-tokio")]
+    /// Knowing that the computation ended, tear down the topology wait for all of its thread to
+    /// exit.
+    pub(crate) async fn stop_and_wait(&mut self) {
+        self.async_join_handles
+            .drain(..)
+            .collect::<futures::stream::FuturesOrdered<_>>()
+            .for_each(|h| futures::future::ready(h.unwrap()))
+            .await;
+
+        for handle in self.join_handles.drain(..) {
+            handle.join().unwrap();
+        }
+    }
+
+    #[cfg(not(feature = "async-tokio"))]
     /// Knowing that the computation ended, tear down the topology wait for all of its thread to
     /// exit.
     pub(crate) fn stop_and_wait(&mut self) {
         for handle in self.join_handles.drain(..) {
             handle.join().unwrap();
-        }
-        #[cfg(feature = "async-tokio")]
-        {
-            let (tx, rx) = std::sync::mpsc::channel();
-            let handles = std::mem::replace(&mut self.async_join_handles, Vec::new());
-            tokio::spawn(async move {
-                handles
-                    .into_iter()
-                    .collect::<futures::stream::FuturesOrdered<_>>()
-                    .for_each(|h| futures::future::ready(h.unwrap()))
-                    .await;
-                tx.send(()).unwrap();
-            });
-    
-            rx.recv().unwrap();
         }
     }
 

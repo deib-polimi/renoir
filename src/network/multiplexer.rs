@@ -146,7 +146,7 @@ fn connect_remote(
                         debug!("Timeout connecting to {} at {:?}", coord, address);
                     }
                     _ => {
-                        debug!("Failed to connect to {} at {}: {:?}", coord, address, err);
+                        warn!("Failed to connect to {} at {}: {:?}", coord, address, err);
                     }
                 },
             }

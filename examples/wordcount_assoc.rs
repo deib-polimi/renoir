@@ -37,18 +37,18 @@ fn main() {
     let elapsed = start.elapsed();
 
     if let Some(_r) = result.get() {
-        println!("OK");
+        // println!("OK");
+        eprintln!("{:?}", elapsed);
         // _r.iter()
         //     .sorted_by_key(|t| t.1)
         //     .rev()
         //     .take(10)
         //     .for_each(|(k, v)| eprintln!("{:>10}:{:>10}", k, v));
     }
-    eprintln!("Elapsed: {:?}", elapsed);
 }
 
 #[cfg(feature = "async-tokio")]
-#[tokio::main()]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     tracing_subscriber::fmt::init();
 
@@ -71,18 +71,18 @@ async fn main() {
         .group_by_count(|word: &String| word.clone())
         .collect_vec();
     let start = Instant::now();
-    env.execute();
+    env.execute().await;
     let elapsed = start.elapsed();
 
     if let Some(_r) = result.get() {
-        println!("OK");
+        // println!("OK");
+        eprintln!("{:?}", elapsed);
         // _r.iter()
         //     .sorted_by_key(|t| t.1)
         //     .rev()
         //     .take(10)
         //     .for_each(|(k, v)| eprintln!("{:>10}:{:>10}", k, v));
     }
-    eprintln!("Elapsed: {:?}", elapsed);
 }
 
 #[derive(Clone)]

@@ -147,6 +147,63 @@ impl Scheduler {
         self.prev_blocks.entry(to).or_default().push((from, typ));
     }
 
+    #[cfg(feature = "async-tokio")]
+    /// Start the computation returning the list of handles used to join the workers.
+    pub(crate) async fn start(mut self, num_blocks: usize) {
+        info!("Starting scheduler: {:#?}", self.config);
+        self.log_topology();
+
+        assert_eq!(
+            self.block_info.len(),
+            num_blocks,
+            "Some streams do not have a sink attached: {} streams created, but only {} registered",
+            num_blocks,
+            self.block_info.len(),
+        );
+
+        self.build_execution_graph();
+        self.network.build();
+        self.network.log();
+
+        let mut join = vec![];
+        let mut block_structures = vec![];
+        let mut job_graph_generator = JobGraphGenerator::new();
+
+        for (coord, init_fn) in self.block_init {
+            let block_info = &self.block_info[&coord.block_id];
+            let replicas = block_info.replicas.values().flatten().cloned().collect();
+            let global_id = block_info.global_ids[&coord];
+            let mut metadata = ExecutionMetadata {
+                coord,
+                replicas,
+                global_id,
+                prev: self.network.prev(coord),
+                network: &mut self.network,
+                batch_mode: block_info.batch_mode,
+            };
+            let (handle, structure) = init_fn(&mut metadata);
+            join.push(handle);
+            block_structures.push((coord, structure.clone()));
+            job_graph_generator.add_block(coord.block_id, structure);
+        }
+
+        let job_graph = job_graph_generator.finalize();
+        debug!("Job graph in dot format:\n{}", job_graph);
+        
+        self.network.finalize();
+
+        self.network.stop_and_wait().await;
+
+        for handle in join {
+            handle.join().unwrap();
+        }
+
+        let profiler_results = wait_profiler();
+
+        Self::log_tracing_data(block_structures, profiler_results);
+    }
+
+    #[cfg(not(feature = "async-tokio"))]
     /// Start the computation returning the list of handles used to join the workers.
     pub(crate) fn start(mut self, num_blocks: usize) {
         info!("Starting scheduler: {:#?}", self.config);

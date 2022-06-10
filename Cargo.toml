@@ -9,11 +9,11 @@ authors = [
 edition = "2021"
 
 [features]
-default = ["flume", "fair"]
+default = ["flume"]
 crossbeam = ["crossbeam-channel"]
 fair = []
 profiler = []
-async-tokio = ["tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
+async-tokio = ["tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros", "fair"]
 
 [dependencies]
 # for logging to the console
