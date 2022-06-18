@@ -19,9 +19,10 @@ pub(crate) fn local_channel<T: ExchangeData>(
 ) -> (NetworkSender<T>, NetworkReceiver<T>) {
     let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
     (
-        NetworkSender{
+        NetworkSender {
             receiver_endpoint,
-            sender},
+            sender,
+        },
         NetworkReceiver {
             receiver_endpoint,
             receiver,
@@ -35,9 +36,10 @@ pub(crate) fn local_channel<T: ExchangeData>(
 ) -> (NetworkSender<T>, NetworkReceiver<T>) {
     let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
     (
-        NetworkSender{
+        NetworkSender {
             receiver_endpoint,
-            sender: SenderInner::Local(sender)},
+            sender: SenderInner::Local(sender),
+        },
         NetworkReceiver {
             receiver_endpoint,
             receiver,
@@ -48,9 +50,9 @@ pub(crate) fn local_channel<T: ExchangeData>(
 #[cfg(not(feature = "fair"))]
 pub(crate) fn mux_sender<T: ExchangeData>(
     receiver_endpoint: ReceiverEndpoint,
-    tx: Sender<(ReceiverEndpoint, NetworkMessage<T>)>
+    tx: Sender<(ReceiverEndpoint, NetworkMessage<T>)>,
 ) -> NetworkSender<T> {
-    NetworkSender{
+    NetworkSender {
         receiver_endpoint,
         sender: SenderInner::Mux(tx),
     }
@@ -182,7 +184,7 @@ impl<Out: ExchangeData> NetworkSender<Out> {
                 .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint)),
             SenderInner::Local(tx) => tx
                 .send(message)
-                .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint))
+                .map_err(|_| NetworkSendError::Disconnected(self.receiver_endpoint)),
         }
     }
 

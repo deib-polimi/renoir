@@ -5,11 +5,10 @@ use std::io::Write;
 #[cfg(feature = "async-tokio")]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-
-#[cfg(feature = "async-tokio")]
-use tokio::net::TcpStream;
 #[cfg(not(feature = "async-tokio"))]
 use std::net::TcpStream;
+#[cfg(feature = "async-tokio")]
+use tokio::net::TcpStream;
 
 use anyhow::Result;
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
@@ -124,15 +123,18 @@ pub(crate) async fn remote_send<T: ExchangeData>(
         sender_block_id: dest.prev_block_id,
     };
     let serialized_header = HEADER_CONFIG.serialize(&header).unwrap();
-    stream.write_all(&serialized_header).await.unwrap_or_else(|e| {
-        panic!(
-            "Failed to send size of message (was {} bytes) to {} at {}: {:?}",
-            serialized.len(),
-            dest,
-            address,
-            e
-        )
-    });
+    stream
+        .write_all(&serialized_header)
+        .await
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failed to send size of message (was {} bytes) to {} at {}: {:?}",
+                serialized.len(),
+                dest,
+                address,
+                e
+            )
+        });
 
     stream.write_all(&serialized).await.unwrap_or_else(|e| {
         panic!(

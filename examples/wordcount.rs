@@ -38,7 +38,6 @@ fn main() {
     }
 }
 
-
 #[cfg(feature = "async-tokio")]
 #[tokio::main()]
 async fn main() {

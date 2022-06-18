@@ -4,17 +4,17 @@ use std::net::{Shutdown, TcpListener, TcpStream};
 use std::thread::JoinHandle;
 
 #[cfg(feature = "async-tokio")]
-use tokio::task::JoinHandle;
+use tokio::io::AsyncWriteExt;
 #[cfg(feature = "async-tokio")]
 use tokio::net::{TcpListener, TcpStream};
 #[cfg(feature = "async-tokio")]
-use tokio::io::AsyncWriteExt;
+use tokio::task::JoinHandle;
 
-use std::net::ToSocketAddrs;
 use ahash::AHashMap;
 use anyhow::anyhow;
+use std::net::ToSocketAddrs;
 
-use crate::channel::{Sender, UnboundedReceiver, UnboundedSender, self};
+use crate::channel::{self, Sender, UnboundedReceiver, UnboundedSender};
 use crate::network::remote::{deserialize, header_size, remote_recv};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
@@ -65,10 +65,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
             receiver_endpoint, self.coord
         );
         self.tx_senders
-            .send((
-                receiver_endpoint,
-                sender,
-            ))
+            .send((receiver_endpoint, sender))
             .unwrap_or_else(|_| panic!("register for {:?} failed", self.coord))
     }
 }
@@ -79,7 +76,7 @@ fn bind_remotes<In: ExchangeData>(
     coord: DemuxCoord,
     address: (String, u16),
     num_clients: usize,
-    rx_senders: UnboundedReceiver<(ReceiverEndpoint, Sender<NetworkMessage<In>>)>
+    rx_senders: UnboundedReceiver<(ReceiverEndpoint, Sender<NetworkMessage<In>>)>,
 ) {
     let address = (address.0.as_ref(), address.1);
     let address: Vec<_> = address
@@ -145,10 +142,7 @@ fn bind_remotes<In: ExchangeData>(
         join_handles.push(join_handle);
         tx_broadcast.push(demux_tx);
     }
-    debug!(
-        "All connection to {} started, waiting for senders",
-        coord
-    );
+    debug!("All connection to {} started, waiting for senders", coord);
 
     // Broadcast senders
     while let Ok(t) = rx_senders.recv() {
@@ -167,25 +161,22 @@ fn bind_remotes<In: ExchangeData>(
 ///
 /// Will deserialize the message upon arrival and send to the corresponding recipient the
 /// deserialized data. If the recipient is not yet known, it is waited until it registers.
-/// 
+///
 /// # Upgrade path
-/// 
+///
 /// Replace send with queue.
-/// 
+///
 /// The queue uses a hierarchical queue:
 /// + First try to reserve and put the value in the fast queue
 /// + If the fast queue is full, put in the slow (unbounded?) queue
 /// + Return an enum, either Queued or Overflowed
-/// 
+///
 /// if overflowed send a yield request through a second channel
 #[cfg(not(feature = "async-tokio"))]
 #[tracing::instrument(skip_all)]
 fn demux_thread<In: ExchangeData>(
     coord: DemuxCoord,
-    senders: AHashMap<
-        ReceiverEndpoint,
-        Sender<NetworkMessage<In>>,
-    >,
+    senders: AHashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,
     mut stream: TcpStream,
 ) {
     let address = stream
@@ -198,7 +189,7 @@ fn demux_thread<In: ExchangeData>(
         let message_len = message.len();
         let message = deserialize::<NetworkMessage<In>>(message).unwrap();
         get_profiler().net_bytes_in(message.sender, dest.coord, header_size() + message_len);
-        
+
         if let Err(e) = senders[&dest].send(message) {
             warn!("failed to send message to {}: {:?}", dest, e);
         }
@@ -207,7 +198,6 @@ fn demux_thread<In: ExchangeData>(
     let _ = stream.shutdown(Shutdown::Both);
     debug!("demultiplexer for {} at {} exited", coord, address);
 }
-
 
 #[cfg(feature = "async-tokio")]
 impl<In: ExchangeData> DemuxHandle<In> {
@@ -239,10 +229,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
             receiver_endpoint, self.coord
         );
         self.tx_senders
-            .send((
-                receiver_endpoint,
-                sender,
-            ))
+            .send((receiver_endpoint, sender))
             .unwrap_or_else(|_| panic!("register for {:?} failed", self.coord))
     }
 }
@@ -253,7 +240,7 @@ async fn bind_remotes<In: ExchangeData>(
     coord: DemuxCoord,
     address: (String, u16),
     num_clients: usize,
-    rx_senders: UnboundedReceiver<(ReceiverEndpoint, Sender<NetworkMessage<In>>)>
+    rx_senders: UnboundedReceiver<(ReceiverEndpoint, Sender<NetworkMessage<In>>)>,
 ) {
     let address = (address.0.as_ref(), address.1);
     let address: Vec<_> = address
@@ -263,7 +250,8 @@ async fn bind_remotes<In: ExchangeData>(
         .collect();
 
     tracing::debug!("demux binding {}", address[0]);
-    let listener = TcpListener::bind(&*address).await
+    let listener = TcpListener::bind(&*address)
+        .await
         .map_err(|e| {
             anyhow!(
                 "Failed to bind socket for {} at {:?}: {:?}",
@@ -285,7 +273,7 @@ async fn bind_remotes<In: ExchangeData>(
     // the list of JoinHandle of all the spawned threads, including the demultiplexer one
     let mut join_handles = vec![];
     let mut tx_broadcast = vec![];
-    
+
     let mut connected_clients = 0;
     while connected_clients < num_clients {
         let stream = listener.accept().await;
@@ -304,20 +292,17 @@ async fn bind_remotes<In: ExchangeData>(
 
         let (demux_tx, demux_rx) = flume::unbounded();
         let join_handle = tokio::spawn(async move {
-                let mut senders = AHashMap::new();
-                while let Ok((endpoint, sender)) = demux_rx.recv_async().await {
-                    senders.insert(endpoint, sender);
-                }
-                tracing::debug!("demux got senders");
-                demux_thread::<In>(coord, senders, stream).await;
-            });
+            let mut senders = AHashMap::new();
+            while let Ok((endpoint, sender)) = demux_rx.recv_async().await {
+                senders.insert(endpoint, sender);
+            }
+            tracing::debug!("demux got senders");
+            demux_thread::<In>(coord, senders, stream).await;
+        });
         join_handles.push(join_handle);
         tx_broadcast.push(demux_tx);
     }
-    debug!(
-        "All connection to {} started, waiting for senders",
-        coord
-    );
+    debug!("All connection to {} started, waiting for senders", coord);
 
     // Broadcast senders
     while let Ok(t) = rx_senders.recv() {
@@ -336,25 +321,22 @@ async fn bind_remotes<In: ExchangeData>(
 ///
 /// Will deserialize the message upon arrival and send to the corresponding recipient the
 /// deserialized data. If the recipient is not yet known, it is waited until it registers.
-/// 
+///
 /// # Upgrade path
-/// 
+///
 /// Replace send with queue.
-/// 
+///
 /// The queue uses a hierarchical queue:
 /// + First try to reserve and put the value in the fast queue
 /// + If the fast queue is full, put in the slow (unbounded?) queue
 /// + Return an enum, either Queued or Overflowed
-/// 
+///
 /// if overflowed send a yield request through a second channel
 #[cfg(feature = "async-tokio")]
 #[tracing::instrument(skip_all)]
 async fn demux_thread<In: ExchangeData>(
     coord: DemuxCoord,
-    senders: AHashMap<
-        ReceiverEndpoint,
-        Sender<NetworkMessage<In>>,
-    >,
+    senders: AHashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,
     mut stream: TcpStream,
 ) {
     let address = stream
@@ -367,7 +349,7 @@ async fn demux_thread<In: ExchangeData>(
         let message_len = message.len();
         let message = deserialize::<NetworkMessage<In>>(message).unwrap();
         get_profiler().net_bytes_in(message.sender, dest.coord, header_size() + message_len);
-        
+
         if let Err(e) = senders[&dest].send(message) {
             warn!("failed to send message to {}: {:?}", dest, e);
         }

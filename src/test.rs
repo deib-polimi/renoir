@@ -70,7 +70,6 @@ pub(crate) struct FakeNetworkTopology<T: ExchangeData> {
 }
 
 impl<T: ExchangeData> FakeNetworkTopology<T> {
-
     /// Build a fake network topology for a single replica (with coord b0 h0 r0), that receives data
     /// of type `T` from `num_prev_blocks`, each with `num_replicas_per_block` replicas.
     pub fn new(num_prev_blocks: usize, num_replicas_per_block: usize) -> Self {

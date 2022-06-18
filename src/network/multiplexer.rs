@@ -7,15 +7,15 @@ use std::net::{Shutdown, TcpStream, ToSocketAddrs};
 use std::thread::{sleep, JoinHandle};
 
 #[cfg(feature = "async-tokio")]
+use std::net::ToSocketAddrs;
+#[cfg(feature = "async-tokio")]
 use tokio::net::TcpStream;
 #[cfg(feature = "async-tokio")]
 use tokio::task::JoinHandle;
 #[cfg(feature = "async-tokio")]
 use tokio::time::sleep;
-#[cfg(feature = "async-tokio")]
-use std::net::ToSocketAddrs;
 
-use crate::channel::{self, Receiver, UnboundedSender, Sender};
+use crate::channel::{self, Receiver, Sender, UnboundedSender};
 use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
@@ -60,14 +60,25 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         let join_handle = std::thread::Builder::new()
             .name(format!("noir-mux-{}", coord))
             .spawn(move || {
-                tracing::debug!("mux connecting to {}", address.to_socket_addrs().unwrap().nth(0).unwrap());
+                tracing::debug!(
+                    "mux connecting to {}",
+                    address.to_socket_addrs().unwrap().nth(0).unwrap()
+                );
                 let stream = connect_remote(coord, address);
                 tracing::debug!("mux connected, waiting for receivers");
                 let mut receivers = Vec::new();
                 while let Ok(t) = rx.recv() {
                     receivers.push(t);
                 }
-                tracing::debug!("mux for {} got receivers: [{}]", coord, receivers.iter().map(|(e, _)| format!("{e} ")).collect::<String>().trim());
+                tracing::debug!(
+                    "mux for {} got receivers: [{}]",
+                    coord,
+                    receivers
+                        .iter()
+                        .map(|(e, _)| format!("{e} "))
+                        .collect::<String>()
+                        .trim()
+                );
                 mux_thread::<Out>(coord, receivers, stream);
             })
             .unwrap();
@@ -77,11 +88,14 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     #[cfg(not(feature = "fair"))]
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
         let (tx, rx) = channel::bounded(CHANNEL_CAPACITY);
-        
+
         let join_handle = std::thread::Builder::new()
             .name(format!("noir-mux-{}", coord))
             .spawn(move || {
-                tracing::debug!("mux connecting to {}", address.to_socket_addrs().unwrap().nth(0).unwrap());
+                tracing::debug!(
+                    "mux connecting to {}",
+                    address.to_socket_addrs().unwrap().nth(0).unwrap()
+                );
                 let stream = connect_remote(coord, address);
 
                 mux_thread::<Out>(coord, rx, stream);
@@ -103,7 +117,10 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
         let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
         self.tx.send((receiver_endpoint, receiver)).unwrap();
-        NetworkSender{ receiver_endpoint, sender }
+        NetworkSender {
+            receiver_endpoint,
+            sender,
+        }
     }
 
     #[cfg(not(feature = "fair"))]
@@ -121,10 +138,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
 ///   of errors.
 /// - If the connection cannot be established this function will panic.
 #[cfg(not(feature = "async-tokio"))]
-fn connect_remote(
-    coord: DemuxCoord,
-    address: (String, u16),
-) -> TcpStream {
+fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
     let socket_addrs: Vec<_> = address
         .to_socket_addrs()
         .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
@@ -227,7 +241,6 @@ fn mux_thread<Out: ExchangeData>(
     debug!("Remote sender for {} exited", coord);
 }
 
-
 #[cfg(all(feature = "async-tokio", feature = "fair"))]
 impl<Out: ExchangeData> MultiplexingSender<Out> {
     /// Construct a new `MultiplexingSender` for a block.
@@ -236,16 +249,27 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
         let (tx, rx) = channel::unbounded();
         let join_handle = tokio::spawn(async move {
-                tracing::debug!("mux connecting to {}", address.to_socket_addrs().unwrap().nth(0).unwrap());
-                let stream = connect_remote(coord, address).await;
-                tracing::debug!("mux connected, waiting for receivers");
-                let mut receivers = Vec::new();
-                while let Ok(t) = rx.recv() {
-                    receivers.push(t);
-                }
-                tracing::debug!("mux for {} got receivers: [{}]", coord, receivers.iter().map(|(e, _)| format!("{e} ")).collect::<String>().trim());
-                mux_thread::<Out>(coord, receivers, stream).await;
-            });
+            tracing::debug!(
+                "mux connecting to {}",
+                address.to_socket_addrs().unwrap().nth(0).unwrap()
+            );
+            let stream = connect_remote(coord, address).await;
+            tracing::debug!("mux connected, waiting for receivers");
+            let mut receivers = Vec::new();
+            while let Ok(t) = rx.recv() {
+                receivers.push(t);
+            }
+            tracing::debug!(
+                "mux for {} got receivers: [{}]",
+                coord,
+                receivers
+                    .iter()
+                    .map(|(e, _)| format!("{e} "))
+                    .collect::<String>()
+                    .trim()
+            );
+            mux_thread::<Out>(coord, receivers, stream).await;
+        });
         (Self { tx }, join_handle)
     }
 
@@ -263,7 +287,10 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
         let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
         self.tx.send((receiver_endpoint, receiver)).unwrap();
-        NetworkSender{ receiver_endpoint, sender }
+        NetworkSender {
+            receiver_endpoint,
+            sender,
+        }
     }
 }
 
@@ -275,10 +302,13 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
         let (tx, rx) = channel::bounded(CHANNEL_CAPACITY);
         let join_handle = tokio::spawn(async move {
-                tracing::debug!("mux connecting to {}", address.to_socket_addrs().unwrap().nth(0).unwrap());
-                let stream = connect_remote(coord, address).await;
-                mux_thread::<Out>(coord, rx, stream).await;
-            });
+            tracing::debug!(
+                "mux connecting to {}",
+                address.to_socket_addrs().unwrap().nth(0).unwrap()
+            );
+            let stream = connect_remote(coord, address).await;
+            mux_thread::<Out>(coord, rx, stream).await;
+        });
         (Self { tx: Some(tx) }, join_handle)
     }
 
@@ -306,10 +336,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
 ///   of errors.
 /// - If the connection cannot be established this function will panic.
 #[cfg(feature = "async-tokio")]
-async fn connect_remote(
-    coord: DemuxCoord,
-    address: (String, u16),
-) -> TcpStream {
+async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
     let socket_addrs: Vec<_> = address
         .to_socket_addrs()
         .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
@@ -385,17 +412,15 @@ async fn mux_thread<Out: ExchangeData>(
         .unwrap_or_else(|_| "unknown".to_string());
     debug!("Connection to {} at {} established", coord, address);
 
-    async fn make_fut<T: ExchangeData>((i, r) : (usize, &(ReceiverEndpoint, Receiver<NetworkMessage<T>>))) -> (usize, Result<NetworkMessage<T>, RecvError>) {
+    async fn make_fut<T: ExchangeData>(
+        (i, r): (usize, &(ReceiverEndpoint, Receiver<NetworkMessage<T>>)),
+    ) -> (usize, Result<NetworkMessage<T>, RecvError>) {
         (i, r.1.recv_async().await)
     }
 
     // let make_fut = |(i, r) : (usize, &(ReceiverEndpoint, Receiver<NetworkMessage<Out>>))| async { (i, r.1.recv_async().await) };
 
-    let mut selector: FuturesUnordered<_> = receivers
-        .iter()
-        .enumerate()
-        .map(make_fut)
-        .collect();
+    let mut selector: FuturesUnordered<_> = receivers.iter().enumerate().map(make_fut).collect();
 
     while let Some(next) = selector.next().await {
         match next {
@@ -407,11 +432,10 @@ async fn mux_thread<Out: ExchangeData>(
             (_, Err(RecvError::Disconnected)) => {}
         }
     }
-    
+
     stream.shutdown().await.unwrap();
     debug!("Remote sender for {} exited", coord);
 }
-
 
 #[cfg(all(feature = "async-tokio", not(feature = "fair")))]
 async fn mux_thread<Out: ExchangeData>(
@@ -430,7 +454,7 @@ async fn mux_thread<Out: ExchangeData>(
     while let Ok((dest, message)) = rx.recv_async().await {
         remote_send(message, dest, &mut stream).await;
     }
-    
+
     stream.shutdown().await.unwrap();
     debug!("Remote sender for {} exited", coord);
 }

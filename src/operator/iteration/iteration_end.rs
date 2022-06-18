@@ -67,7 +67,9 @@ where
             metadata.coord, leader
         );
 
-        let sender = metadata.network.get_sender(ReceiverEndpoint::new(leader, metadata.coord.block_id));
+        let sender = metadata
+            .network
+            .get_sender(ReceiverEndpoint::new(leader, metadata.coord.block_id));
         self.leader_sender = Some(sender);
 
         self.coord = metadata.coord;

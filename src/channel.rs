@@ -225,7 +225,9 @@ impl<T: Send + 'static, K: Clone + Eq> Selector<T, K> {
         }
 
         for (k, recv) in self.rxs.iter() {
-            selector = selector.recv(&recv.0, move |r| r.map(|i| (k.clone(), i)).map_err(|e| (k.clone(), e)))
+            selector = selector.recv(&recv.0, move |r| {
+                r.map(|i| (k.clone(), i)).map_err(|e| (k.clone(), e))
+            })
         }
 
         match selector.wait() {
@@ -245,10 +247,15 @@ impl<T: Send + 'static, K: Clone + Eq> Selector<T, K> {
         }
 
         for (k, recv) in self.rxs.iter() {
-            selector = selector.recv(&recv.0, move |r| r.map(|i| (k.clone(), i)).map_err(|e| (k.clone(), e)))
+            selector = selector.recv(&recv.0, move |r| {
+                r.map(|i| (k.clone(), i)).map_err(|e| (k.clone(), e))
+            })
         }
 
-        match selector.wait_timeout(timeout).map_err(|_| RecvTimeoutError::Timeout)? {
+        match selector
+            .wait_timeout(timeout)
+            .map_err(|_| RecvTimeoutError::Timeout)?
+        {
             Ok(i) => Ok(i),
             Err((k, RecvError::Disconnected)) => {
                 self.rxs.retain(|r| r.0 != k);

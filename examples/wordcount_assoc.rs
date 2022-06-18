@@ -38,7 +38,7 @@ fn main() {
 
     if let Some(_r) = result.get() {
         // println!("OK");
-        eprintln!("{:?}", elapsed);
+        println!("{:?}", elapsed);
         // _r.iter()
         //     .sorted_by_key(|t| t.1)
         //     .rev()
@@ -76,7 +76,7 @@ async fn main() {
 
     if let Some(_r) = result.get() {
         // println!("OK");
-        eprintln!("{:?}", elapsed);
+        println!("{:?}", elapsed);
         // _r.iter()
         //     .sorted_by_key(|t| t.1)
         //     .rev()

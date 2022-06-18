@@ -268,10 +268,12 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
                 (false, false, Some(timeout)) => left.select_timeout(right, timeout),
                 (false, false, None) => Ok(left.select(right)),
 
-                (true, false, Some(timeout)) => right.recv_timeout(timeout)
-                    .map(|r| SelectResult::B(Ok(r))),
-                (false, true, Some(timeout)) => left.recv_timeout(timeout)
-                    .map(|r| SelectResult::A(Ok(r))),
+                (true, false, Some(timeout)) => {
+                    right.recv_timeout(timeout).map(|r| SelectResult::B(Ok(r)))
+                }
+                (false, true, Some(timeout)) => {
+                    left.recv_timeout(timeout).map(|r| SelectResult::A(Ok(r)))
+                }
 
                 (true, false, None) => Ok(SelectResult::B(right.recv())),
                 (false, true, None) => Ok(SelectResult::A(left.recv())),

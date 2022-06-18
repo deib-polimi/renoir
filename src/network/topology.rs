@@ -6,15 +6,14 @@ use std::thread::JoinHandle;
 #[cfg(feature = "async-tokio")]
 use futures::StreamExt;
 use itertools::Itertools;
-use typemap_rev::{TypeMapKey, TypeMap};
+use typemap_rev::{TypeMap, TypeMapKey};
 
 use crate::channel::Sender;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::demultiplexer::DemuxHandle;
 use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{
-    local_channel, BlockCoord, Coord, DemuxCoord, NetworkReceiver, NetworkSender,
-    ReceiverEndpoint,
+    local_channel, BlockCoord, Coord, DemuxCoord, NetworkReceiver, NetworkSender, ReceiverEndpoint,
 };
 use crate::operator::ExchangeData;
 use crate::scheduler::HostId;
@@ -206,10 +205,23 @@ impl NetworkTopology {
         &mut self,
         receiver_endpoint: ReceiverEndpoint,
     ) -> NetworkSender<T> {
-        if !self.senders.as_mut().unwrap().contains_key::<SenderKey<T>>() {
-            self.senders.as_mut().unwrap().insert::<SenderKey<T>>(Default::default());
+        if !self
+            .senders
+            .as_mut()
+            .unwrap()
+            .contains_key::<SenderKey<T>>()
+        {
+            self.senders
+                .as_mut()
+                .unwrap()
+                .insert::<SenderKey<T>>(Default::default());
         }
-        let entry = self.senders.as_mut().unwrap().get_mut::<SenderKey<T>>().unwrap();
+        let entry = self
+            .senders
+            .as_mut()
+            .unwrap()
+            .get_mut::<SenderKey<T>>()
+            .unwrap();
         if !entry.contains_key(&receiver_endpoint) {
             self.register_channel::<T>(receiver_endpoint);
         }
@@ -239,25 +251,38 @@ impl NetworkTopology {
         }
         self.used_receivers.insert(receiver_endpoint);
 
-        let entry = self.receivers.as_mut().unwrap().entry::<ReceiverKey<T>>().or_insert_with(Default::default);
+        let entry = self
+            .receivers
+            .as_mut()
+            .unwrap()
+            .entry::<ReceiverKey<T>>()
+            .or_insert_with(Default::default);
         // if the channel has not been registered yet, register it
         if !entry.contains_key(&receiver_endpoint) {
             self.register_channel::<T>(receiver_endpoint);
         }
-        self.receivers.as_mut().unwrap()
+        self.receivers
+            .as_mut()
+            .unwrap()
             .get_mut::<ReceiverKey<T>>()
             .unwrap()
             .remove(&receiver_endpoint)
             .unwrap()
     }
 
-    fn register_demux<T: ExchangeData>(&mut self, receiver_endpoint: ReceiverEndpoint, local_sender: Sender<NetworkMessage<T>>) {
+    fn register_demux<T: ExchangeData>(
+        &mut self,
+        receiver_endpoint: ReceiverEndpoint,
+        local_sender: Sender<NetworkMessage<T>>,
+    ) {
         let demux_coord = DemuxCoord::from(receiver_endpoint);
         let demuxes = self
-            .demultiplexers.as_mut().unwrap()
+            .demultiplexers
+            .as_mut()
+            .unwrap()
             .entry::<DemultiplexingReceiverKey<T>>()
             .or_insert_with(Default::default);
-        
+
         if !demuxes.contains_key(&demux_coord) {
             // find the set of all the previous blocks that have a MultiplexingSender that
             // point to this DemultiplexingReceiver.
@@ -297,9 +322,14 @@ impl NetworkTopology {
         };
     }
 
-    fn register_mux<T: ExchangeData>(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<T> {
+    fn register_mux<T: ExchangeData>(
+        &mut self,
+        receiver_endpoint: ReceiverEndpoint,
+    ) -> NetworkSender<T> {
         let muxers = self
-            .multiplexers.as_mut().unwrap()
+            .multiplexers
+            .as_mut()
+            .unwrap()
             .entry::<MultiplexingSenderKey<T>>()
             .or_insert_with(Default::default);
         let demux_coord = DemuxCoord::from(receiver_endpoint);
@@ -313,7 +343,10 @@ impl NetworkTopology {
             self.async_join_handles.push(join_handle);
             muxers.insert(demux_coord, mux);
         }
-        muxers.get_mut(&demux_coord).unwrap().get_sender(receiver_endpoint)
+        muxers
+            .get_mut(&demux_coord)
+            .unwrap()
+            .get_sender(receiver_endpoint)
     }
 
     /// Register the channel for the given receiver.
@@ -339,7 +372,9 @@ impl NetworkTopology {
                 if sender_metadata.to_remote {
                     let sender = self.register_mux(receiver_endpoint);
 
-                    self.senders.as_mut().unwrap()
+                    self.senders
+                        .as_mut()
+                        .unwrap()
                         .entry::<SenderKey<T>>()
                         .or_insert_with(Default::default)
                         .insert(receiver_endpoint, sender);
@@ -350,11 +385,15 @@ impl NetworkTopology {
                         self.register_demux(receiver_endpoint, sender.clone_inner());
                     }
 
-                    self.receivers.as_mut().unwrap()
+                    self.receivers
+                        .as_mut()
+                        .unwrap()
                         .entry::<ReceiverKey<T>>()
                         .or_insert_with(Default::default)
                         .insert(receiver_endpoint, receiver);
-                    self.senders.as_mut().unwrap()
+                    self.senders
+                        .as_mut()
+                        .unwrap()
                         .entry::<SenderKey<T>>()
                         .or_insert_with(Default::default)
                         .insert(receiver_endpoint, sender);
@@ -363,11 +402,15 @@ impl NetworkTopology {
             ExecutionRuntime::Local(_) => {
                 let (sender, receiver) = local_channel(receiver_endpoint);
 
-                self.receivers.as_mut().unwrap()
+                self.receivers
+                    .as_mut()
+                    .unwrap()
                     .entry::<ReceiverKey<T>>()
                     .or_insert_with(Default::default)
                     .insert(receiver_endpoint, receiver);
-                self.senders.as_mut().unwrap()
+                self.senders
+                    .as_mut()
+                    .unwrap()
                     .entry::<SenderKey<T>>()
                     .or_insert_with(Default::default)
                     .insert(receiver_endpoint, sender);

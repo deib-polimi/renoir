@@ -113,7 +113,8 @@ where
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
-        self.new_state_senders = metadata.network
+        self.new_state_senders = metadata
+            .network
             .get_senders(metadata.coord)
             .into_iter()
             .map(|(_, s)| s)

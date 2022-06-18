@@ -63,8 +63,10 @@ pub(crate) struct Scheduler {
     block_info: HashMap<BlockId, SchedulerBlockInfo, ahash::RandomState>,
     /// The list of handles of each block in the execution graph.
     // start_handles: Vec<(Coord, StartHandle)>,
-
-    block_init: Vec<(Coord, Box<dyn FnOnce(&mut ExecutionMetadata) -> (JoinHandle<()>, BlockStructure) + Send>)>,
+    block_init: Vec<(
+        Coord,
+        Box<dyn FnOnce(&mut ExecutionMetadata) -> (JoinHandle<()>, BlockStructure) + Send>,
+    )>,
     /// The network topology that keeps track of all the connections inside the execution graph.
     network: NetworkTopology,
 }
@@ -121,9 +123,10 @@ impl Scheduler {
 
         for (coord, block) in blocks {
             // spawn the actual worker
-            self.block_init.push(
-                (coord, Box::new(move |metadata| spawn_worker(block, metadata)))
-            );
+            self.block_init.push((
+                coord,
+                Box::new(move |metadata| spawn_worker(block, metadata)),
+            ));
         }
     }
 
@@ -189,7 +192,7 @@ impl Scheduler {
 
         let job_graph = job_graph_generator.finalize();
         debug!("Job graph in dot format:\n{}", job_graph);
-        
+
         self.network.finalize();
 
         self.network.stop_and_wait().await;
@@ -245,7 +248,7 @@ impl Scheduler {
 
         let job_graph = job_graph_generator.finalize();
         debug!("Job graph in dot format:\n{}", job_graph);
-        
+
         self.network.finalize();
 
         for handle in join {

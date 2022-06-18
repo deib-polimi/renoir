@@ -300,10 +300,7 @@ fn send_file(
     remote_file.close().unwrap();
     remote_file.wait_close().unwrap();
 
-    tracing::info!(
-        "Sent executable to host {}",
-        host_id,
-    );
+    tracing::info!("Sent executable to host {}", host_id,);
 
     // setting the file mode using scp_send seems unreliable
     let chmod = format!(

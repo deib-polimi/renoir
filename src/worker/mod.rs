@@ -60,11 +60,7 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out> + 'static>(
 ) -> (JoinHandle<()>, BlockStructure) {
     let coord = metadata.coord;
 
-    info!(
-        "Starting worker for {}: {}",
-        coord,
-        block.to_string(),
-    );
+    info!("Starting worker for {}: {}", coord, block.to_string(),);
 
     block.operators.setup(metadata);
     let structure = block.operators.structure();
@@ -77,7 +73,6 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out> + 'static>(
             do_work(block, coord)
         })
         .unwrap();
-
 
     (join_handle, structure)
 }

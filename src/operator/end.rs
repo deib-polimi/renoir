@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::block::{
     BatchMode, Batcher, BlockStructure, Connection, NextStrategy, OperatorStructure, SenderList,
 };
-use crate::network::{ReceiverEndpoint, Coord};
+use crate::network::{Coord, ReceiverEndpoint};
 use crate::operator::{ExchangeData, KeyerFn, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;

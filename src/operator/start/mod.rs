@@ -189,10 +189,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
             return StreamElement::Terminate;
         }
         if self.missing_flush_and_restart == 0 {
-            info!(
-                "StartBlock for {} is emitting flush and restart",
-                coord
-            );
+            info!("StartBlock for {} is emitting flush and restart", coord);
 
             self.missing_flush_and_restart = self.num_previous_replicas;
             self.watermark_frontier.reset();
