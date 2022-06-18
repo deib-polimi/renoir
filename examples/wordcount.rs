@@ -9,6 +9,7 @@ use noir::StreamEnvironment;
 
 #[cfg(not(feature = "async-tokio"))]
 fn main() {
+    tracing_subscriber::fmt::init();
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the dataset path as an argument");
@@ -33,14 +34,15 @@ fn main() {
     let elapsed = start.elapsed();
     if let Some(_res) = result.get() {
         // eprintln!("Output: {:?}", _res.len());
-        eprintln!("{:?}", elapsed);
+        println!("{:?}", elapsed);
     }
 }
 
 
 #[cfg(feature = "async-tokio")]
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main()]
 async fn main() {
+    tracing_subscriber::fmt::init();
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the dataset path as an argument");
@@ -65,7 +67,7 @@ async fn main() {
     let elapsed = start.elapsed();
     if let Some(_res) = result.get() {
         // eprintln!("Output: {:?}", _res.len());
-        eprintln!("{:?}", elapsed);
+        println!("{:?}", elapsed);
     }
 }
 

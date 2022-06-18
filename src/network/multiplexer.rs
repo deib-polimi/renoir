@@ -29,7 +29,7 @@ use super::NetworkSender;
 const CONNECT_ATTEMPTS: usize = 16;
 /// Timeout for connecting to a remote host.
 #[cfg(not(feature = "async-tokio"))]
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(4);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// To avoid spamming the connections, wait this timeout before trying again. If the connection
 /// fails again this timeout will be doubled up to `RETRY_MAX_TIMEOUT`.
 const RETRY_INITIAL_TIMEOUT: Duration = Duration::from_millis(125);
@@ -105,6 +105,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         self.tx.send((receiver_endpoint, receiver)).unwrap();
         NetworkSender{ receiver_endpoint, sender }
     }
+
     #[cfg(not(feature = "fair"))]
     pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
         use super::mux_sender;
@@ -144,6 +145,9 @@ fn connect_remote(
                 Err(err) => match err.kind() {
                     ErrorKind::TimedOut => {
                         debug!("Timeout connecting to {} at {:?}", coord, address);
+                    }
+                    ErrorKind::ConnectionRefused => {
+                        debug!("ConnectionRefused connecting to {} at {:?}", coord, address);
                     }
                     _ => {
                         warn!("Failed to connect to {} at {}: {:?}", coord, address, err);
@@ -224,7 +228,7 @@ fn mux_thread<Out: ExchangeData>(
 }
 
 
-#[cfg(feature = "async-tokio")]
+#[cfg(all(feature = "async-tokio", feature = "fair"))]
 impl<Out: ExchangeData> MultiplexingSender<Out> {
     /// Construct a new `MultiplexingSender` for a block.
     ///
@@ -260,6 +264,38 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         let (sender, receiver) = channel::bounded(CHANNEL_CAPACITY);
         self.tx.send((receiver_endpoint, receiver)).unwrap();
         NetworkSender{ receiver_endpoint, sender }
+    }
+}
+
+#[cfg(all(feature = "async-tokio", not(feature = "fair")))]
+impl<Out: ExchangeData> MultiplexingSender<Out> {
+    /// Construct a new `MultiplexingSender` for a block.
+    ///
+    /// All the replicas of this block should point to this multiplexer (or one of its clones).
+    pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
+        let (tx, rx) = channel::bounded(CHANNEL_CAPACITY);
+        let join_handle = tokio::spawn(async move {
+                tracing::debug!("mux connecting to {}", address.to_socket_addrs().unwrap().nth(0).unwrap());
+                let stream = connect_remote(coord, address).await;
+                mux_thread::<Out>(coord, rx, stream).await;
+            });
+        (Self { tx: Some(tx) }, join_handle)
+    }
+
+    /// Send a message to the channel.
+    ///
+    /// Unlikely the normal channels, the destination is required since the channel is multiplexed.
+    // pub fn send(
+    //     &self,
+    //     destination: ReceiverEndpoint,
+    //     message: NetworkMessage<Out>,
+    // ) -> Result<(), SendError<(ReceiverEndpoint, NetworkMessage<Out>)>> {
+    //     self.sender.send((destination, message))
+    // }
+
+    pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
+        use super::mux_sender;
+        mux_sender(receiver_endpoint, self.tx.as_ref().unwrap().clone())
     }
 }
 
@@ -332,7 +368,7 @@ async fn connect_remote(
 /// In that case, do not pop from the channel and only select from others
 /// (this handles backpressure since the sender will block when the channel is full)
 /// If a Resume request was received then allow popping from the channel
-#[cfg(feature = "async-tokio")]
+#[cfg(all(feature = "async-tokio", feature = "fair"))]
 async fn mux_thread<Out: ExchangeData>(
     coord: DemuxCoord,
     receivers: Vec<(ReceiverEndpoint, Receiver<NetworkMessage<Out>>)>,
@@ -370,6 +406,29 @@ async fn mux_thread<Out: ExchangeData>(
             }
             (_, Err(RecvError::Disconnected)) => {}
         }
+    }
+    
+    stream.shutdown().await.unwrap();
+    debug!("Remote sender for {} exited", coord);
+}
+
+
+#[cfg(all(feature = "async-tokio", not(feature = "fair")))]
+async fn mux_thread<Out: ExchangeData>(
+    coord: DemuxCoord,
+    rx: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
+    mut stream: TcpStream,
+) {
+    use tokio::io::AsyncWriteExt;
+
+    let address = stream
+        .peer_addr()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+    debug!("Connection to {} at {} established", coord, address);
+
+    while let Ok((dest, message)) = rx.recv_async().await {
+        remote_send(message, dest, &mut stream).await;
     }
     
     stream.shutdown().await.unwrap();

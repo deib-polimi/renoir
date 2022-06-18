@@ -85,76 +85,76 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
         b.iter_custom(|n| builder.bench(n))
     });
 
-    group.bench_function("wordcount-fold-kstring", |b| {
-        let builder = NoirBenchBuilder::new(
-            noir_max_parallism_env,
-            |n: u64, env: &mut StreamEnvironment| {
-                let file = make_file(n as usize);
-                let path = file.path();
-                let source = FileSource::new(path);
-                let result = env
-                    .stream(source)
-                    .batch_mode(BatchMode::fixed(1024))
-                    .flat_map(move |line| {
-                        line.split(' ')
-                            .map(kstring::KString::from_ref)
-                            .collect_vec()
-                    })
-                    .group_by_fold(
-                        |w| w.clone(),
-                        0,
-                        |count, _word| *count += 1,
-                        |count1, count2| *count1 += count2,
-                    )
-                    .unkey()
-                    .collect_vec();
-                (result, file)
-            },
-        );
-        b.iter_custom(|n| builder.bench(n))
-    });
+    // group.bench_function("wordcount-fold-kstring", |b| {
+    //     let builder = NoirBenchBuilder::new(
+    //         noir_max_parallism_env,
+    //         |n: u64, env: &mut StreamEnvironment| {
+    //             let file = make_file(n as usize);
+    //             let path = file.path();
+    //             let source = FileSource::new(path);
+    //             let result = env
+    //                 .stream(source)
+    //                 .batch_mode(BatchMode::fixed(1024))
+    //                 .flat_map(move |line| {
+    //                     line.split(' ')
+    //                         .map(kstring::KString::from_ref)
+    //                         .collect_vec()
+    //                 })
+    //                 .group_by_fold(
+    //                     |w| w.clone(),
+    //                     0,
+    //                     |count, _word| *count += 1,
+    //                     |count1, count2| *count1 += count2,
+    //                 )
+    //                 .unkey()
+    //                 .collect_vec();
+    //             (result, file)
+    //         },
+    //     );
+    //     b.iter_custom(|n| builder.bench(n))
+    // });
 
-    group.bench_function("wordcount-reduce", |b| {
-        let builder = NoirBenchBuilder::new(
-            noir_max_parallism_env,
-            |n: u64, env: &mut StreamEnvironment| {
-                let file = make_file(n as usize);
-                let path = file.path();
-                let source = FileSource::new(path);
-                let result = env
-                    .stream(source)
-                    .batch_mode(BatchMode::fixed(1024))
-                    .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
-                    .group_by(|word| word.clone())
-                    .map(|(_, word)| (word, 1))
-                    .reduce(|(_w1, c1), (_w2, c2)| *c1 += c2)
-                    .collect_vec();
-                (result, file)
-            },
-        );
-        b.iter_custom(|n| builder.bench(n))
-    });
+    // group.bench_function("wordcount-reduce", |b| {
+    //     let builder = NoirBenchBuilder::new(
+    //         noir_max_parallism_env,
+    //         |n: u64, env: &mut StreamEnvironment| {
+    //             let file = make_file(n as usize);
+    //             let path = file.path();
+    //             let source = FileSource::new(path);
+    //             let result = env
+    //                 .stream(source)
+    //                 .batch_mode(BatchMode::fixed(1024))
+    //                 .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
+    //                 .group_by(|word| word.clone())
+    //                 .map(|(_, word)| (word, 1))
+    //                 .reduce(|(_w1, c1), (_w2, c2)| *c1 += c2)
+    //                 .collect_vec();
+    //             (result, file)
+    //         },
+    //     );
+    //     b.iter_custom(|n| builder.bench(n))
+    // });
 
-    group.bench_function("wordcount-reduce-assoc", |b| {
-        let builder = NoirBenchBuilder::new(
-            noir_max_parallism_env,
-            |n: u64, env: &mut StreamEnvironment| {
-                let file = make_file(n as usize);
-                let path = file.path();
-                let source = FileSource::new(path);
-                let result = env
-                    .stream(source)
-                    .batch_mode(BatchMode::fixed(1024))
-                    .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
-                    .map(|word| (word, 1))
-                    .group_by_reduce(|w| w.clone(), |(_w1, c1), (_w, c2)| *c1 += c2)
-                    .unkey()
-                    .collect_vec();
-                (result, file)
-            },
-        );
-        b.iter_custom(|n| builder.bench(n))
-    });
+    // group.bench_function("wordcount-reduce-assoc", |b| {
+    //     let builder = NoirBenchBuilder::new(
+    //         noir_max_parallism_env,
+    //         |n: u64, env: &mut StreamEnvironment| {
+    //             let file = make_file(n as usize);
+    //             let path = file.path();
+    //             let source = FileSource::new(path);
+    //             let result = env
+    //                 .stream(source)
+    //                 .batch_mode(BatchMode::fixed(1024))
+    //                 .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
+    //                 .map(|word| (word, 1))
+    //                 .group_by_reduce(|w| w.clone(), |(_w1, c1), (_w, c2)| *c1 += c2)
+    //                 .unkey()
+    //                 .collect_vec();
+    //             (result, file)
+    //         },
+    //     );
+    //     b.iter_custom(|n| builder.bench(n))
+    // });
     group.finish();
 }
 

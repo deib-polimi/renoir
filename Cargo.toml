@@ -13,7 +13,8 @@ default = ["flume"]
 crossbeam = ["crossbeam-channel"]
 fair = []
 profiler = []
-async-tokio = ["tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros", "fair"]
+async-tokio = ["tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
+deque-flatten = []
 
 [dependencies]
 # for logging to the console
@@ -129,3 +130,4 @@ harness = false
 
 [profile.release]
 lto = "thin"
+strip = "symbols"
