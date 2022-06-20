@@ -23,9 +23,6 @@ use crate::stream::BlockId;
 
 pub(crate) type SerializedMessage = Vec<u8>;
 
-/// The capacity of the out-buffer.
-pub(crate) const CHANNEL_CAPACITY: usize = 10;
-
 lazy_static! {
 /// Configuration of the header serializer: the integers must have a fixed length encoding.
     static ref HEADER_CONFIG: WithOtherTrailing<WithOtherIntEncoding<DefaultOptions, FixintEncoding>, RejectTrailing> =

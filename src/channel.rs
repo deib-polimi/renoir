@@ -273,11 +273,11 @@ mod tests {
 
     use crate::channel::{bounded, SelectResult};
 
-    const CHANNEL_CAPACITY: usize = 10;
+    const TEST_CAPACITY: usize = 10;
 
     #[test]
     fn test_recv_local() {
-        let (sender, receiver) = bounded(CHANNEL_CAPACITY);
+        let (sender, receiver) = bounded(TEST_CAPACITY);
 
         sender.send(123).unwrap();
         sender.send(456).unwrap();
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_recv_timeout_local() {
-        let (sender, receiver) = bounded(CHANNEL_CAPACITY);
+        let (sender, receiver) = bounded(TEST_CAPACITY);
 
         sender.send(123).unwrap();
 
@@ -312,8 +312,8 @@ mod tests {
 
     #[test]
     fn test_select_local() {
-        let (sender1, receiver1) = bounded(CHANNEL_CAPACITY);
-        let (sender2, receiver2) = bounded(CHANNEL_CAPACITY);
+        let (sender1, receiver1) = bounded(TEST_CAPACITY);
+        let (sender2, receiver2) = bounded(TEST_CAPACITY);
 
         sender1.send(123).unwrap();
 
@@ -328,8 +328,8 @@ mod tests {
 
     #[test]
     fn test_select_timeout_local() {
-        let (sender1, receiver1) = bounded(CHANNEL_CAPACITY);
-        let (sender2, receiver2) = bounded(CHANNEL_CAPACITY);
+        let (sender1, receiver1) = bounded(TEST_CAPACITY);
+        let (sender2, receiver2) = bounded(TEST_CAPACITY);
 
         sender1.send(123).unwrap();
 
@@ -355,23 +355,23 @@ mod tests {
     #[test]
     fn test_select_fairness() {
         // this test has a probability of randomly failing of c!c! / (2c)! where c is
-        // CHANNEL_CAPACITY. Repeating this test enough times makes sure to avoid any fluke.
-        // If CHANNEL_CAPACITY == 10, with 100 tries the failure probability is ~3x10^-23 (the
+        // TEST_CAPACITY. Repeating this test enough times makes sure to avoid any fluke.
+        // If TEST_CAPACITY == 10, with 100 tries the failure probability is ~3x10^-23 (the
         // single try has a failure probability of ~5x10^-6)
         let tries = 100;
         let mut failures = 0;
         for _ in 0..100 {
-            let (sender1, receiver1) = bounded(CHANNEL_CAPACITY);
-            let (sender2, receiver2) = bounded(CHANNEL_CAPACITY);
+            let (sender1, receiver1) = bounded(TEST_CAPACITY);
+            let (sender2, receiver2) = bounded(TEST_CAPACITY);
 
-            for _ in 0..CHANNEL_CAPACITY {
+            for _ in 0..TEST_CAPACITY {
                 sender1.send(1).unwrap();
                 sender2.send(2).unwrap();
             }
 
             let mut order = Vec::new();
 
-            for _ in 0..2 * CHANNEL_CAPACITY {
+            for _ in 0..2 * TEST_CAPACITY {
                 let elem = receiver1.select(&receiver2);
                 match elem {
                     SelectResult::A(Ok(_)) => order.push(1),
@@ -380,13 +380,13 @@ mod tests {
                 }
             }
 
-            let in_order1 = (0..CHANNEL_CAPACITY)
+            let in_order1 = (0..TEST_CAPACITY)
                 .map(|_| 1)
-                .chain((0..CHANNEL_CAPACITY).map(|_| 2))
+                .chain((0..TEST_CAPACITY).map(|_| 2))
                 .collect_vec();
-            let in_order2 = (0..CHANNEL_CAPACITY)
+            let in_order2 = (0..TEST_CAPACITY)
                 .map(|_| 2)
-                .chain((0..CHANNEL_CAPACITY).map(|_| 1))
+                .chain((0..TEST_CAPACITY).map(|_| 1))
                 .collect_vec();
 
             if order == in_order1 || order == in_order2 {

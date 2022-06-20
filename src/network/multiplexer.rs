@@ -16,7 +16,7 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 use crate::channel::{self, Receiver, Sender, UnboundedSender};
-use crate::network::remote::{remote_send, CHANNEL_CAPACITY};
+use crate::network::remote::remote_send;
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
 
@@ -36,6 +36,7 @@ const RETRY_INITIAL_TIMEOUT: Duration = Duration::from_millis(125);
 /// Maximum timeout between connection attempts.
 const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 
+const MUX_CHANNEL_CAPACITY: usize = 32;
 /// Like `NetworkSender`, but this should be used in a multiplexed channel (i.e. a remote one).
 ///
 /// The `ReceiverEndpoint` is sent alongside the actual message in order to demultiplex it.
@@ -87,7 +88,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
 
     #[cfg(not(feature = "fair"))]
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
-        let (tx, rx) = channel::bounded(CHANNEL_CAPACITY);
+        let (tx, rx) = channel::bounded(MUX_CHANNEL_CAPACITY);
 
         let join_handle = std::thread::Builder::new()
             .name(format!("noir-mux-{}", coord))

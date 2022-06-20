@@ -261,7 +261,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
         let global_id = metadata.global_id;
         let num_replicas = metadata.replicas.len();
 
-        let file = File::open(&self.path).unwrap_or_else(|err| {
+        let file = File::options().read(true).write(false).open(&self.path).unwrap_or_else(|err| {
             panic!(
                 "CsvSource: error while opening file {:?}: {:?}",
                 self.path, err
