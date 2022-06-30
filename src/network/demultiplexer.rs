@@ -10,8 +10,8 @@ use tokio::net::{TcpListener, TcpStream};
 #[cfg(feature = "async-tokio")]
 use tokio::task::JoinHandle;
 
-use ahash::AHashMap;
 use anyhow::anyhow;
+use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 
 use crate::channel::{self, Sender, UnboundedReceiver, UnboundedSender};
@@ -131,7 +131,7 @@ fn bind_remotes<In: ExchangeData>(
         let join_handle = std::thread::Builder::new()
             .name(format!("noir-demux-{}", coord))
             .spawn(move || {
-                let mut senders = AHashMap::new();
+                let mut senders = HashMap::new();
                 while let Ok((endpoint, sender)) = demux_rx.recv() {
                     senders.insert(endpoint, sender);
                 }
@@ -176,7 +176,7 @@ fn bind_remotes<In: ExchangeData>(
 #[tracing::instrument(skip_all)]
 fn demux_thread<In: ExchangeData>(
     coord: DemuxCoord,
-    senders: AHashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,
+    senders: HashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,
     mut stream: TcpStream,
 ) {
     let address = stream
@@ -292,7 +292,7 @@ async fn bind_remotes<In: ExchangeData>(
 
         let (demux_tx, demux_rx) = flume::unbounded();
         let join_handle = tokio::spawn(async move {
-            let mut senders = AHashMap::new();
+            let mut senders = HashMap::new();
             while let Ok((endpoint, sender)) = demux_rx.recv_async().await {
                 senders.insert(endpoint, sender);
             }
@@ -336,7 +336,7 @@ async fn bind_remotes<In: ExchangeData>(
 #[tracing::instrument(skip_all)]
 async fn demux_thread<In: ExchangeData>(
     coord: DemuxCoord,
-    senders: AHashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,
+    senders: HashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,
     mut stream: TcpStream,
 ) {
     let address = stream

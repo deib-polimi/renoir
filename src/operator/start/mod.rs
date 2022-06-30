@@ -1,4 +1,5 @@
-use std::fmt::Debug;
+use std::collections::VecDeque;
+use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,6 +15,7 @@ use crate::operator::start::watermark_frontier::WatermarkFrontier;
 use crate::operator::{timestamp_max, ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::BlockId;
+use crate::BatchMode;
 
 mod multiple;
 mod single;
@@ -50,6 +52,7 @@ pub(crate) type MultipleStartBlockReceiverOperator<OutL, OutR> =
 pub(crate) type SingleStartBlockReceiverOperator<Out> =
     StartBlock<Out, SingleStartBlockReceiver<Out>>;
 
+#[cfg(not(feature = "deque-start"))]
 /// Each block should start with a `StartBlock` operator, whose task is to read from the network,
 /// receive from the previous operators and handle the watermark frontier.
 ///
@@ -73,6 +76,52 @@ pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out
 
     /// Inner iterator over batch items, contains coordinate of the sender
     batch_iter: Option<(Coord, NetworkDataIterator<StreamElement<Out>>)>,
+
+    /// The number of `StreamElement::Terminate` messages yet to be received. When this value
+    /// reaches zero this operator will emit the terminate.
+    missing_terminate: usize,
+    /// The number of `StreamElement::FlushAndRestart` messages yet to be received.
+    missing_flush_and_restart: usize,
+    /// The total number of replicas in the previous blocks. This is used for resetting
+    /// `missing_flush_and_restart`.
+    num_previous_replicas: usize,
+
+    /// Whether the previous blocks timed out and the last batch has been flushed.
+    ///
+    /// The next time `next()` is called it will not wait the timeout asked by the batch mode.
+    already_timed_out: bool,
+
+    /// The current frontier of the watermarks from the previous replicas.
+    watermark_frontier: WatermarkFrontier,
+
+    /// Whether the iteration has ended and the current block has to wait for the local iteration
+    /// leader to update the iteration state before letting the messages pass.
+    wait_for_state: bool,
+    state_lock: Option<Arc<IterationStateLock>>,
+    state_generation: usize,
+}
+
+#[cfg(not(feature = "deque-start"))]
+impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Display
+    for StartBlock<Out, Receiver>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}]", std::any::type_name::<Out>())
+    }
+}
+
+#[cfg(feature = "deque-start")]
+#[derive(Clone, Debug)]
+pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> {
+    /// Execution metadata of this block.
+    coord: Option<Coord>,
+
+    batch_mode: Option<BatchMode>,
+
+    /// The actual receiver able to fetch messages from the network.
+    receiver: Receiver,
+    /// A stash of the received messages ready to be returned.
+    buffer: VecDeque<StreamElement<Out>>,
 
     /// The number of `StreamElement::Terminate` messages yet to be received. When this value
     /// reaches zero this operator will emit the terminate.
@@ -131,6 +180,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData>
     }
 }
 
+#[cfg(not(feature = "deque-start"))]
 impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out, Receiver> {
     fn new(receiver: Receiver, state_lock: Option<Arc<IterationStateLock>>) -> Self {
         Self {
@@ -159,6 +209,36 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out
     }
 }
 
+#[cfg(feature = "deque-start")]
+impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out, Receiver> {
+    fn new(receiver: Receiver, state_lock: Option<Arc<IterationStateLock>>) -> Self {
+        Self {
+            coord: Default::default(),
+            batch_mode: Default::default(),
+
+            receiver,
+            buffer: Default::default(),
+
+            missing_terminate: Default::default(),
+            missing_flush_and_restart: Default::default(),
+            num_previous_replicas: 0,
+
+            already_timed_out: Default::default(),
+
+            watermark_frontier: Default::default(),
+
+            wait_for_state: Default::default(),
+            state_lock,
+            state_generation: Default::default(),
+        }
+    }
+
+    pub(crate) fn receiver(&self) -> &Receiver {
+        &self.receiver
+    }
+}
+
+#[cfg(not(feature = "deque-start"))]
 impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
     for StartBlock<Out, Receiver>
 {
@@ -270,6 +350,131 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
 
         self.batch_iter = Some((net_msg.sender(), net_msg.into_iter()));
         self.next()
+    }
+
+    fn structure(&self) -> BlockStructure {
+        self.receiver.structure()
+    }
+}
+
+#[cfg(feature = "deque-start")]
+impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
+    for StartBlock<Out, Receiver>
+{
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        self.receiver.setup(metadata);
+
+        let prev_replicas = self.receiver.prev_replicas();
+        self.num_previous_replicas = prev_replicas.len();
+        self.missing_terminate = self.num_previous_replicas;
+        self.missing_flush_and_restart = self.num_previous_replicas;
+        self.watermark_frontier = WatermarkFrontier::new(prev_replicas);
+
+        debug!(
+            "StartBlock {} of {} initialized",
+            metadata.coord,
+            std::any::type_name::<Out>()
+        );
+        self.coord = Some(metadata.coord);
+        self.batch_mode = Some(metadata.batch_mode);
+    }
+
+    fn next(&mut self) -> StreamElement<Out> {
+        let coord = self.coord.unwrap();
+        let max_delay = self.batch_mode.unwrap().max_delay();
+
+        // all the previous blocks sent an end: we're done
+        if self.missing_terminate == 0 {
+            info!("StartBlock for {} has ended", coord);
+            return StreamElement::Terminate;
+        }
+        if self.missing_flush_and_restart == 0 {
+            info!("StartBlock for {} is emitting flush and restart", coord);
+
+            self.missing_flush_and_restart = self.num_previous_replicas;
+            self.watermark_frontier.reset();
+            // this iteration has ended, before starting the next one wait for the state update
+            self.wait_for_state = true;
+            self.state_generation += 2;
+            return StreamElement::FlushAndRestart;
+        }
+
+        while self.buffer.is_empty() {
+            let buf = match (self.already_timed_out, max_delay) {
+                // check the timeout only if there is one and the last time we didn't timed out
+                (false, Some(max_delay)) => {
+                    match self.receiver.recv_timeout(max_delay) {
+                        Ok(buf) => buf,
+                        Err(_) => {
+                            // timed out: tell the block to flush the current batch
+                            // next time we wait indefinitely without the timeout since the batch is
+                            // currently empty
+                            self.already_timed_out = true;
+                            // this is a fake batch, and its sender is meaningless and will be
+                            // forget immediately
+                            NetworkMessage::new_single(
+                                StreamElement::FlushBatch,
+                                Default::default(),
+                            )
+                        }
+                    }
+                }
+                _ => {
+                    self.already_timed_out = false;
+                    self.receiver.recv()
+                }
+            };
+
+            let sender = buf.sender();
+
+            // use watermarks to update the frontier
+            let watermark_frontier = &mut self.watermark_frontier;
+            self.buffer
+                .extend(buf.into_iter().filter_map(|item| match item {
+                    StreamElement::Watermark(ts) => {
+                        // update the frontier and return a watermark if necessary
+                        watermark_frontier
+                            .update(sender, ts)
+                            .map(StreamElement::Watermark)
+                    }
+                    StreamElement::FlushAndRestart => {
+                        // mark this replica as ended and let the frontier ignore it from now on
+                        watermark_frontier.update(sender, timestamp_max());
+                        Some(item)
+                    }
+                    _ => Some(item),
+                }));
+        }
+
+        let message = self
+            .buffer
+            .pop_front()
+            .expect("Previous block sent an empty message");
+        if matches!(message, StreamElement::FlushAndRestart) {
+            self.missing_flush_and_restart -= 1;
+            debug!(
+                "{} received an FlushAndRestart, {} more to come",
+                coord, self.missing_flush_and_restart
+            );
+            return self.next();
+        }
+        if matches!(message, StreamElement::Terminate) {
+            self.missing_terminate -= 1;
+            debug!(
+                "{} received a Terminate, {} more to come",
+                coord, self.missing_terminate
+            );
+            return self.next();
+        }
+        // the previous iteration has ended, this message refers to the new iteration: we need to be
+        // sure the state is set before we let this message pass
+        if self.wait_for_state {
+            if let Some(lock) = self.state_lock.as_ref() {
+                lock.wait_for_update(self.state_generation);
+            }
+            self.wait_for_state = false;
+        }
+        message
     }
 
     fn to_string(&self) -> String {

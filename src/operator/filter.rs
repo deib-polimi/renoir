@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -14,6 +15,21 @@ where
     prev: PreviousOperator,
     predicate: Predicate,
     _out: PhantomData<Out>,
+}
+
+impl<Out: Data, PreviousOperator, Predicate> Display for Filter<Out, PreviousOperator, Predicate>
+where
+    Predicate: Fn(&Out) -> bool + Send + Clone + 'static,
+    PreviousOperator: Operator<Out> + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> Filter<{}>",
+            self.prev.to_string(),
+            std::any::type_name::<Out>()
+        )
+    }
 }
 
 impl<Out: Data, PreviousOperator, Predicate> Filter<Out, PreviousOperator, Predicate>
@@ -48,14 +64,6 @@ where
                 element => return element,
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> Filter<{}>",
-            self.prev.to_string(),
-            std::any::type_name::<Out>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

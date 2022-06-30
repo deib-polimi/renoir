@@ -1,6 +1,7 @@
 use core::iter::Iterator;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{group_by_hash, BlockStructure, NextStrategy, OperatorStructure};
@@ -23,13 +24,30 @@ where
     #[derivative(Debug = "ignore")]
     fold: F,
     init: NewOut,
-    accumulators: HashMap<Key, NewOut, ahash::RandomState>,
-    timestamps: HashMap<Key, Timestamp, ahash::RandomState>,
+    accumulators: HashMap<Key, NewOut, std::collections::hash_map::RandomState>,
+    timestamps: HashMap<Key, Timestamp, std::collections::hash_map::RandomState>,
     ready: Vec<StreamElement<KeyValue<Key, NewOut>>>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
     received_end_iter: bool,
     _out: PhantomData<Out>,
+}
+
+impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Display
+    for KeyedFold<Key, Out, NewOut, F, PreviousOperators>
+where
+    F: Fn(&mut NewOut, Out) + Send + Clone,
+    PreviousOperators: Operator<KeyValue<Key, Out>>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> KeyedFold<{} -> {}>",
+            self.prev.to_string(),
+            std::any::type_name::<KeyValue<Key, Out>>(),
+            std::any::type_name::<KeyValue<Key, NewOut>>()
+        )
+    }
 }
 
 impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators: Operator<KeyValue<Key, Out>>>
@@ -134,15 +152,6 @@ where
         }
 
         StreamElement::Terminate
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> KeyedFold<{} -> {}>",
-            self.prev.to_string(),
-            std::any::type_name::<KeyValue<Key, Out>>(),
-            std::any::type_name::<KeyValue<Key, NewOut>>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

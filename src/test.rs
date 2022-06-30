@@ -1,5 +1,6 @@
 use std::any::TypeId;
 use std::collections::VecDeque;
+use std::fmt::Display;
 use std::time::Duration;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -14,6 +15,12 @@ use crate::{BatchMode, EnvironmentConfig};
 pub struct FakeOperator<Out: Data> {
     /// The data to return from `next()`.
     buffer: VecDeque<StreamElement<Out>>,
+}
+
+impl<Out: Data> Display for FakeOperator<Out> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FakeOperator<{}>", std::any::type_name::<Out>())
+    }
 }
 
 impl<Out: Data> FakeOperator<Out> {
@@ -46,10 +53,6 @@ impl<Out: Data> Operator<Out> for FakeOperator<Out> {
         } else {
             StreamElement::Terminate
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("FakeOperator<{}>", std::any::type_name::<Out>())
     }
 
     fn structure(&self) -> BlockStructure {

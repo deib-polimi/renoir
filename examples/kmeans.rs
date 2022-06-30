@@ -92,7 +92,11 @@ impl Div<f64> for Point {
 }
 
 fn read_centroids(filename: &str, n: usize) -> Vec<Point> {
-    let file = File::options().read(true).write(false).open(filename).unwrap();
+    let file = File::options()
+        .read(true)
+        .write(false)
+        .open(filename)
+        .unwrap();
     csv::ReaderBuilder::new()
         .has_headers(false)
         .from_reader(file)
@@ -103,7 +107,8 @@ fn read_centroids(filename: &str, n: usize) -> Vec<Point> {
 }
 
 fn select_nearest(point: Point, old_centroids: &[Point]) -> Point {
-    old_centroids.iter()
+    old_centroids
+        .iter()
         .map(|c| (c, point.distance_to(c)))
         .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
         .unwrap()

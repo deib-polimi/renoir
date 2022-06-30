@@ -15,6 +15,7 @@ fair = []
 profiler = []
 async-tokio = ["tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 deque-flatten = []
+deque-start = []
 
 [dependencies]
 # for logging to the console

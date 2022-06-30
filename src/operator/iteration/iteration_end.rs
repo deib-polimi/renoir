@@ -33,6 +33,21 @@ where
     coord: Coord,
 }
 
+impl<DeltaUpdate: ExchangeData, OperatorChain> std::fmt::Display
+    for IterationEndBlock<DeltaUpdate, OperatorChain>
+where
+    OperatorChain: Operator<DeltaUpdate>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> IterationEndBlock<{}>",
+            self.prev.to_string(),
+            std::any::type_name::<DeltaUpdate>()
+        )
+    }
+}
+
 impl<DeltaUpdate: ExchangeData, OperatorChain> IterationEndBlock<DeltaUpdate, OperatorChain>
 where
     OperatorChain: Operator<DeltaUpdate>,
@@ -107,14 +122,6 @@ where
             StreamElement::FlushBatch => elem.map(|_| unreachable!()),
             _ => unreachable!(),
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> IterationEndBlock<{}>",
-            self.prev.to_string(),
-            std::any::type_name::<DeltaUpdate>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

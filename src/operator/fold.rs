@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -22,6 +23,23 @@ where
     received_end: bool,
     received_end_iter: bool,
     _out: PhantomData<Out>,
+}
+
+impl<Out: Data, NewOut: Data, F, PreviousOperators> Display
+    for Fold<Out, NewOut, F, PreviousOperators>
+where
+    F: Fn(&mut NewOut, Out) + Send + Clone,
+    PreviousOperators: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> Fold<{} -> {}>",
+            self.prev.to_string(),
+            std::any::type_name::<Out>(),
+            std::any::type_name::<NewOut>()
+        )
+    }
 }
 
 impl<Out: Data, NewOut: Data, F, PreviousOperators: Operator<Out>>
@@ -105,15 +123,6 @@ where
         }
 
         StreamElement::Terminate
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> Fold<{} -> {}>",
-            self.prev.to_string(),
-            std::any::type_name::<Out>(),
-            std::any::type_name::<NewOut>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

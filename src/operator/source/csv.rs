@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
@@ -94,6 +95,12 @@ pub struct CsvSource<Out: Data + for<'a> Deserialize<'a>> {
     /// Whether the reader has terminated its job.
     terminated: bool,
     _out: PhantomData<Out>,
+}
+
+impl<Out: Data + for<'a> Deserialize<'a>> Display for CsvSource<Out> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsvSource<{}>", std::any::type_name::<Out>())
+    }
 }
 
 impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
@@ -261,12 +268,16 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
         let global_id = metadata.global_id;
         let num_replicas = metadata.replicas.len();
 
-        let file = File::options().read(true).write(false).open(&self.path).unwrap_or_else(|err| {
-            panic!(
-                "CsvSource: error while opening file {:?}: {:?}",
-                self.path, err
-            )
-        });
+        let file = File::options()
+            .read(true)
+            .write(false)
+            .open(&self.path)
+            .unwrap_or_else(|err| {
+                panic!(
+                    "CsvSource: error while opening file {:?}: {:?}",
+                    self.path, err
+                )
+            });
 
         let file_size = file.metadata().unwrap().len();
 
@@ -375,10 +386,6 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
                 StreamElement::FlushAndRestart
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("CsvSource<{}>", std::any::type_name::<Out>())
     }
 
     fn structure(&self) -> BlockStructure {

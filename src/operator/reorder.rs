@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
@@ -42,6 +43,20 @@ where
     last_watermark: Option<Timestamp>,
     prev: PreviousOperators,
     received_end: bool,
+}
+
+impl<Out: Data, PreviousOperators> Display for Reorder<Out, PreviousOperators>
+where
+    PreviousOperators: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> Reorder<{}>",
+            self.prev.to_string(),
+            std::any::type_name::<Out>(),
+        )
+    }
 }
 
 impl<Out: Data, PreviousOperators> Reorder<Out, PreviousOperators>
@@ -99,14 +114,6 @@ where
                 }
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> Reorder<{}>",
-            self.prev.to_string(),
-            std::any::type_name::<Out>(),
-        )
     }
 
     fn structure(&self) -> BlockStructure {

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[cfg(all(feature = "crossbeam", not(feature = "flume")))]
 use crossbeam_channel::{bounded, Receiver, RecvError, Sender, TryRecvError};
 #[cfg(all(feature = "flume", not(feature = "crossbeam")))]
@@ -21,6 +23,12 @@ pub struct ChannelSource<Out: Data> {
     rx: Receiver<Out>,
     terminated: bool,
     retry_count: u8,
+}
+
+impl<Out: Data> Display for ChannelSource<Out> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChannelSource<{}>", std::any::type_name::<Out>())
+    }
 }
 
 impl<Out: Data> ChannelSource<Out> {
@@ -103,10 +111,6 @@ impl<Out: Data + core::fmt::Debug> Operator<Out> for ChannelSource<Out> {
                 StreamElement::FlushAndRestart
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("StreamSource<{}>", std::any::type_name::<Out>())
     }
 
     fn structure(&self) -> BlockStructure {

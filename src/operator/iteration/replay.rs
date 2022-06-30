@@ -1,4 +1,5 @@
 use std::any::TypeId;
+use std::fmt::Display;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -38,6 +39,20 @@ where
 
     /// Whether the input stream has ended or not.
     has_input_ended: bool,
+}
+
+impl<Out: Data, State: ExchangeData, OperatorChain> Display for Replay<Out, State, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> Replay<{}>",
+            self.prev.to_string(),
+            std::any::type_name::<Out>()
+        )
+    }
 }
 
 impl<Out: Data, State: ExchangeData, OperatorChain> Replay<Out, State, OperatorChain>
@@ -295,14 +310,6 @@ where
         // This iteration has ended but FlushAndRestart has already been sent. To avoid sending
         // twice the FlushAndRestart recurse.
         self.next()
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> Replay<{}>",
-            self.prev.to_string(),
-            std::any::type_name::<Out>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use std::collections::VecDeque;
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -46,6 +47,25 @@ struct JoinLocalSortMerge<
     /// This is used to check whether an element of the right side was matched with an element
     /// of the left side or not.
     last_left_key: Option<Key>,
+}
+
+impl<
+        Key: Data + Ord,
+        Out1: ExchangeData,
+        Out2: ExchangeData,
+        Keyer1: KeyerFn<Key, Out1>,
+        Keyer2: KeyerFn<Key, Out2>,
+        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
+    > Display for JoinLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> JoinLocalSortMerge<{}>",
+            self.prev.to_string(),
+            std::any::type_name::<Key>()
+        )
+    }
 }
 impl<
         Key: Data + Ord,
@@ -196,14 +216,6 @@ impl<
                 StreamElement::Terminate => return StreamElement::Terminate,
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> JoinLocalSortMerge<{}>",
-            self.prev.to_string(),
-            std::any::type_name::<Key>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

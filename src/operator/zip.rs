@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fmt::Display;
 use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStructure};
@@ -15,6 +16,17 @@ pub struct Zip<Out1: ExchangeData, Out2: ExchangeData> {
     stash2: VecDeque<StreamElement<Out2>>,
     prev_block_id1: BlockId,
     prev_block_id2: BlockId,
+}
+
+impl<Out1: ExchangeData, Out2: ExchangeData> Display for Zip<Out1, Out2> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Zip[{}, {}]",
+            std::any::type_name::<Out1>(),
+            std::any::type_name::<Out2>()
+        )
+    }
 }
 
 impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
@@ -95,14 +107,6 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1
             }
             _ => panic!("Unsupported mixing of timestamped and non-timestamped items"),
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "Zip[{}, {}]",
-            std::any::type_name::<Out1>(),
-            std::any::type_name::<Out2>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

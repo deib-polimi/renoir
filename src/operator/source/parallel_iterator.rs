@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
@@ -78,6 +80,20 @@ where
     terminated: bool,
 }
 
+impl<Out: Data, It, GenIt> Display for ParallelIteratorSource<Out, It, GenIt>
+where
+    It: Iterator<Item = Out> + Send + 'static,
+    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ParallelIteratorSource<{}>",
+            std::any::type_name::<Out>()
+        )
+    }
+}
+
 impl<Out: Data, It, GenIt> ParallelIteratorSource<Out, It, GenIt>
 where
     It: Iterator<Item = Out> + Send + 'static,
@@ -149,10 +165,6 @@ where
                 StreamElement::FlushAndRestart
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("StreamSource<{}>", std::any::type_name::<Out>())
     }
 
     fn structure(&self) -> BlockStructure {

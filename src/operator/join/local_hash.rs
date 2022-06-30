@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -18,7 +19,7 @@ struct SideHashMap<Key: DataKey, Out> {
     /// The actual items on this side, grouped by key.
     ///
     /// Note that when the other side ends this map is emptied.
-    data: HashMap<Key, Vec<Out>, ahash::RandomState>,
+    data: HashMap<Key, Vec<Out>, std::collections::hash_map::RandomState>,
     /// The set of all the keys seen.
     ///
     /// Note that when this side ends this set is emptied since it won't be used again.
@@ -71,6 +72,25 @@ struct JoinLocalHash<
     variant: JoinVariant,
     /// The already generated tuples, but not yet returned.
     buffer: VecDeque<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>,
+}
+
+impl<
+        Key: DataKey,
+        Out1: ExchangeData,
+        Out2: ExchangeData,
+        Keyer1: KeyerFn<Key, Out1>,
+        Keyer2: KeyerFn<Key, Out2>,
+        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
+    > Display for JoinLocalHash<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> JoinLocalHash<{}>",
+            self.prev.to_string(),
+            std::any::type_name::<Key>()
+        )
+    }
 }
 
 impl<
@@ -251,14 +271,6 @@ impl<
 
         let item = self.buffer.pop_front().unwrap();
         StreamElement::Item(item)
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> JoinLocalHash<{}>",
-            self.prev.to_string(),
-            std::any::type_name::<Key>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

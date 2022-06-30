@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -13,10 +14,27 @@ where
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
     prev: OperatorChain,
-    maps_fn: HashMap<Key, F, ahash::RandomState>,
+    maps_fn: HashMap<Key, F, std::collections::hash_map::RandomState>,
     init_map: F,
     _out: PhantomData<Out>,
     _new_out: PhantomData<NewOut>,
+}
+
+impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain> Display
+    for RichMap<Key, Out, NewOut, F, OperatorChain>
+where
+    F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
+    OperatorChain: Operator<KeyValue<Key, Out>>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> RichMap<{} -> {}>",
+            self.prev.to_string(),
+            std::any::type_name::<Out>(),
+            std::any::type_name::<NewOut>()
+        )
+    }
 }
 
 impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain>
@@ -63,15 +81,6 @@ where
             let new_value = (map_fn)((&key, value));
             (key, new_value)
         })
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> RichMap<{} -> {}>",
-            self.prev.to_string(),
-            std::any::type_name::<Out>(),
-            std::any::type_name::<NewOut>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

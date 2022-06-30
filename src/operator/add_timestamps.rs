@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -17,6 +18,18 @@ where
     watermark_gen: WatermarkGen,
     pending_watermark: Option<Timestamp>,
     _out: PhantomData<Out>,
+}
+
+impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain> Display
+    for AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+    TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
+    WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> AddTimestamp", self.prev.to_string())
+    }
 }
 
 impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
@@ -66,10 +79,6 @@ where
             | StreamElement::Terminate => elem,
             _ => panic!("AddTimestamp received invalid variant: {}", elem.variant()),
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("{} -> AddTimestamp", self.prev.to_string())
     }
 
     fn structure(&self) -> BlockStructure {

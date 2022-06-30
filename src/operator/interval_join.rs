@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::fmt::Display;
 use std::time::Duration;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -31,7 +32,7 @@ where
     /// Elements of the left side to be processed.
     left: VecDeque<(Timestamp, KeyValue<Key, Out>)>,
     /// Elements of the right side that might still be matched.
-    right: HashMap<Key, VecDeque<(Timestamp, Out2)>, ahash::RandomState>,
+    right: HashMap<Key, VecDeque<(Timestamp, Out2)>, std::collections::hash_map::RandomState>,
     /// Elements ready to be sent downstream.
     buffer: VecDeque<(Timestamp, OutputElement<Key, Out, Out2>)>,
     /// Timestamp of the last element (item or watermark).
@@ -42,6 +43,25 @@ where
     lower_bound: Duration,
     /// Whether the operator has received a `FlushAndRestart` message.
     received_restart: bool,
+}
+
+impl<Key, Out, Out2, OperatorChain> Display for IntervalJoin<Key, Out, Out2, OperatorChain>
+where
+    Key: ExchangeDataKey,
+    Out: ExchangeData,
+    Out2: ExchangeData,
+    OperatorChain: Operator<KeyValue<Key, ConcatElement<Out, Out2>>>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> IntervalJoin<{}, {:?}, {:?}>",
+            self.prev.to_string(),
+            std::any::type_name::<KeyValue<Key, (Out, Out2)>>(),
+            self.lower_bound,
+            self.upper_bound,
+        )
+    }
 }
 
 impl<Key, Out, Out2, OperatorChain> IntervalJoin<Key, Out, Out2, OperatorChain>
@@ -171,16 +191,6 @@ where
 
         let (ts, item) = self.buffer.pop_front().unwrap();
         StreamElement::Timestamped(item, ts)
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> IntervalJoin<{}, {:?}, {:?}>",
-            self.prev.to_string(),
-            std::any::type_name::<KeyValue<Key, (Out, Out2)>>(),
-            self.lower_bound,
-            self.upper_bound,
-        )
     }
 
     fn structure(&self) -> BlockStructure {

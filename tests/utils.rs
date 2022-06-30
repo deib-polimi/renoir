@@ -1,5 +1,6 @@
 #![allow(dead_code)] // not all tests use all the members
 
+use std::fmt::Display;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU16, AtomicUsize, Ordering};
@@ -41,6 +42,15 @@ where
     _out: PhantomData<Out>,
 }
 
+impl<Out: Data, PreviousOperator> Display for WatermarkChecker<Out, PreviousOperator>
+where
+    PreviousOperator: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WatermarkChecker")
+    }
+}
+
 impl<Out: Data, PreviousOperator: Operator<Out>> WatermarkChecker<Out, PreviousOperator> {
     pub fn new(prev: PreviousOperator, received_watermarks: Arc<AtomicUsize>) -> Self {
         Self {
@@ -77,10 +87,6 @@ impl<Out: Data, PreviousOperator: Operator<Out>> Operator<Out>
             _ => {}
         }
         item
-    }
-
-    fn to_string(&self) -> String {
-        String::from("WatermarkController")
     }
 
     fn structure(&self) -> BlockStructure {

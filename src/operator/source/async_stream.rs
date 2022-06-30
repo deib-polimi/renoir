@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use futures::{Stream, StreamExt};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
@@ -18,6 +20,15 @@ where
     #[derivative(Debug = "ignore")]
     inner: S,
     terminated: bool,
+}
+
+impl<Out: Data, S> Display for AsyncStreamSource<Out, S>
+where
+    S: Stream<Item = Out> + Send + Unpin + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StreamSource<{}>", std::any::type_name::<Out>())
+    }
 }
 
 impl<Out: Data, S> AsyncStreamSource<Out, S>
@@ -77,10 +88,6 @@ where
                 StreamElement::FlushAndRestart
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("StreamSource<{}>", std::any::type_name::<Out>())
     }
 
     fn structure(&self) -> BlockStructure {

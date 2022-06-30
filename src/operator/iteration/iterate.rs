@@ -1,5 +1,6 @@
 use std::any::TypeId;
 use std::collections::VecDeque;
+use std::fmt::Display;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -426,14 +427,6 @@ where
         self.next()
     }
 
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> Iterate<{}>",
-            self.prev.to_string(),
-            std::any::type_name::<Out>()
-        )
-    }
-
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<Out, _>("Iterate");
         operator
@@ -450,5 +443,20 @@ where
             &NextStrategy::only_one(),
         ));
         self.prev.structure().add_operator(operator)
+    }
+}
+
+impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Display
+    for Iterate<Out, State, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> Iterate<{}>",
+            self.prev.to_string(),
+            std::any::type_name::<Out>()
+        )
     }
 }

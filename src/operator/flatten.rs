@@ -3,6 +3,7 @@ pub use inner::*;
 #[cfg(not(feature = "deque-flatten"))]
 mod inner {
     use core::iter::{IntoIterator, Iterator};
+    use std::fmt::Display;
     use std::marker::PhantomData;
     use std::time::Duration;
 
@@ -31,6 +32,25 @@ mod inner {
         timestamp: Option<Duration>,
         _out: PhantomData<In>,
         _iter_out: PhantomData<Out>,
+    }
+
+    impl<In, Out, InnerIterator, PreviousOperators> Display
+        for Flatten<In, Out, InnerIterator, PreviousOperators>
+    where
+        PreviousOperators: Operator<In>,
+        In: Data + IntoIterator<Item = Out>,
+        Out: Data,
+        InnerIterator: Iterator,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "{} -> Flatten<{} -> {}>",
+                self.prev.to_string(),
+                std::any::type_name::<In>(),
+                std::any::type_name::<Out>()
+            )
+        }
     }
 
     impl<In, Out, InnerIterator, PreviousOperators> Flatten<In, Out, InnerIterator, PreviousOperators>
@@ -89,15 +109,6 @@ mod inner {
                     StreamElement::FlushAndRestart => return StreamElement::FlushAndRestart,
                 }
             }
-        }
-
-        fn to_string(&self) -> String {
-            format!(
-                "{} -> Flatten<{} -> {}>",
-                self.prev.to_string(),
-                std::any::type_name::<In>(),
-                std::any::type_name::<Out>()
-            )
         }
 
         fn structure(&self) -> BlockStructure {
@@ -199,6 +210,26 @@ mod inner {
         _iter_out: PhantomData<Out>,
     }
 
+    impl<Key, In, Out, InnerIterator, PreviousOperators> Display
+        for KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
+    where
+        Key: DataKey,
+        PreviousOperators: Operator<KeyValue<Key, In>>,
+        In: Data + IntoIterator<Item = Out>,
+        Out: Data,
+        InnerIterator: Iterator,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "{} -> KeyedFlatten<{} -> {}>",
+                self.prev.to_string(),
+                std::any::type_name::<In>(),
+                std::any::type_name::<Out>()
+            )
+        }
+    }
+
     impl<Key, In, Out, InnerIterator, PreviousOperators>
         KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
     where
@@ -259,15 +290,6 @@ mod inner {
                     StreamElement::FlushAndRestart => return StreamElement::FlushAndRestart,
                 }
             }
-        }
-
-        fn to_string(&self) -> String {
-            format!(
-                "{} -> KeyedFlatten<{} -> {}>",
-                self.prev.to_string(),
-                std::any::type_name::<In>(),
-                std::any::type_name::<Out>()
-            )
         }
 
         fn structure(&self) -> BlockStructure {

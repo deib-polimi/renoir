@@ -4,6 +4,7 @@
 //! [`KeyedStream`](crate::KeyedStream), [`WindowedStream`](crate::WindowedStream) and
 //! [`KeyedWindowedStream`](crate::KeyedWindowedStream).
 
+use std::fmt::Display;
 use std::hash::Hash;
 use std::time::Duration;
 
@@ -119,7 +120,7 @@ pub enum StreamElement<Out> {
 ///
 /// An `Operator` must be Clone since it is part of a single chain when it's built, but it has to
 /// be cloned to spawn the replicas of the block.
-pub trait Operator<Out: Data>: Clone + Send {
+pub trait Operator<Out: Data>: Clone + Send + Display {
     /// Setup the operator chain. This is called before any call to `next` and it's used to
     /// initialize the operator. When it's called the operator has already been cloned and it will
     /// never be cloned again. Therefore it's safe to store replica-specific metadata inside of it.
@@ -130,9 +131,6 @@ pub trait Operator<Out: Data>: Clone + Send {
 
     /// Take a value from the previous operator, process it and return it.
     fn next(&mut self) -> StreamElement<Out>;
-
-    /// A string representation of the operator and its predecessors.
-    fn to_string(&self) -> String;
 
     /// A more refined representation of the operator and its predecessors.
     fn structure(&self) -> BlockStructure;

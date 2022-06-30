@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
@@ -15,6 +17,15 @@ where
     #[derivative(Debug = "ignore")]
     inner: It,
     terminated: bool,
+}
+
+impl<Out: Data, It> Display for IteratorSource<Out, It>
+where
+    It: Iterator<Item = Out> + Send + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IteratorSource<{}>", std::any::type_name::<Out>())
+    }
 }
 
 impl<Out: Data, It> IteratorSource<Out, It>
@@ -72,10 +83,6 @@ where
                 StreamElement::FlushAndRestart
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("StreamSource<{}>", std::any::type_name::<Out>())
     }
 
     fn structure(&self) -> BlockStructure {

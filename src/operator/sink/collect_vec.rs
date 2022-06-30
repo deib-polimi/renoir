@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement};
@@ -12,6 +14,15 @@ where
     prev: PreviousOperators,
     result: Option<Vec<Out>>,
     output: StreamOutputRef<Vec<Out>>,
+}
+
+impl<Out: ExchangeData, PreviousOperators> Display for CollectVecSink<Out, PreviousOperators>
+where
+    PreviousOperators: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> CollectVecSink", self.prev.to_string())
+    }
 }
 
 impl<Out: ExchangeData, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
@@ -41,10 +52,6 @@ where
             StreamElement::FlushBatch => StreamElement::FlushBatch,
             StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("{} -> CollectVecSink", self.prev.to_string())
     }
 
     fn structure(&self) -> BlockStructure {

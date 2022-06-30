@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -18,6 +19,22 @@ where
     keyer: Keyer,
     _key: PhantomData<Key>,
     _out: PhantomData<Out>,
+}
+
+impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Display
+    for KeyBy<Key, Out, Keyer, OperatorChain>
+where
+    Keyer: Fn(&Out) -> Key + Send + Clone,
+    OperatorChain: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> KeyBy<{}>",
+            self.prev.to_string(),
+            std::any::type_name::<Key>(),
+        )
+    }
 }
 
 impl<Key: DataKey, Out: Data, Keyer, OperatorChain> KeyBy<Key, Out, Keyer, OperatorChain>
@@ -56,14 +73,6 @@ where
             StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
             StreamElement::FlushBatch => StreamElement::FlushBatch,
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> KeyBy<{}>",
-            self.prev.to_string(),
-            std::any::type_name::<Key>(),
-        )
     }
 
     fn structure(&self) -> BlockStructure {

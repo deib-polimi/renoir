@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 
 use crate::block::{
     BatchMode, Batcher, BlockStructure, Connection, NextStrategy, OperatorStructure, SenderList,
@@ -21,9 +22,23 @@ where
     batch_mode: BatchMode,
     sender_groups: Vec<SenderList>,
     #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
-    senders: HashMap<ReceiverEndpoint, Batcher<Out>, ahash::RandomState>,
+    senders: HashMap<ReceiverEndpoint, Batcher<Out>, std::collections::hash_map::RandomState>,
     feedback_id: Option<BlockId>,
     ignore_block_ids: Vec<BlockId>,
+}
+
+impl<Out: ExchangeData, OperatorChain, IndexFn> Display for EndBlock<Out, OperatorChain, IndexFn>
+where
+    IndexFn: KeyerFn<u64, Out>,
+    OperatorChain: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.next_strategy {
+            NextStrategy::Random => write!(f, "{} -> Shuffle", self.prev.to_string()),
+            NextStrategy::OnlyOne => write!(f, "{} -> OnlyOne", self.prev.to_string()),
+            _ => self.prev.fmt(f),
+        }
+    }
 }
 
 impl<Out: ExchangeData, OperatorChain, IndexFn> EndBlock<Out, OperatorChain, IndexFn>
@@ -142,14 +157,6 @@ where
             }
         }
         to_return
-    }
-
-    fn to_string(&self) -> String {
-        match self.next_strategy {
-            NextStrategy::Random => format!("{} -> Shuffle", self.prev.to_string()),
-            NextStrategy::OnlyOne => format!("{} -> OnlyOne", self.prev.to_string()),
-            _ => self.prev.to_string(),
-        }
     }
 
     fn structure(&self) -> BlockStructure {

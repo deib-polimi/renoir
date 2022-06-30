@@ -36,7 +36,7 @@ const RETRY_INITIAL_TIMEOUT: Duration = Duration::from_millis(125);
 /// Maximum timeout between connection attempts.
 const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 
-const MUX_CHANNEL_CAPACITY: usize = 32;
+const MUX_CHANNEL_CAPACITY: usize = 10;
 /// Like `NetworkSender`, but this should be used in a multiplexed channel (i.e. a remote one).
 ///
 /// The `ReceiverEndpoint` is sent alongside the actual message in order to demultiplex it.

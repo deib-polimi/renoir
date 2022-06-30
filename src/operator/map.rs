@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -17,6 +18,23 @@ where
     f: F,
     _out: PhantomData<Out>,
     _new_out: PhantomData<NewOut>,
+}
+
+impl<Out: Data, NewOut: Data, F, PreviousOperators> Display
+    for Map<Out, NewOut, F, PreviousOperators>
+where
+    F: Fn(Out) -> NewOut + Send + Clone,
+    PreviousOperators: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> Map<{} -> {}>",
+            self.prev.to_string(),
+            std::any::type_name::<Out>(),
+            std::any::type_name::<NewOut>()
+        )
+    }
 }
 
 impl<Out: Data, NewOut: Data, F, PreviousOperators> Map<Out, NewOut, F, PreviousOperators>
@@ -46,15 +64,6 @@ where
 
     fn next(&mut self) -> StreamElement<NewOut> {
         self.prev.next().map(&self.f)
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> Map<{} -> {}>",
-            self.prev.to_string(),
-            std::any::type_name::<Out>(),
-            std::any::type_name::<NewOut>()
-        )
     }
 
     fn structure(&self) -> BlockStructure {

@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
@@ -17,6 +18,16 @@ where
     #[derivative(Debug = "ignore")]
     f: F,
     _out: PhantomData<Out>,
+}
+
+impl<Out: Data, F, PreviousOperators> Display for ForEachSink<Out, F, PreviousOperators>
+where
+    F: FnMut(Out) + Send + Clone,
+    PreviousOperators: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> ForEach", self.prev.to_string())
+    }
 }
 
 impl<Out: Data, F, PreviousOperators> Operator<()> for ForEachSink<Out, F, PreviousOperators>
@@ -39,10 +50,6 @@ where
             StreamElement::FlushBatch => StreamElement::FlushBatch,
             StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("{} -> ForEach", self.prev.to_string())
     }
 
     fn structure(&self) -> BlockStructure {

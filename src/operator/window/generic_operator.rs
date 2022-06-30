@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::reorder::Reorder;
@@ -36,6 +37,25 @@ pub(crate) struct GenericWindowOperator<
     process_func: ProcessFunc,
     /// A buffer for storing ready items.
     buffer: VecDeque<StreamElement<KeyValue<Key, NewOut>>>,
+}
+
+impl<Key: DataKey, Out: Data, NewOut: Data, ProcessFunc, WindowDescr, OperatorChain> Display
+    for GenericWindowOperator<Key, Out, NewOut, ProcessFunc, WindowDescr, OperatorChain>
+where
+    ProcessFunc: Fn(&Window<Key, Out>) -> NewOut + Clone,
+    WindowDescr: WindowDescription<Key, Out> + Clone,
+    OperatorChain: Operator<KeyValue<Key, Out>>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> {} -> GenericOperator[{}]<{}>",
+            self.prev.to_string(),
+            self.manager,
+            self.name,
+            std::any::type_name::<NewOut>(),
+        )
+    }
 }
 
 impl<Key: DataKey, Out: Data, NewOut: Data, F, WindowDescr, OperatorChain>
@@ -112,16 +132,6 @@ where
                 });
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{} -> {} -> GenericOperator[{}]<{}>",
-            self.prev.to_string(),
-            self.manager,
-            self.name,
-            std::any::type_name::<NewOut>(),
-        )
     }
 
     fn structure(&self) -> BlockStructure {

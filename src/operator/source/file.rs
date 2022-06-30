@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::Seek;
@@ -22,6 +23,12 @@ pub struct FileSource {
     end: usize,
     terminated: bool,
     coord: Option<Coord>,
+}
+
+impl Display for FileSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileSource<{}>", std::any::type_name::<String>())
+    }
 }
 
 impl FileSource {
@@ -132,10 +139,6 @@ impl Operator<String> for FileSource {
         };
 
         element
-    }
-
-    fn to_string(&self) -> String {
-        format!("FileSource<{}>", std::any::type_name::<String>())
     }
 
     fn structure(&self) -> BlockStructure {

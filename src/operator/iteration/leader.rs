@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -71,6 +72,17 @@ where
     /// A function that, given the global state, checks whether the iteration should continue.
     #[derivative(Debug = "ignore")]
     loop_condition: LoopCond,
+}
+
+impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond> Display
+    for IterationLeader<DeltaUpdate, State, Global, LoopCond>
+where
+    Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
+    LoopCond: Fn(&mut State) -> bool + Send + Clone,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IterationLeader<{}>", std::any::type_name::<State>())
+    }
 }
 
 impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond>
@@ -202,10 +214,6 @@ where
                 return StreamElement::Item(state);
             }
         }
-    }
-
-    fn to_string(&self) -> String {
-        format!("IterationLeader<{}>", std::any::type_name::<State>())
     }
 
     fn structure(&self) -> BlockStructure {
