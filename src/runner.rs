@@ -52,7 +52,7 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
     for (host_id, host) in config.hosts.into_iter().enumerate() {
         let config_str = config_str.clone();
         let join_handle = std::thread::Builder::new()
-            .name(format!("RemoteW{}", host_id))
+            .name(format!("noir-remote-{}", host_id))
             .spawn(move || {
                 let config_str = config_str.clone();
                 spawn_remote_worker(host_id, host, config_str)
@@ -216,8 +216,24 @@ fn spawn_remote_worker(
             eprintln!("{}|{}", host_id, line);
         }
     }
+
+    let reader = BufReader::new(&mut channel);
+
+    for l in reader.lines() {
+        println!(
+            "{}|{}",
+            host_id,
+            l.unwrap_or_else(|e| format!("ERROR: {}", e))
+        );
+    }
+
+
     channel.wait_close().unwrap();
-    info!("Exit status: {}", channel.exit_status().unwrap());
+    info!(
+        "{}|Exit status: {}",
+        host_id,
+        channel.exit_status().unwrap()
+    );
 
     let execution_time = execution_start.elapsed();
 
@@ -261,8 +277,8 @@ fn send_file(
     mode: i32,
 ) {
     let metadata = local_path.metadata().unwrap();
-    debug!(
-        "Sending file to host {}: {} -> {}, {} bytes",
+    log::info!(
+        "Sending executable to host {}: {} -> {}, {} bytes",
         host_id,
         local_path.display(),
         remote_path.display(),
@@ -272,6 +288,7 @@ fn send_file(
     let mut remote_file = session
         .scp_send(remote_path, mode, metadata.len(), None)
         .unwrap();
+
     let mut buffer = [0u8; SCP_BUFFER_SIZE];
     while let Ok(n) = local_file.read(&mut buffer) {
         if n == 0 {
@@ -283,6 +300,8 @@ fn send_file(
     remote_file.wait_eof().unwrap();
     remote_file.close().unwrap();
     remote_file.wait_close().unwrap();
+
+    log::info!("Sent executable to host {}", host_id,);
 
     // setting the file mode using scp_send seems unreliable
     let chmod = format!(

@@ -13,12 +13,12 @@ use crate::operator::ExchangeData;
 /// Maximum number of attempts to make for connecting to a remote host.
 const CONNECT_ATTEMPTS: usize = 10;
 /// Timeout for connecting to a remote host.
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// To avoid spamming the connections, wait this timeout before trying again. If the connection
 /// fails again this timeout will be doubled up to `RETRY_MAX_TIMEOUT`.
 const RETRY_INITIAL_TIMEOUT: Duration = Duration::from_millis(50);
 /// Maximum timeout between connection attempts.
-const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
+const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Like `NetworkSender`, but this should be used in a multiplexed channel (i.e. a remote one).
 ///

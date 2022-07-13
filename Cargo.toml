@@ -15,10 +15,10 @@ profiler = []
 [dependencies]
 # for logging to the console
 log = { version = "0.4", features = ["release_max_level_info"] }
-env_logger = "0.8"
+env_logger = "0.9"
 
 # used by the network for storing type-generic structures
-typemap = "0.3"
+typemap_rev = "0.1"
 
 # the shuffle() operator requires a random source
 rand = "0.8"
@@ -44,7 +44,7 @@ lazy_static = "1.4"
 
 # used for spawning the remote workers
 ssh2 = { version = "0.9", features = ["vendored-openssl"] }
-whoami = "1.1"
+whoami = "1.2"
 shell-escape = "0.1"
 
 # command line parsing utility
@@ -55,7 +55,7 @@ crossbeam-channel = { version = "0.5", optional = true }
 flume = { version = "0.10", optional = true }
 
 # Used for KeyedWindowManager
-hashbrown = "0.11"
+hashbrown = "0.12"
 
 # used for csv file source
 csv = "1.1"
@@ -69,17 +69,17 @@ chrono = "0.4"
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
 coarsetime = "0.1"
 
-# faster allocator
-mimalloc = { version = "*", optional = true }
-
 [dev-dependencies]
 # for the tests
-tempfile = "3.2"
+tempfile = "3.3"
 criterion = { version = "0.3", features = ["html_reports"] }
-fake = "2.4"
+fake = "2.5"
+
+# faster allocator
+mimalloc = { version = "*", default-features = false}
 
 # for the examples
-regex = "1.4.3"
+regex = "1.6"
 
 # used in the benchmarks
 crossbeam-channel = "0.5"

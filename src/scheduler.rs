@@ -174,7 +174,7 @@ impl Scheduler {
         );
 
         self.build_execution_graph();
-        self.network.finalize_topology();
+        self.network.build();
         self.network.log_topology();
 
         let mut join = vec![];

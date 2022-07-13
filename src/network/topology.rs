@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::thread::JoinHandle;
 
 use itertools::Itertools;
-use typemap::{Key, SendMap};
+use typemap_rev::{TypeMap, TypeMapKey};
 
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::demultiplexer::DemultiplexingReceiver;
@@ -19,28 +19,28 @@ use crate::stream::BlockId;
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In: ExchangeData>(PhantomData<In>);
 
-impl<In: ExchangeData> Key for ReceiverKey<In> {
+impl<In: ExchangeData> TypeMapKey for ReceiverKey<In> {
     type Value = HashMap<ReceiverEndpoint, NetworkReceiver<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `NetworkSender`s.
 struct SenderKey<In: ExchangeData>(PhantomData<In>);
 
-impl<In: ExchangeData> Key for SenderKey<In> {
+impl<In: ExchangeData> TypeMapKey for SenderKey<In> {
     type Value = HashMap<ReceiverEndpoint, NetworkSender<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `DemultiplexingReceiver`s.
 struct DemultiplexingReceiverKey<In: ExchangeData>(PhantomData<In>);
 
-impl<In: ExchangeData> Key for DemultiplexingReceiverKey<In> {
+impl<In: ExchangeData> TypeMapKey for DemultiplexingReceiverKey<In> {
     type Value = HashMap<DemuxCoord, DemultiplexingReceiver<In>>;
 }
 
 /// This struct is used to index inside the `typemap` with the `MultiplexingSender`s.
 struct MultiplexingSenderKey<In: ExchangeData>(PhantomData<In>);
 
-impl<In: ExchangeData> Key for MultiplexingSenderKey<In> {
+impl<In: ExchangeData> TypeMapKey for MultiplexingSenderKey<In> {
     type Value = HashMap<DemuxCoord, MultiplexingSender<In>>;
 }
 
@@ -74,25 +74,25 @@ pub(crate) struct NetworkTopology {
     ///
     /// This map is indexed using `ReceiverKey`.
     #[derivative(Debug = "ignore")]
-    receivers: SendMap,
+    receivers: Option<TypeMap>,
     /// All the registered local senders.
     ///
-    /// It works exactly like `self.receivers`.
+    /// It works exactly like `self.receivers.as_mut().unwrap()`.
     ///
     /// This map is indexed using `SenderKey`.
     #[derivative(Debug = "ignore")]
-    senders: SendMap,
+    senders: Option<TypeMap>,
 
     /// All the registered demultiplexers.
     ///
     /// This map is indexed using `DemultiplexingReceiverKey`.
     #[derivative(Debug = "ignore")]
-    demultiplexers: SendMap,
+    demultiplexers: Option<TypeMap>,
     /// All the registered multiplexers.
     ///
     /// This map is indexed using `MultiplexingSenderKey`.
     #[derivative(Debug = "ignore")]
-    multiplexers: SendMap,
+    multiplexers: Option<TypeMap>,
 
     /// The adjacency list of the execution graph.
     next: HashMap<(Coord, TypeId), Vec<(Coord, bool)>>,
@@ -125,10 +125,10 @@ impl NetworkTopology {
     pub(crate) fn new(config: EnvironmentConfig) -> Self {
         NetworkTopology {
             config,
-            receivers: SendMap::custom(),
-            senders: SendMap::custom(),
-            demultiplexers: SendMap::custom(),
-            multiplexers: SendMap::custom(),
+            receivers: Some(TypeMap::new()),
+            senders: Some(TypeMap::new()),
+            demultiplexers: Some(TypeMap::new()),
+            multiplexers: Some(TypeMap::new()),
             next: Default::default(),
             prev: Default::default(),
             senders_metadata: Default::default(),
@@ -143,16 +143,10 @@ impl NetworkTopology {
     /// Knowing that the computation ended, tear down the topology wait for all of its thread to
     /// exit.
     pub(crate) fn stop_and_wait(&mut self) {
-        // drop all the senders/receivers making sure no dangling sender keep alive their network
-        // receivers.
-        // SAFETY: this is safe since we are not altering the content of the typemaps, just emptying
-        // them.
-        unsafe {
-            self.receivers.data_mut().drain();
-            self.senders.data_mut().drain();
-            self.demultiplexers.data_mut().drain();
-            self.multiplexers.data_mut().drain();
-        }
+        self.demultiplexers.take();
+        self.multiplexers.take();
+        self.receivers.take();
+        self.senders.take();
         for handle in self.join_handles.drain(..) {
             handle.join().unwrap();
         }
@@ -191,14 +185,14 @@ impl NetworkTopology {
         &mut self,
         receiver_endpoint: ReceiverEndpoint,
     ) -> NetworkSender<T> {
-        if !self.senders.contains::<SenderKey<T>>() {
-            self.senders.insert::<SenderKey<T>>(Default::default());
+        if !self.senders.as_mut().unwrap().contains_key::<SenderKey<T>>() {
+            self.senders.as_mut().unwrap().insert::<SenderKey<T>>(Default::default());
         }
-        let entry = self.senders.get_mut::<SenderKey<T>>().unwrap();
+        let entry = self.senders.as_mut().unwrap().get_mut::<SenderKey<T>>().unwrap();
         if !entry.contains_key(&receiver_endpoint) {
             self.register_channel::<T>(receiver_endpoint);
         }
-        self.senders
+        self.senders.as_mut().unwrap()
             .get::<SenderKey<T>>()
             .unwrap()
             .get(&receiver_endpoint)
@@ -222,15 +216,15 @@ impl NetworkTopology {
         }
         self.used_receivers.insert(receiver_endpoint);
 
-        if !self.receivers.contains::<ReceiverKey<T>>() {
-            self.receivers.insert::<ReceiverKey<T>>(Default::default());
+        if !self.receivers.as_mut().unwrap().contains_key::<ReceiverKey<T>>() {
+            self.receivers.as_mut().unwrap().insert::<ReceiverKey<T>>(Default::default());
         }
-        let entry = self.receivers.get_mut::<ReceiverKey<T>>().unwrap();
+        let entry = self.receivers.as_mut().unwrap().get_mut::<ReceiverKey<T>>().unwrap();
         // if the channel has not been registered yet, register it
         if !entry.contains_key(&receiver_endpoint) {
             self.register_channel::<T>(receiver_endpoint);
         }
-        self.receivers
+        self.receivers.as_mut().unwrap()
             .get_mut::<ReceiverKey<T>>()
             .unwrap()
             .remove(&receiver_endpoint)
@@ -263,6 +257,8 @@ impl NetworkTopology {
                 let demux_coord = DemuxCoord::from(receiver_endpoint);
                 let demuxes = self
                     .demultiplexers
+                    .as_mut()
+                    .unwrap()
                     .entry::<DemultiplexingReceiverKey<T>>()
                     .or_insert_with(Default::default);
                 #[allow(clippy::map_entry)]
@@ -301,7 +297,7 @@ impl NetworkTopology {
                 };
             }
         }
-        self.receivers
+        self.receivers.as_mut().unwrap()
             .entry::<ReceiverKey<T>>()
             .or_insert_with(Default::default)
             .insert(receiver_endpoint, receiver);
@@ -312,6 +308,8 @@ impl NetworkTopology {
             if let ExecutionRuntime::Remote(_) = &self.config.runtime {
                 let muxers = self
                     .multiplexers
+                    .as_mut()
+                    .unwrap()
                     .entry::<MultiplexingSenderKey<T>>()
                     .or_insert_with(Default::default);
                 let demux_coord = DemuxCoord::from(receiver_endpoint);
@@ -329,7 +327,7 @@ impl NetworkTopology {
         } else {
             local_sender
         };
-        self.senders
+        self.senders.as_mut().unwrap()
             .entry::<SenderKey<T>>()
             .or_insert_with(Default::default)
             .insert(receiver_endpoint, sender);
@@ -411,7 +409,7 @@ impl NetworkTopology {
     /// and `get_receiver`.
     ///
     /// Internally this computes the mapping between `DemuxCoord` and actual TCP port.
-    pub fn finalize_topology(&mut self) {
+    pub fn build(&mut self) {
         let config = if let ExecutionRuntime::Remote(config) = &self.config.runtime {
             config
         } else {
@@ -482,7 +480,7 @@ mod tests {
         topology.connect(sender1, receiver1, TypeId::of::<i32>(), false);
         topology.connect(sender2, receiver1, TypeId::of::<u64>(), false);
         topology.connect(sender2, receiver2, TypeId::of::<u64>(), false);
-        topology.finalize_topology();
+        topology.build();
 
         let endpoint1 = ReceiverEndpoint::new(receiver1, 0);
         let endpoint2 = ReceiverEndpoint::new(receiver1, 1);
@@ -555,7 +553,7 @@ mod tests {
             topology.connect(s4, r1, TypeId::of::<u64>(), false);
             topology.connect(s3, r2, TypeId::of::<u64>(), false);
             topology.connect(s4, r2, TypeId::of::<u64>(), false);
-            topology.finalize_topology();
+            topology.build();
 
             let endpoint1 = ReceiverEndpoint::new(r1, 0);
             let endpoint2 = ReceiverEndpoint::new(r1, 1);
@@ -666,7 +664,7 @@ mod tests {
 
         topology.connect(sender1, receiver1, TypeId::of::<i32>(), false);
         topology.connect(sender2, receiver2, TypeId::of::<u64>(), false);
-        topology.finalize_topology();
+        topology.build();
 
         let endpoint1 = ReceiverEndpoint::new(receiver1, 0);
         let endpoint2 = ReceiverEndpoint::new(receiver2, 0);

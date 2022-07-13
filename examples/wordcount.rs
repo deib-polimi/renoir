@@ -7,7 +7,12 @@ use noir::BatchMode;
 use noir::EnvironmentConfig;
 use noir::StreamEnvironment;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() {
+    env_logger::init();
+
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the dataset path as an argument");
@@ -44,15 +49,13 @@ struct Tokenizer {
 impl Tokenizer {
     fn new() -> Self {
         Self {
-            re: Regex::new(r"[^A-Za-z]+").unwrap(),
+            re: Regex::new(r"[A-Za-z]+").unwrap(),
         }
     }
     fn tokenize(&self, value: String) -> Vec<String> {
         self.re
-            .replace_all(&value, " ")
-            .split_ascii_whitespace()
-            .filter(|word| !word.is_empty())
-            .map(|t| t.to_lowercase())
+            .find_iter(&value)
+            .map(|t| t.as_str().to_lowercase())
             .collect()
     }
 }
