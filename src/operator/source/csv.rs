@@ -303,7 +303,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
         let body_size = file_size - header_size;
         let range_size = body_size / num_replicas as u64;
         let mut start = header_size + range_size * global_id as u64;
-        let mut end = if global_id == num_replicas - 1 {
+        let mut end = if global_id as usize == num_replicas - 1 {
             file_size
         } else {
             start + range_size
@@ -323,7 +323,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
         }
 
         // Align end byte
-        if global_id != num_replicas - 1 {
+        if global_id as usize != num_replicas - 1 {
             // Seek reader to the last byte to be read
             buf_reader
                 .seek(SeekFrom::Start(end))

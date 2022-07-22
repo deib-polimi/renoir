@@ -42,6 +42,8 @@ pub(crate) mod stream;
 pub(crate) mod test;
 pub(crate) mod worker;
 
+pub type CoordUInt = u32;
+
 /// Tracing information of the current execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct TracingData {

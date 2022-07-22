@@ -10,7 +10,8 @@ pub(crate) use structure::*;
 
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::{Data, Operator};
-use crate::stream::BlockId;
+use crate::scheduler::BlockId;
+use crate::CoordUInt;
 
 mod batcher;
 mod graph_generator;
@@ -53,7 +54,7 @@ pub(crate) struct SchedulerRequirements {
     /// this block as it likes.
     ///
     /// The value specified is only an upper bound, the scheduler is allowed to spawn less blocks,
-    pub(crate) max_parallelism: Option<usize>,
+    pub(crate) max_parallelism: Option<u32>,
 }
 
 impl<Out: Data, OperatorChain> InnerBlock<Out, OperatorChain>
@@ -100,7 +101,7 @@ where
 
 impl SchedulerRequirements {
     /// Limit the maximum parallelism of this block.
-    pub(crate) fn max_parallelism(&mut self, max_parallelism: usize) {
+    pub(crate) fn max_parallelism(&mut self, max_parallelism: CoordUInt) {
         if let Some(old) = self.max_parallelism {
             self.max_parallelism = Some(old.min(max_parallelism));
         } else {

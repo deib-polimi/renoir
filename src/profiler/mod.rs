@@ -6,8 +6,7 @@ pub use with_profiler::*;
 #[cfg(not(feature = "profiler"))]
 pub use without_profiler::*;
 
-use crate::network::Coord;
-use crate::stream::BlockId;
+use crate::{network::Coord, scheduler::BlockId};
 
 #[cfg(feature = "profiler")]
 mod backend;
@@ -156,7 +155,7 @@ mod without_profiler {
         #[inline(always)]
         fn net_bytes_out(&mut self, _from: Coord, _to: Coord, _amount: usize) {}
         #[inline(always)]
-        fn iteration_boundary(&mut self, _leader_block_id: usize) {}
+        fn iteration_boundary(&mut self, _leader_block_id: BlockId) {}
     }
 
     /// Get a fake profiler that does nothing.

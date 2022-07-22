@@ -11,9 +11,7 @@ use crate::operator::window::WindowDescription;
 use crate::operator::DataKey;
 use crate::operator::StartBlock;
 use crate::operator::{Data, ExchangeData, KeyerFn, Operator};
-
-/// Identifier of a block in the job graph.
-pub type BlockId = usize;
+use crate::scheduler::BlockId;
 
 /// On keyed streams, this is the type of the items of the stream.
 ///

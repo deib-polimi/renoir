@@ -16,6 +16,7 @@ use noir::operator::{Data, Operator, StreamElement, Timestamp};
 use noir::structure::BlockStructure;
 use noir::ExecutionMetadata;
 use noir::{EnvironmentConfig, StreamEnvironment};
+use noir::CoordUInt;
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;
@@ -140,7 +141,7 @@ impl TestHelper {
     }
 
     /// Run the test body under a local environment.
-    pub fn local_env(body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>, num_cores: usize) {
+    pub fn local_env(body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>, num_cores: CoordUInt) {
         Self::setup();
         let config = EnvironmentConfig::local(num_cores);
         debug!("Running test with env: {:?}", config);
@@ -150,8 +151,8 @@ impl TestHelper {
     /// Run the test body under a simulated remote environment.
     pub fn remote_env(
         body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>,
-        num_hosts: usize,
-        cores_per_host: usize,
+        num_hosts: CoordUInt,
+        cores_per_host: CoordUInt,
     ) {
         Self::setup();
         let mut hosts = vec![];
@@ -223,12 +224,12 @@ impl TestHelper {
     /// Parse a list of arguments from an environment variable.
     ///
     /// The list should be comma separated without spaces.
-    fn parse_list_from_env(var_name: &str) -> Option<Vec<usize>> {
+    fn parse_list_from_env(var_name: &str) -> Option<Vec<CoordUInt>> {
         let content = std::env::var(var_name).ok()?;
         if content.is_empty() {
             return Some(Vec::new());
         }
-        let values = content.split(',').map(usize::from_str).collect_vec();
+        let values = content.split(',').map(CoordUInt::from_str).collect_vec();
         process_results(values.into_iter(), |values| values.collect_vec()).ok()
     }
 

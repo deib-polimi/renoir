@@ -14,8 +14,8 @@ use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
 use crate::operator::start::StartBlock;
 use crate::operator::{ExchangeData, Operator, StreamElement};
-use crate::scheduler::ExecutionMetadata;
-use crate::stream::{BlockId, Stream};
+use crate::scheduler::{ExecutionMetadata, BlockId};
+use crate::stream::Stream;
 
 fn clone_with_default<T: Default>(_: &T) -> T {
     T::default()
@@ -306,9 +306,9 @@ where
         drop(env);
 
         // store the id of the blocks we now know
-        shared_delta_update_end_block_id.store(delta_update_end_block_id, Ordering::Release);
-        shared_feedback_end_block_id.store(feedback_end_block_id, Ordering::Release);
-        shared_output_block_id.store(output_block_id, Ordering::Release);
+        shared_delta_update_end_block_id.store(delta_update_end_block_id as usize, Ordering::Release);
+        shared_feedback_end_block_id.store(feedback_end_block_id as usize, Ordering::Release);
+        shared_output_block_id.store(output_block_id as usize, Ordering::Release);
 
         // TODO: check parallelism and make sure the blocks are spawned on the same replicas
 
@@ -331,11 +331,11 @@ where
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
 
-        let feedback_end_block_id = self.feedback_end_block_id.load(Ordering::Acquire);
+        let feedback_end_block_id = self.feedback_end_block_id.load(Ordering::Acquire) as BlockId;
         let feedback_endpoint = ReceiverEndpoint::new(metadata.coord, feedback_end_block_id);
         self.feedback_receiver = Some(metadata.network.get_receiver(feedback_endpoint));
 
-        let output_block_id = self.output_block_id.load(Ordering::Acquire);
+        let output_block_id = self.output_block_id.load(Ordering::Acquire) as BlockId;
         let output_endpoint = ReceiverEndpoint::new(
             Coord::new(
                 output_block_id,
@@ -435,11 +435,11 @@ where
                 self.state.leader_block_id,
             ));
         operator.receivers.push(OperatorReceiver::new::<Out>(
-            self.feedback_end_block_id.load(Ordering::Acquire),
+            self.feedback_end_block_id.load(Ordering::Acquire) as BlockId,
         ));
         let output_block_id = self.output_block_id.load(Ordering::Acquire);
         operator.connections.push(Connection::new::<Out, _>(
-            output_block_id,
+            output_block_id as BlockId,
             &NextStrategy::only_one(),
         ));
         self.prev.structure().add_operator(operator)

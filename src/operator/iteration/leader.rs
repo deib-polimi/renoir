@@ -9,7 +9,7 @@ use crate::operator::source::Source;
 use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock, StartBlockReceiver};
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::profiler::{get_profiler, Profiler};
-use crate::scheduler::ExecutionMetadata;
+use crate::scheduler::{ExecutionMetadata, BlockId};
 
 /// The leader block of an iteration.
 ///
@@ -133,7 +133,7 @@ where
             .collect();
 
         // at this point the id of the block with IterationEndBlock must be known
-        let feedback_block_id = self.feedback_block_id.load(Ordering::Acquire);
+        let feedback_block_id = self.feedback_block_id.load(Ordering::Acquire) as BlockId;
         // get the receiver for the delta updates
         let mut delta_update_receiver = StartBlock::single(feedback_block_id, None);
         delta_update_receiver.setup(metadata);

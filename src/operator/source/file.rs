@@ -85,9 +85,9 @@ impl Operator<String> for FileSource {
         let file_size = file.metadata().unwrap().len() as usize;
 
         let range_size = file_size / num_replicas;
-        let start = range_size * global_id;
+        let start = range_size * global_id as usize;
         self.current = start;
-        self.end = if global_id == num_replicas - 1 {
+        self.end = if global_id as usize == num_replicas - 1 {
             file_size
         } else {
             start + range_size

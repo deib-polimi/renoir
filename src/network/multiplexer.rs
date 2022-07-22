@@ -15,13 +15,13 @@ use tokio::task::JoinHandle;
 #[cfg(feature = "async-tokio")]
 use tokio::time::sleep;
 
-use crate::channel::{self, Receiver, Sender, UnboundedSender};
+use crate::channel::{self, Receiver, Sender};
 use crate::network::remote::remote_send;
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
 
-#[cfg(not(feature = "async-tokio"))]
-use crate::channel::Selector;
+// #[cfg(not(feature = "async-tokio"))]
+// use crate::channel::Selector;
 
 use super::NetworkSender;
 
@@ -301,7 +301,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
-        let (tx, rx) = channel::bounded(CHANNEL_CAPACITY);
+        let (tx, rx) = channel::bounded(MUX_CHANNEL_CAPACITY);
         let join_handle = tokio::spawn(async move {
             tracing::debug!(
                 "mux connecting to {}",

@@ -7,6 +7,9 @@ use noir::BatchMode;
 use noir::EnvironmentConfig;
 use noir::StreamEnvironment;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[cfg(not(feature = "async-tokio"))]
 fn main() {
     tracing_subscriber::fmt::init();

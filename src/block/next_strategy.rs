@@ -6,7 +6,7 @@ use nanorand::{tls_rng, Rng};
 
 use crate::network::{NetworkSender, ReceiverEndpoint};
 use crate::operator::{ExchangeData, KeyerFn};
-use crate::stream::BlockId;
+use crate::scheduler::BlockId;
 
 /// The list with the interesting senders of a single block.
 #[derive(Debug, Clone)]
