@@ -40,10 +40,10 @@ pub enum NetworkData<T> {
 /// What is sent from a replica to the next.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NetworkMessage<T> {
-    /// The list of messages inside the batch,
-    data: NetworkData<StreamElement<T>>,
     /// The coordinates of the block that sent this message.
     sender: Coord,
+    /// The list of messages inside the batch,
+    data: NetworkData<StreamElement<T>>,
 }
 
 /// Coordinates that identify a block inside the network.

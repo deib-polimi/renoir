@@ -179,19 +179,25 @@ fn demux_thread<In: ExchangeData>(
     senders: HashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,
     mut stream: TcpStream,
 ) {
+    use std::io::BufReader;
+
     let address = stream
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
     debug!("demultiplexer for {} at {} started", coord, address);
 
-    while let Some((dest, message)) = remote_recv(coord, &mut stream) {
+    let mut r = BufReader::new(&mut stream);
+
+    while let Some((dest, message)) = remote_recv(coord, &mut r, &address) {
         // get_profiler().net_bytes_in(message.sender, dest.coord, HEADER_SIZE + message_len);
 
         if let Err(e) = senders[&dest].send(message) {
             warn!("failed to send message to {}: {:?}", dest, e);
         }
     }
+
+    drop(r);
 
     let _ = stream.shutdown(Shutdown::Both);
     debug!("demultiplexer for {} at {} exited", coord, address);
