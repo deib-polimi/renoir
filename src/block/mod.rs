@@ -54,7 +54,7 @@ pub(crate) struct SchedulerRequirements {
     /// this block as it likes.
     ///
     /// The value specified is only an upper bound, the scheduler is allowed to spawn less blocks,
-    pub(crate) max_parallelism: Option<u32>,
+    pub(crate) max_parallelism: Option<CoordUInt>,
 }
 
 impl<Out: Data, OperatorChain> InnerBlock<Out, OperatorChain>

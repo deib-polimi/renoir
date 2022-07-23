@@ -93,7 +93,7 @@ pub struct LocalRuntimeConfig {
     /// The number of CPU cores of this host.
     ///
     /// A thread will be spawned for each core, for each block in the job graph.
-    pub num_cores: u32,
+    pub num_cores: CoordUInt,
 }
 
 /// This environment uses local threads and remote hosts.
@@ -165,7 +165,7 @@ struct CommandLineOptions {
     ///
     /// When this is specified the execution will be local. This conflicts with `--remote`.
     #[structopt(short, long)]
-    local: Option<u32>,
+    local: Option<CoordUInt>,
 
     /// The rest of the arguments.
     args: Vec<String>,
@@ -190,7 +190,7 @@ impl EnvironmentConfig {
     }
 
     /// Local environment that avoid using the network and runs concurrently using only threads.
-    pub fn local(num_cores: u32) -> EnvironmentConfig {
+    pub fn local(num_cores: CoordUInt) -> EnvironmentConfig {
         EnvironmentConfig {
             runtime: ExecutionRuntime::Local(LocalRuntimeConfig { num_cores }),
             host_id: Some(0),
@@ -232,7 +232,7 @@ impl EnvironmentConfig {
     }
 
     /// Extract the host id from the environment variable, if present.
-    fn host_id(num_hosts: u32) -> Option<HostId> {
+    fn host_id(num_hosts: CoordUInt) -> Option<HostId> {
         let host_id = match std::env::var(HOST_ID_ENV_VAR) {
             Ok(host_id) => host_id,
             Err(_) => return None,

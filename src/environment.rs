@@ -117,7 +117,7 @@ impl StreamEnvironment {
     }
 
     /// Get the total number of processing cores in the cluster.
-    pub fn parallelism(&self) -> u32 {
+    pub fn parallelism(&self) -> CoordUInt {
         match &self.inner.lock().config.runtime {
             ExecutionRuntime::Local(local) => local.num_cores,
             ExecutionRuntime::Remote(remote) => remote.hosts.iter().map(|h| h.num_cores).sum(),

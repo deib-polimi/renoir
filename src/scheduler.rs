@@ -211,7 +211,7 @@ impl Scheduler {
 
     #[cfg(not(feature = "async-tokio"))]
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) fn start(mut self, num_blocks: u32) {
+    pub(crate) fn start(mut self, num_blocks: CoordUInt) {
         info!("Starting scheduler: {:#?}", self.config);
         self.log_topology();
 
@@ -363,7 +363,7 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let num_replicas = local.num_cores.min(max_parallelism.unwrap_or(u32::MAX));
+        let num_replicas = local.num_cores.min(max_parallelism.unwrap_or(CoordUInt::MAX));
         debug!(
             "Block {} will have {} local replicas (max_parallelism={:?}), is_only_one_strategy={}",
             block.id, num_replicas, max_parallelism, block.is_only_one_strategy

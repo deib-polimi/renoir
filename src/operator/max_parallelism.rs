@@ -1,3 +1,4 @@
+use crate::CoordUInt;
 use crate::block::NextStrategy;
 use crate::operator::end::EndBlock;
 use crate::operator::{ExchangeData, Operator};
@@ -11,7 +12,7 @@ where
     ///
     /// **Note**: this operator is pretty advanced, some operators may need to be fully replicated
     /// and will fail otherwise.
-    pub fn max_parallelism(self, max_parallelism: u32) -> Stream<Out, impl Operator<Out>> {
+    pub fn max_parallelism(self, max_parallelism: CoordUInt) -> Stream<Out, impl Operator<Out>> {
         assert!(max_parallelism > 0, "Cannot set the parallelism to zero");
 
         let mut new_stream = self.add_block(EndBlock::new, NextStrategy::only_one());
