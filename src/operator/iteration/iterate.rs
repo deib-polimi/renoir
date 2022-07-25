@@ -14,7 +14,7 @@ use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
 use crate::operator::start::StartBlock;
 use crate::operator::{ExchangeData, Operator, StreamElement};
-use crate::scheduler::{ExecutionMetadata, BlockId};
+use crate::scheduler::{BlockId, ExecutionMetadata};
 use crate::stream::Stream;
 
 fn clone_with_default<T: Default>(_: &T) -> T {
@@ -306,7 +306,8 @@ where
         drop(env);
 
         // store the id of the blocks we now know
-        shared_delta_update_end_block_id.store(delta_update_end_block_id as usize, Ordering::Release);
+        shared_delta_update_end_block_id
+            .store(delta_update_end_block_id as usize, Ordering::Release);
         shared_feedback_end_block_id.store(feedback_end_block_id as usize, Ordering::Release);
         shared_output_block_id.store(output_block_id as usize, Ordering::Release);
 

@@ -10,8 +10,8 @@ use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
 use crate::profiler::{wait_profiler, ProfilerResult};
 use crate::worker::spawn_worker;
-use crate::TracingData;
 use crate::CoordUInt;
+use crate::TracingData;
 
 /// Identifier of a block in the job graph.
 pub type BlockId = CoordUInt;
@@ -363,7 +363,9 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let num_replicas = local.num_cores.min(max_parallelism.unwrap_or(CoordUInt::MAX));
+        let num_replicas = local
+            .num_cores
+            .min(max_parallelism.unwrap_or(CoordUInt::MAX));
         debug!(
             "Block {} will have {} local replicas (max_parallelism={:?}), is_only_one_strategy={}",
             block.id, num_replicas, max_parallelism, block.is_only_one_strategy

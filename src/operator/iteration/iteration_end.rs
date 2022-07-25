@@ -1,7 +1,7 @@
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::{ExchangeData, Operator, StreamElement};
-use crate::scheduler::{ExecutionMetadata, BlockId};
+use crate::scheduler::{BlockId, ExecutionMetadata};
 
 /// Similar to `EndBlock`, but tied specifically for the iterations.
 ///

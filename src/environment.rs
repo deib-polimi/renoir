@@ -7,7 +7,7 @@ use crate::operator::source::Source;
 use crate::operator::Data;
 use crate::profiler::Stopwatch;
 use crate::runner::spawn_remote_workers;
-use crate::scheduler::{Scheduler, BlockId};
+use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
 use crate::CoordUInt;
 
@@ -174,7 +174,9 @@ impl StreamEnvironmentInner {
         );
         let mut block = InnerBlock::new(block_id, source, Default::default(), Default::default());
         if let Some(p) = source_max_parallelism {
-            block.scheduler_requirements.max_parallelism(p.try_into().expect("Parallelism level > max id"));
+            block
+                .scheduler_requirements
+                .max_parallelism(p.try_into().expect("Parallelism level > max id"));
         }
         drop(env);
         Stream { block, env: env_rc }

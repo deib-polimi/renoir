@@ -12,7 +12,7 @@ use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::start::watermark_frontier::WatermarkFrontier;
 use crate::operator::{timestamp_max, ExchangeData, Operator, StreamElement};
-use crate::scheduler::{ExecutionMetadata, BlockId};
+use crate::scheduler::{BlockId, ExecutionMetadata};
 
 mod multiple;
 mod single;

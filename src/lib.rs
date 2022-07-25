@@ -42,7 +42,7 @@ pub(crate) mod stream;
 pub(crate) mod test;
 pub(crate) mod worker;
 
-pub type CoordUInt = u32;
+pub type CoordUInt = u64;
 
 /// Tracing information of the current execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

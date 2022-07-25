@@ -16,7 +16,7 @@ use crate::network::{
     local_channel, BlockCoord, Coord, DemuxCoord, NetworkReceiver, NetworkSender, ReceiverEndpoint,
 };
 use crate::operator::ExchangeData;
-use crate::scheduler::{HostId, BlockId};
+use crate::scheduler::{BlockId, HostId};
 
 use super::NetworkMessage;
 

@@ -15,7 +15,6 @@ use crate::runner::{CONFIG_ENV_VAR, HOST_ID_ENV_VAR};
 use crate::scheduler::HostId;
 use crate::CoordUInt;
 
-
 /// The runtime configuration of the environment,
 ///
 /// This configuration selects which runtime to use for this execution. The runtime is either local

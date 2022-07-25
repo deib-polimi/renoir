@@ -9,7 +9,7 @@ use crate::operator::source::Source;
 use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock, StartBlockReceiver};
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::profiler::{get_profiler, Profiler};
-use crate::scheduler::{ExecutionMetadata, BlockId};
+use crate::scheduler::{BlockId, ExecutionMetadata};
 
 /// The leader block of an iteration.
 ///

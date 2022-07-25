@@ -50,5 +50,7 @@ pub fn noir_local_env(parallelism: CoordUInt) -> StreamEnvironment {
 pub fn max_cpu_parallelism() -> CoordUInt {
     std::thread::available_parallelism()
         .map(|n| n.get())
-        .unwrap_or(4).try_into().unwrap()
+        .unwrap_or(4)
+        .try_into()
+        .unwrap()
 }

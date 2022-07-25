@@ -7,9 +7,9 @@ use crate::block::{BlockStructure, OperatorStructure};
 use crate::network::{Coord, NetworkSender, NetworkTopology, ReceiverEndpoint};
 use crate::operator::source::Source;
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
-use crate::scheduler::{ExecutionMetadata};
-use crate::{BatchMode, EnvironmentConfig};
+use crate::scheduler::ExecutionMetadata;
 use crate::CoordUInt;
+use crate::{BatchMode, EnvironmentConfig};
 
 /// A fake operator that can be used to unit-test the operators.
 #[derive(Debug, Clone)]

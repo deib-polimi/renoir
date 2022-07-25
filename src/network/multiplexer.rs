@@ -242,7 +242,7 @@ fn mux_thread<Out: ExchangeData>(
     while let Ok((dest, message)) = rx.recv() {
         remote_send(message, dest, &mut w, &address);
     }
-    
+
     w.flush().unwrap();
     drop(w);
     let _ = stream.shutdown(Shutdown::Both);

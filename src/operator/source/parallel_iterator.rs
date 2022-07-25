@@ -150,8 +150,14 @@ where
     GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
-        self.inner
-            .generate(metadata.global_id, metadata.replicas.len().try_into().expect("Num replicas > max id"));
+        self.inner.generate(
+            metadata.global_id,
+            metadata
+                .replicas
+                .len()
+                .try_into()
+                .expect("Num replicas > max id"),
+        );
     }
 
     fn next(&mut self) -> StreamElement<Out> {

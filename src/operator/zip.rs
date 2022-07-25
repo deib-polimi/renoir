@@ -6,7 +6,7 @@ use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStruc
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::start::{MultipleStartBlockReceiverOperator, StartBlock, TwoSidesItem};
 use crate::operator::{ExchangeData, Operator, StreamElement};
-use crate::scheduler::{ExecutionMetadata, BlockId};
+use crate::scheduler::{BlockId, ExecutionMetadata};
 use crate::stream::Stream;
 
 #[derive(Clone)]

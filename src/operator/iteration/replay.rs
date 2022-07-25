@@ -12,7 +12,7 @@ use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
-use crate::scheduler::{ExecutionMetadata, BlockId};
+use crate::scheduler::{BlockId, ExecutionMetadata};
 use crate::stream::Stream;
 
 /// This is the first operator of the chain of blocks inside an iteration.

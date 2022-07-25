@@ -30,8 +30,7 @@ static BINCODE_HEADER_CONFIG: Lazy<
 
 static BINCODE_MSG_CONFIG: Lazy<DefaultOptions> = Lazy::new(|| bincode::DefaultOptions::new());
 
-pub(crate) const HEADER_SIZE: usize = std::mem::size_of::<MessageHeader>();
-
+pub(crate) const HEADER_SIZE: usize = 20; // std::mem::size_of::<MessageHeader>();
 
 /// Header of a message sent before the actual message.
 #[derive(Serialize, Deserialize, Default)]
@@ -58,7 +57,12 @@ pub(crate) fn remote_send<T: ExchangeData, W: Write>(
 ) {
     let serialized_len = BINCODE_MSG_CONFIG
         .serialized_size(&msg)
-        .unwrap_or_else(|e| panic!("Failed to compute serialized length of outgoing message to {}: {:?}", dest, e));
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failed to compute serialized length of outgoing message to {}: {:?}",
+                dest, e
+            )
+        });
 
     let header = MessageHeader {
         size: serialized_len.try_into().unwrap(),
@@ -169,7 +173,7 @@ pub(crate) fn remote_recv<T: ExchangeData, R: Read>(
     let header: MessageHeader = BINCODE_HEADER_CONFIG
         .deserialize(&header)
         .expect("Malformed header");
-    
+
     // let mut buf = vec![0u8; header.size as usize];
     // reader.read_exact(&mut buf).unwrap_or_else(|e| {
     //     panic!(
@@ -233,11 +237,13 @@ mod tests {
 
     use crate::network::remote::HEADER_SIZE;
 
-    use super::{BINCODE_HEADER_CONFIG, MessageHeader};
+    use super::{MessageHeader, BINCODE_HEADER_CONFIG};
 
     #[test]
     fn header_size() {
-        let computed_size = BINCODE_HEADER_CONFIG.serialized_size(&MessageHeader::default()).unwrap();
+        let computed_size = BINCODE_HEADER_CONFIG
+            .serialized_size(&MessageHeader::default())
+            .unwrap();
 
         assert_eq!(HEADER_SIZE as u64, computed_size);
     }

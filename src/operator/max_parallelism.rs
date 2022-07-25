@@ -1,8 +1,8 @@
-use crate::CoordUInt;
 use crate::block::NextStrategy;
 use crate::operator::end::EndBlock;
 use crate::operator::{ExchangeData, Operator};
 use crate::stream::Stream;
+use crate::CoordUInt;
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where

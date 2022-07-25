@@ -7,7 +7,7 @@ use crate::channel::{RecvTimeoutError, SelectResult};
 use crate::network::{Coord, NetworkMessage};
 use crate::operator::start::{SingleStartBlockReceiver, StartBlockReceiver};
 use crate::operator::{Data, ExchangeData, StreamElement};
-use crate::scheduler::{ExecutionMetadata, BlockId};
+use crate::scheduler::{BlockId, ExecutionMetadata};
 
 /// This enum is an _either_ type, it contain either an element from the left part or an element
 /// from the right part.

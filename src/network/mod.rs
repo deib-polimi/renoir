@@ -6,7 +6,7 @@ pub(crate) use network_channel::*;
 pub(crate) use topology::*;
 
 use crate::operator::StreamElement;
-use crate::scheduler::{HostId, ReplicaId, BlockId};
+use crate::scheduler::{BlockId, HostId, ReplicaId};
 
 mod demultiplexer;
 mod multiplexer;

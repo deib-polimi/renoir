@@ -14,9 +14,9 @@ use log::*;
 use noir::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
 use noir::operator::{Data, Operator, StreamElement, Timestamp};
 use noir::structure::BlockStructure;
+use noir::CoordUInt;
 use noir::ExecutionMetadata;
 use noir::{EnvironmentConfig, StreamEnvironment};
-use noir::CoordUInt;
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;
