@@ -25,7 +25,7 @@ struct ReceiverKey<In: ExchangeData>(PhantomData<In>);
 
 impl<In: ExchangeData> TypeMapKey for ReceiverKey<In> {
     type Value =
-        HashMap<ReceiverEndpoint, NetworkReceiver<In>, std::collections::hash_map::RandomState>;
+        HashMap<ReceiverEndpoint, NetworkReceiver<In>, ahash::RandomState>;
 }
 
 /// This struct is used to index inside the `typemap` with the `NetworkSender`s.
@@ -33,14 +33,14 @@ struct SenderKey<In: ExchangeData>(PhantomData<In>);
 
 impl<In: ExchangeData> TypeMapKey for SenderKey<In> {
     type Value =
-        HashMap<ReceiverEndpoint, NetworkSender<In>, std::collections::hash_map::RandomState>;
+        HashMap<ReceiverEndpoint, NetworkSender<In>, ahash::RandomState>;
 }
 
 /// This struct is used to index inside the `typemap` with the `DemultiplexingReceiver`s.
 struct DemultiplexingReceiverKey<In: ExchangeData>(PhantomData<In>);
 
 impl<In: ExchangeData> TypeMapKey for DemultiplexingReceiverKey<In> {
-    type Value = HashMap<DemuxCoord, DemuxHandle<In>, std::collections::hash_map::RandomState>;
+    type Value = HashMap<DemuxCoord, DemuxHandle<In>, ahash::RandomState>;
 }
 
 /// This struct is used to index inside the `typemap` with the `MultiplexingSender`s.
@@ -48,7 +48,7 @@ struct MultiplexingSenderKey<In: ExchangeData>(PhantomData<In>);
 
 impl<In: ExchangeData> TypeMapKey for MultiplexingSenderKey<In> {
     type Value =
-        HashMap<DemuxCoord, MultiplexingSender<In>, std::collections::hash_map::RandomState>;
+        HashMap<DemuxCoord, MultiplexingSender<In>, ahash::RandomState>;
 }
 
 /// Metadata about a registered sender.
@@ -102,14 +102,14 @@ pub(crate) struct NetworkTopology {
     multiplexers: Option<TypeMap>,
 
     /// The adjacency list of the execution graph.
-    next: HashMap<(Coord, TypeId), Vec<(Coord, bool)>, std::collections::hash_map::RandomState>,
+    next: HashMap<(Coord, TypeId), Vec<(Coord, bool)>, ahash::RandomState>,
     /// The inverse adjacency list of the execution graph.
-    prev: HashMap<Coord, Vec<(Coord, TypeId)>, std::collections::hash_map::RandomState>,
+    prev: HashMap<Coord, Vec<(Coord, TypeId)>, ahash::RandomState>,
     /// The metadata about all the registered senders.
     senders_metadata:
-        HashMap<ReceiverEndpoint, SenderMetadata, std::collections::hash_map::RandomState>,
+        HashMap<ReceiverEndpoint, SenderMetadata, ahash::RandomState>,
     /// The list of all the replicas, indexed by block.
-    block_replicas: HashMap<BlockId, HashSet<Coord>, std::collections::hash_map::RandomState>,
+    block_replicas: HashMap<BlockId, HashSet<Coord>, ahash::RandomState>,
 
     /// The set of the used receivers.
     ///
@@ -124,7 +124,7 @@ pub(crate) struct NetworkTopology {
     /// The mapping between the coordinate of a demultiplexer of a block to the actual address/port
     /// of that demultiplexer in the network.
     demultiplexer_addresses:
-        HashMap<DemuxCoord, (String, u16), std::collections::hash_map::RandomState>,
+        HashMap<DemuxCoord, (String, u16), ahash::RandomState>,
 
     /// The set of join handles of the various threads spawned by the topology.
     join_handles: Vec<JoinHandle<()>>,
@@ -183,7 +183,7 @@ impl NetworkTopology {
     pub fn get_senders<T: ExchangeData>(
         &mut self,
         coord: Coord,
-    ) -> HashMap<ReceiverEndpoint, NetworkSender<T>, std::collections::hash_map::RandomState> {
+    ) -> HashMap<ReceiverEndpoint, NetworkSender<T>, ahash::RandomState> {
         let typ = TypeId::of::<T>();
         match self.next.get(&(coord, typ)) {
             None => Default::default(),

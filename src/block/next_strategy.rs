@@ -93,7 +93,7 @@ where
                 .collect();
         }
 
-        let mut by_block_id: HashMap<_, Vec<_>, std::collections::hash_map::RandomState> =
+        let mut by_block_id: HashMap<_, Vec<_>, ahash::RandomState> =
             HashMap::default();
         for (coord, sender) in senders {
             by_block_id
@@ -126,9 +126,9 @@ where
 }
 
 pub fn group_by_hash<T: Hash>(item: &T) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::default();
+    // let mut hasher = std::collections::hash_map::DefaultHasher::default();
     // let mut hasher = wyhash::WyHash::with_seed(0x0123456789abcdef);
-    // let mut hasher = ahash::AHasher::new_with_keys(0x0123456789abcdef, !0x0123456789abcdef);
+    let mut hasher = ahash::AHasher::new_with_keys(0x0123456789abcdef, !0x0123456789abcdef);
     item.hash(&mut hasher);
     hasher.finish()
 }

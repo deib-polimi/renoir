@@ -24,8 +24,8 @@ where
     #[derivative(Debug = "ignore")]
     fold: F,
     init: NewOut,
-    accumulators: HashMap<Key, NewOut, std::collections::hash_map::RandomState>,
-    timestamps: HashMap<Key, Timestamp, std::collections::hash_map::RandomState>,
+    accumulators: HashMap<Key, NewOut, ahash::RandomState>,
+    timestamps: HashMap<Key, Timestamp, ahash::RandomState>,
     ready: Vec<StreamElement<KeyValue<Key, NewOut>>>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
