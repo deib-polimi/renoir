@@ -9,14 +9,16 @@ use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, Rem
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
 use crate::profiler::{wait_profiler, ProfilerResult};
-use crate::stream::BlockId;
 use crate::worker::spawn_worker;
+use crate::CoordUInt;
 use crate::TracingData;
 
+/// Identifier of a block in the job graph.
+pub type BlockId = CoordUInt;
 /// The identifier of an host.
-pub type HostId = usize;
+pub type HostId = CoordUInt;
 /// The identifier of a replica of a block in the execution graph.
-pub type ReplicaId = usize;
+pub type ReplicaId = CoordUInt;
 
 /// Metadata associated to a block in the execution graph.
 #[derive(Debug)]
@@ -26,7 +28,7 @@ pub struct ExecutionMetadata<'a> {
     /// The list of replicas of this block.
     pub replicas: Vec<Coord>,
     /// The global identifier of the replica (from 0 to `replicas.len()-1`)
-    pub global_id: usize,
+    pub global_id: CoordUInt,
     /// The total number of previous blocks inside the execution graph.
     pub prev: Vec<(Coord, TypeId)>,
     /// A reference to the `NetworkTopology` that keeps the state of the network.
@@ -43,7 +45,7 @@ struct SchedulerBlockInfo {
     /// All the replicas, grouped by host.
     replicas: HashMap<HostId, Vec<Coord>, std::collections::hash_map::RandomState>,
     /// All the global ids, grouped by coordinate.
-    global_ids: HashMap<Coord, usize, std::collections::hash_map::RandomState>,
+    global_ids: HashMap<Coord, CoordUInt, std::collections::hash_map::RandomState>,
     /// The batching mode to use inside this block.
     batch_mode: BatchMode,
     /// Whether this block has `NextStrategy::OnlyOne`.
@@ -209,15 +211,15 @@ impl Scheduler {
 
     #[cfg(not(feature = "async-tokio"))]
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) fn start(mut self, num_blocks: usize) {
+    pub(crate) fn start(mut self, num_blocks: CoordUInt) {
         info!("Starting scheduler: {:#?}", self.config);
         self.log_topology();
 
         assert_eq!(
             self.block_info.len(),
-            num_blocks,
+            num_blocks as usize,
             "Some streams do not have a sink attached: {} streams created, but only {} registered",
-            num_blocks,
+            num_blocks as usize,
             self.block_info.len(),
         );
 
@@ -361,7 +363,9 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let num_replicas = local.num_cores.min(max_parallelism.unwrap_or(usize::MAX));
+        let num_replicas = local
+            .num_cores
+            .min(max_parallelism.unwrap_or(CoordUInt::MAX));
         debug!(
             "Block {} will have {} local replicas (max_parallelism={:?}), is_only_one_strategy={}",
             block.id, num_replicas, max_parallelism, block.is_only_one_strategy
@@ -393,7 +397,7 @@ impl Scheduler {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
         debug!("Allocating block {} on remote runtime", block.id);
         // number of replicas we can assign at most
-        let mut remaining_replicas = max_parallelism.unwrap_or(usize::MAX);
+        let mut remaining_replicas = max_parallelism.unwrap_or(CoordUInt::MAX);
         let mut num_replicas = 0;
         let mut replicas: HashMap<_, Vec<_>, std::collections::hash_map::RandomState> =
             HashMap::default();
@@ -401,6 +405,7 @@ impl Scheduler {
         // FIXME: if the next_strategy of the previous blocks are OnlyOne the replicas of this block
         //        must be in the same hosts are the previous blocks.
         for (host_id, host_info) in remote.hosts.iter().enumerate() {
+            let host_id: HostId = host_id.try_into().expect("host_id > max id");
             let num_host_replicas = host_info.num_cores.min(remaining_replicas);
             debug!(
                 "Block {} will have {} replicas on {} (max_parallelism={:?}, num_cores={})",

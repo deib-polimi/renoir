@@ -6,8 +6,8 @@ use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStruc
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::start::{MultipleStartBlockReceiverOperator, StartBlock, TwoSidesItem};
 use crate::operator::{ExchangeData, Operator, StreamElement};
-use crate::scheduler::ExecutionMetadata;
-use crate::stream::{BlockId, Stream};
+use crate::scheduler::{BlockId, ExecutionMetadata};
+use crate::stream::Stream;
 
 #[derive(Clone)]
 pub struct Zip<Out1: ExchangeData, Out2: ExchangeData> {

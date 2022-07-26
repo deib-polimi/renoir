@@ -13,6 +13,7 @@ use structopt::StructOpt;
 
 use crate::runner::{CONFIG_ENV_VAR, HOST_ID_ENV_VAR};
 use crate::scheduler::HostId;
+use crate::CoordUInt;
 
 /// The runtime configuration of the environment,
 ///
@@ -91,7 +92,7 @@ pub struct LocalRuntimeConfig {
     /// The number of CPU cores of this host.
     ///
     /// A thread will be spawned for each core, for each block in the job graph.
-    pub num_cores: usize,
+    pub num_cores: CoordUInt,
 }
 
 /// This environment uses local threads and remote hosts.
@@ -118,7 +119,7 @@ pub struct RemoteHostConfig {
     /// The number of cores of the remote host.
     ///
     /// This is the same as `LocalRuntimeConfig::num_cores`.
-    pub num_cores: usize,
+    pub num_cores: CoordUInt,
     /// The configuration to use to connect via SSH to the remote host.
     #[serde(default)]
     pub ssh: RemoteHostSSHConfig,
@@ -163,7 +164,7 @@ struct CommandLineOptions {
     ///
     /// When this is specified the execution will be local. This conflicts with `--remote`.
     #[structopt(short, long)]
-    local: Option<usize>,
+    local: Option<CoordUInt>,
 
     /// The rest of the arguments.
     args: Vec<String>,
@@ -188,7 +189,7 @@ impl EnvironmentConfig {
     }
 
     /// Local environment that avoid using the network and runs concurrently using only threads.
-    pub fn local(num_cores: usize) -> EnvironmentConfig {
+    pub fn local(num_cores: CoordUInt) -> EnvironmentConfig {
         EnvironmentConfig {
             runtime: ExecutionRuntime::Local(LocalRuntimeConfig { num_cores }),
             host_id: Some(0),
@@ -219,7 +220,7 @@ impl EnvironmentConfig {
             }
         }
 
-        let host_id = EnvironmentConfig::host_id(config.hosts.len());
+        let host_id = EnvironmentConfig::host_id(config.hosts.len().try_into().unwrap());
         debug!("Detected host id: {:?}", host_id);
         debug!("Remote runtime configuration: {:#?}", config);
         Ok(EnvironmentConfig {
@@ -230,7 +231,7 @@ impl EnvironmentConfig {
     }
 
     /// Extract the host id from the environment variable, if present.
-    fn host_id(num_hosts: usize) -> Option<HostId> {
+    fn host_id(num_hosts: CoordUInt) -> Option<HostId> {
         let host_id = match std::env::var(HOST_ID_ENV_VAR) {
             Ok(host_id) => host_id,
             Err(_) => return None,

@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::block::{BlockStructure, ConnectionStrategy, DataType, OperatorKind};
-use crate::stream::BlockId;
+use crate::{
+    block::{BlockStructure, ConnectionStrategy, DataType, OperatorKind},
+    scheduler::BlockId,
+};
 
 /// This struct is able to track the block structure of all the blocks of the job graph for later
 /// producing a diagram in dot format.

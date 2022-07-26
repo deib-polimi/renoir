@@ -16,8 +16,7 @@ use crate::network::{
     local_channel, BlockCoord, Coord, DemuxCoord, NetworkReceiver, NetworkSender, ReceiverEndpoint,
 };
 use crate::operator::ExchangeData;
-use crate::scheduler::HostId;
-use crate::stream::BlockId;
+use crate::scheduler::{BlockId, HostId};
 
 use super::NetworkMessage;
 
@@ -521,7 +520,7 @@ impl NetworkTopology {
         for coord in coords.into_iter().sorted() {
             let host_id = coord.coord.host_id;
             let port_offset = used_ports.entry(host_id).or_default();
-            let host = &config.hosts[host_id];
+            let host = &config.hosts[host_id as usize];
             let port = host.base_port + *port_offset;
             *port_offset += 1;
             let address = (host.address.clone(), port);

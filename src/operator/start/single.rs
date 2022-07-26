@@ -6,8 +6,7 @@ use crate::channel::RecvTimeoutError;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, ReceiverEndpoint};
 use crate::operator::start::StartBlockReceiver;
 use crate::operator::ExchangeData;
-use crate::scheduler::ExecutionMetadata;
-use crate::stream::BlockId;
+use crate::scheduler::{BlockId, ExecutionMetadata};
 
 /// This will receive the data from a single previous block.
 #[derive(Debug)]

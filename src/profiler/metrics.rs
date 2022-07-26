@@ -4,7 +4,7 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::network::Coord;
-use crate::stream::BlockId;
+use crate::scheduler::BlockId;
 
 /// A time point.
 ///

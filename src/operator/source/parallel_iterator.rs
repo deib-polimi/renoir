@@ -4,6 +4,7 @@ use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
+use crate::CoordUInt;
 
 /// This enum wraps either an `Iterator` that yields the items, or a generator function that
 /// produces such iterator.
@@ -13,7 +14,7 @@ use crate::scheduler::ExecutionMetadata;
 enum IteratorGenerator<It, GenIt, Out>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     /// The function that generates the iterator.
     Generator(GenIt),
@@ -27,12 +28,12 @@ where
 impl<It, GenIt, Out> IteratorGenerator<It, GenIt, Out>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     /// Consume the generator function and store the produced iterator.
     ///
     /// This method can be called only once.
-    fn generate(&mut self, global_id: usize, num_replicas: usize) {
+    fn generate(&mut self, global_id: CoordUInt, num_replicas: CoordUInt) {
         let gen = std::mem::replace(self, IteratorGenerator::Generating);
         let iter = match gen {
             IteratorGenerator::Generator(gen) => gen(global_id, num_replicas),
@@ -53,7 +54,7 @@ where
 impl<It, GenIt, Out> Clone for IteratorGenerator<It, GenIt, Out>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     fn clone(&self) -> Self {
         match self {
@@ -73,7 +74,7 @@ where
 pub struct ParallelIteratorSource<Out: Data, It, GenIt>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     #[derivative(Debug = "ignore")]
     inner: IteratorGenerator<It, GenIt, Out>,
@@ -83,7 +84,7 @@ where
 impl<Out: Data, It, GenIt> Display for ParallelIteratorSource<Out, It, GenIt>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -97,7 +98,7 @@ where
 impl<Out: Data, It, GenIt> ParallelIteratorSource<Out, It, GenIt>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     /// Create a new source that ingest items into the stream using the maximum parallelism
     /// available.
@@ -136,7 +137,7 @@ where
 impl<Out: Data, It, GenIt> Source<Out> for ParallelIteratorSource<Out, It, GenIt>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     fn get_max_parallelism(&self) -> Option<usize> {
         None
@@ -146,11 +147,17 @@ where
 impl<Out: Data, It, GenIt> Operator<Out> for ParallelIteratorSource<Out, It, GenIt>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
-        self.inner
-            .generate(metadata.global_id, metadata.replicas.len());
+        self.inner.generate(
+            metadata.global_id,
+            metadata
+                .replicas
+                .len()
+                .try_into()
+                .expect("Num replicas > max id"),
+        );
     }
 
     fn next(&mut self) -> StreamElement<Out> {
@@ -177,7 +184,7 @@ where
 impl<Out: Data, It, GenIt> Clone for ParallelIteratorSource<Out, It, GenIt>
 where
     It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(usize, usize) -> It + Send + Clone,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
     fn clone(&self) -> Self {
         Self {

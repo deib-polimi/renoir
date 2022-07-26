@@ -15,13 +15,13 @@ use tokio::task::JoinHandle;
 #[cfg(feature = "async-tokio")]
 use tokio::time::sleep;
 
-use crate::channel::{self, Receiver, Sender, UnboundedSender};
+use crate::channel::{self, Receiver, Sender};
 use crate::network::remote::remote_send;
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
 
-#[cfg(not(feature = "async-tokio"))]
-use crate::channel::Selector;
+// #[cfg(not(feature = "async-tokio"))]
+// use crate::channel::Selector;
 
 use super::NetworkSender;
 
@@ -229,15 +229,23 @@ fn mux_thread<Out: ExchangeData>(
     rx: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
     mut stream: TcpStream,
 ) {
+    use std::io::Write;
+
     let address = stream
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
     debug!("Connection to {} at {} established", coord, address);
 
+    // let mut w = std::io::BufWriter::new(&mut stream);
+    let mut w = &mut stream;
+
     while let Ok((dest, message)) = rx.recv() {
-        remote_send(message, dest, &mut stream);
+        remote_send(message, dest, &mut w, &address);
     }
+
+    w.flush().unwrap();
+    drop(w);
     let _ = stream.shutdown(Shutdown::Both);
     debug!("Remote sender for {} exited", coord);
 }
@@ -301,7 +309,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
-        let (tx, rx) = channel::bounded(CHANNEL_CAPACITY);
+        let (tx, rx) = channel::bounded(MUX_CHANNEL_CAPACITY);
         let join_handle = tokio::spawn(async move {
             tracing::debug!(
                 "mux connecting to {}",

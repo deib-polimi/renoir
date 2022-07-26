@@ -8,6 +8,7 @@ use crate::network::{Coord, NetworkSender, NetworkTopology, ReceiverEndpoint};
 use crate::operator::source::Source;
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
+use crate::CoordUInt;
 use crate::{BatchMode, EnvironmentConfig};
 
 /// A fake operator that can be used to unit-test the operators.
@@ -75,7 +76,7 @@ pub(crate) struct FakeNetworkTopology<T: ExchangeData> {
 impl<T: ExchangeData> FakeNetworkTopology<T> {
     /// Build a fake network topology for a single replica (with coord b0 h0 r0), that receives data
     /// of type `T` from `num_prev_blocks`, each with `num_replicas_per_block` replicas.
-    pub fn new(num_prev_blocks: usize, num_replicas_per_block: usize) -> Self {
+    pub fn new(num_prev_blocks: CoordUInt, num_replicas_per_block: CoordUInt) -> Self {
         let config = EnvironmentConfig::local(1);
         let mut topology = NetworkTopology::new(config);
 

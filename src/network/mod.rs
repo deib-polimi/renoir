@@ -6,8 +6,7 @@ pub(crate) use network_channel::*;
 pub(crate) use topology::*;
 
 use crate::operator::StreamElement;
-use crate::scheduler::{HostId, ReplicaId};
-use crate::stream::BlockId;
+use crate::scheduler::{BlockId, HostId, ReplicaId};
 
 mod demultiplexer;
 mod multiplexer;
@@ -17,7 +16,6 @@ mod topology;
 
 #[derive(Debug, Clone)]
 pub enum NetworkDataIterator<T> {
-    Single(std::iter::Once<T>),
     Batch(std::vec::IntoIter<T>),
 }
 
@@ -26,7 +24,6 @@ impl<T> Iterator for NetworkDataIterator<T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            NetworkDataIterator::Single(i) => i.next(),
             NetworkDataIterator::Batch(i) => i.next(),
         }
     }
@@ -34,17 +31,16 @@ impl<T> Iterator for NetworkDataIterator<T> {
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NetworkData<T> {
-    Single(T),
     Batch(Vec<T>),
 }
 
 /// What is sent from a replica to the next.
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NetworkMessage<T> {
-    /// The list of messages inside the batch,
-    data: NetworkData<StreamElement<T>>,
     /// The coordinates of the block that sent this message.
     sender: Coord,
+    /// The list of messages inside the batch,
+    data: NetworkData<StreamElement<T>>,
 }
 
 /// Coordinates that identify a block inside the network.
@@ -97,7 +93,7 @@ pub struct DemuxCoord {
 impl<T> NetworkMessage<T> {
     pub fn new_single(data: StreamElement<T>, sender: Coord) -> Self {
         Self {
-            data: NetworkData::Single(data),
+            data: NetworkData::Batch(vec![data]),
             sender,
         }
     }
@@ -117,7 +113,6 @@ impl<T> NetworkMessage<T> {
     /// The number of items in the batch.
     pub fn num_items(&self) -> usize {
         match &self.data {
-            NetworkData::Single(_) => 1,
             NetworkData::Batch(v) => v.len(),
         }
     }
@@ -130,7 +125,6 @@ impl<T> IntoIterator for NetworkMessage<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         match self.data {
-            NetworkData::Single(i) => NetworkDataIterator::Single(std::iter::once(i)),
             NetworkData::Batch(v) => NetworkDataIterator::Batch(v.into_iter()),
         }
     }

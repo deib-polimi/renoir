@@ -12,8 +12,8 @@ use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
-use crate::scheduler::ExecutionMetadata;
-use crate::stream::{BlockId, Stream};
+use crate::scheduler::{BlockId, ExecutionMetadata};
+use crate::stream::Stream;
 
 /// This is the first operator of the chain of blocks inside an iteration.
 ///
@@ -221,7 +221,7 @@ where
         drop(env);
 
         // store the id of the block containing the IterationEndBlock
-        feedback_block_id.store(iteration_end_block_id, Ordering::Release);
+        feedback_block_id.store(iteration_end_block_id as usize, Ordering::Release);
 
         // TODO: check parallelism and make sure the blocks are spawned on the same replicas
 

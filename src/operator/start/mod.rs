@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,9 +12,7 @@ use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::start::watermark_frontier::WatermarkFrontier;
 use crate::operator::{timestamp_max, ExchangeData, Operator, StreamElement};
-use crate::scheduler::ExecutionMetadata;
-use crate::stream::BlockId;
-use crate::BatchMode;
+use crate::scheduler::{BlockId, ExecutionMetadata};
 
 mod multiple;
 mod single;

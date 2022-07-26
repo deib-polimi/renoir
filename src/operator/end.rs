@@ -6,8 +6,7 @@ use crate::block::{
 };
 use crate::network::{Coord, ReceiverEndpoint};
 use crate::operator::{ExchangeData, KeyerFn, Operator, StreamElement};
-use crate::scheduler::ExecutionMetadata;
-use crate::stream::BlockId;
+use crate::scheduler::{BlockId, ExecutionMetadata};
 
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]

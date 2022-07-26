@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::block::NextStrategy;
 use crate::operator::{ExchangeData, KeyerFn};
-use crate::stream::BlockId;
+use crate::scheduler::BlockId;
 
 /// Wrapper type that contains a string representing the type.
 ///

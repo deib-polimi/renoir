@@ -7,8 +7,9 @@ use crate::operator::source::Source;
 use crate::operator::Data;
 use crate::profiler::Stopwatch;
 use crate::runner::spawn_remote_workers;
-use crate::scheduler::Scheduler;
-use crate::stream::{BlockId, Stream};
+use crate::scheduler::{BlockId, Scheduler};
+use crate::stream::Stream;
+use crate::CoordUInt;
 
 lazy_static! {
     static ref LAST_REMOTE_CONFIG: Mutex<Option<RemoteRuntimeConfig>> = Mutex::new(None);
@@ -20,7 +21,7 @@ pub(crate) struct StreamEnvironmentInner {
     /// The configuration of the environment.
     pub(crate) config: EnvironmentConfig,
     /// The number of blocks in the job graph, it's used to assign new ids to the blocks.
-    block_count: BlockId,
+    block_count: CoordUInt,
     /// The scheduler that will start the computation. It's an option because it will be moved out
     /// of this struct when the computation starts.
     scheduler: Option<Scheduler>,
@@ -116,7 +117,7 @@ impl StreamEnvironment {
     }
 
     /// Get the total number of processing cores in the cluster.
-    pub fn parallelism(&self) -> usize {
+    pub fn parallelism(&self) -> CoordUInt {
         match &self.inner.lock().config.runtime {
             ExecutionRuntime::Local(local) => local.num_cores,
             ExecutionRuntime::Remote(remote) => remote.hosts.iter().map(|h| h.num_cores).sum(),
@@ -173,7 +174,9 @@ impl StreamEnvironmentInner {
         );
         let mut block = InnerBlock::new(block_id, source, Default::default(), Default::default());
         if let Some(p) = source_max_parallelism {
-            block.scheduler_requirements.max_parallelism(p);
+            block
+                .scheduler_requirements
+                .max_parallelism(p.try_into().expect("Parallelism level > max id"));
         }
         drop(env);
         Stream { block, env: env_rc }

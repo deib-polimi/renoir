@@ -55,7 +55,7 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
             .name(format!("noir-remote-{}", host_id))
             .spawn(move || {
                 let config_str = config_str.clone();
-                spawn_remote_worker(host_id, host, config_str)
+                spawn_remote_worker(host_id.try_into().unwrap(), host, config_str)
             })
             .unwrap();
         join_handles.push(join_handle);
