@@ -70,23 +70,34 @@ pub(crate) fn remote_send<T: ExchangeData, W: Write>(
         sender_block_id: dest.prev_block_id,
     };
 
+    let mut buf = Vec::with_capacity(HEADER_SIZE + serialized_len as usize);
+
     BINCODE_HEADER_CONFIG
-        .serialize_into(&mut *writer, &header)
+        .serialize_into(&mut buf, &header)
         .unwrap_or_else(|e| {
             panic!(
-                "Failed to serialize and send header of message (was {} bytes) to {} at {}: {:?}",
+                "Failed to serialize header of message (was {} bytes) to {} at {}: {:?}",
                 serialized_len, dest, address, e
             )
         });
 
     BINCODE_MSG_CONFIG
-        .serialize_into(writer, &msg)
+        .serialize_into(&mut buf, &msg)
         .unwrap_or_else(|e| {
             panic!(
-                "Failed to serialize and send {} bytes to {} at {}: {:?}",
+                "Failed to serialize message, {} bytes to {} at {}: {:?}",
                 serialized_len, dest, address, e
             )
         });
+
+    assert_eq!(buf.len(), HEADER_SIZE + serialized_len as usize);
+
+    writer.write_all(buf.as_ref()).unwrap_or_else(|e| {
+        panic!(
+            "Failed to send message {} bytes to {} at {}: {:?}",
+            serialized_len, dest, address, e
+        )
+    });
 
     get_profiler().net_bytes_out(
         msg.sender,
@@ -173,24 +184,23 @@ pub(crate) fn remote_recv<T: ExchangeData, R: Read>(
     let header: MessageHeader = BINCODE_HEADER_CONFIG
         .deserialize(&header)
         .expect("Malformed header");
-
-    // let mut buf = vec![0u8; header.size as usize];
-    // reader.read_exact(&mut buf).unwrap_or_else(|e| {
-    //     panic!(
-    //         "Failed to receive {} bytes to {} from {}: {:?}",
-    //         header.size, coord, address, e
-    //     )
-    // });
-
-    let msg = BINCODE_MSG_CONFIG
-        .deserialize_from(reader)
+    let mut buf = vec![0u8; header.size as usize];
+    reader.read_exact(&mut buf).unwrap_or_else(|e| {
+        panic!(
+            "Failed to receive {} bytes to {} from {}: {:?}",
+            header.size, coord, address, e
+        )
+    });
+    let msg: NetworkMessage<T> = BINCODE_MSG_CONFIG
+        .deserialize(buf.as_ref())
         .expect("Malformed message");
 
-    let receiver_endpoint = ReceiverEndpoint::new(
+    let dest = ReceiverEndpoint::new(
         Coord::new(coord.coord.block_id, coord.coord.host_id, header.replica_id),
         header.sender_block_id,
     );
-    Some((receiver_endpoint, msg))
+    get_profiler().net_bytes_in(msg.sender, dest.coord, HEADER_SIZE + header.size as usize);
+    Some((dest, msg))
 }
 
 #[cfg(feature = "async-tokio")]

@@ -18,7 +18,6 @@ use crate::channel::{self, Sender, UnboundedReceiver, UnboundedSender};
 use crate::network::remote::remote_recv;
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
-// use crate::profiler::{get_profiler, Profiler};
 
 /// Like `NetworkReceiver`, but this should be used in a multiplexed channel (i.e. a remote one).
 ///
@@ -179,19 +178,16 @@ fn demux_thread<In: ExchangeData>(
     senders: HashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,
     mut stream: TcpStream,
 ) {
-    use std::io::BufReader;
-
     let address = stream
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
     debug!("demultiplexer for {} at {} started", coord, address);
 
-    let mut r = BufReader::new(&mut stream);
+    // let mut r = std::io::BufReader::new(&mut stream);
+    let mut r = &mut stream;
 
     while let Some((dest, message)) = remote_recv(coord, &mut r, &address) {
-        // get_profiler().net_bytes_in(message.sender, dest.coord, HEADER_SIZE + message_len);
-
         if let Err(e) = senders[&dest].send(message) {
             warn!("failed to send message to {}: {:?}", dest, e);
         }

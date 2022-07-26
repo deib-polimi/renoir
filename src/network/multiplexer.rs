@@ -229,7 +229,7 @@ fn mux_thread<Out: ExchangeData>(
     rx: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
     mut stream: TcpStream,
 ) {
-    use std::io::{BufWriter, Write};
+    use std::io::Write;
 
     let address = stream
         .peer_addr()
@@ -237,7 +237,8 @@ fn mux_thread<Out: ExchangeData>(
         .unwrap_or_else(|_| "unknown".to_string());
     debug!("Connection to {} at {} established", coord, address);
 
-    let mut w = BufWriter::new(&mut stream);
+    // let mut w = std::io::BufWriter::new(&mut stream);
+    let mut w = &mut stream;
 
     while let Ok((dest, message)) = rx.recv() {
         remote_send(message, dest, &mut w, &address);
