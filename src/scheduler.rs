@@ -43,9 +43,9 @@ struct SchedulerBlockInfo {
     /// String representation of the block.
     repr: String,
     /// All the replicas, grouped by host.
-    replicas: HashMap<HostId, Vec<Coord>, ahash::RandomState>,
+    replicas: HashMap<HostId, Vec<Coord>, crate::block::HasherBuilder>,
     /// All the global ids, grouped by coordinate.
-    global_ids: HashMap<Coord, CoordUInt, ahash::RandomState>,
+    global_ids: HashMap<Coord, CoordUInt, crate::block::HasherBuilder>,
     /// The batching mode to use inside this block.
     batch_mode: BatchMode,
     /// Whether this block has `NextStrategy::OnlyOne`.
@@ -59,11 +59,11 @@ pub(crate) struct Scheduler {
     config: EnvironmentConfig,
     /// Adjacency list of the job graph.
     next_blocks:
-        HashMap<BlockId, Vec<(BlockId, TypeId, bool)>, ahash::RandomState>,
+        HashMap<BlockId, Vec<(BlockId, TypeId, bool)>, crate::block::HasherBuilder>,
     /// Reverse adjacency list of the job graph.
-    prev_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>, ahash::RandomState>,
+    prev_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>, crate::block::HasherBuilder>,
     /// Information about the blocks known to the scheduler.
-    block_info: HashMap<BlockId, SchedulerBlockInfo, ahash::RandomState>,
+    block_info: HashMap<BlockId, SchedulerBlockInfo, crate::block::HasherBuilder>,
     /// The list of handles of each block in the execution graph.
     // start_handles: Vec<(Coord, StartHandle)>,
     block_init: Vec<(
@@ -399,7 +399,7 @@ impl Scheduler {
         // number of replicas we can assign at most
         let mut remaining_replicas = max_parallelism.unwrap_or(CoordUInt::MAX);
         let mut num_replicas = 0;
-        let mut replicas: HashMap<_, Vec<_>, ahash::RandomState> =
+        let mut replicas: HashMap<_, Vec<_>, crate::block::HasherBuilder> =
             HashMap::default();
         let mut global_ids = HashMap::default();
         // FIXME: if the next_strategy of the previous blocks are OnlyOne the replicas of this block

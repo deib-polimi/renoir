@@ -32,7 +32,7 @@ where
     /// Elements of the left side to be processed.
     left: VecDeque<(Timestamp, KeyValue<Key, Out>)>,
     /// Elements of the right side that might still be matched.
-    right: HashMap<Key, VecDeque<(Timestamp, Out2)>, ahash::RandomState>,
+    right: HashMap<Key, VecDeque<(Timestamp, Out2)>, crate::block::HasherBuilder>,
     /// Elements ready to be sent downstream.
     buffer: VecDeque<(Timestamp, OutputElement<Key, Out, Out2>)>,
     /// Timestamp of the last element (item or watermark).

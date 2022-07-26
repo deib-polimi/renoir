@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::hash::{Hash, Hasher};
 
 pub use batcher::BatchMode;
 pub(crate) use batcher::*;
@@ -109,3 +110,15 @@ impl SchedulerRequirements {
         }
     }
 }
+
+pub fn group_by_hash<T: Hash>(item: &T) -> u64 {
+    let mut hasher = fxhash::FxHasher::default();
+    // let mut hasher = wyhash::WyHash::with_seed(0x0123456789abcdef);
+    // let mut hasher = std::collections::hash_map::DefaultHasher::default();
+    item.hash(&mut hasher);
+    hasher.finish()
+}
+
+pub type HasherBuilder = fxhash::FxBuildHasher;
+// pub type HasherBuilder = ahash::RandomState;
+// pub type HasherBuilder = std::collections::hash_map::RandomState;

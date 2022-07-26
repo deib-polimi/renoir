@@ -14,7 +14,7 @@ where
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
     prev: OperatorChain,
-    maps_fn: HashMap<Key, F, ahash::RandomState>,
+    maps_fn: HashMap<Key, F, crate::block::HasherBuilder>,
     init_map: F,
     _out: PhantomData<Out>,
     _new_out: PhantomData<NewOut>,
