@@ -58,8 +58,7 @@ pub(crate) struct Scheduler {
     /// The configuration of the environment.
     config: EnvironmentConfig,
     /// Adjacency list of the job graph.
-    next_blocks:
-        HashMap<BlockId, Vec<(BlockId, TypeId, bool)>, crate::block::HasherBuilder>,
+    next_blocks: HashMap<BlockId, Vec<(BlockId, TypeId, bool)>, crate::block::HasherBuilder>,
     /// Reverse adjacency list of the job graph.
     prev_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>, crate::block::HasherBuilder>,
     /// Information about the blocks known to the scheduler.
@@ -155,15 +154,15 @@ impl Scheduler {
 
     #[cfg(feature = "async-tokio")]
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) async fn start(mut self, num_blocks: usize) {
+    pub(crate) async fn start(mut self, num_blocks: CoordUInt) {
         info!("Starting scheduler: {:#?}", self.config);
         self.log_topology();
 
         assert_eq!(
             self.block_info.len(),
-            num_blocks,
+            num_blocks as usize,
             "Some streams do not have a sink attached: {} streams created, but only {} registered",
-            num_blocks,
+            num_blocks as usize,
             self.block_info.len(),
         );
 
@@ -200,9 +199,13 @@ impl Scheduler {
 
         self.network.stop_and_wait().await;
 
-        for handle in join {
-            handle.join().unwrap();
-        }
+        tokio::task::spawn_blocking(move || {
+            for handle in join {
+                handle.join().unwrap();
+            }
+        })
+        .await
+        .expect("Could not join worker threads");
 
         let profiler_results = wait_profiler();
 
@@ -399,8 +402,7 @@ impl Scheduler {
         // number of replicas we can assign at most
         let mut remaining_replicas = max_parallelism.unwrap_or(CoordUInt::MAX);
         let mut num_replicas = 0;
-        let mut replicas: HashMap<_, Vec<_>, crate::block::HasherBuilder> =
-            HashMap::default();
+        let mut replicas: HashMap<_, Vec<_>, crate::block::HasherBuilder> = HashMap::default();
         let mut global_ids = HashMap::default();
         // FIXME: if the next_strategy of the previous blocks are OnlyOne the replicas of this block
         //        must be in the same hosts are the previous blocks.
@@ -441,6 +443,7 @@ impl SchedulerBlockInfo {
     }
 }
 
+#[cfg(not(feature = "async-tokio"))]
 #[cfg(test)]
 mod tests {
     use crate::config::EnvironmentConfig;

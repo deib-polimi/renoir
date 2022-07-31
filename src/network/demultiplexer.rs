@@ -28,7 +28,7 @@ use crate::operator::ExchangeData;
 #[derive(Debug)]
 pub(crate) struct DemuxHandle<In: ExchangeData> {
     coord: DemuxCoord,
-    /// Tell the demultiplexer that a new receiver is present,
+    /// Tell the dem&ultiplexer that a new receiver is present,
     tx_senders: UnboundedSender<(ReceiverEndpoint, Sender<NetworkMessage<In>>)>,
 }
 
@@ -345,11 +345,7 @@ async fn demux_thread<In: ExchangeData>(
         .unwrap_or_else(|_| "unknown".to_string());
     debug!("demultiplexer for {} at {} started", coord, address);
 
-    while let Some((dest, message)) = remote_recv(coord, &mut stream).await {
-        let message_len = message.len();
-        let message = deserialize::<NetworkMessage<In>>(message).unwrap();
-        get_profiler().net_bytes_in(message.sender, dest.coord, header_size() + message_len);
-
+    while let Some((dest, message)) = remote_recv(coord, &mut stream, &address).await {
         if let Err(e) = senders[&dest].send(message) {
             warn!("failed to send message to {}: {:?}", dest, e);
         }

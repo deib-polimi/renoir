@@ -461,7 +461,7 @@ async fn mux_thread<Out: ExchangeData>(
     debug!("Connection to {} at {} established", coord, address);
 
     while let Ok((dest, message)) = rx.recv_async().await {
-        remote_send(message, dest, &mut stream).await;
+        remote_send(message, dest, &mut stream, &address).await;
     }
 
     stream.shutdown().await.unwrap();

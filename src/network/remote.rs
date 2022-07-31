@@ -4,10 +4,7 @@ use std::io::Read;
 #[cfg(not(feature = "async-tokio"))]
 use std::io::Write;
 #[cfg(feature = "async-tokio")]
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-#[cfg(feature = "async-tokio")]
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
 use bincode::{DefaultOptions, Options};
@@ -112,51 +109,59 @@ pub(crate) fn remote_send<T: ExchangeData, W: Write>(
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
 #[cfg(feature = "async-tokio")]
-pub(crate) async fn remote_send<T: ExchangeData>(
-    what: NetworkMessage<T>,
+pub(crate) async fn remote_send<T: ExchangeData, W: AsyncWrite + Unpin>(
+    msg: NetworkMessage<T>,
     dest: ReceiverEndpoint,
-    stream: &mut TcpStream,
+    writer: &mut W,
+    address: &str,
 ) {
-    let address = stream
-        .peer_addr()
-        .map(|a| a.to_string())
-        .unwrap_or_else(|_| "unknown".to_string());
-    let serialized = BINCODE_MSG_CONFIG
-        .serialize(&what)
-        .unwrap_or_else(|e| panic!("Failed to serialize outgoing message to {}: {:?}", dest, e));
-    let header = MessageHeader {
-        size: serialized.len() as _,
-        replica_id: dest.coord.replica_id,
-        sender_block_id: dest.prev_block_id,
-    };
-    let serialized_header = BINCODE_HEADER_CONFIG.serialize(&header).unwrap();
-    stream
-        .write_all(&serialized_header)
-        .await
+    let serialized_len = BINCODE_MSG_CONFIG
+        .serialized_size(&msg)
         .unwrap_or_else(|e| {
             panic!(
-                "Failed to send size of message (was {} bytes) to {} at {}: {:?}",
-                serialized.len(),
-                dest,
-                address,
-                e
+                "Failed to compute serialized length of outgoing message to {}: {:?}",
+                dest, e
             )
         });
 
-    stream.write_all(&serialized).await.unwrap_or_else(|e| {
+    let header = MessageHeader {
+        size: serialized_len.try_into().unwrap(),
+        replica_id: dest.coord.replica_id,
+        sender_block_id: dest.prev_block_id,
+    };
+
+    let mut buf = Vec::with_capacity(HEADER_SIZE + serialized_len as usize);
+
+    BINCODE_HEADER_CONFIG
+        .serialize_into(&mut buf, &header)
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failed to serialize header of message (was {} bytes) to {} at {}: {:?}",
+                serialized_len, dest, address, e
+            )
+        });
+
+    BINCODE_MSG_CONFIG
+        .serialize_into(&mut buf, &msg)
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failed to serialize message, {} bytes to {} at {}: {:?}",
+                serialized_len, dest, address, e
+            )
+        });
+    assert_eq!(buf.len(), HEADER_SIZE + serialized_len as usize);
+
+    writer.write_all(buf.as_ref()).await.unwrap_or_else(|e| {
         panic!(
-            "Failed to send {} bytes to {} at {}: {:?}",
-            serialized.len(),
-            dest,
-            address,
-            e
+            "Failed to send message {} bytes to {} at {}: {:?}",
+            serialized_len, dest, address, e
         )
     });
 
     get_profiler().net_bytes_out(
-        what.sender,
+        msg.sender,
         dest.coord,
-        serialized_header.len() + serialized.len(),
+        HEADER_SIZE + serialized_len as usize,
     );
 }
 
@@ -204,22 +209,18 @@ pub(crate) fn remote_recv<T: ExchangeData, R: Read>(
 }
 
 #[cfg(feature = "async-tokio")]
-pub(crate) async fn remote_recv(
+pub(crate) async fn remote_recv<T: ExchangeData, R: AsyncRead + Unpin>(
     coord: DemuxCoord,
-    stream: &mut TcpStream,
-) -> Option<(ReceiverEndpoint, SerializedMessage)> {
-    let address = stream
-        .peer_addr()
-        .map(|a| a.to_string())
-        .unwrap_or_else(|_| "unknown".to_string());
-    let header_size = header_size();
-    let mut header = vec![0u8; header_size];
-    match stream.read_exact(&mut header).await {
+    reader: &mut R,
+    address: &str,
+) -> Option<(ReceiverEndpoint, NetworkMessage<T>)> {
+    let mut header = [0u8; HEADER_SIZE];
+    match reader.read_exact(&mut header).await {
         Ok(_) => {}
         Err(e) => {
             debug!(
                 "Failed to receive {} bytes of header to {} from {}: {:?}",
-                header_size, coord, address, e
+                HEADER_SIZE, coord, address, e
             );
             return None;
         }
@@ -228,17 +229,22 @@ pub(crate) async fn remote_recv(
         .deserialize(&header)
         .expect("Malformed header");
     let mut buf = vec![0u8; header.size as usize];
-    stream.read_exact(&mut buf).await.unwrap_or_else(|e| {
+    reader.read_exact(&mut buf).await.unwrap_or_else(|e| {
         panic!(
             "Failed to receive {} bytes to {} from {}: {:?}",
             header.size, coord, address, e
         )
     });
-    let receiver_endpoint = ReceiverEndpoint::new(
+    let msg: NetworkMessage<T> = BINCODE_MSG_CONFIG
+        .deserialize(buf.as_ref())
+        .expect("Malformed message");
+
+    let dest = ReceiverEndpoint::new(
         Coord::new(coord.coord.block_id, coord.coord.host_id, header.replica_id),
         header.sender_block_id,
     );
-    Some((receiver_endpoint, buf))
+    get_profiler().net_bytes_in(msg.sender, dest.coord, HEADER_SIZE + header.size as usize);
+    Some((dest, msg))
 }
 
 #[cfg(test)]

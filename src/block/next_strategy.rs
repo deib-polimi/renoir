@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 use nanorand::{tls_rng, Rng};
@@ -7,6 +7,8 @@ use nanorand::{tls_rng, Rng};
 use crate::network::{NetworkSender, ReceiverEndpoint};
 use crate::operator::{ExchangeData, KeyerFn};
 use crate::scheduler::BlockId;
+
+use super::group_by_hash;
 
 /// The list with the interesting senders of a single block.
 #[derive(Debug, Clone)]
@@ -93,8 +95,7 @@ where
                 .collect();
         }
 
-        let mut by_block_id: HashMap<_, Vec<_>, crate::block::HasherBuilder> =
-            HashMap::default();
+        let mut by_block_id: HashMap<_, Vec<_>, crate::block::HasherBuilder> = HashMap::default();
         for (coord, sender) in senders {
             by_block_id
                 .entry(coord.coord.block_id)
