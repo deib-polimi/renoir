@@ -23,6 +23,8 @@ fn main() {
 
     env.spawn_remote_workers();
 
+    spanner::span!(start);
+
     let source = FileSource::new(path);
     let tokenizer = Tokenizer::new();
     let result = env
@@ -39,6 +41,9 @@ fn main() {
         // eprintln!("Output: {:?}", _res.len());
         println!("{:?}", elapsed);
     }
+
+    drop(start);
+    spanner::summary_grouped();
 }
 
 #[cfg(feature = "async-tokio")]

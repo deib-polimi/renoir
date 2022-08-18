@@ -19,91 +19,93 @@ deque-start = []
 
 [dependencies]
 # for logging to the console
-log = { version = "0.4", features = ["release_max_level_info"] }
-tracing = "0.1"
-tracing-log = "0.1"
-env_logger = "0.9"
+log = { version = "0.4.17", features = ["release_max_level_info"] }
+tracing = "0.1.36"
+tracing-log = "0.1.3"
+env_logger = "0.9.0"
 
 # used by the network for storing type-generic structures
-typemap_rev = "0.1"
+typemap_rev = "0.1.5"
 
 # the shuffle() operator requires a random source
-nanorand = "0.7"
+nanorand = "0.7.0"
 
 # utility macros for customizing the derive Debug, Default, ...
-derivative = "2.2"
+derivative = "2.2.0"
 
 # serialization library used for reading the config file (yaml) and serializing
 # the messages on the network
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.8"
-serde_json = "1.0"
-bincode = "1.3"
+serde = { version = "1.0.143", features = ["derive"] }
+serde_yaml = "0.9.9"
+serde_json = "1.0.83"
+bincode = "1.3.3"
 
 # handy Result type
-anyhow = "1.0"
-thiserror = "1.0"
+anyhow = "1.0.62"
+thiserror = "1.0.32"
 
 # handy iterators functions
-itertools = "0.10"
+itertools = "0.10.3"
 
 # for storing non-mutable static variables with non-trivial initialization
-lazy_static = "1.4"
+lazy_static = "1.4.0"
 
 # used for spawning the remote workers
-ssh2 = { version = "0.9", features = ["vendored-openssl"] }
-whoami = "1.2"
-shell-escape = "0.1"
+ssh2 = { version = "0.9.3", features = ["vendored-openssl"] }
+whoami = "1.2.1"
+shell-escape = "0.1.5"
 
 # command line parsing utility
-structopt = "0.3"
+structopt = "0.3.26"
 
 # channel implementation
-crossbeam-channel = { version = "0.5", optional = true }
-flume = { version = "0.10", optional = true }
+crossbeam-channel = { version = "0.5.6", optional = true }
+flume = { version = "0.10.14", optional = true }
 
 # Used for KeyedWindowManager
-hashbrown = "0.12"
+hashbrown = "0.12.3"
 
 # used for csv file source
-csv = "1.1"
+csv = "1.1.6"
 
 # Lazy with support for delayed and synchronized initialization
-lazy-init = "0.5"
+lazy-init = "0.5.1"
 
 # Format dates and times
-chrono = "0.4"
+chrono = "0.4.22"
 
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
-coarsetime = "0.1"
+coarsetime = "0.1.22"
 
-tokio = { version = "1", features = ["rt"], default-features = false }
-futures = "0.3"
+tokio = { version = "1.20.1", features = ["rt"], default-features = false }
+futures = "0.3.23"
 
-parking_lot = "0.12"
-once_cell = "1.9"
+parking_lot = "0.12.1"
+once_cell = "1.13.1"
 
-ahash = "0.7"
-wyhash = "0.5"
-fxhash = "0.2"
+ahash = "0.8.0"
+wyhash = "0.5.0"
+fxhash = "0.2.1"
+
+spanner = { path = "../spanner", features = ["enable"] }
 
 [dev-dependencies]
 # for the tests
-rand = "0.8"
-tempfile = "3.3"
-criterion = { version = "0.3", features = ["html_reports"] }
-fake = "2.4"
-mimalloc = { version = "0.1", default-features = false }
-tracing-subscriber = "0.3"
+rand = "0.8.5"
+tempfile = "3.3.0"
+criterion = { version = "0.3.6", features = ["html_reports"] }
+fake = "2.5.0"
+mimalloc = { version = "0.1.29", default-features = false }
+tracing-subscriber = "0.3.15"
 
 # for the examples
-regex = "1.4.3"
+regex = "1.6.0"
 
 # used in the benchmarks
-crossbeam-channel = "0.5"
-flume = "0.10"
+crossbeam-channel = "0.5.6"
+flume = "0.10.14"
 
-kstring = { version = "2.0", features = ["serde"] }
+kstring = { version = "2.0.0", features = ["serde"] }
 
 # The list of benchmarks, all of them require "harness = false" in order to
 # work with criterion.rs. Cannot set `[lib] harness = false` because the tests

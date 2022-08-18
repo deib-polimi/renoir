@@ -43,9 +43,9 @@ struct SchedulerBlockInfo {
     /// String representation of the block.
     repr: String,
     /// All the replicas, grouped by host.
-    replicas: HashMap<HostId, Vec<Coord>, crate::block::HasherBuilder>,
+    replicas: HashMap<HostId, Vec<Coord>, crate::block::CoordHasherBuilder>,
     /// All the global ids, grouped by coordinate.
-    global_ids: HashMap<Coord, CoordUInt, crate::block::HasherBuilder>,
+    global_ids: HashMap<Coord, CoordUInt, crate::block::CoordHasherBuilder>,
     /// The batching mode to use inside this block.
     batch_mode: BatchMode,
     /// Whether this block has `NextStrategy::OnlyOne`.
@@ -58,11 +58,11 @@ pub(crate) struct Scheduler {
     /// The configuration of the environment.
     config: EnvironmentConfig,
     /// Adjacency list of the job graph.
-    next_blocks: HashMap<BlockId, Vec<(BlockId, TypeId, bool)>, crate::block::HasherBuilder>,
+    next_blocks: HashMap<BlockId, Vec<(BlockId, TypeId, bool)>, crate::block::CoordHasherBuilder>,
     /// Reverse adjacency list of the job graph.
-    prev_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>, crate::block::HasherBuilder>,
+    prev_blocks: HashMap<BlockId, Vec<(BlockId, TypeId)>, crate::block::CoordHasherBuilder>,
     /// Information about the blocks known to the scheduler.
-    block_info: HashMap<BlockId, SchedulerBlockInfo, crate::block::HasherBuilder>,
+    block_info: HashMap<BlockId, SchedulerBlockInfo, crate::block::CoordHasherBuilder>,
     /// The list of handles of each block in the execution graph.
     // start_handles: Vec<(Coord, StartHandle)>,
     block_init: Vec<(
@@ -402,7 +402,7 @@ impl Scheduler {
         // number of replicas we can assign at most
         let mut remaining_replicas = max_parallelism.unwrap_or(CoordUInt::MAX);
         let mut num_replicas = 0;
-        let mut replicas: HashMap<_, Vec<_>, crate::block::HasherBuilder> = HashMap::default();
+        let mut replicas: HashMap<_, Vec<_>, crate::block::CoordHasherBuilder> = HashMap::default();
         let mut global_ids = HashMap::default();
         // FIXME: if the next_strategy of the previous blocks are OnlyOne the replicas of this block
         //        must be in the same hosts are the previous blocks.

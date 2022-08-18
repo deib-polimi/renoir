@@ -111,14 +111,17 @@ impl SchedulerRequirements {
     }
 }
 
+/// Hashing function for group by operations
 pub fn group_by_hash<T: Hash>(item: &T) -> u64 {
-    // let mut hasher = fxhash::FxHasher::default();
-    // let mut hasher = wyhash::WyHash::with_seed(0x0123456789abcdef);
-    let mut hasher = std::collections::hash_map::DefaultHasher::default();
+    let mut hasher = wyhash::WyHash::with_seed(0x0123456789abcdef);
     item.hash(&mut hasher);
     hasher.finish()
 }
 
-pub type HasherBuilder = fxhash::FxBuildHasher;
-// pub type HasherBuilder = ahash::RandomState;
-// pub type HasherBuilder = std::collections::hash_map::RandomState;
+/// Hasher used for internal hashmaps that have coordinates as keys
+/// (optimized for small keys)
+pub type CoordHasherBuilder = fxhash::FxBuildHasher;
+
+/// Hasher used for StreamElement keys
+/// (for all around good performance)
+pub type GroupHasherBuilder = core::hash::BuildHasherDefault<wyhash::WyHash>;

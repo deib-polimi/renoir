@@ -12,7 +12,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct JobGraphGenerator {
     /// The list of known blocks, indexed by block id.
-    blocks: HashMap<BlockId, BlockStructure, crate::block::HasherBuilder>,
+    blocks: HashMap<BlockId, BlockStructure, crate::block::CoordHasherBuilder>,
 }
 
 impl JobGraphGenerator {
@@ -111,7 +111,7 @@ impl JobGraphGenerator {
         let mut receivers: HashMap<
             (BlockId, BlockId),
             (usize, DataType),
-            crate::block::HasherBuilder,
+            crate::block::CoordHasherBuilder,
         > = Default::default();
         for (&block_id, block) in &self.blocks {
             for (index, operator) in block.operators.iter().enumerate() {
