@@ -95,7 +95,8 @@ where
                 .collect();
         }
 
-        let mut by_block_id: HashMap<_, Vec<_>, crate::block::CoordHasherBuilder> = HashMap::default();
+        let mut by_block_id: HashMap<_, Vec<_>, crate::block::CoordHasherBuilder> =
+            HashMap::default();
         for (coord, sender) in senders {
             by_block_id
                 .entry(coord.coord.block_id)

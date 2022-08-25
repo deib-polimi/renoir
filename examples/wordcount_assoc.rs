@@ -4,7 +4,6 @@ use regex::Regex;
 
 use noir::prelude::*;
 
-
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 

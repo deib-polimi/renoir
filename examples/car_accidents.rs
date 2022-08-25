@@ -5,8 +5,8 @@ use std::time::Instant;
 
 use itertools::Itertools;
 use noir::operator::Operator;
-use serde::{Deserialize, Serialize};
 use noir::{prelude::*, Stream};
+use serde::{Deserialize, Serialize};
 
 const DAYS_BEFORE: [u16; 13] = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 
