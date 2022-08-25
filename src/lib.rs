@@ -44,6 +44,13 @@ pub(crate) mod worker;
 
 pub type CoordUInt = u64;
 
+pub mod prelude {
+    pub use super::{EnvironmentConfig, StreamEnvironment, BatchMode};
+    pub use super::operator::source::*;
+    pub use super::operator::window::{CountWindow, EventTimeWindow, ProcessingTimeWindow};
+    pub use super::operator::sink::StreamOutput;
+}
+
 /// Tracing information of the current execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct TracingData {

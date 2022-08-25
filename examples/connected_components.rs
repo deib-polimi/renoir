@@ -2,10 +2,8 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
+use noir::prelude::*;
 
-use noir::operator::source::CsvSource;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 struct State {

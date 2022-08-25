@@ -2,10 +2,8 @@ use std::time::Instant;
 
 use regex::Regex;
 
-use noir::operator::source::FileSource;
-use noir::BatchMode;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
+
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

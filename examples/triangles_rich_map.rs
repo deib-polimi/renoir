@@ -2,9 +2,7 @@ use std::time::Instant;
 
 use itertools::Itertools;
 
-use noir::operator::source::CsvSource;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();

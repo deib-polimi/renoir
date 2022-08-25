@@ -1,8 +1,6 @@
 use std::time::Instant;
 
-use noir::operator::source::CsvSource;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
 
 const EPS: f64 = 1e-8;
 const DAMPENING: f64 = 0.85;

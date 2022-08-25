@@ -6,9 +6,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use noir::operator::source::CsvSource;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 struct Point {
@@ -17,6 +15,7 @@ struct Point {
 }
 
 impl Point {
+    #[allow(unused)]
     fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }

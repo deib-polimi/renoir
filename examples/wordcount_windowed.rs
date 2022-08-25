@@ -2,11 +2,7 @@ use std::time::{Duration, Instant};
 
 use regex::Regex;
 
-use noir::operator::source::FileSource;
-use noir::operator::window::CountWindow;
-use noir::BatchMode;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();
