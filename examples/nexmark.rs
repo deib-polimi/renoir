@@ -3,9 +3,9 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use noir::operator::{Operator, Timestamp};
 use noir::prelude::*;
 use noir::Stream;
-use noir::operator::{Operator, Timestamp};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Auction {

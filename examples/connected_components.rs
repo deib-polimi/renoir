@@ -1,9 +1,8 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use serde::{Deserialize, Serialize};
 use noir::prelude::*;
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 struct State {

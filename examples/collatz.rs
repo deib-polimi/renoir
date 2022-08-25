@@ -1,6 +1,5 @@
-use std::time::Instant;
 use noir::prelude::*;
-
+use std::time::Instant;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();

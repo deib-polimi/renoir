@@ -2,7 +2,7 @@ use noir::prelude::*;
 
 fn main() {
     let (config, _args) = EnvironmentConfig::from_args();
-    
+
     let mut env = StreamEnvironment::new(config);
 
     env.spawn_remote_workers();
