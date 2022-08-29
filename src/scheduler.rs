@@ -253,7 +253,7 @@ impl Scheduler {
         }
 
         let job_graph = job_graph_generator.finalize();
-        debug!("Job graph in dot format:\n{}", job_graph);
+        tracing::debug!("Job graph in dot format:\n{}", job_graph);
 
         self.network.finalize();
 

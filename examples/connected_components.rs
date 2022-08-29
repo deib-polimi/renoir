@@ -4,6 +4,9 @@ use std::time::Instant;
 use noir::prelude::*;
 use serde::{Deserialize, Serialize};
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[derive(Serialize, Deserialize, Clone, Default)]
 struct State {
     /// Maps each vertex to its current component.

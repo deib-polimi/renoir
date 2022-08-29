@@ -379,6 +379,7 @@ mod inner {
 mod inner {
     use core::iter::{IntoIterator, Iterator};
     use std::collections::VecDeque;
+    use std::fmt::Display;
     use std::iter::repeat;
     use std::marker::PhantomData;
 
@@ -425,6 +426,24 @@ mod inner {
         }
     }
 
+    impl<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators> Display for
+        Flatten<Out, IterOut, MakeIter, NewOut, PreviousOperators>
+    where
+        IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
+        MakeIter: Fn(Out) -> IterOut + Send + Clone,
+        PreviousOperators: Operator<Out>,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "{} -> Flatten<{} -> {}>",
+                self.prev.to_string(),
+                std::any::type_name::<Out>(),
+                std::any::type_name::<NewOut>()
+            )
+        }
+    }
+
     impl<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators> Operator<NewOut>
         for Flatten<Out, IterOut, MakeIter, NewOut, PreviousOperators>
     where
@@ -458,16 +477,7 @@ mod inner {
 
             self.buffer.pop_front().unwrap()
         }
-
-        fn to_string(&self) -> String {
-            format!(
-                "{} -> Flatten<{} -> {}>",
-                self.prev.to_string(),
-                std::any::type_name::<Out>(),
-                std::any::type_name::<NewOut>()
-            )
-        }
-
+        
         fn structure(&self) -> BlockStructure {
             self.prev
                 .structure()

@@ -1,3 +1,5 @@
+#[cfg(feature = "deque-start")]
+use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use std::time::Duration;
@@ -98,7 +100,6 @@ pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out
     state_generation: usize,
 }
 
-#[cfg(not(feature = "deque-start"))]
 impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Display
     for StartBlock<Out, Receiver>
 {
@@ -113,7 +114,7 @@ pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out
     /// Execution metadata of this block.
     coord: Option<Coord>,
 
-    batch_mode: Option<BatchMode>,
+    max_delay: Option<Duration>,
 
     /// The actual receiver able to fetch messages from the network.
     receiver: Receiver,
@@ -211,7 +212,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out
     fn new(receiver: Receiver, state_lock: Option<Arc<IterationStateLock>>) -> Self {
         Self {
             coord: Default::default(),
-            batch_mode: Default::default(),
+            max_delay: Default::default(),
 
             receiver,
             buffer: Default::default(),
@@ -373,12 +374,12 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
             std::any::type_name::<Out>()
         );
         self.coord = Some(metadata.coord);
-        self.batch_mode = Some(metadata.batch_mode);
+        self.max_delay = metadata.batch_mode.max_delay();
     }
 
     fn next(&mut self) -> StreamElement<Out> {
         let coord = self.coord.unwrap();
-        let max_delay = self.batch_mode.unwrap().max_delay();
+        let max_delay = self.max_delay;
 
         // all the previous blocks sent an end: we're done
         if self.missing_terminate == 0 {
@@ -472,10 +473,6 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
             self.wait_for_state = false;
         }
         message
-    }
-
-    fn to_string(&self) -> String {
-        format!("[{}]", std::any::type_name::<Out>())
     }
 
     fn structure(&self) -> BlockStructure {

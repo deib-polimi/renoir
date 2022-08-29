@@ -3,3 +3,5 @@ target
 *.yml
 *.yaml
 tracing/
+bench_conf.toml
+log.txt

@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use noir::prelude::*;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 struct Point {
     x: f64,

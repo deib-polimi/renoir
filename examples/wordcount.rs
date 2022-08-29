@@ -7,6 +7,10 @@ use noir::prelude::*;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+fn tokenize(s: &str) -> Vec<String> {
+    s.split_whitespace().map(str::to_lowercase).collect()
+}
+
 #[cfg(not(feature = "async-tokio"))]
 fn main() {
     tracing_subscriber::fmt::init();
@@ -25,7 +29,7 @@ fn main() {
     let result = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
-        .flat_map(move |line| tokenizer.tokenize(line))
+        .flat_map(move |line| tokenize(&line))
         .group_by(|word| word.clone())
         .fold(0, |count, _word| *count += 1)
         .collect_vec();
