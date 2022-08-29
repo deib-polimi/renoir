@@ -2,6 +2,9 @@ use std::time::Instant;
 
 use noir::prelude::*;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 const EPS: f64 = 1e-8;
 const DAMPENING: f64 = 0.85;
 

@@ -4,6 +4,9 @@ use itertools::Itertools;
 
 use noir::prelude::*;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 1 {
