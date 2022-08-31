@@ -25,7 +25,7 @@ tracing-log = "0.1.3"
 env_logger = "0.9.0"
 
 # used by the network for storing type-generic structures
-typemap_rev = "0.1.5"
+typemap_rev = "0.2.0"
 
 # the shuffle() operator requires a random source
 nanorand = "0.7.0"
