@@ -2,16 +2,14 @@ use std::time::Instant;
 
 use regex::Regex;
 
-use noir::operator::source::FileSource;
-use noir::BatchMode;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+#[cfg(not(feature = "async-tokio"))]
 fn main() {
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 1 {
@@ -29,15 +27,59 @@ fn main() {
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| tokenizer.tokenize(line))
-        .group_by_count(|word| word.clone())
+        .group_by_count(|word: &String| word.clone())
         .collect_vec();
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();
-    if let Some(res) = result.get() {
-        eprintln!("Output: {:?}", res.len());
+
+    if let Some(_r) = result.get() {
+        // println!("OK");
+        println!("{:?}", elapsed);
+        // _r.iter()
+        //     .sorted_by_key(|t| t.1)
+        //     .rev()
+        //     .take(10)
+        //     .for_each(|(k, v)| eprintln!("{:>10}:{:>10}", k, v));
     }
-    eprintln!("Elapsed: {:?}", elapsed);
+}
+
+#[cfg(feature = "async-tokio")]
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    tracing_subscriber::fmt::init();
+
+    let (config, args) = EnvironmentConfig::from_args();
+    if args.len() != 1 {
+        panic!("Pass the dataset path as an argument");
+    }
+    let path = &args[0];
+
+    let mut env = StreamEnvironment::new(config);
+
+    env.spawn_remote_workers();
+
+    let source = FileSource::new(path);
+    let tokenizer = Tokenizer::new();
+    let result = env
+        .stream(source)
+        .batch_mode(BatchMode::fixed(1024))
+        .flat_map(move |line| tokenizer.tokenize(line))
+        .group_by_count(|word: &String| word.clone())
+        .collect_vec();
+    let start = Instant::now();
+    env.execute().await;
+    let elapsed = start.elapsed();
+
+    if let Some(_r) = result.get() {
+        // println!("OK");
+        println!("{:?}", elapsed);
+        // _r.iter()
+        //     .sorted_by_key(|t| t.1)
+        //     .rev()
+        //     .take(10)
+        //     .for_each(|(k, v)| eprintln!("{:>10}:{:>10}", k, v));
+    }
 }
 
 #[derive(Clone)]

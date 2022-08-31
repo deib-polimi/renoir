@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
+use noir::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use noir::operator::source::CsvSource;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 struct State {

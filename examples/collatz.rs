@@ -1,8 +1,8 @@
+use noir::prelude::*;
 use std::time::Instant;
 
-use noir::operator::source::IteratorSource;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();

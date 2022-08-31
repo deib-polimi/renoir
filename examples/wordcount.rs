@@ -2,17 +2,50 @@ use std::time::Instant;
 
 use regex::Regex;
 
-use noir::operator::source::FileSource;
-use noir::BatchMode;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-fn main() {
-    env_logger::init();
+fn tokenize(s: &str) -> Vec<String> {
+    s.split_whitespace().map(str::to_lowercase).collect()
+}
 
+#[cfg(not(feature = "async-tokio"))]
+fn main() {
+    tracing_subscriber::fmt::init();
+    let (config, args) = EnvironmentConfig::from_args();
+    if args.len() != 1 {
+        panic!("Pass the dataset path as an argument");
+    }
+    let path = &args[0];
+
+    let mut env = StreamEnvironment::new(config);
+
+    env.spawn_remote_workers();
+
+    let source = FileSource::new(path);
+    let tokenizer = Tokenizer::new();
+    let result = env
+        .stream(source)
+        .batch_mode(BatchMode::fixed(1024))
+        .flat_map(move |line| tokenize(&line))
+        .group_by(|word| word.clone())
+        .fold(0, |count, _word| *count += 1)
+        .collect_vec();
+    let start = Instant::now();
+    env.execute();
+    let elapsed = start.elapsed();
+    if let Some(_res) = result.get() {
+        // eprintln!("Output: {:?}", _res.len());
+        println!("{:?}", elapsed);
+    }
+}
+
+#[cfg(feature = "async-tokio")]
+#[tokio::main()]
+async fn main() {
+    tracing_subscriber::fmt::init();
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the dataset path as an argument");
@@ -33,12 +66,12 @@ fn main() {
         .fold(0, |count, _word| *count += 1)
         .collect_vec();
     let start = Instant::now();
-    env.execute();
+    env.execute().await;
     let elapsed = start.elapsed();
-    if let Some(res) = result.get() {
-        eprintln!("Output: {:?}", res.len());
+    if let Some(_res) = result.get() {
+        // eprintln!("Output: {:?}", _res.len());
+        println!("{:?}", elapsed);
     }
-    eprintln!("Elapsed: {:?}", elapsed);
 }
 
 #[derive(Clone)]

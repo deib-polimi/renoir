@@ -2,9 +2,10 @@ use std::time::Instant;
 
 use itertools::Itertools;
 
-use noir::operator::source::CsvSource;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
+
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
     let (config, args) = EnvironmentConfig::from_args();

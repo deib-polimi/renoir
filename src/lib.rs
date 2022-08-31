@@ -46,6 +46,13 @@ pub(crate) mod stream;
 pub(crate) mod test;
 pub(crate) mod worker;
 
+pub mod prelude {
+    pub use super::operator::sink::StreamOutput;
+    pub use super::operator::source::*;
+    pub use super::operator::window::{CountWindow, EventTimeWindow, ProcessingTimeWindow};
+    pub use super::{BatchMode, EnvironmentConfig, StreamEnvironment};
+}
+
 /// Tracing information of the current execution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct TracingData {

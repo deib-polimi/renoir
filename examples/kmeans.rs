@@ -6,9 +6,10 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use noir::operator::source::CsvSource;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir::prelude::*;
+
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 struct Point {
@@ -17,6 +18,7 @@ struct Point {
 }
 
 impl Point {
+    #[allow(unused)]
     fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
@@ -92,7 +94,11 @@ impl Div<f64> for Point {
 }
 
 fn read_centroids(filename: &str, n: usize) -> Vec<Point> {
-    let file = File::open(filename).unwrap();
+    let file = File::options()
+        .read(true)
+        .write(false)
+        .open(filename)
+        .unwrap();
     csv::ReaderBuilder::new()
         .has_headers(false)
         .from_reader(file)
@@ -103,16 +109,13 @@ fn read_centroids(filename: &str, n: usize) -> Vec<Point> {
 }
 
 fn select_nearest(point: Point, old_centroids: &[Point]) -> Point {
-    let mut selected_distance = f64::MAX;
-    let mut selected_centroid = Point::new(0.0, 0.0);
-    for centroid in old_centroids {
-        let distance = point.distance_to(centroid);
-        if distance < selected_distance {
-            selected_distance = distance;
-            selected_centroid = *centroid;
-        }
-    }
-    selected_centroid
+    old_centroids
+        .iter()
+        .map(|c| (c, point.distance_to(c)))
+        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .unwrap()
+        .0
+        .clone()
 }
 
 #[derive(Clone, Serialize, Deserialize)]
