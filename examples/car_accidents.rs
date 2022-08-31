@@ -14,7 +14,7 @@ type Week = (u16, u16);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Accident {
-    #[serde(rename = "DATE")]
+    #[serde(rename = "CRASH DATE")]
     date: String,
     #[serde(rename = "BOROUGH")]
     borough: String,

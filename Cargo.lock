@@ -1412,9 +1412,9 @@ dependencies = [
 
 [[package]]
 name = "typemap_rev"
-version = "0.1.5"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed5b74f0a24b5454580a79abb6994393b09adf0ab8070f15827cb666255de155"
+checksum = "4fc45e9608894c9fefd9792d880560280086d73a4d8c8cb7436f27ca98550fb5"
 
 [[package]]
 name = "unicode-ident"
