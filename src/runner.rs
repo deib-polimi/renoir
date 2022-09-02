@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::fmt::Write as FmtWrite;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -7,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use itertools::Itertools;
+use sha2::Digest;
 use ssh2::Session;
 
 use crate::config::{RemoteHostConfig, RemoteRuntimeConfig};
@@ -20,7 +23,7 @@ pub(crate) const HOST_ID_ENV_VAR: &str = "noir_HOST_ID";
 /// Environment variable set by the runner with the content of the config file so that it's not
 /// required to have it on all the hosts.
 pub(crate) const CONFIG_ENV_VAR: &str = "noir_CONFIG";
-/// Size of the buffer used to send the executable file via SCP.
+/// Size of the buffer usedahash to send the executable file via SCP.
 pub(crate) const SCP_BUFFER_SIZE: usize = 512 * 1024;
 
 /// Execution results returned by a remote worker.
@@ -31,6 +34,25 @@ struct HostExecutionResult {
     sync_time: Duration,
     /// Execution time excluding the sync.
     execution_time: Duration,
+}
+
+/// Compute a cryptographic hash digest of the current executable and return it as a string.
+/// Intended as a discrimintaor for file changes
+fn executable_hash() -> String {
+    let mut hasher = sha2::Sha256::new();
+    let mut buf = vec![0u8; 1 << 20];
+    let mut f = File::open(std::env::current_exe().unwrap()).unwrap();
+
+    loop {
+        match f.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => hasher.update(&buf[..n]),
+            Err(e) => panic!("Error reading the current executable! {e}"),
+        }
+    }
+
+    let digest = hasher.finalize();
+    base64::encode_config(digest, base64::URL_SAFE_NO_PAD)
 }
 
 /// Spawn all the remote workers via ssh and wait until all of them complete, after that exit from
@@ -47,16 +69,23 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
 
     // from now we are sure this is the process that should spawn the remote workers
     info!("Spawning {} remote workers", config.hosts.len());
-    let config_str = serde_yaml::to_string(&config).unwrap();
+
+    let exe_hash = executable_hash();
     let mut join_handles = Vec::new();
-    for (host_id, host) in config.hosts.into_iter().enumerate() {
-        let config_str = config_str.clone();
+    let mut host_dup: HashMap<String, usize> = HashMap::new(); // Used to detect deployments with replicated host
+    for (host_id, host) in config.hosts.iter().enumerate() {
+        let mut exe_uid = exe_hash.clone();
+        let ctr = host_dup.entry(host.address.clone()).or_default();
+        if *ctr > 0 {
+            write!(&mut exe_uid, "-{:02}", *ctr).unwrap();
+        }
+        *ctr += 1;
+
+        let config = config.clone();
+        let host = host.clone();
         let join_handle = std::thread::Builder::new()
-            .name(format!("noir-remote-{}", host_id))
-            .spawn(move || {
-                let config_str = config_str.clone();
-                spawn_remote_worker(host_id.try_into().unwrap(), host, config_str)
-            })
+            .name(format!("noir-remote-{:02}", host_id))
+            .spawn(move || remote_worker(host_id as _, host, config, exe_uid))
             .unwrap();
         join_handles.push(join_handle);
     }
@@ -107,10 +136,11 @@ fn is_spawned_process() -> bool {
 ///
 /// This function is allowed to block (i.e. not be asynchronous) since it will be run inside a
 /// `spawn_blocking`.
-fn spawn_remote_worker(
+fn remote_worker(
     host_id: HostId,
     mut host: RemoteHostConfig,
-    config_str: String,
+    config: RemoteRuntimeConfig,
+    executable_uid: String,
 ) -> HostExecutionResult {
     if host.ssh.username.is_none() {
         host.ssh.username = Some(whoami::username());
@@ -163,18 +193,6 @@ fn spawn_remote_worker(
     debug!("Authentication succeeded to host {}", host_id);
 
     let sync_start = Instant::now();
-    // generate a temporary file on remote host
-    let (remote_path, exit_code) = run_remote_command(&mut session, "mktemp -p '' noir2.XXXXXXXX");
-    let remote_path = remote_path.trim();
-    assert_eq!(
-        exit_code, 0,
-        "Failed to create temporary file on remote host {}",
-        host_id
-    );
-    debug!(
-        "On host {} the executable will be copied at {}",
-        host_id, remote_path
-    );
 
     let current_exe = std::env::current_exe().unwrap();
     debug!(
@@ -182,7 +200,19 @@ fn spawn_remote_worker(
         current_exe.display()
     );
 
-    send_file(
+    // generate a temporary file on remote host
+    let remote_path = Path::new("/tmp/noir/").join(format!(
+        "{}-{}",
+        current_exe.file_name().unwrap().to_string_lossy(),
+        executable_uid
+    ));
+    debug!(
+        "On host {} the executable will be copied at {}",
+        host_id,
+        remote_path.display()
+    );
+
+    send_executable(
         host_id,
         &mut session,
         &current_exe,
@@ -192,7 +222,7 @@ fn spawn_remote_worker(
     let sync_time = sync_start.elapsed();
 
     // build the remote command
-    let command = build_remote_command(host_id, config_str.as_str(), remote_path, &host.perf_path);
+    let command = build_remote_command(host_id, &config, &remote_path, &host.perf_path);
     debug!("Executing on host {}:\n{}", host_id, command);
 
     let execution_start = Instant::now();
@@ -236,17 +266,27 @@ fn spawn_remote_worker(
 
     let execution_time = execution_start.elapsed();
 
-    debug!(
-        "Removing temporary binary file at host {}: {}",
-        host_id, remote_path
-    );
-    let remove_binary = format!("rm -f {}", shell_escape::escape(Cow::Borrowed(remote_path)));
-    let (_, exit_code) = run_remote_command(&mut session, &remove_binary);
-    assert_eq!(
-        exit_code, 0,
-        "Failed to remove remote executable on host {} at {}",
-        host_id, remote_path
-    );
+    if config.cleanup_executable {
+        debug!(
+            "Removing temporary binary file at host {}: {}",
+            host_id,
+            remote_path.display()
+        );
+        let remove_binary = format!(
+            "rm -f {}",
+            shell_escape::escape(Cow::Borrowed(
+                remote_path.to_str().expect("non UTF-8 executable path")
+            ))
+        );
+        let (_, exit_code) = run_remote_command(&mut session, &remove_binary);
+        assert_eq!(
+            exit_code,
+            0,
+            "Failed to remove remote executable on host {} at {}",
+            host_id,
+            remote_path.display()
+        );
+    }
 
     HostExecutionResult {
         tracing: tracing_data,
@@ -268,13 +308,14 @@ fn run_remote_command(session: &mut Session, command: &str) -> (String, i32) {
 }
 
 /// Send a file remotely via SCP and change its mode.
-fn send_file(
+fn send_executable(
     host_id: HostId,
     session: &mut Session,
     local_path: &Path,
     remote_path: &Path,
     mode: i32,
 ) {
+    let remote_path_str = remote_path.to_str().expect("non UTF-8 executable path");
     let metadata = local_path.metadata().unwrap();
     tracing::info!(
         "Sending executable to host {}: {} -> {}, {} bytes",
@@ -283,6 +324,21 @@ fn send_file(
         remote_path.display(),
         metadata.len()
     );
+
+    let (_, result) = run_remote_command(session, &format!("ls {}", remote_path_str));
+    if result == 0 {
+        info!(
+            "Remote file with matching hash `{}` already exists, skipping transfer.",
+            remote_path_str
+        );
+        return;
+    }
+
+    let (msg, result) = run_remote_command(session, "mkdir -p /tmp/noir");
+    if result != 0 {
+        warn!("Failed to create /tmp/noir directory [{result}]: {msg}");
+    }
+
     let mut local_file = File::open(local_path).unwrap();
     let mut remote_file = session
         .scp_send(remote_path, mode, metadata.len(), None)
@@ -306,7 +362,7 @@ fn send_file(
     let chmod = format!(
         "chmod {:03o} {}",
         mode,
-        shell_escape::escape(remote_path.to_string_lossy())
+        shell_escape::escape(remote_path_str.into())
     );
     run_remote_command(session, &chmod);
 }
@@ -316,20 +372,21 @@ fn send_file(
 /// This will export all the required variables before executing the binary.
 fn build_remote_command(
     host_id: HostId,
-    config_str: &str,
-    binary_path: &str,
+    config: &RemoteRuntimeConfig,
+    binary_path: &Path,
     perf_path: &Option<PathBuf>,
 ) -> String {
-    let config_str = shell_escape::escape(Cow::Borrowed(config_str));
+    let config_yaml = serde_yaml::to_string(config).unwrap();
+    let config_str = shell_escape::escape(config_yaml.into());
     let args = std::env::args()
         .skip(1)
-        .map(|arg| shell_escape::escape(Cow::Owned(arg)))
+        .map(|arg| shell_escape::escape(arg.into()))
         .join(" ");
     let perf_cmd = if let Some(path) = perf_path.as_ref() {
         warn!("Running remote process on host {} with perf enabled. This may cause performance regressions.", host_id);
         format!(
             "perf record --call-graph dwarf -o {} -- ",
-            shell_escape::escape(Cow::Borrowed(path.to_str().expect("non UTF-8 perf path")))
+            shell_escape::escape(path.to_str().expect("non UTF-8 perf path").into())
         )
     } else {
         "".to_string()
@@ -346,7 +403,7 @@ export RUST_LOG_STYLE=always;
         config_env = CONFIG_ENV_VAR,
         config = config_str,
         perf_cmd = perf_cmd,
-        binary_path = binary_path,
+        binary_path = binary_path.to_str().expect("non UTF-8 executable path"),
         args = args,
         rust_log = std::env::var("RUST_LOG").unwrap_or_default(),
         rust_backtrace = std::env::var("RUST_BACKTRACE").unwrap_or_default(),

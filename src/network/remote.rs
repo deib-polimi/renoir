@@ -25,7 +25,7 @@ static BINCODE_HEADER_CONFIG: Lazy<
         .reject_trailing_bytes()
 });
 
-static BINCODE_MSG_CONFIG: Lazy<DefaultOptions> = Lazy::new(|| bincode::DefaultOptions::new());
+static BINCODE_MSG_CONFIG: Lazy<DefaultOptions> = Lazy::new(bincode::DefaultOptions::new);
 
 pub(crate) const HEADER_SIZE: usize = 20; // std::mem::size_of::<MessageHeader>();
 

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use criterion::black_box;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};

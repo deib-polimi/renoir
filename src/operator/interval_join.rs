@@ -56,7 +56,7 @@ where
         write!(
             f,
             "{} -> IntervalJoin<{}, {:?}, {:?}>",
-            self.prev.to_string(),
+            self.prev,
             std::any::type_name::<KeyValue<Key, (Out, Out2)>>(),
             self.lower_bound,
             self.upper_bound,

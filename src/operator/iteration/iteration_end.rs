@@ -41,7 +41,7 @@ where
         write!(
             f,
             "{} -> IterationEndBlock<{}>",
-            self.prev.to_string(),
+            self.prev,
             std::any::type_name::<DeltaUpdate>()
         )
     }

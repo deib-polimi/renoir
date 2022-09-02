@@ -25,7 +25,7 @@ where
     PreviousOperators: Operator<Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} -> CollectChannelSink", self.prev.to_string())
+        write!(f, "{} -> CollectChannelSink", self.prev)
     }
 }
 

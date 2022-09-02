@@ -14,7 +14,6 @@ use noir::EnvironmentConfig;
 use noir::StreamEnvironment;
 
 mod common;
-use common::*;
 
 fn wordcount_fold(path: &Path) {
     let config = EnvironmentConfig::local(4);

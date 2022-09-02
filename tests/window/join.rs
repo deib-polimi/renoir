@@ -26,7 +26,7 @@ fn window_join() {
             )
             .shuffle()
             .group_by(|x| x % 2)
-            .map(|(_, x)| ('a'..'z').nth(x as usize).unwrap());
+            .map(|(_, x)| ('a'..='z').nth(x as usize).unwrap());
 
         let res = stream1
             .window(EventTimeWindow::tumbling(Timestamp::from_secs(3)))
@@ -53,7 +53,7 @@ fn window_join() {
             for window in windows.into_iter() {
                 for &x in window.iter() {
                     for &y in window.iter() {
-                        expected.push((x % 2, (x, ('a'..'z').nth(y as usize).unwrap())));
+                        expected.push((x % 2, (x, ('a'..='z').nth(y as usize).unwrap())));
                     }
                 }
             }
@@ -84,7 +84,7 @@ fn window_all_join() {
                 |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
             )
             .shuffle()
-            .map(|x| ('a'..'z').nth(x as usize).unwrap());
+            .map(|x| ('a'..='z').nth(x as usize).unwrap());
 
         let res = stream1
             .window_all(EventTimeWindow::tumbling(Timestamp::from_secs(3)))
@@ -101,7 +101,7 @@ fn window_all_join() {
             for window in windows.into_iter() {
                 for &x in window.iter() {
                     for &y in window.iter() {
-                        expected.push((x, ('a'..'z').nth(y as usize).unwrap()));
+                        expected.push((x, ('a'..='z').nth(y as usize).unwrap()));
                     }
                 }
             }

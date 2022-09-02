@@ -193,8 +193,6 @@ fn demux_thread<In: ExchangeData>(
         }
     }
 
-    drop(r);
-
     let _ = stream.shutdown(Shutdown::Both);
     debug!("demultiplexer for {} at {} exited", coord, address);
 }

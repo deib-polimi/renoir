@@ -172,6 +172,7 @@ impl TestHelper {
         let runtime = ExecutionRuntime::Remote(RemoteRuntimeConfig {
             hosts,
             tracing_dir: None,
+            cleanup_executable: true,
         });
         debug!("Running with remote configuration: {:?}", runtime);
 

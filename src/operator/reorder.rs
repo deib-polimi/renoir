@@ -53,7 +53,7 @@ where
         write!(
             f,
             "{} -> Reorder<{}>",
-            self.prev.to_string(),
+            self.prev,
             std::any::type_name::<Out>(),
         )
     }

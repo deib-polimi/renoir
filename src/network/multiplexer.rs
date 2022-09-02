@@ -95,7 +95,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
             .spawn(move || {
                 tracing::debug!(
                     "mux connecting to {}",
-                    address.to_socket_addrs().unwrap().nth(0).unwrap()
+                    address.to_socket_addrs().unwrap().next().unwrap()
                 );
                 let stream = connect_remote(coord, address);
 
@@ -245,7 +245,6 @@ fn mux_thread<Out: ExchangeData>(
     }
 
     w.flush().unwrap();
-    drop(w);
     let _ = stream.shutdown(Shutdown::Both);
     debug!("Remote sender for {} exited", coord);
 }

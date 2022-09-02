@@ -43,7 +43,7 @@ where
         write!(
             f,
             "{} -> KeyedFold<{} -> {}>",
-            self.prev.to_string(),
+            self.prev,
             std::any::type_name::<KeyValue<Key, Out>>(),
             std::any::type_name::<KeyValue<Key, NewOut>>()
         )
