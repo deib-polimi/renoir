@@ -1,5 +1,6 @@
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::thread::JoinHandle;
 
 use itertools::Itertools;
@@ -19,6 +20,9 @@ pub type BlockId = CoordUInt;
 pub type HostId = CoordUInt;
 /// The identifier of a replica of a block in the execution graph.
 pub type ReplicaId = CoordUInt;
+
+type BlockInitFn =
+    Box<dyn FnOnce(&mut ExecutionMetadata) -> (JoinHandle<()>, BlockStructure) + Send>;
 
 /// Metadata associated to a block in the execution graph.
 #[derive(Debug)]
@@ -64,11 +68,7 @@ pub(crate) struct Scheduler {
     /// Information about the blocks known to the scheduler.
     block_info: HashMap<BlockId, SchedulerBlockInfo, crate::block::CoordHasherBuilder>,
     /// The list of handles of each block in the execution graph.
-    // start_handles: Vec<(Coord, StartHandle)>,
-    block_init: Vec<(
-        Coord,
-        Box<dyn FnOnce(&mut ExecutionMetadata) -> (JoinHandle<()>, BlockStructure) + Send>,
-    )>,
+    block_init: Vec<(Coord, BlockInitFn)>,
     /// The network topology that keeps track of all the connections inside the execution graph.
     network: NetworkTopology,
 }
@@ -79,7 +79,6 @@ impl Scheduler {
             next_blocks: Default::default(),
             prev_blocks: Default::default(),
             block_info: Default::default(),
-            // start_handles: Default::default(),
             block_init: Default::default(),
             network: NetworkTopology::new(config.clone()),
             config,
@@ -315,23 +314,23 @@ impl Scheduler {
     fn log_topology(&self) {
         let mut topology = "Job graph:".to_string();
         for (block_id, block) in self.block_info.iter() {
-            topology += &format!("\n  {}: {}", block_id, block.repr);
+            write!(&mut topology, "\n  {}: {}", block_id, block.repr).unwrap();
             if let Some(next) = &self.next_blocks.get(block_id) {
                 let sorted = next
                     .iter()
                     .map(|(x, _, fragile)| format!("{}{}", x, if *fragile { "*" } else { "" }))
                     .sorted()
                     .collect_vec();
-                topology += &format!("\n    -> {:?}", sorted);
+                write!(&mut topology, "\n    -> {:?}", sorted).unwrap();
             }
         }
         debug!("{}", topology);
         let mut assignments = "Replicas:".to_string();
         for (block_id, block) in self.block_info.iter() {
-            assignments += &format!("\n  {}:", block_id);
+            write!(&mut assignments, "\n  {}:", block_id).unwrap();
             let replicas = block.replicas.values().flatten().sorted();
             for &coord in replicas {
-                assignments += &format!(" {}", coord);
+                write!(&mut assignments, " {}", coord).unwrap();
             }
         }
         debug!("{}", assignments);

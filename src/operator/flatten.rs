@@ -46,7 +46,7 @@ mod inner {
             write!(
                 f,
                 "{} -> Flatten<{} -> {}>",
-                self.prev.to_string(),
+                self.prev,
                 std::any::type_name::<In>(),
                 std::any::type_name::<Out>()
             )
@@ -223,7 +223,7 @@ mod inner {
             write!(
                 f,
                 "{} -> KeyedFlatten<{} -> {}>",
-                self.prev.to_string(),
+                self.prev,
                 std::any::type_name::<In>(),
                 std::any::type_name::<Out>()
             )
@@ -426,8 +426,8 @@ mod inner {
         }
     }
 
-    impl<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators> Display for
-        Flatten<Out, IterOut, MakeIter, NewOut, PreviousOperators>
+    impl<Out: Data, IterOut, MakeIter, NewOut: Data, PreviousOperators> Display
+        for Flatten<Out, IterOut, MakeIter, NewOut, PreviousOperators>
     where
         IterOut: Iterator<Item = NewOut> + Clone + Send + 'static,
         MakeIter: Fn(Out) -> IterOut + Send + Clone,
@@ -437,7 +437,7 @@ mod inner {
             write!(
                 f,
                 "{} -> Flatten<{} -> {}>",
-                self.prev.to_string(),
+                self.prev,
                 std::any::type_name::<Out>(),
                 std::any::type_name::<NewOut>()
             )
@@ -477,7 +477,7 @@ mod inner {
 
             self.buffer.pop_front().unwrap()
         }
-        
+
         fn structure(&self) -> BlockStructure {
             self.prev
                 .structure()

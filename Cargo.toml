@@ -87,6 +87,10 @@ ahash = "0.8.0"
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 
+# For execution deduplication
+sha2 = "0.10.3"
+base64 = "0.13.0"
+
 [dev-dependencies]
 # for the tests
 rand = "0.8.5"

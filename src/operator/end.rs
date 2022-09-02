@@ -33,8 +33,8 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.next_strategy {
-            NextStrategy::Random => write!(f, "{} -> Shuffle", self.prev.to_string()),
-            NextStrategy::OnlyOne => write!(f, "{} -> OnlyOne", self.prev.to_string()),
+            NextStrategy::Random => write!(f, "{} -> Shuffle", self.prev),
+            NextStrategy::OnlyOne => write!(f, "{} -> OnlyOne", self.prev),
             _ => self.prev.fmt(f),
         }
     }

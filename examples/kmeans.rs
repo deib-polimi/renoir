@@ -109,13 +109,12 @@ fn read_centroids(filename: &str, n: usize) -> Vec<Point> {
 }
 
 fn select_nearest(point: Point, old_centroids: &[Point]) -> Point {
-    old_centroids
+    *old_centroids
         .iter()
         .map(|c| (c, point.distance_to(c)))
         .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
         .unwrap()
         .0
-        .clone()
 }
 
 #[derive(Clone, Serialize, Deserialize)]

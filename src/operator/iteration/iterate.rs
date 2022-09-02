@@ -456,7 +456,7 @@ where
         write!(
             f,
             "{} -> Iterate<{}>",
-            self.prev.to_string(),
+            self.prev,
             std::any::type_name::<Out>()
         )
     }

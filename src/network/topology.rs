@@ -1,5 +1,7 @@
 use std::any::TypeId;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
 use std::marker::PhantomData;
 use std::thread::JoinHandle;
 
@@ -282,7 +284,7 @@ impl NetworkTopology {
             .entry::<DemultiplexingReceiverKey<T>>()
             .or_insert_with(Default::default);
 
-        if !demuxes.contains_key(&demux_coord) {
+        if let Entry::Vacant(e) = demuxes.entry(demux_coord) {
             // find the set of all the previous blocks that have a MultiplexingSender that
             // point to this DemultiplexingReceiver.
             let mut prev = HashSet::new();
@@ -309,7 +311,7 @@ impl NetworkTopology {
                 self.join_handles.push(join_handle);
                 #[cfg(feature = "async-tokio")]
                 self.async_join_handles.push(join_handle);
-                demuxes.insert(demux_coord, demux);
+                e.insert(demux);
             } else {
                 debug!("Demultiplexer of {} is useless since it has no previous remote block, ignoring", demux_coord);
             }
@@ -333,14 +335,14 @@ impl NetworkTopology {
             .or_insert_with(Default::default);
         let demux_coord = DemuxCoord::from(receiver_endpoint);
 
-        if !muxers.contains_key(&demux_coord) {
+        if let Entry::Vacant(e) = muxers.entry(demux_coord) {
             let address = self.demultiplexer_addresses[&demux_coord].clone();
             let (mux, join_handle) = MultiplexingSender::new(demux_coord, address);
             #[cfg(not(feature = "async-tokio"))]
             self.join_handles.push(join_handle);
             #[cfg(feature = "async-tokio")]
             self.async_join_handles.push(join_handle);
-            muxers.insert(demux_coord, mux);
+            e.insert(mux);
         }
         muxers
             .get_mut(&demux_coord)
@@ -538,9 +540,15 @@ impl NetworkTopology {
     pub fn log(&self) {
         let mut topology = "Execution graph:".to_owned();
         for ((coord, _typ), next) in self.next.iter().sorted() {
-            topology += &format!("\n  {}:", coord);
+            write!(&mut topology, "\n  {}:", coord).unwrap();
             for (next, fragile) in next.iter().sorted() {
-                topology += &format!(" {}{}", next, if *fragile { "*" } else { "" });
+                write!(
+                    &mut topology,
+                    " {}{}",
+                    next,
+                    if *fragile { "*" } else { "" }
+                )
+                .unwrap();
             }
         }
         debug!("{}", topology);

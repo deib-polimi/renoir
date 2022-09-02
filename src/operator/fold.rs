@@ -35,7 +35,7 @@ where
         write!(
             f,
             "{} -> Fold<{} -> {}>",
-            self.prev.to_string(),
+            self.prev,
             std::any::type_name::<Out>(),
             std::any::type_name::<NewOut>()
         )

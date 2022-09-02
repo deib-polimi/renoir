@@ -102,6 +102,9 @@ pub struct RemoteRuntimeConfig {
     pub hosts: Vec<RemoteHostConfig>,
     /// If specified some debug information will be stored inside this directory.
     pub tracing_dir: Option<PathBuf>,
+    /// Remove remote binaries after execution
+    #[serde(default)]
+    pub cleanup_executable: bool,
 }
 
 /// The configuration of a single remote host.

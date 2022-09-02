@@ -87,7 +87,7 @@ impl<
         write!(
             f,
             "{} -> JoinLocalHash<{}>",
-            self.prev.to_string(),
+            self.prev,
             std::any::type_name::<Key>()
         )
     }

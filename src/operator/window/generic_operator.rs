@@ -50,7 +50,7 @@ where
         write!(
             f,
             "{} -> {} -> GenericOperator[{}]<{}>",
-            self.prev.to_string(),
+            self.prev,
             self.manager,
             self.name,
             std::any::type_name::<NewOut>(),
