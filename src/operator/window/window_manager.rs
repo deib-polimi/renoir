@@ -87,13 +87,11 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
             StreamElement::Item(_) | StreamElement::Timestamped(_, _) => {
                 let (key, el) = el.remove_key();
                 let key = key.unwrap();
-                if let Some(gen) = self.generators.get_mut(&key) {
-                    gen.add(el);
-                } else {
-                    let mut gen = self.descr.new_generator();
-                    gen.add(el);
-                    self.generators.insert(key.clone(), gen);
-                }
+
+                self.generators
+                    .entry(key.clone())
+                    .or_insert_with(|| self.descr.new_generator())
+                    .add(el);
 
                 // Only return this window generator, since the others are not affected by this element
                 return ManagerAddIterator::<Key, Out, WindowDescr>::Single(
