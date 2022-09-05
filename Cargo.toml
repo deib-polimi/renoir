@@ -88,6 +88,7 @@ regex = "1.6"
 # used in the benchmarks
 crossbeam-channel = "0.5"
 flume = "0.10"
+nanorand = "0.7.0"
 
 
 # The list of benchmarks, all of them require "harness = false" in order to
