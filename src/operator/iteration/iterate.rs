@@ -352,80 +352,83 @@ where
     }
 
     fn next(&mut self) -> StreamElement<Out> {
-        // try to make progress on the feedback
-        while let Ok(message) = self.feedback_receiver.as_ref().unwrap().try_recv() {
-            self.next_content.extend(&mut message.into_iter());
-        }
+        loop {
+            // try to make progress on the feedback
+            while let Ok(message) = self.feedback_receiver.as_ref().unwrap().try_recv() {
+                self.next_content.extend(&mut message.into_iter());
+            }
 
-        if !self.has_input_ended {
-            let item = self.prev.next();
-            return match &item {
-                StreamElement::FlushAndRestart => {
-                    debug!(
-                        "Iterate at {} received all the input: {} elements total",
-                        self.coord,
-                        self.content.len()
-                    );
-                    self.has_input_ended = true;
+            if !self.has_input_ended {
+                let item = self.prev.next();
+                return match &item {
+                    StreamElement::FlushAndRestart => {
+                        debug!(
+                            "Iterate at {} received all the input: {} elements total",
+                            self.coord,
+                            self.content.len()
+                        );
+                        self.has_input_ended = true;
+                        // since this moment accessing the state for the next iteration must wait
+                        self.state.lock();
+                        StreamElement::FlushAndRestart
+                    }
+                    StreamElement::Item(_)
+                    | StreamElement::Timestamped(_, _)
+                    | StreamElement::Watermark(_)
+                    | StreamElement::FlushBatch => item,
+                    StreamElement::Terminate => {
+                        debug!("Iterate at {} is terminating", self.coord);
+                        let message =
+                            NetworkMessage::new_single(StreamElement::Terminate, self.coord);
+                        self.output_sender.as_ref().unwrap().send(message).unwrap();
+                        item
+                    }
+                };
+            } else if !self.content.is_empty() {
+                let item = self.content.pop_front().unwrap();
+                if matches!(item, StreamElement::FlushAndRestart) {
                     // since this moment accessing the state for the next iteration must wait
                     self.state.lock();
-                    StreamElement::FlushAndRestart
                 }
-                StreamElement::Item(_)
-                | StreamElement::Timestamped(_, _)
-                | StreamElement::Watermark(_)
-                | StreamElement::FlushBatch => item,
-                StreamElement::Terminate => {
-                    debug!("Iterate at {} is terminating", self.coord);
-                    let message = NetworkMessage::new_single(StreamElement::Terminate, self.coord);
-                    self.output_sender.as_ref().unwrap().send(message).unwrap();
-                    item
-                }
-            };
-        } else if !self.content.is_empty() {
-            let item = self.content.pop_front().unwrap();
-            if matches!(item, StreamElement::FlushAndRestart) {
-                // since this moment accessing the state for the next iteration must wait
-                self.state.lock();
+                return item;
             }
-            return item;
+
+            // make sure to consume all the feedback
+            while !matches!(
+                self.next_content.back(),
+                Some(StreamElement::FlushAndRestart)
+            ) {
+                let message = self.feedback_receiver.as_ref().unwrap().recv().unwrap();
+                self.next_content.extend(&mut message.into_iter());
+            }
+
+            debug!("Iterate at {} has ended the iteration", self.coord);
+
+            // make sure not to lose anything
+            debug_assert!(self.content.is_empty());
+            // the next iteration
+            std::mem::swap(&mut self.content, &mut self.next_content);
+
+            // this iteration has ended, wait here for the leader
+            let should_continue = self.state.wait_leader();
+
+            if !should_continue {
+                debug!(
+                    "Iterate block at {} ended the iteration, producing: {:?}",
+                    self.coord,
+                    self.content.iter().map(|x| x.variant()).collect::<Vec<_>>()
+                );
+                // cleanup so that if this is a nested iteration next time we'll be good to start again
+                self.has_input_ended = false;
+
+                let message =
+                    NetworkMessage::new_batch(self.content.drain(..).collect(), self.coord);
+                self.output_sender.as_ref().unwrap().send(message).unwrap();
+            }
+
+            // This iteration has ended but FlushAndRestart has already been sent. To avoid sending
+            // twice the FlushAndRestart repeat.
         }
-
-        // make sure to consume all the feedback
-        while !matches!(
-            self.next_content.back(),
-            Some(StreamElement::FlushAndRestart)
-        ) {
-            let message = self.feedback_receiver.as_ref().unwrap().recv().unwrap();
-            self.next_content.extend(&mut message.into_iter());
-        }
-
-        debug!("Iterate at {} has ended the iteration", self.coord);
-
-        // make sure not to lose anything
-        debug_assert!(self.content.is_empty());
-        // the next iteration
-        std::mem::swap(&mut self.content, &mut self.next_content);
-
-        // this iteration has ended, wait here for the leader
-        let should_continue = self.state.wait_leader();
-
-        if !should_continue {
-            debug!(
-                "Iterate block at {} ended the iteration, producing: {:?}",
-                self.coord,
-                self.content.iter().map(|x| x.variant()).collect::<Vec<_>>()
-            );
-            // cleanup so that if this is a nested iteration next time we'll be good to start again
-            self.has_input_ended = false;
-
-            let message = NetworkMessage::new_batch(self.content.drain(..).collect(), self.coord);
-            self.output_sender.as_ref().unwrap().send(message).unwrap();
-        }
-
-        // This iteration has ended but FlushAndRestart has already been sent. To avoid sending
-        // twice the FlushAndRestart recurse.
-        self.next()
     }
 
     fn structure(&self) -> BlockStructure {

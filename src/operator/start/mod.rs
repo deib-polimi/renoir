@@ -261,93 +261,94 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
     fn next(&mut self) -> StreamElement<Out> {
         let coord = self.coord.unwrap();
 
-        // all the previous blocks sent an end: we're done
-        if self.missing_terminate == 0 {
-            info!("StartBlock for {} has ended", coord);
-            return StreamElement::Terminate;
-        }
-        if self.missing_flush_and_restart == 0 {
-            info!("StartBlock for {} is emitting flush and restart", coord);
+        loop {
+            // all the previous blocks sent an end: we're done
+            if self.missing_terminate == 0 {
+                info!("StartBlock for {} has ended", coord);
+                return StreamElement::Terminate;
+            }
+            if self.missing_flush_and_restart == 0 {
+                info!("StartBlock for {} is emitting flush and restart", coord);
 
-            self.missing_flush_and_restart = self.num_previous_replicas;
-            self.watermark_frontier.reset();
-            // this iteration has ended, before starting the next one wait for the state update
-            self.wait_for_state = true;
-            self.state_generation += 2;
-            return StreamElement::FlushAndRestart;
-        }
+                self.missing_flush_and_restart = self.num_previous_replicas;
+                self.watermark_frontier.reset();
+                // this iteration has ended, before starting the next one wait for the state update
+                self.wait_for_state = true;
+                self.state_generation += 2;
+                return StreamElement::FlushAndRestart;
+            }
 
-        if let Some((sender, ref mut inner)) = self.batch_iter {
-            let msg = match inner.next() {
-                None => {
-                    // Current batch is finished
-                    self.batch_iter = None;
-                    return self.next();
-                }
-                Some(item) => {
-                    match item {
-                        StreamElement::Watermark(ts) => {
-                            // update the frontier and return a watermark if necessary
-                            match self.watermark_frontier.update(sender, ts) {
-                                Some(ts) => StreamElement::Watermark(ts), // ts is safe
-                                None => return self.next(),
-                            }
-                        }
-                        StreamElement::FlushAndRestart => {
-                            // mark this replica as ended and let the frontier ignore it from now on
-                            self.watermark_frontier.update(sender, timestamp_max());
-                            self.missing_flush_and_restart -= 1;
-                            return self.next();
-                        }
-                        StreamElement::Terminate => {
-                            self.missing_terminate -= 1;
-                            debug!(
-                                "{} received a Terminate, {} more to come",
-                                coord, self.missing_terminate
-                            );
-                            return self.next();
-                        }
-                        _ => item,
+            if let Some((sender, ref mut inner)) = self.batch_iter {
+                let msg = match inner.next() {
+                    None => {
+                        // Current batch is finished
+                        self.batch_iter = None;
+                        continue;
                     }
+                    Some(item) => {
+                        match item {
+                            StreamElement::Watermark(ts) => {
+                                // update the frontier and return a watermark if necessary
+                                match self.watermark_frontier.update(sender, ts) {
+                                    Some(ts) => StreamElement::Watermark(ts), // ts is safe
+                                    None => continue,
+                                }
+                            }
+                            StreamElement::FlushAndRestart => {
+                                // mark this replica as ended and let the frontier ignore it from now on
+                                self.watermark_frontier.update(sender, timestamp_max());
+                                self.missing_flush_and_restart -= 1;
+                                continue;
+                            }
+                            StreamElement::Terminate => {
+                                self.missing_terminate -= 1;
+                                debug!(
+                                    "{} received a Terminate, {} more to come",
+                                    coord, self.missing_terminate
+                                );
+                                continue;
+                            }
+                            _ => item,
+                        }
+                    }
+                };
+
+                // the previous iteration has ended, this message refers to the new iteration: we need to be
+                // sure the state is set before we let this message pass
+                if self.wait_for_state {
+                    if let Some(lock) = self.state_lock.as_ref() {
+                        lock.wait_for_update(self.state_generation);
+                    }
+                    self.wait_for_state = false;
+                }
+                return msg;
+            }
+
+            // Receive next batch
+            let net_msg = match (self.already_timed_out, self.max_delay) {
+                // check the timeout only if there is one and the last time we didn't timed out
+                (false, Some(max_delay)) => {
+                    match self.receiver.recv_timeout(max_delay) {
+                        Ok(net_msg) => net_msg,
+                        Err(_) => {
+                            // timed out: tell the block to flush the current batch
+                            // next time we wait indefinitely without the timeout since the batch is
+                            // currently empty
+                            self.already_timed_out = true;
+                            // this is a fake batch, and its sender is meaningless and will be
+                            // forget immediately
+                            NetworkMessage::new_single(StreamElement::FlushBatch, Default::default())
+                        }
+                    }
+                }
+                _ => {
+                    self.already_timed_out = false;
+                    self.receiver.recv()
                 }
             };
 
-            // the previous iteration has ended, this message refers to the new iteration: we need to be
-            // sure the state is set before we let this message pass
-            if self.wait_for_state {
-                if let Some(lock) = self.state_lock.as_ref() {
-                    lock.wait_for_update(self.state_generation);
-                }
-                self.wait_for_state = false;
-            }
-            return msg;
+            self.batch_iter = Some((net_msg.sender(), net_msg.into_iter()));
         }
-
-        // Receive next batch
-        let net_msg = match (self.already_timed_out, self.max_delay) {
-            // check the timeout only if there is one and the last time we didn't timed out
-            (false, Some(max_delay)) => {
-                match self.receiver.recv_timeout(max_delay) {
-                    Ok(net_msg) => net_msg,
-                    Err(_) => {
-                        // timed out: tell the block to flush the current batch
-                        // next time we wait indefinitely without the timeout since the batch is
-                        // currently empty
-                        self.already_timed_out = true;
-                        // this is a fake batch, and its sender is meaningless and will be
-                        // forget immediately
-                        NetworkMessage::new_single(StreamElement::FlushBatch, Default::default())
-                    }
-                }
-            }
-            _ => {
-                self.already_timed_out = false;
-                self.receiver.recv()
-            }
-        };
-
-        self.batch_iter = Some((net_msg.sender(), net_msg.into_iter()));
-        self.next()
     }
 
     fn structure(&self) -> BlockStructure {

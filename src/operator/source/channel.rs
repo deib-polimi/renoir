@@ -72,43 +72,45 @@ impl<Out: Data + core::fmt::Debug> Operator<Out> for ChannelSource<Out> {
     fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {
-        if self.terminated {
-            return StreamElement::Terminate;
-        }
-        let result = self.rx.try_recv();
+        loop {
+            if self.terminated {
+                return StreamElement::Terminate;
+            }
+            let result = self.rx.try_recv();
 
-        log::debug!("Channel received stuff");
-        match result {
-            Ok(t) => {
-                self.retry_count = 0;
-                StreamElement::Item(t)
-            }
-            Err(TryRecvError::Empty) if self.retry_count < MAX_RETRY => {
-                // Spin before blocking
-                self.retry_count += 1;
-                self.next()
-            }
-            Err(TryRecvError::Empty) if self.retry_count == MAX_RETRY => {
-                log::debug!("no values ready after {MAX_RETRY} tries, sending flush");
-                self.retry_count += 1;
-                StreamElement::FlushBatch
-            }
-            Err(TryRecvError::Empty) => {
-                log::debug!("flushed and no values ready, blocking");
-                self.retry_count = 0;
-                match self.rx.recv() {
-                    Ok(t) => StreamElement::Item(t),
-                    Err(RecvError::Disconnected) => {
-                        self.terminated = true;
-                        log::info!("Stream disconnected");
-                        StreamElement::FlushAndRestart
+            log::debug!("Channel received stuff");
+            match result {
+                Ok(t) => {
+                    self.retry_count = 0;
+                    return StreamElement::Item(t);
+                }
+                Err(TryRecvError::Empty) if self.retry_count < MAX_RETRY => {
+                    // Spin before blocking
+                    self.retry_count += 1;
+                    continue;
+                }
+                Err(TryRecvError::Empty) if self.retry_count == MAX_RETRY => {
+                    log::debug!("no values ready after {MAX_RETRY} tries, sending flush");
+                    self.retry_count += 1;
+                    return StreamElement::FlushBatch;
+                }
+                Err(TryRecvError::Empty) => {
+                    log::debug!("flushed and no values ready, blocking");
+                    self.retry_count = 0;
+                    match self.rx.recv() {
+                        Ok(t) => return StreamElement::Item(t),
+                        Err(RecvError::Disconnected) => {
+                            self.terminated = true;
+                            log::info!("Stream disconnected");
+                            return StreamElement::FlushAndRestart;
+                        }
                     }
                 }
-            }
-            Err(TryRecvError::Disconnected) => {
-                self.terminated = true;
-                log::info!("Stream disconnected");
-                StreamElement::FlushAndRestart
+                Err(TryRecvError::Disconnected) => {
+                    self.terminated = true;
+                    log::info!("Stream disconnected");
+                    return StreamElement::FlushAndRestart;
+                }
             }
         }
     }
