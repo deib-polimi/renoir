@@ -8,9 +8,6 @@ use noir::operator::Operator;
 use noir::{prelude::*, Stream};
 use serde::{Deserialize, Serialize};
 
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 const DAYS_BEFORE: [u16; 13] = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 
 type Week = (u16, u16);
