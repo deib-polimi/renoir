@@ -337,7 +337,10 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                             self.already_timed_out = true;
                             // this is a fake batch, and its sender is meaningless and will be
                             // forget immediately
-                            NetworkMessage::new_single(StreamElement::FlushBatch, Default::default())
+                            NetworkMessage::new_single(
+                                StreamElement::FlushBatch,
+                                Default::default(),
+                            )
                         }
                     }
                 }

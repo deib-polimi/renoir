@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 
 use crate::block::{
-    BatchMode, Batcher, BlockStructure, Connection, NextStrategy, OperatorStructure, SenderList,
+    BatchMode, Batcher, BlockSenders, BlockStructure, Connection, NextStrategy, OperatorStructure,
 };
 use crate::network::{Coord, ReceiverEndpoint};
 use crate::operator::{ExchangeData, KeyerFn, Operator, StreamElement};
@@ -19,9 +18,9 @@ where
     coord: Option<Coord>,
     next_strategy: NextStrategy<Out, IndexFn>,
     batch_mode: BatchMode,
-    sender_groups: Vec<SenderList>,
+    block_senders: Vec<BlockSenders>,
     #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
-    senders: HashMap<ReceiverEndpoint, Batcher<Out>, crate::block::CoordHasherBuilder>,
+    senders: Vec<(ReceiverEndpoint, Batcher<Out>)>,
     feedback_id: Option<BlockId>,
     ignore_block_ids: Vec<BlockId>,
 }
@@ -55,7 +54,7 @@ where
             coord: None,
             next_strategy,
             batch_mode,
-            sender_groups: Default::default(),
+            block_senders: Default::default(),
             senders: Default::default(),
             feedback_id: None,
             ignore_block_ids: Default::default(),
@@ -86,18 +85,17 @@ where
 
         let senders = metadata.network.get_senders(metadata.coord);
         // remove the ignored destinations
-        let senders = senders
-            .into_iter()
-            .filter(|(endpoint, _)| !self.ignore_block_ids.contains(&endpoint.coord.block_id))
-            .collect();
-        // group the senders based on the strategy
-        self.sender_groups = self
-            .next_strategy
-            .group_senders(&senders, Some(metadata.coord.block_id));
         self.senders = senders
             .into_iter()
+            .filter(|(endpoint, _)| !self.ignore_block_ids.contains(&endpoint.coord.block_id))
             .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode, metadata.coord)))
             .collect();
+
+        // group the senders based on the strategy
+        self.block_senders = self
+            .next_strategy
+            .block_senders(&self.senders, Some(metadata.coord.block_id));
+
         self.coord = Some(metadata.coord);
     }
 
@@ -108,33 +106,32 @@ where
             StreamElement::Watermark(_)
             | StreamElement::Terminate
             | StreamElement::FlushAndRestart => {
-                for senders in self.sender_groups.iter() {
-                    for &sender in senders.0.iter() {
+                for block in self.block_senders.iter() {
+                    for &sender_idx in block.indexes.iter() {
+                        let sender = &mut self.senders[sender_idx];
+
                         // if this block is the end of the feedback loop it should not forward
                         // `Terminate` since the destination is before us in the termination chain,
                         // and therefore has already left
                         if matches!(message, StreamElement::Terminate)
-                            && Some(sender.coord.block_id) == self.feedback_id
+                            && Some(sender.0.coord.block_id) == self.feedback_id
                         {
                             continue;
                         }
-                        let sender = self.senders.get_mut(&sender).unwrap();
-                        sender.enqueue(message.clone());
+                        sender.1.enqueue(message.clone());
                         // make sure to flush at the end of each iteration
                         if matches!(message, StreamElement::FlushAndRestart) {
-                            sender.flush();
+                            sender.1.flush();
                         }
                     }
                 }
             }
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
                 let index = self.next_strategy.index(item);
-                for sender in self.sender_groups.iter() {
-                    let index = index % sender.0.len();
-                    self.senders
-                        .get_mut(&sender.0[index])
-                        .unwrap()
-                        .enqueue(message.clone());
+                for block in self.block_senders.iter() {
+                    let index = index % block.indexes.len();
+                    let sender_idx = block.indexes[index];
+                    self.senders[sender_idx].1.enqueue(message.clone());
                 }
             }
             StreamElement::FlushBatch => {
@@ -151,7 +148,7 @@ where
                 coord,
                 self.senders.len()
             );
-            for (_, batcher) in self.senders.drain() {
+            for (_, batcher) in self.senders.drain(..) {
                 batcher.end();
             }
         }
@@ -160,9 +157,9 @@ where
 
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<Out, _>("EndBlock");
-        for sender_group in &self.sender_groups {
-            if !sender_group.0.is_empty() {
-                let block_id = sender_group.0[0].coord.block_id;
+        for sender_group in &self.block_senders {
+            if !sender_group.indexes.is_empty() {
+                let block_id = self.senders[sender_group.indexes[0]].0.coord.block_id;
                 operator
                     .connections
                     .push(Connection::new::<Out, _>(block_id, &self.next_strategy));
