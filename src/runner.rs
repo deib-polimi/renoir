@@ -34,6 +34,8 @@ struct HostExecutionResult {
     sync_time: Duration,
     /// Execution time excluding the sync.
     execution_time: Duration,
+    /// Worker process exit code.
+    exit_code: i32,
 }
 
 /// Compute a cryptographic hash digest of the current executable and return it as a string.
@@ -92,10 +94,12 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
     let mut tracing_data = TracingData::default();
     let mut max_execution_time = Duration::default();
     let mut max_sync_time = Duration::default();
+    let mut exit_code_or = 0;
     for join_handle in join_handles {
         let result = join_handle.join().unwrap();
         max_execution_time = max_execution_time.max(result.execution_time);
         max_sync_time = max_sync_time.max(result.sync_time);
+        exit_code_or |= result.exit_code;
         if let Some(data) = result.tracing {
             tracing_data += data;
         }
@@ -116,7 +120,7 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
 
     // all the remote processes have finished, exit to avoid running the environment inside the
     // spawner process
-    std::process::exit(0);
+    std::process::exit(exit_code_or);
 }
 
 /// Check if this is a spawned process.
@@ -258,11 +262,8 @@ fn remote_worker(
     }
 
     channel.wait_close().unwrap();
-    info!(
-        "{}|Exit status: {}",
-        host_id,
-        channel.exit_status().unwrap()
-    );
+    let exit_code = channel.exit_status().unwrap();
+    info!("{}|Exit status: {}", host_id, exit_code);
 
     let execution_time = execution_start.elapsed();
 
@@ -292,6 +293,7 @@ fn remote_worker(
         tracing: tracing_data,
         execution_time,
         sync_time,
+        exit_code,
     }
 }
 
