@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::marker::PhantomData;
+#[cfg(not(feature = "async-tokio"))]
 use std::thread::JoinHandle;
 
 #[cfg(feature = "async-tokio")]
@@ -124,8 +125,10 @@ pub(crate) struct NetworkTopology {
     demultiplexer_addresses: HashMap<DemuxCoord, (String, u16), crate::block::CoordHasherBuilder>,
 
     /// The set of join handles of the various threads spawned by the topology.
+    #[cfg(not(feature = "async-tokio"))]
     join_handles: Vec<JoinHandle<()>>,
 
+    #[cfg(feature = "async-tokio")]
     async_join_handles: Vec<tokio::task::JoinHandle<()>>,
 }
 
@@ -144,7 +147,9 @@ impl NetworkTopology {
             used_receivers: Default::default(),
             registered_receivers: Default::default(),
             demultiplexer_addresses: Default::default(),
+            #[cfg(not(feature = "async-tokio"))]
             join_handles: Default::default(),
+            #[cfg(feature = "async-tokio")]
             async_join_handles: Default::default(),
         }
     }
@@ -158,10 +163,6 @@ impl NetworkTopology {
             .collect::<futures::stream::FuturesOrdered<_>>()
             .for_each(|h| futures::future::ready(h.unwrap()))
             .await;
-
-        for handle in self.join_handles.drain(..) {
-            handle.join().unwrap();
-        }
     }
 
     #[cfg(not(feature = "async-tokio"))]
@@ -621,6 +622,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(feature = "async-tokio"))]
     #[test]
     fn test_remote_topology() {
         let mut config = tempfile::NamedTempFile::new().unwrap();
@@ -746,6 +748,7 @@ mod tests {
         join1.join().unwrap();
     }
 
+    #[cfg(not(feature = "async-tokio"))]
     fn receiver<T: ExchangeData + Ord + Debug>(receiver: NetworkReceiver<T>, expected: Vec<T>) {
         let res = (0..expected.len())
             .flat_map(|_| receiver.recv().unwrap().into_iter())

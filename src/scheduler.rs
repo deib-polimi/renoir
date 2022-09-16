@@ -196,15 +196,17 @@ impl Scheduler {
 
         self.network.finalize();
 
-        self.network.stop_and_wait().await;
+        let (_, join_result) = tokio::join!(
+            self.network.stop_and_wait(),
+            tokio::task::spawn_blocking(move || {
+                for handle in join {
+                    handle.join().unwrap();
+                }
+            })
+        );
 
-        tokio::task::spawn_blocking(move || {
-            for handle in join {
-                handle.join().unwrap();
-            }
-        })
-        .await
-        .expect("Could not join worker threads");
+        join_result.expect("Could not join worker threads");
+        
 
         let profiler_results = wait_profiler();
 

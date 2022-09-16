@@ -38,7 +38,7 @@ fn main() {
     env.execute();
     let elapsed = start.elapsed();
     if let Some(_res) = result.get() {
-        // eprintln!("Output: {:?}", _res.len());
+        eprintln!("Output: {:?}", _res.len());
         println!("{:?}", elapsed);
     }
 }
@@ -70,7 +70,7 @@ async fn main() {
     env.execute().await;
     let elapsed = start.elapsed();
     if let Some(_res) = result.get() {
-        // eprintln!("Output: {:?}", _res.len());
+        eprintln!("Output: {:?}", _res.len());
         println!("{:?}", elapsed);
     }
 }
