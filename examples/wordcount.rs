@@ -38,7 +38,10 @@ fn main() {
     env.execute();
     let elapsed = start.elapsed();
     if let Some(_res) = result.get() {
-        // eprintln!("Output: {:?}", _res.len());
+        itertools::Itertools::sorted_by_key(_res.iter(), |t| t.1)
+            .rev()
+            .take(10)
+            .for_each(|(k, v)| eprintln!("{:>10}:{:>10}", k, v));
         println!("{:?}", elapsed);
     }
 }
