@@ -91,6 +91,8 @@ where
             .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode, metadata.coord)))
             .collect();
 
+        self.senders.sort_unstable_by_key(|s| s.0);
+
         // group the senders based on the strategy
         self.block_senders = self
             .next_strategy
