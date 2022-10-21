@@ -20,9 +20,9 @@ deque-start = []
 [dependencies]
 # for logging to the console
 log = { version = "0.4.17", features = ["release_max_level_info"] }
-tracing = "0.1.36"
+tracing = "0.1.37"
 tracing-log = "0.1.3"
-env_logger = "0.9.0"
+env_logger = "0.9.1"
 
 # used by the network for storing type-generic structures
 typemap_rev = "0.2.0"
@@ -35,24 +35,24 @@ derivative = "2.2.0"
 
 # serialization library used for reading the config file (yaml) and serializing
 # the messages on the network
-serde = { version = "1.0.143", features = ["derive"] }
-serde_yaml = "0.9.9"
-serde_json = "1.0.83"
+serde = { version = "1.0.146", features = ["derive"] }
+serde_yaml = "0.9.13"
+serde_json = "1.0.87"
 bincode = "1.3.3"
 
 # handy Result type
-anyhow = "1.0.62"
-thiserror = "1.0.32"
+anyhow = "1.0.66"
+thiserror = "1.0.37"
 
 # handy iterators functions
-itertools = "0.10.3"
+itertools = "0.10.5"
 
 # for storing non-mutable static variables with non-trivial initialization
 lazy_static = "1.4.0"
 
 # used for spawning the remote workers
 ssh2 = { version = "0.9.3", features = ["vendored-openssl"] }
-whoami = "1.2.1"
+whoami = "1.2.3"
 shell-escape = "0.1.5"
 
 # command line parsing utility
@@ -77,28 +77,28 @@ chrono = "0.4.22"
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
 coarsetime = "0.1.22"
 
-tokio = { version = "1.20.1", features = ["rt"], default-features = false }
-futures = "0.3.23"
+tokio = { version = "1.21.2", features = ["rt"], default-features = false }
+futures = "0.3.25"
 
 parking_lot = "0.12.1"
-once_cell = "1.13.1"
+once_cell = "1.15.0"
 
 ahash = "0.8.0"
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 
 # For execution deduplication
-sha2 = "0.10.3"
+sha2 = "0.10.6"
 base64 = "0.13.0"
 
 [dev-dependencies]
 # for the tests
 rand = "0.8.5"
 tempfile = "3.3.0"
-criterion = { version = "0.3.6", features = ["html_reports"] }
+criterion = { version = "0.4.0", features = ["html_reports"] }
 fake = "2.5.0"
-mimalloc = { version = "0.1.29", default-features = false }
-tracing-subscriber = "0.3.15"
+mimalloc = { version = "0.1.30", default-features = false }
+tracing-subscriber = "0.3.16"
 
 # for the examples
 regex = "1.6.0"
