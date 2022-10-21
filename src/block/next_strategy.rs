@@ -84,7 +84,7 @@ where
     /// If `ignore_block` is specified, no senders to the specified block will be returned.
     pub fn block_senders(
         &self,
-        senders: &Vec<(ReceiverEndpoint, Batcher<Out>)>,
+        senders: &[(ReceiverEndpoint, Batcher<Out>)],
         ignore_block: Option<BlockId>,
     ) -> Vec<BlockSenders> {
         // If NextStrategy is All, return every sender except the ignored ones.
