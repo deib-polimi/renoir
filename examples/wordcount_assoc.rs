@@ -33,16 +33,16 @@ fn main() {
     env.execute();
     let elapsed = start.elapsed();
 
-    if let Some(_r) = result.get() {
-        // println!("OK");
+    if let Some(_res) = result.get() {
+        eprintln!("Output: {:?}", _res.len());
         println!("{:?}", elapsed);
 
-        use itertools::Itertools;
-        _r.iter()
-            .sorted_by_key(|t| t.1)
-            .rev()
-            .take(10)
-            .for_each(|(k, v)| eprintln!("{:>10}:{:>10}", k, v));
+        // use itertools::Itertools;
+        // _res.iter()
+        //     .sorted_by_key(|t| t.1)
+        //     .rev()
+        //     .take(10)
+        //     .for_each(|(k, v)| eprintln!("{:>10}:{:>10}", k, v));
     }
 }
 
