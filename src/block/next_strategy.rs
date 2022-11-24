@@ -4,15 +4,19 @@ use std::marker::PhantomData;
 
 use nanorand::{tls_rng, Rng};
 
-use crate::network::{NetworkSender, ReceiverEndpoint};
+use crate::network::ReceiverEndpoint;
 use crate::operator::{ExchangeData, KeyerFn};
 use crate::scheduler::BlockId;
+use crate::CoordUInt;
 
-use super::group_by_hash;
+use super::{group_by_hash, Batcher};
 
 /// The list with the interesting senders of a single block.
 #[derive(Debug, Clone)]
-pub(crate) struct SenderList(pub Vec<ReceiverEndpoint>);
+pub(crate) struct BlockSenders {
+    /// Indexes of the senders for all the replicas of this box
+    pub indexes: Vec<usize>,
+}
 
 /// The next strategy used at the end of a block.
 ///
@@ -78,43 +82,41 @@ where
     /// graph. The messages will be sent to one replica of each group, according to the strategy.
     ///
     /// If `ignore_block` is specified, no senders to the specified block will be returned.
-    pub fn group_senders(
+    pub fn block_senders(
         &self,
-        senders: &HashMap<ReceiverEndpoint, NetworkSender<Out>>,
+        senders: &[(ReceiverEndpoint, Batcher<Out>)],
         ignore_block: Option<BlockId>,
-    ) -> Vec<SenderList> {
+    ) -> Vec<BlockSenders> {
         // If NextStrategy is All, return every sender except the ignored ones.
         // Each sender has its own SenderList.
         if matches!(self, NextStrategy::All) {
             return senders
                 .iter()
-                .filter_map(|(coord, sender)| match ignore_block {
+                .enumerate()
+                .filter_map(|(i, (coord, _))| match ignore_block {
                     Some(ignore_block) if coord.coord.block_id == ignore_block => None,
-                    _ => Some(SenderList(vec![sender.receiver_endpoint])),
+                    _ => Some(BlockSenders { indexes: vec![i] }),
                 })
                 .collect();
         }
 
-        let mut by_block_id: HashMap<_, Vec<_>, crate::block::CoordHasherBuilder> =
+        let mut by_block_id: HashMap<CoordUInt, Vec<_>, crate::block::CoordHasherBuilder> =
             HashMap::default();
-        for (coord, sender) in senders {
-            by_block_id
-                .entry(coord.coord.block_id)
-                .or_default()
-                .push(sender.receiver_endpoint);
+        for (i, (coord, _)) in senders.iter().enumerate() {
+            by_block_id.entry(coord.coord.block_id).or_default().push(i);
         }
         if let Some(ignore_block) = ignore_block {
             by_block_id.remove(&ignore_block);
         }
-        let mut senders = Vec::new();
-        for (_block_id, mut block_senders) in by_block_id {
-            block_senders.sort_unstable();
+        let mut block_senders = Vec::new();
+        for (_block_id, mut indexes) in by_block_id {
+            indexes.sort_unstable();
             if matches!(self, NextStrategy::OnlyOne) {
-                assert_eq!(block_senders.len(), 1, "OnlyOne must have a single sender");
+                assert_eq!(indexes.len(), 1, "OnlyOne must have a single sender");
             }
-            senders.push(SenderList(block_senders));
+            block_senders.push(BlockSenders { indexes });
         }
-        senders
+        block_senders
     }
 
     /// Compute the index of the replica which this message should be forwarded to.

@@ -26,13 +26,13 @@ use crate::operator::ExchangeData;
 use super::NetworkSender;
 
 /// Maximum number of attempts to make for connecting to a remote host.
-const CONNECT_ATTEMPTS: usize = 16;
+const CONNECT_ATTEMPTS: usize = 32;
 /// Timeout for connecting to a remote host.
 #[cfg(not(feature = "async-tokio"))]
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// To avoid spamming the connections, wait this timeout before trying again. If the connection
 /// fails again this timeout will be doubled up to `RETRY_MAX_TIMEOUT`.
-const RETRY_INITIAL_TIMEOUT: Duration = Duration::from_millis(125);
+const RETRY_INITIAL_TIMEOUT: Duration = Duration::from_millis(8);
 /// Maximum timeout between connection attempts.
 const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
 
@@ -162,7 +162,7 @@ fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
                         debug!("Timeout connecting to {} at {:?}", coord, address);
                     }
                     ErrorKind::ConnectionRefused => {
-                        debug!("ConnectionRefused connecting to {} at {:?}", coord, address);
+                        warn!("ConnectionRefused connecting to {} at {:?}", coord, address);
                     }
                     _ => {
                         warn!("Failed to connect to {} at {}: {:?}", coord, address, err);
