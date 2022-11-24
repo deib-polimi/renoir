@@ -206,7 +206,6 @@ impl Scheduler {
         );
 
         join_result.expect("Could not join worker threads");
-        
 
         let profiler_results = wait_profiler();
 
