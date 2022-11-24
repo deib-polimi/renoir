@@ -593,11 +593,17 @@ mod tests {
         let endpoint2 = ReceiverEndpoint::new(receiver1, 1);
         let endpoint3 = ReceiverEndpoint::new(receiver2, 1);
 
-        let tx1 = topology.get_senders::<i32>(sender1).into_iter().collect::<HashMap<_,_>>();
+        let tx1 = topology
+            .get_senders::<i32>(sender1)
+            .into_iter()
+            .collect::<HashMap<_, _>>();
         assert_eq!(tx1.len(), 1);
         tx1[&endpoint1].send(build_message(123i32)).unwrap();
 
-        let tx2 = topology.get_senders::<u64>(sender2).into_iter().collect::<HashMap<_,_>>();
+        let tx2 = topology
+            .get_senders::<u64>(sender2)
+            .into_iter()
+            .collect::<HashMap<_, _>>();
         assert_eq!(tx2.len(), 2);
         tx2[&endpoint2].send(build_message(666u64)).unwrap();
         tx2[&endpoint3].send(build_message(42u64)).unwrap();
@@ -667,25 +673,37 @@ mod tests {
             let endpoint3 = ReceiverEndpoint::new(r2, 1);
 
             if s1.host_id == host {
-                let tx1 = topology.get_senders::<i32>(s1).into_iter().collect::<HashMap<_,_>>();
+                let tx1 = topology
+                    .get_senders::<i32>(s1)
+                    .into_iter()
+                    .collect::<HashMap<_, _>>();
                 tx1[&endpoint1].send(build_message(123i32)).unwrap();
             }
 
             if s2.host_id == host {
-                let tx2 = topology.get_senders::<i32>(s2).into_iter().collect::<HashMap<_,_>>();
+                let tx2 = topology
+                    .get_senders::<i32>(s2)
+                    .into_iter()
+                    .collect::<HashMap<_, _>>();
                 assert_eq!(tx2.len(), 1);
                 tx2[&endpoint1].send(build_message(456i32)).unwrap();
             }
 
             if s3.host_id == host {
-                let tx3 = topology.get_senders::<u64>(s3).into_iter().collect::<HashMap<_,_>>();
+                let tx3 = topology
+                    .get_senders::<u64>(s3)
+                    .into_iter()
+                    .collect::<HashMap<_, _>>();
                 assert_eq!(tx3.len(), 2);
                 tx3[&endpoint2].send(build_message(666u64)).unwrap();
                 tx3[&endpoint3].send(build_message(42u64)).unwrap();
             }
 
             if s4.host_id == host {
-                let tx4 = topology.get_senders::<u64>(s4).into_iter().collect::<HashMap<_,_>>();
+                let tx4 = topology
+                    .get_senders::<u64>(s4)
+                    .into_iter()
+                    .collect::<HashMap<_, _>>();
                 assert_eq!(tx4.len(), 2);
                 tx4[&endpoint2].send(build_message(111u64)).unwrap();
                 tx4[&endpoint3].send(build_message(4242u64)).unwrap();
