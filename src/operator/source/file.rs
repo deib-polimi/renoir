@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::Seek;
 use std::io::{BufReader, SeekFrom};
+use std::path::Path;
 use std::path::PathBuf;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
@@ -10,6 +11,7 @@ use crate::network::Coord;
 use crate::operator::source::Source;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
+use crate::Stream;
 
 /// Source that reads a text file line-by-line.
 ///
@@ -162,5 +164,13 @@ impl Clone for FileSource {
             terminated: false,
             coord: None,
         }
+    }
+}
+
+impl crate::StreamEnvironment {
+    /// Convenience method, creates a `FileSource` and makes a stream using `StreamEnvironment::stream`
+    pub fn stream_file(&mut self, path: &Path) -> Stream<String, FileSource> {
+        let source = FileSource::new(path);
+        self.stream(source)
     }
 }

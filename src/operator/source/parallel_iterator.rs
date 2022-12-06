@@ -4,7 +4,7 @@ use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::CoordUInt;
+use crate::{CoordUInt, Stream};
 
 /// This enum wraps either an `Iterator` that yields the items, or a generator function that
 /// produces such iterator.
@@ -191,5 +191,21 @@ where
             inner: self.inner.clone(),
             terminated: false,
         }
+    }
+}
+
+impl crate::StreamEnvironment {
+    /// Convenience method, creates a `ParallelIteratorSource` and makes a stream using `StreamEnvironment::stream`
+    pub fn stream_par_iter<Out, It, GenIt>(
+        &mut self,
+        generator: GenIt,
+    ) -> Stream<Out, ParallelIteratorSource<Out, It, GenIt>>
+    where
+        Out: Data,
+        It: Iterator<Item = Out> + Send + 'static,
+        GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone + 'static,
+    {
+        let source = ParallelIteratorSource::new(generator);
+        self.stream(source)
     }
 }

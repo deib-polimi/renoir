@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use csv::{Reader, ReaderBuilder, Terminator, Trim};
 use serde::Deserialize;
@@ -12,6 +12,7 @@ use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
+use crate::Stream;
 
 /// Wrapper that limits the bytes that can be read from a type that implements `io::Read`.
 struct LimitedReader<R: Read> {
@@ -408,6 +409,17 @@ impl<Out: Data + for<'a> Deserialize<'a>> Clone for CsvSource<Out> {
             terminated: false,
             _out: PhantomData,
         }
+    }
+}
+
+impl crate::StreamEnvironment {
+    /// Convenience method, creates a `CsvSource` and makes a stream using `StreamEnvironment::stream`
+    pub fn stream_csv<T: Data + for<'a> Deserialize<'a>>(
+        &mut self,
+        path: &Path,
+    ) -> Stream<T, CsvSource<T>> {
+        let source = CsvSource::new(path);
+        self.stream(source)
     }
 }
 

@@ -5,13 +5,13 @@
 
 use std::time::Duration;
 
-#[cfg(all(feature = "crossbeam", not(feature = "flume")))]
+#[cfg(feature = "crossbeam")]
 use crossbeam_channel::{
     bounded as bounded_ext, select, unbounded as unbounded_ext, Receiver as ReceiverExt,
-    RecvError as ExtRecvError, RecvTimeoutError as ExtRecvTimeoutError, Select,
-    SendError as SendErrorExt, Sender as SenderExt, TryRecvError as ExtTryRecvError,
+    RecvError as ExtRecvError, RecvTimeoutError as ExtRecvTimeoutError, SendError as SendErrorExt,
+    Sender as SenderExt, TryRecvError as ExtTryRecvError,
 };
-#[cfg(all(not(feature = "crossbeam"), feature = "flume"))]
+#[cfg(feature = "flume")]
 use flume::{
     bounded as bounded_ext, unbounded as unbounded_ext, Receiver as ReceiverExt,
     RecvError as ExtRecvError, RecvTimeoutError as ExtRecvTimeoutError, SendError as SendErrorExt,
@@ -22,9 +22,47 @@ pub trait ChannelItem: Send + 'static {}
 impl<T: Send + 'static> ChannelItem for T {}
 
 pub type SendError<T> = SendErrorExt<T>;
-pub type RecvError = ExtRecvError;
-pub type RecvTimeoutError = ExtRecvTimeoutError;
-pub type TryRecvError = ExtTryRecvError;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum RecvError {
+    Disconnected,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum TryRecvError {
+    Empty,
+    Disconnected,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum RecvTimeoutError {
+    Timeout,
+    Disconnected,
+}
+
+impl From<ExtRecvError> for RecvError {
+    fn from(_: ExtRecvError) -> Self {
+        Self::Disconnected
+    }
+}
+
+impl From<ExtTryRecvError> for TryRecvError {
+    fn from(e: ExtTryRecvError) -> Self {
+        match e {
+            ExtTryRecvError::Empty => Self::Empty,
+            ExtTryRecvError::Disconnected => Self::Disconnected,
+        }
+    }
+}
+
+impl From<ExtRecvTimeoutError> for RecvTimeoutError {
+    fn from(e: ExtRecvTimeoutError) -> Self {
+        match e {
+            ExtRecvTimeoutError::Timeout => Self::Timeout,
+            ExtRecvTimeoutError::Disconnected => Self::Disconnected,
+        }
+    }
+}
 
 /// Crate a new pair sender/receiver with limited capacity.
 pub fn bounded<T: Send + 'static>(size: usize) -> (Sender<T>, Receiver<T>) {
@@ -47,14 +85,14 @@ pub enum SelectResult<In1, In2> {
     B(Result<In2, RecvError>),
 }
 
-#[cfg(all(feature = "crossbeam", not(feature = "flume")))]
+#[cfg(feature = "crossbeam")]
 #[macro_use]
 mod select_impl {
     macro_rules! select_impl {
         ($self:expr, $other:expr) => {
             select! {
-                recv($self.0) -> elem => SelectResult::A(elem),
-                recv($other.0) -> elem => SelectResult::B(elem),
+                recv($self.0) -> el => SelectResult::A(el.map_err(RecvError::from)),
+                recv($other.0) -> el => SelectResult::B(el.map_err(RecvError::from)),
             }
         };
     }
@@ -62,22 +100,22 @@ mod select_impl {
     macro_rules! select_timeout_impl {
         ($self:expr, $other:expr, $timeout:expr) => {
             select! {
-                recv($self.0) -> elem => Ok(SelectResult::A(elem)),
-                recv($other.0) -> elem => Ok(SelectResult::B(elem)),
+                recv($self.0) -> el => Ok(SelectResult::A(el.map_err(RecvError::from))),
+                recv($other.0) -> el => Ok(SelectResult::B(el.map_err(RecvError::from))),
                 default($timeout) => Err(RecvTimeoutError::Timeout),
             }
         };
     }
 }
 
-#[cfg(all(not(feature = "crossbeam"), feature = "flume"))]
+#[cfg(feature = "flume")]
 #[macro_use]
 mod select_impl {
     macro_rules! select_impl {
         ($self:expr, $other:expr) => {{
             flume::Selector::new()
-                .recv(&$self.0, SelectResult::A)
-                .recv(&$other.0, SelectResult::B)
+                .recv(&$self.0, |el| SelectResult::A(el.map_err(RecvError::from)))
+                .recv(&$other.0, |el| SelectResult::B(el.map_err(RecvError::from)))
                 .wait()
         }};
     }
@@ -85,8 +123,8 @@ mod select_impl {
     macro_rules! select_timeout_impl {
         ($self:expr, $other:expr, $timeout:expr) => {
             flume::Selector::new()
-                .recv(&$self.0, SelectResult::A)
-                .recv(&$other.0, SelectResult::B)
+                .recv(&$self.0, |el| SelectResult::A(el.map_err(RecvError::from)))
+                .recv(&$other.0, |el| SelectResult::B(el.map_err(RecvError::from)))
                 .wait_timeout($timeout)
                 .map_err(|_| RecvTimeoutError::Timeout)
         };
@@ -112,18 +150,19 @@ impl<T: ChannelItem> Receiver<T> {
     /// Block until a message is present in the channel and return it when ready.
     #[inline]
     pub fn recv(&self) -> Result<T, RecvError> {
-        self.0.recv()
+        self.0.recv().map_err(RecvError::from)
     }
 
     /// Like `recv`, but without blocking.
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
-        self.0.try_recv()
+        self.0.try_recv().map_err(TryRecvError::from)
     }
 
     #[inline]
+    #[cfg(feature = "flume")]
     pub async fn recv_async(&self) -> Result<T, RecvError> {
-        self.0.recv_async().await
+        self.0.recv_async().await.map_err(RecvError::from)
     }
 
     /// Block until a message is present in the channel and return it when ready.
@@ -131,7 +170,7 @@ impl<T: ChannelItem> Receiver<T> {
     /// If the timeout expires an error is returned.
     #[inline]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
-        self.0.recv_timeout(timeout)
+        self.0.recv_timeout(timeout).map_err(RecvTimeoutError::from)
     }
 
     /// Receive a message from any sender of this receiver of the other provided receiver.
@@ -174,7 +213,7 @@ impl<T: ChannelItem> UnboundedReceiver<T> {
     /// Block until a message is present in the channel and return it when ready.
     #[inline]
     pub fn recv(&self) -> Result<T, RecvError> {
-        self.0.recv()
+        self.0.recv().map_err(RecvError::from)
     }
 
     /// Block until a message is present in the channel and return it when ready.
@@ -182,7 +221,7 @@ impl<T: ChannelItem> UnboundedReceiver<T> {
     /// If the timeout expires an error is returned.
     #[inline]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
-        self.0.recv_timeout(timeout)
+        self.0.recv_timeout(timeout).map_err(RecvTimeoutError::from)
     }
 
     /// Receive a message from any sender of this receiver of the other provided receiver.
@@ -203,65 +242,6 @@ impl<T: ChannelItem> UnboundedReceiver<T> {
         timeout: Duration,
     ) -> Result<SelectResult<T, T2>, RecvTimeoutError> {
         select_timeout_impl!(self, other, timeout)
-    }
-}
-
-pub struct Selector<T: Send + 'static, K: Clone + Eq> {
-    rxs: Vec<(K, Receiver<T>)>,
-    // inner: flume::Selector<'a, Result<(K, T), RecvError>>,
-}
-
-impl<T: Send + 'static, K: Clone + Eq> Selector<T, K> {
-    pub fn new(receivers: Vec<(K, Receiver<T>)>) -> Self {
-        let rxs = receivers;
-        Self { rxs }
-    }
-
-    pub fn recv(&mut self) -> Result<(K, T), RecvError> {
-        let mut selector = flume::Selector::new();
-
-        if self.rxs.is_empty() {
-            return Err(RecvError::Disconnected);
-        }
-
-        for (k, recv) in self.rxs.iter() {
-            selector = selector.recv(&recv.0, move |r| {
-                r.map(|i| (k.clone(), i)).map_err(|e| (k.clone(), e))
-            })
-        }
-
-        match selector.wait() {
-            Ok(i) => Ok(i),
-            Err((k, RecvError::Disconnected)) => {
-                self.rxs.retain(|r| r.0 != k);
-                self.recv()
-            }
-        }
-    }
-
-    pub fn recv_timeout(&mut self, timeout: Duration) -> Result<(K, T), RecvTimeoutError> {
-        let mut selector = flume::Selector::new();
-
-        if self.rxs.is_empty() {
-            return Err(RecvTimeoutError::Disconnected);
-        }
-
-        for (k, recv) in self.rxs.iter() {
-            selector = selector.recv(&recv.0, move |r| {
-                r.map(|i| (k.clone(), i)).map_err(|e| (k.clone(), e))
-            })
-        }
-
-        match selector
-            .wait_timeout(timeout)
-            .map_err(|_| RecvTimeoutError::Timeout)?
-        {
-            Ok(i) => Ok(i),
-            Err((k, RecvError::Disconnected)) => {
-                self.rxs.retain(|r| r.0 != k);
-                self.recv_timeout(timeout)
-            }
-        }
     }
 }
 

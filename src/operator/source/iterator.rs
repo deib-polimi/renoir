@@ -4,6 +4,7 @@ use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
+use crate::Stream;
 
 /// Source that consumes an iterator and emits all its elements into the stream.
 ///
@@ -99,5 +100,16 @@ where
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
         panic!("IteratorSource cannot be cloned, max_parallelism should be 1");
+    }
+}
+
+impl crate::StreamEnvironment {
+    /// Convenience method, creates a `IteratorSource` and makes a stream using `StreamEnvironment::stream`
+    pub fn stream_iter<Out: Data, It: Iterator<Item = Out> + Send + 'static>(
+        &mut self,
+        iterator: It,
+    ) -> Stream<Out, IteratorSource<Out, It>> {
+        let source = IteratorSource::new(iterator);
+        self.stream(source)
     }
 }
