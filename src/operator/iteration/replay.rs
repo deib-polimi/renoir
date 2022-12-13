@@ -251,7 +251,7 @@ where
 
                 return match &item {
                     StreamElement::FlushAndRestart => {
-                        debug!(
+                        log::debug!(
                             "Replay at {} received all the input: {} elements total",
                             self.coord,
                             self.content.len()
@@ -274,7 +274,7 @@ where
                     // messages to forward without replaying
                     StreamElement::FlushBatch => item,
                     StreamElement::Terminate => {
-                        debug!("Replay at {} is terminating", self.coord);
+                        log::debug!("Replay at {} is terminating", self.coord);
                         item
                     }
                 };
@@ -293,7 +293,7 @@ where
                 return item;
             }
 
-            debug!("Replay at {} has ended the iteration", self.coord);
+            log::debug!("Replay at {} has ended the iteration", self.coord);
 
             self.content_index = 0;
 
@@ -302,7 +302,7 @@ where
 
             // the loop has ended
             if !should_continue {
-                debug!("Replay block at {} ended the iteration", self.coord);
+                log::debug!("Replay block at {} ended the iteration", self.coord);
                 // cleanup so that if this is a nested iteration next time we'll be good to start again
                 self.content.clear();
                 self.has_input_ended = false;

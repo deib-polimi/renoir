@@ -220,10 +220,11 @@ impl<
                     |x, y| (y, x),
                 ),
                 StreamElement::Item(TwoSidesItem::LeftEnd) => {
-                    debug!(
+                    log::debug!(
                         "Left side of join ended with {} elements on the left \
                         and {} elements on the right",
-                        self.left.count, self.right.count
+                        self.left.count,
+                        self.right.count
                     );
                     Self::side_ended(
                         self.variant.right_outer(),
@@ -234,10 +235,11 @@ impl<
                     )
                 }
                 StreamElement::Item(TwoSidesItem::RightEnd) => {
-                    debug!(
+                    log::debug!(
                         "Right side of join ended with {} elements on the left \
                         and {} elements on the right",
-                        self.left.count, self.right.count
+                        self.left.count,
+                        self.right.count
                     );
                     Self::side_ended(
                         self.variant.left_outer(),
@@ -258,7 +260,7 @@ impl<
                     self.left.count = 0;
                     self.right.ended = false;
                     self.right.count = 0;
-                    debug!("JoinLocalHash at {} emitted FlushAndRestart", self.coord);
+                    log::debug!("JoinLocalHash at {} emitted FlushAndRestart", self.coord);
                     return StreamElement::FlushAndRestart;
                 }
                 StreamElement::Terminate => return StreamElement::Terminate,

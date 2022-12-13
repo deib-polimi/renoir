@@ -144,7 +144,7 @@ impl TestHelper {
     pub fn local_env(body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>, num_cores: CoordUInt) {
         Self::setup();
         let config = EnvironmentConfig::local(num_cores);
-        debug!("Running test with env: {:?}", config);
+        log::debug!("Running test with env: {:?}", config);
         Self::env_with_config(config, body)
     }
 
@@ -174,7 +174,7 @@ impl TestHelper {
             tracing_dir: None,
             cleanup_executable: true,
         });
-        debug!("Running with remote configuration: {:?}", runtime);
+        log::debug!("Running with remote configuration: {:?}", runtime);
 
         let mut join_handles = vec![];
         for host_id in 0..num_hosts {

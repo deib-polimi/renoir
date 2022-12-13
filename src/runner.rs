@@ -162,9 +162,10 @@ fn remote_worker(
     let mut session = Session::new().unwrap();
     session.set_tcp_stream(stream);
     session.handshake().unwrap();
-    debug!(
+    log::debug!(
         "Connected to ssh server for host {}: {:?}",
-        host_id, address
+        host_id,
+        address
     );
 
     // try to authenticate
@@ -194,12 +195,12 @@ fn remote_worker(
         host_id,
         address
     );
-    debug!("Authentication succeeded to host {}", host_id);
+    log::debug!("Authentication succeeded to host {}", host_id);
 
     let sync_start = Instant::now();
 
     let current_exe = std::env::current_exe().unwrap();
-    debug!(
+    log::debug!(
         "Locally the executable is located at {}",
         current_exe.display()
     );
@@ -210,7 +211,7 @@ fn remote_worker(
         current_exe.file_name().unwrap().to_string_lossy(),
         executable_uid
     ));
-    debug!(
+    log::debug!(
         "On host {} the executable will be copied at {}",
         host_id,
         remote_path.display()
@@ -227,7 +228,7 @@ fn remote_worker(
 
     // build the remote command
     let command = build_remote_command(host_id, &config, &remote_path, &host.perf_path);
-    debug!("Executing on host {}:\n{}", host_id, command);
+    log::debug!("Executing on host {}:\n{}", host_id, command);
 
     let execution_start = Instant::now();
     let mut channel = session.channel_session().unwrap();
@@ -268,7 +269,7 @@ fn remote_worker(
     let execution_time = execution_start.elapsed();
 
     if config.cleanup_executable {
-        debug!(
+        log::debug!(
             "Removing temporary binary file at host {}: {}",
             host_id,
             remote_path.display()
@@ -299,7 +300,7 @@ fn remote_worker(
 
 /// Execute a command remotely and return the standard output and the exit code.
 fn run_remote_command(session: &mut Session, command: &str) -> (String, i32) {
-    debug!("Running remote command: {}", command);
+    log::debug!("Running remote command: {}", command);
     let mut channel = session.channel_session().unwrap();
     channel.exec(command).unwrap();
     let mut stdout = String::new();
@@ -319,7 +320,7 @@ fn send_executable(
 ) {
     let remote_path_str = remote_path.to_str().expect("non UTF-8 executable path");
     let metadata = local_path.metadata().unwrap();
-    tracing::info!(
+    log::info!(
         "Sending executable to host {}: {} -> {}, {} bytes",
         host_id,
         local_path.display(),
@@ -358,7 +359,7 @@ fn send_executable(
     remote_file.close().unwrap();
     remote_file.wait_close().unwrap();
 
-    tracing::info!("Sent executable to host {}", host_id,);
+    log::info!("Sent executable to host {}", host_id,);
 
     // setting the file mode using scp_send seems unreliable
     let chmod = format!(

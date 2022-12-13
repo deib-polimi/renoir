@@ -13,6 +13,7 @@ pub use crate::operator::join::ship::{JoinStreamShipBroadcastRight, JoinStreamSh
 use crate::operator::{Data, DataKey, ExchangeData, KeyerFn, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
+mod keyed_join;
 mod local_hash;
 mod local_sort_merge;
 mod ship;

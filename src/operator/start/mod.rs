@@ -249,7 +249,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
         self.missing_flush_and_restart = self.num_previous_replicas;
         self.watermark_frontier = WatermarkFrontier::new(prev_replicas);
 
-        debug!(
+        log::debug!(
             "StartBlock {} of {} initialized",
             metadata.coord,
             std::any::type_name::<Out>()
@@ -264,11 +264,11 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
         loop {
             // all the previous blocks sent an end: we're done
             if self.missing_terminate == 0 {
-                info!("StartBlock for {} has ended", coord);
+                log::debug!("StartBlock for {} has ended", coord);
                 return StreamElement::Terminate;
             }
             if self.missing_flush_and_restart == 0 {
-                info!("StartBlock for {} is emitting flush and restart", coord);
+                log::debug!("StartBlock for {} is emitting flush and restart", coord);
 
                 self.missing_flush_and_restart = self.num_previous_replicas;
                 self.watermark_frontier.reset();
@@ -302,9 +302,10 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                             }
                             StreamElement::Terminate => {
                                 self.missing_terminate -= 1;
-                                debug!(
+                                log::debug!(
                                     "{} received a Terminate, {} more to come",
-                                    coord, self.missing_terminate
+                                    coord,
+                                    self.missing_terminate
                                 );
                                 continue;
                             }
@@ -372,7 +373,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
         self.missing_flush_and_restart = self.num_previous_replicas;
         self.watermark_frontier = WatermarkFrontier::new(prev_replicas);
 
-        debug!(
+        log::debug!(
             "StartBlock {} of {} initialized",
             metadata.coord,
             std::any::type_name::<Out>()
@@ -387,11 +388,11 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
 
         // all the previous blocks sent an end: we're done
         if self.missing_terminate == 0 {
-            info!("StartBlock for {} has ended", coord);
+            log::debug!("StartBlock for {} has ended", coord);
             return StreamElement::Terminate;
         }
         if self.missing_flush_and_restart == 0 {
-            info!("StartBlock for {} is emitting flush and restart", coord);
+            log::debug!("StartBlock for {} is emitting flush and restart", coord);
 
             self.missing_flush_and_restart = self.num_previous_replicas;
             self.watermark_frontier.reset();
@@ -454,17 +455,19 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
             .expect("Previous block sent an empty message");
         if matches!(message, StreamElement::FlushAndRestart) {
             self.missing_flush_and_restart -= 1;
-            debug!(
+            log::debug!(
                 "{} received an FlushAndRestart, {} more to come",
-                coord, self.missing_flush_and_restart
+                coord,
+                self.missing_flush_and_restart
             );
             return self.next();
         }
         if matches!(message, StreamElement::Terminate) {
             self.missing_terminate -= 1;
-            debug!(
+            log::debug!(
                 "{} received a Terminate, {} more to come",
-                coord, self.missing_terminate
+                coord,
+                self.missing_terminate
             );
             return self.next();
         }

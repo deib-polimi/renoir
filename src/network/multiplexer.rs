@@ -61,17 +61,17 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         let join_handle = std::thread::Builder::new()
             .name(format!("noir-mux-{}", coord))
             .spawn(move || {
-                tracing::debug!(
+                log::debug!(
                     "mux connecting to {}",
                     address.to_socket_addrs().unwrap().nth(0).unwrap()
                 );
                 let stream = connect_remote(coord, address);
-                tracing::debug!("mux connected, waiting for receivers");
+                log::debug!("mux connected, waiting for receivers");
                 let mut receivers = Vec::new();
                 while let Ok(t) = rx.recv() {
                     receivers.push(t);
                 }
-                tracing::debug!(
+                log::debug!(
                     "mux for {} got receivers: [{}]",
                     coord,
                     receivers
@@ -93,7 +93,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         let join_handle = std::thread::Builder::new()
             .name(format!("noir-mux-{}", coord))
             .spawn(move || {
-                tracing::debug!(
+                log::debug!(
                     "mux connecting to {}",
                     address.to_socket_addrs().unwrap().next().unwrap()
                 );
@@ -147,9 +147,11 @@ fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
         .collect();
     let mut retry_delay = RETRY_INITIAL_TIMEOUT;
     for attempt in 1..=CONNECT_ATTEMPTS {
-        debug!(
+        log::debug!(
             "Attempt {} to connect to {} at {:?}",
-            attempt, coord, socket_addrs
+            attempt,
+            coord,
+            socket_addrs
         );
 
         for address in socket_addrs.iter() {
@@ -159,7 +161,7 @@ fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
                 }
                 Err(err) => match err.kind() {
                     ErrorKind::TimedOut => {
-                        debug!("Timeout connecting to {} at {:?}", coord, address);
+                        log::debug!("Timeout connecting to {} at {:?}", coord, address);
                     }
                     ErrorKind::ConnectionRefused => {
                         warn!("ConnectionRefused connecting to {} at {:?}", coord, address);
@@ -171,7 +173,7 @@ fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
             }
         }
 
-        debug!(
+        log::debug!(
             "Retrying connection to {} at {:?} in {}s",
             coord,
             socket_addrs,
@@ -212,7 +214,7 @@ fn mux_thread<Out: ExchangeData>(
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    debug!("Connection to {} at {} established", coord, address);
+    log::debug!("Connection to {} at {} established", coord, address);
 
     let mut selector = Selector::new(receivers);
 
@@ -220,7 +222,7 @@ fn mux_thread<Out: ExchangeData>(
         remote_send(message, dest, &mut stream);
     }
     let _ = stream.shutdown(Shutdown::Both);
-    debug!("Remote sender for {} exited", coord);
+    log::debug!("Remote sender for {} exited", coord);
 }
 
 #[cfg(all(not(feature = "async-tokio"), not(feature = "fair")))]
@@ -235,7 +237,7 @@ fn mux_thread<Out: ExchangeData>(
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    debug!("Connection to {} at {} established", coord, address);
+    log::debug!("Connection to {} at {} established", coord, address);
 
     // let mut w = std::io::BufWriter::new(&mut stream);
     let mut w = &mut stream;
@@ -246,7 +248,7 @@ fn mux_thread<Out: ExchangeData>(
 
     w.flush().unwrap();
     let _ = stream.shutdown(Shutdown::Both);
-    debug!("Remote sender for {} exited", coord);
+    log::debug!("Remote sender for {} exited", coord);
 }
 
 #[cfg(all(feature = "async-tokio", feature = "fair"))]
@@ -257,17 +259,17 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
         let (tx, rx) = channel::unbounded();
         let join_handle = tokio::spawn(async move {
-            tracing::debug!(
+            log::debug!(
                 "mux connecting to {}",
                 address.to_socket_addrs().unwrap().nth(0).unwrap()
             );
             let stream = connect_remote(coord, address).await;
-            tracing::debug!("mux connected, waiting for receivers");
+            log::debug!("mux connected, waiting for receivers");
             let mut receivers = Vec::new();
             while let Ok(t) = rx.recv() {
                 receivers.push(t);
             }
-            tracing::debug!(
+            log::debug!(
                 "mux for {} got receivers: [{}]",
                 coord,
                 receivers
@@ -310,7 +312,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
         let (tx, rx) = channel::bounded(MUX_CHANNEL_CAPACITY);
         let join_handle = tokio::spawn(async move {
-            tracing::debug!(
+            log::debug!(
                 "mux connecting to {}",
                 address.to_socket_addrs().unwrap().nth(0).unwrap()
             );
@@ -352,9 +354,11 @@ async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream 
         .collect();
     let mut retry_delay = RETRY_INITIAL_TIMEOUT;
     for attempt in 1..=CONNECT_ATTEMPTS {
-        debug!(
+        log::debug!(
             "Attempt {} to connect to {} at {:?}",
-            attempt, coord, socket_addrs
+            attempt,
+            coord,
+            socket_addrs
         );
 
         for address in socket_addrs.iter() {
@@ -364,16 +368,16 @@ async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream 
                 }
                 Err(err) => match err.kind() {
                     ErrorKind::TimedOut => {
-                        debug!("Timeout connecting to {} at {:?}", coord, address);
+                        log::debug!("Timeout connecting to {} at {:?}", coord, address);
                     }
                     _ => {
-                        debug!("Failed to connect to {} at {}: {:?}", coord, address, err);
+                        log::debug!("Failed to connect to {} at {}: {:?}", coord, address, err);
                     }
                 },
             }
         }
 
-        debug!(
+        log::debug!(
             "Retrying connection to {} at {:?} in {}s",
             coord,
             socket_addrs,
@@ -418,7 +422,7 @@ async fn mux_thread<Out: ExchangeData>(
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    debug!("Connection to {} at {} established", coord, address);
+    log::debug!("Connection to {} at {} established", coord, address);
 
     async fn make_fut<T: ExchangeData>(
         (i, r): (usize, &(ReceiverEndpoint, Receiver<NetworkMessage<T>>)),
@@ -442,7 +446,7 @@ async fn mux_thread<Out: ExchangeData>(
     }
 
     stream.shutdown().await.unwrap();
-    debug!("Remote sender for {} exited", coord);
+    log::debug!("Remote sender for {} exited", coord);
 }
 
 #[cfg(all(feature = "async-tokio", not(feature = "fair")))]
@@ -457,12 +461,12 @@ async fn mux_thread<Out: ExchangeData>(
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    debug!("Connection to {} at {} established", coord, address);
+    log::debug!("Connection to {} at {} established", coord, address);
 
     while let Ok((dest, message)) = rx.recv_async().await {
         remote_send(message, dest, &mut stream, &address).await;
     }
 
     stream.shutdown().await.unwrap();
-    debug!("Remote sender for {} exited", coord);
+    log::debug!("Remote sender for {} exited", coord);
 }

@@ -13,16 +13,13 @@ default = ["flume"]
 crossbeam = ["crossbeam-channel"]
 fair = []
 profiler = []
-async-tokio = ["tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
+async-tokio = ["tokio", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 deque-flatten = []
 deque-start = []
 
 [dependencies]
 # for logging to the console
 log = { version = "0.4.17", features = ["release_max_level_info"] }
-tracing = "0.1.37"
-tracing-log = "0.1.3"
-env_logger = "0.10.0"
 
 # used by the network for storing type-generic structures
 typemap_rev = "0.3.0"
@@ -77,22 +74,22 @@ chrono = "0.4.22"
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
 coarsetime = "0.1.22"
 
-tokio = { version = "1.21.2", features = ["rt"], default-features = false }
+tokio = { version = "1.21.2", features = ["rt"], default-features = false, optional = true }
 futures = "0.3.25"
 
 parking_lot = "0.12.1"
 once_cell = "1.15.0"
 
-ahash = "0.8.0"
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 
 # For execution deduplication
 sha2 = "0.10.6"
-base64 = "0.13.0"
+base64 = "0.13.1"
 
 [dev-dependencies]
 # for the tests
+env_logger = "0.10.0"
 rand = "0.8.5"
 tempfile = "3.3.0"
 criterion = { version = "0.4.0", features = ["html_reports"] }

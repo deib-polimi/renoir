@@ -1,10 +1,13 @@
 use std::any::TypeId;
 use std::collections::VecDeque;
 use std::fmt::Display;
+use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use crate::CoordUInt;
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure};
+use crate::channel::Receiver;
 use crate::environment::StreamEnvironmentInner;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
 use crate::operator::end::EndBlock;
@@ -12,6 +15,7 @@ use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
+use crate::operator::source::Source;
 use crate::operator::start::StartBlock;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
@@ -26,7 +30,7 @@ fn clone_with_default<T: Default>(_: &T) -> T {
 /// After an iteration what comes out of the loop will come back inside for the next iteration.
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
-pub struct Iterate<Out: ExchangeData, State: ExchangeData, OperatorChain>
+pub struct IterateInput<Out: ExchangeData, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -37,7 +41,7 @@ where
     prev: OperatorChain,
 
     /// Helper structure that manages the iteration's state.
-    state: IterationStateHandler<State>,
+    // state: IterationStateHandler<State>,
 
     /// The receiver of the data coming from the previous iteration of the loop.
     #[derivative(Clone(clone_with = "clone_with_default"))]
@@ -60,39 +64,73 @@ where
     has_input_ended: bool,
 }
 
-impl<Out: ExchangeData, State: ExchangeData, OperatorChain> Iterate<Out, State, OperatorChain>
+impl<Out: ExchangeData, State: ExchangeData, OperatorChain> IterateInput<Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
     fn new(
         prev: OperatorChain,
-        state_ref: IterationStateHandle<State>,
-        leader_block_id: BlockId,
-        feedback_end_block_id: Arc<AtomicUsize>,
-        output_block_id: Arc<AtomicUsize>,
-        state_lock: Arc<IterationStateLock>,
+        // state_ref: IterationStateHandle<State>,
+        // leader_block_id: BlockId,
+        // feedback_end_block_id: Arc<AtomicUsize>,
+        // output_block_id: Arc<AtomicUsize>,
+        // state_lock: Arc<IterationStateLock>,
     ) -> Self {
-        Self {
-            // these fields will be set inside the `setup` method
-            coord: Coord::new(0, 0, 0),
-            feedback_receiver: None,
-            feedback_end_block_id,
-            output_sender: None,
-            output_block_id,
+        todo!();
+        // Self {
+        //     // these fields will be set inside the `setup` method
+        //     coord: Coord::new(0, 0, 0),
+        //     feedback_receiver: None,
+        //     feedback_end_block_id,
+        //     output_sender: None,
+        //     output_block_id,
 
-            prev,
-            content: Default::default(),
-            content_index: 0,
-            next_content: Default::default(),
-            has_input_ended: false,
-            state: IterationStateHandler::new(leader_block_id, state_ref, state_lock),
-        }
+        //     prev,
+        //     content: Default::default(),
+        //     content_index: 0,
+        //     next_content: Default::default(),
+        //     has_input_ended: false,
+        //     // state: IterationStateHandler::new(leader_block_id, state_ref, state_lock),
+        // }
     }
 }
 
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
+#[derive(Clone, Debug)]
+pub(crate) struct IterateFeedbackInput<Delta: ExchangeData> {
+    _t: PhantomData<Delta>,
+}
+
+impl<Delta: ExchangeData> Display for IterateFeedbackInput<Delta> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl<Delta: ExchangeData> Operator<Delta> for IterateFeedbackInput<Delta> {
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        todo!()
+    }
+
+    fn next(&mut self) -> StreamElement<Delta> {
+        todo!()
+    }
+
+    fn structure(&self) -> BlockStructure {
+        todo!()
+    }
+}
+
+impl<Delta: ExchangeData> Source<Delta> for IterateFeedbackInput<Delta> {
+    fn get_max_parallelism(&self) -> Option<usize> {
+        None
+    }
+}
+
+
+
+impl<In: ExchangeData, OperatorChain> Stream<In, OperatorChain>
 where
-    OperatorChain: Operator<Out> + 'static,
+    OperatorChain: Operator<In> + 'static,
 {
     /// Construct an iterative dataflow where the input stream is fed inside a cycle. What comes
     /// out of the loop will be fed back at the next iteration.
@@ -145,29 +183,27 @@ where
     /// assert_eq!(state.get().unwrap(), vec![10 + 11 + 12 + 20 + 21 + 22 + 30 + 31 + 32]);
     /// assert_eq!(items.get().unwrap(), vec![30, 31, 32]);
     /// ```
-    pub fn iterate<
-        Body,
-        DeltaUpdate: ExchangeData + Default,
-        State: ExchangeData + Sync,
-        OperatorChain2,
+    pub fn iterate_diff<
+        BodyFn,
+        Delta: ExchangeData,
+        Out: ExchangeData,
+        BodyOperators,
+        DeltaOperators,
     >(
         self,
         num_iterations: usize,
-        initial_state: State,
-        body: Body,
-        local_fold: impl Fn(&mut DeltaUpdate, Out) + Send + Clone + 'static,
-        global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Clone + 'static,
-        loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
+        body: BodyFn,
     ) -> (
-        Stream<State, impl Operator<State>>,
+        Stream<Delta, impl Operator<Delta>>,
         Stream<Out, impl Operator<Out>>,
     )
     where
-        Body: FnOnce(
-            Stream<Out, Iterate<Out, State, OperatorChain>>,
-            IterationStateHandle<State>,
-        ) -> Stream<Out, OperatorChain2>,
-        OperatorChain2: Operator<Out> + 'static,
+        BodyFn: FnOnce(
+            Stream<In, IterateInput<In, OperatorChain>>,
+            Stream<Delta, IterateFeedbackInput<Delta>>,
+        ) -> (Stream<Out, BodyOperators>, Stream<Delta, DeltaOperators>),
+        BodyOperators: Operator<Out> + 'static,
+        DeltaOperators: Operator<Delta> + 'static,
     {
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.
@@ -176,53 +212,94 @@ where
             "Cannot have an iteration block with limited parallelism"
         );
 
-        let state = IterationStateHandle::new(initial_state.clone());
-        let state_clone = state.clone();
+        // let state = IterationStateHandle::new(initial_state.clone());
+        // let state_clone = state.clone();
         let env = self.env.clone();
 
         // the id of the block where IterationEndBlock is. At this moment we cannot know it, so we
         // store a fake value inside this and as soon as we know it we set it to the right value.
-        let shared_delta_update_end_block_id = Arc::new(AtomicUsize::new(0));
-        let shared_feedback_end_block_id = Arc::new(AtomicUsize::new(0));
-        let shared_output_block_id = Arc::new(AtomicUsize::new(0));
+        // let shared_delta_update_end_block_id = Arc::new(AtomicUsize::new(0));
+        // let shared_feedback_end_block_id = Arc::new(AtomicUsize::new(0));
+        // let shared_output_block_id = Arc::new(AtomicUsize::new(0));
 
-        // prepare the stream with the IterationLeader block, this will provide the state output
-        let mut leader_stream = StreamEnvironmentInner::stream(
-            env.clone(),
-            IterationLeader::new(
-                initial_state,
-                num_iterations,
-                global_fold,
-                loop_condition,
-                shared_delta_update_end_block_id.clone(),
-            ),
-        );
-        let leader_block_id = leader_stream.block.id;
-        // the output stream is outside this loop, so it doesn't have the lock for this state
-        leader_stream.block.iteration_state_lock_stack =
-            self.block.iteration_state_lock_stack.clone();
+        // // prepare the stream with the IterationLeader block, this will provide the state output
+        // let mut leader_stream = StreamEnvironmentInner::stream(
+        //     env.clone(),
+        //     IterationLeader::new(
+        //         initial_state,
+        //         num_iterations,
+        //         global_fold,
+        //         loop_condition,
+        //         shared_delta_update_end_block_id.clone(),
+        //     ),
+        // );
+        // let leader_block_id = leader_stream.block.id;
+        // // the output stream is outside this loop, so it doesn't have the lock for this state
+        // leader_stream.block.iteration_state_lock_stack =
+        //     self.block.iteration_state_lock_stack.clone();
 
-        // the lock for synchronizing the access to the state of this iteration
-        let state_lock = Arc::new(IterationStateLock::default());
+        // // the lock for synchronizing the access to the state of this iteration
+        // let state_lock = Arc::new(IterationStateLock::default());
 
         // prepare the loop body stream
         let mut iter_start = self.add_operator(|prev| {
-            Iterate::new(
+            IterateInput::new(
                 prev,
-                state,
-                leader_block_id,
-                shared_feedback_end_block_id.clone(),
-                shared_output_block_id.clone(),
-                state_lock.clone(),
             )
         });
-        let iterate_block_id = iter_start.block.id;
+        let id_start = iter_start.block.id;
+
+        let mut iter_feedback = StreamEnvironmentInner::stream(
+            env.clone(),
+            IterateFeedbackInput::new(),
+        );
+        let id_feedback = iter_feedback.block.id;
+
+        let (stream_body, stream_delta) = body(iter_start, iter_feedback);
+
+        let id_body_out = stream_body.block.id;
+
+        let stream_output = StreamEnvironmentInner::stream(
+            env.clone(),
+            StartBlock::single(
+                id_body_out,
+                iter_start.block.iteration_state_lock_stack.last().cloned()
+            )
+        );
+        let id_output = stream_output.block.id;
+
+        let batch_mode = stream_body.block.batch_mode;
+        let stream_body = stream_body.add_operator(|prev| {
+            EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode) // Mark feedback?
+        });
+
+        let batch_mode = stream_body.block.batch_mode;
+        let stream_delta = stream_delta.add_operator(|prev| {
+            EndBlock::new(prev, NextStrategy::OnlyOne, batch_mode) // Mark feedback?
+        });
+        let id_delta = stream_delta.block.id;
+
+        {
+            let mut env_lock = env.lock();
+            let mut scheduler = env_lock.scheduler_mut();
+
+            scheduler.add_block(stream_body.block);
+            scheduler.add_block(stream_delta.block);
+            scheduler.add_block(stream_output.block);
+
+            scheduler.connect_blocks(id_start, id_body_out, TypeId::of::<Out>());
+            scheduler.connect_blocks(id_body_out, id_output, TypeId::of::<Out>());
+            scheduler.connect_blocks(id_delta, id_feedback, TypeId::of::<Delta>());
+            scheduler.connect_blocks(id_delta, id_feedback, TypeId::of::<Delta>());
+
+        }
+        
 
         // prepare the stream that will output the content of the loop
         let output = StreamEnvironmentInner::stream(
             env.clone(),
             StartBlock::single(
-                iterate_block_id,
+                id_start,
                 iter_start.block.iteration_state_lock_stack.last().cloned(),
             ),
         );
@@ -271,7 +348,7 @@ where
         let batch_mode = body_end.block.batch_mode;
         let mut feedback_end = body_end.add_operator(|prev| {
             let mut end = EndBlock::new(prev, NextStrategy::only_one(), batch_mode);
-            end.mark_feedback(iterate_block_id);
+            end.mark_feedback(id_start);
             end
         });
         feedback_end.block.is_only_one_strategy = true;
@@ -296,13 +373,13 @@ where
         // connect the IterationLeader to the Iterate
         scheduler.connect_blocks(
             leader_block_id,
-            iterate_block_id,
-            TypeId::of::<NewIterationState<State>>(),
+            id_start,
+            TypeId::of::<NewIterationState<Delta>>(),
         );
         // connect the feedback
-        scheduler.connect_blocks(feedback_end_block_id, iterate_block_id, TypeId::of::<Out>());
+        scheduler.connect_blocks(feedback_end_block_id, id_start, TypeId::of::<Out>());
         // connect the output stream
-        scheduler.connect_blocks_fragile(iterate_block_id, output_block_id, TypeId::of::<Out>());
+        scheduler.connect_blocks_fragile(id_start, output_block_id, TypeId::of::<Out>());
         drop(env);
 
         // store the id of the blocks we now know
@@ -325,7 +402,7 @@ where
 }
 
 impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Operator<Out>
-    for Iterate<Out, State, OperatorChain>
+    for IterateInput<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -451,14 +528,14 @@ where
 }
 
 impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Display
-    for Iterate<Out, State, OperatorChain>
+    for IterateInput<Out, State, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} -> Iterate<{}>",
+            "{} -> IterateDiff<{}>",
             self.prev,
             std::any::type_name::<Out>()
         )

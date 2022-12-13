@@ -153,10 +153,6 @@ pub struct RemoteHostSSHConfig {
 #[derive(Debug, StructOpt)]
 #[structopt(name = "noir", about = "Network of Operators In Rust")]
 struct CommandLineOptions {
-    /// Enable verbose output.
-    #[structopt(short, long)]
-    verbose: bool,
-
     /// Path to the configuration file for remote execution.
     ///
     /// When this is specified the execution will be remote. This conflicts with `--threads`.
@@ -178,10 +174,6 @@ impl EnvironmentConfig {
     pub fn from_args() -> (EnvironmentConfig, Vec<String>) {
         let opt: CommandLineOptions = CommandLineOptions::from_args();
         opt.validate();
-        if opt.verbose {
-            std::env::set_var("RUST_LOG", "debug");
-            let _ = env_logger::try_init();
-        }
         if let Some(num_cores) = opt.local {
             (Self::local(num_cores), opt.args)
         } else if let Some(remote) = opt.remote {
@@ -211,7 +203,7 @@ impl EnvironmentConfig {
         let config = if let Some(config) = EnvironmentConfig::config_from_env() {
             config
         } else {
-            debug!("Reading remote config from: {}", config.as_ref().display());
+            log::debug!("Reading remote config from: {}", config.as_ref().display());
             let content = std::fs::read_to_string(config)?;
             serde_yaml::from_str(&content)?
         };
@@ -224,8 +216,8 @@ impl EnvironmentConfig {
         }
 
         let host_id = EnvironmentConfig::host_id(config.hosts.len().try_into().unwrap());
-        debug!("Detected host id: {:?}", host_id);
-        debug!("Remote runtime configuration: {:#?}", config);
+        log::debug!("Detected host id: {:?}", host_id);
+        log::debug!("Remote runtime configuration: {:#?}", config);
         Ok(EnvironmentConfig {
             runtime: ExecutionRuntime::Remote(config),
             host_id,

@@ -343,3 +343,13 @@ where
         KeyedStream(self.0.add_operator(get_operator))
     }
 }
+
+impl<K: DataKey, V: Data, OperatorChain> Stream<(K, V), OperatorChain>
+where
+    OperatorChain: Operator<(K, V)>,
+{
+    /// TODO DOCS
+    pub fn to_keyed(self) -> KeyedStream<K, V, OperatorChain> {
+        KeyedStream(self)
+    }
+}

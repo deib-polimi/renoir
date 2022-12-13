@@ -179,9 +179,12 @@ pub(crate) fn remote_recv<T: ExchangeData, R: Read>(
     match reader.read_exact(&mut header) {
         Ok(_) => {}
         Err(e) => {
-            debug!(
+            log::debug!(
                 "Failed to receive {} bytes of header to {} from {}: {:?}",
-                HEADER_SIZE, coord, address, e
+                HEADER_SIZE,
+                coord,
+                address,
+                e
             );
             return None;
         }
@@ -218,9 +221,12 @@ pub(crate) async fn remote_recv<T: ExchangeData, R: AsyncRead + Unpin>(
     match reader.read_exact(&mut header).await {
         Ok(_) => {}
         Err(e) => {
-            debug!(
+            log::debug!(
                 "Failed to receive {} bytes of header to {} from {}: {:?}",
-                HEADER_SIZE, coord, address, e
+                HEADER_SIZE,
+                coord,
+                address,
+                e
             );
             return None;
         }

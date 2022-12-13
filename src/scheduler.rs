@@ -192,7 +192,7 @@ impl Scheduler {
         }
 
         let job_graph = job_graph_generator.finalize();
-        debug!("Job graph in dot format:\n{}", job_graph);
+        log::debug!("Job graph in dot format:\n{}", job_graph);
 
         self.network.finalize();
 
@@ -253,7 +253,7 @@ impl Scheduler {
         }
 
         let job_graph = job_graph_generator.finalize();
-        tracing::debug!("Job graph in dot format:\n{}", job_graph);
+        log::debug!("Job graph in dot format:\n{}", job_graph);
 
         self.network.finalize();
 
@@ -306,7 +306,7 @@ impl Scheduler {
             structures,
             profilers,
         };
-        debug!(
+        log::trace!(
             "__noir2_TRACING_DATA__ {}",
             serde_json::to_string(&data).unwrap()
         );
@@ -325,7 +325,7 @@ impl Scheduler {
                 write!(&mut topology, "\n    -> {:?}", sorted).unwrap();
             }
         }
-        debug!("{}", topology);
+        log::debug!("{}", topology);
         let mut assignments = "Replicas:".to_string();
         for (block_id, block) in self.block_info.iter() {
             write!(&mut assignments, "\n  {}:", block_id).unwrap();
@@ -334,7 +334,7 @@ impl Scheduler {
                 write!(&mut assignments, " {}", coord).unwrap();
             }
         }
-        debug!("{}", assignments);
+        log::debug!("{}", assignments);
     }
 
     /// Extract the `SchedulerBlockInfo` of a block.
@@ -369,9 +369,12 @@ impl Scheduler {
         let num_replicas = local
             .num_cores
             .min(max_parallelism.unwrap_or(CoordUInt::MAX));
-        debug!(
+        log::debug!(
             "Block {} will have {} local replicas (max_parallelism={:?}), is_only_one_strategy={}",
-            block.id, num_replicas, max_parallelism, block.is_only_one_strategy
+            block.id,
+            num_replicas,
+            max_parallelism,
+            block.is_only_one_strategy
         );
         let host_id = self.config.host_id.unwrap();
         let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
@@ -398,7 +401,7 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        debug!("Allocating block {} on remote runtime", block.id);
+        log::debug!("Allocating block {} on remote runtime", block.id);
         // number of replicas we can assign at most
         let mut remaining_replicas = max_parallelism.unwrap_or(CoordUInt::MAX);
         let mut num_replicas = 0;
@@ -409,7 +412,7 @@ impl Scheduler {
         for (host_id, host_info) in remote.hosts.iter().enumerate() {
             let host_id: HostId = host_id.try_into().expect("host_id > max id");
             let num_host_replicas = host_info.num_cores.min(remaining_replicas);
-            debug!(
+            log::debug!(
                 "Block {} will have {} replicas on {} (max_parallelism={:?}, num_cores={})",
                 block.id,
                 num_host_replicas,

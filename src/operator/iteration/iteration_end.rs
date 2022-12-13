@@ -76,9 +76,10 @@ where
             "The IterationEndBlock block should not be replicated"
         );
         let leader = replicas.into_iter().next().unwrap();
-        debug!(
+        log::debug!(
             "IterationEndBlock {} has {} as leader",
-            metadata.coord, leader
+            metadata.coord,
+            leader
         );
 
         let sender = metadata

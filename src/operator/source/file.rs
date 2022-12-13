@@ -114,7 +114,7 @@ impl Operator<String> for FileSource {
 
     fn next(&mut self) -> StreamElement<String> {
         if self.terminated {
-            tracing::debug!("{} emitting terminate", self.coord.unwrap());
+            log::debug!("{} emitting terminate", self.coord.unwrap());
             return StreamElement::Terminate;
         }
         let element = if self.current <= self.end {

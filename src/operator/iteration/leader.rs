@@ -147,9 +147,10 @@ where
             return StreamElement::FlushAndRestart;
         }
         loop {
-            debug!(
+            log::debug!(
                 "Leader {} is waiting for {} delta updates",
-                self.coord, self.num_receivers
+                self.coord,
+                self.num_receivers
             );
             let mut missing_delta_updates = self.num_receivers;
             while missing_delta_updates > 0 {
@@ -157,14 +158,15 @@ where
                 match update {
                     StreamElement::Item(delta_update) => {
                         missing_delta_updates -= 1;
-                        debug!(
+                        log::debug!(
                             "IterationLeader at {} received a delta update, {} missing",
-                            self.coord, missing_delta_updates
+                            self.coord,
+                            missing_delta_updates
                         );
                         (self.global_fold)(self.state.as_mut().unwrap(), delta_update);
                     }
                     StreamElement::Terminate => {
-                        debug!("IterationLeader {} received Terminate", self.coord);
+                        log::debug!("IterationLeader {} received Terminate", self.coord);
                         return StreamElement::Terminate;
                     }
                     StreamElement::FlushAndRestart => {}
@@ -177,13 +179,14 @@ where
             }
             // the loop condition may change the state
             let mut should_continue = (self.loop_condition)(self.state.as_mut().unwrap());
-            debug!(
+            log::debug!(
                 "IterationLeader at {} checked loop condition and resulted in {}",
-                self.coord, should_continue
+                self.coord,
+                should_continue
             );
             self.iteration_index += 1;
             if self.iteration_index >= self.num_iterations {
-                debug!("IterationLeader at {} reached iteration limit", self.coord);
+                log::debug!("IterationLeader at {} reached iteration limit", self.coord);
                 should_continue = false;
             }
 

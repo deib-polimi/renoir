@@ -145,7 +145,7 @@ where
 
         if matches!(to_return, StreamElement::Terminate) {
             let coord = self.coord.unwrap();
-            debug!(
+            log::debug!(
                 "EndBlock at {} received Terminate, closing {} channels",
                 coord,
                 self.senders.len()

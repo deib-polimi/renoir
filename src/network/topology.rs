@@ -314,13 +314,13 @@ impl NetworkTopology {
                 self.async_join_handles.push(join_handle);
                 e.insert(demux);
             } else {
-                debug!("Demultiplexer of {} is useless since it has no previous remote block, ignoring", demux_coord);
+                log::debug!("Demultiplexer of {} is useless since it has no previous remote block, ignoring", demux_coord);
             }
         }
         if let Some(demux) = demuxes.get_mut(&demux_coord) {
             demux.register(receiver_endpoint, local_sender)
         } else {
-            debug!("Not registering demux")
+            log::debug!("Not registering demux")
         };
     }
 
@@ -356,7 +356,7 @@ impl NetworkTopology {
     /// This will initialize both the sender and the receiver to the receiver. If it's appropriate
     /// also the multiplexer and/or the demultiplexer are initialized and started.
     fn register_channel<T: ExchangeData>(&mut self, receiver_endpoint: ReceiverEndpoint) {
-        debug!("Registering {}", receiver_endpoint);
+        log::debug!("Registering {}", receiver_endpoint);
         assert!(
             !self.registered_receivers.contains(&receiver_endpoint),
             "Receiver {} has already been registered",
@@ -434,9 +434,12 @@ impl NetworkTopology {
         let from_remote = from.host_id != host_id;
         let to_remote = to.host_id != host_id;
 
-        debug!(
+        log::debug!(
             "New connection: {} (remote={}) -> {} (remote={})",
-            from, from_remote, to, to_remote
+            from,
+            from_remote,
+            to,
+            to_remote
         );
         self.next
             .entry((from, typ))
@@ -496,9 +499,8 @@ impl NetworkTopology {
     /// and `get_receiver`.
     ///
     /// Internally this computes the mapping between `DemuxCoord` and actual TCP port.
-    #[tracing::instrument(name = "finalize_topology", skip_all)]
     pub fn build(&mut self) {
-        tracing::debug!("finalizing topology");
+        log::debug!("finalizing topology");
         // Close handles to multiplexers to start the worker threads
 
         let config = if let ExecutionRuntime::Remote(config) = &self.config.runtime {
@@ -522,7 +524,7 @@ impl NetworkTopology {
             let port = host.base_port + *port_offset;
             *port_offset += 1;
             let address = (host.address.clone(), port);
-            debug!("Demultiplexer of {} is at {:?}", coord, address);
+            log::debug!("Demultiplexer of {} is at {:?}", coord, address);
             self.demultiplexer_addresses.insert(coord, address);
         }
     }
@@ -552,7 +554,7 @@ impl NetworkTopology {
                 .unwrap();
             }
         }
-        debug!("{}", topology);
+        log::debug!("{}", topology);
     }
 }
 
