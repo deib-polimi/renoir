@@ -303,7 +303,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
         // Calculate start and end offset of this replica
         let body_size = file_size - header_size;
         let range_size = body_size / num_replicas as u64;
-        let mut start = header_size + range_size * global_id as u64;
+        let mut start = header_size + range_size * global_id;
         let mut end = if global_id as usize == num_replicas - 1 {
             file_size
         } else {

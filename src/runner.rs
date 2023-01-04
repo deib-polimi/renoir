@@ -111,7 +111,7 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
         let now = chrono::Local::now();
         let file_name = format!("{}.json", now.format("%Y-%m-%d-%H%M%S"));
         let target = path.join(file_name);
-        let mut target = std::fs::File::create(&target).expect("Cannot create tracing json file");
+        let mut target = std::fs::File::create(target).expect("Cannot create tracing json file");
         serde_json::to_writer(&mut target, &tracing_data)
             .expect("Failed to write tracing json file");
     }

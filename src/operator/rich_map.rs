@@ -67,7 +67,7 @@ where
     fn next(&mut self) -> StreamElement<(Key, NewOut)> {
         let element = self.prev.next();
         if matches!(element, StreamElement::FlushAndRestart) {
-            self.maps_fn.clear();
+            // self.maps_fn.clear();
         }
         element.map(|(key, value)| {
             let map_fn = if let Some(map_fn) = self.maps_fn.get_mut(&key) {

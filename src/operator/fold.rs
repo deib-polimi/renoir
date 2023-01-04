@@ -47,7 +47,7 @@ impl<Out: Data, NewOut: Data, F, PreviousOperators: Operator<Out>>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
 {
-    fn new(prev: PreviousOperators, init: NewOut, fold: F) -> Self {
+    pub(super) fn new(prev: PreviousOperators, init: NewOut, fold: F) -> Self {
         Fold {
             prev,
             fold,

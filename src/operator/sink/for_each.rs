@@ -40,15 +40,16 @@ where
     }
 
     fn next(&mut self) -> StreamElement<()> {
-        match self.prev.next() {
-            StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
-                (self.f)(t);
-                StreamElement::Item(())
+        loop {
+            match self.prev.next() {
+                StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
+                    (self.f)(t);
+                }
+                StreamElement::Watermark(w) => return StreamElement::Watermark(w),
+                StreamElement::Terminate => return StreamElement::Terminate,
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
+                StreamElement::FlushAndRestart => return StreamElement::FlushAndRestart,
             }
-            StreamElement::Watermark(w) => StreamElement::Watermark(w),
-            StreamElement::Terminate => StreamElement::Terminate,
-            StreamElement::FlushBatch => StreamElement::FlushBatch,
-            StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
         }
     }
 
