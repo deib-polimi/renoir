@@ -9,7 +9,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use itertools::{process_results, Itertools};
-use log::*;
 
 use noir::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
 use noir::operator::{Data, Operator, StreamElement, Timestamp};
