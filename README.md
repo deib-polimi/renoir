@@ -20,10 +20,10 @@ fn main() {
     let (config, args) = EnvironmentConfig::from_args();
     let mut env = StreamEnvironment::new(config);
     env.spawn_remote_workers();
-    let source = FileSource::new(&args[0]);
-    // Create file source
+
     let result = env
-        .stream(source)
+        // Open and read file line by line in parallel
+        .stream_file(&args[0])
         // Split into words
         .flat_map(|line| tokenize(&line))
         // Partition
@@ -32,10 +32,11 @@ fn main() {
         .fold(0, |count, _word| *count += 1)
         // Collect result
         .collect_vec();
+        
     env.execute(); // Start execution (blocking)
     if let Some(result) = result.get() {
         // Print word counts
-        println!("{:?}", result);
+        result.into_iter().for_each(|(word, count)| println!("{word}: {count}"));
     }
 }
 
@@ -46,3 +47,5 @@ fn tokenize(s: &str) -> Vec<String> {
 
 // Execute on 6 local hosts `cargo run -- -l 6 input.txt`
 ```
+
+# Documentation is WIP

@@ -3,7 +3,6 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::Seek;
 use std::io::{BufReader, SeekFrom};
-use std::path::Path;
 use std::path::PathBuf;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
@@ -169,7 +168,7 @@ impl Clone for FileSource {
 
 impl crate::StreamEnvironment {
     /// Convenience method, creates a `FileSource` and makes a stream using `StreamEnvironment::stream`
-    pub fn stream_file(&mut self, path: &Path) -> Stream<String, FileSource> {
+    pub fn stream_file<P: Into<PathBuf>>(&mut self, path: P) -> Stream<String, FileSource> {
         let source = FileSource::new(path);
         self.stream(source)
     }
