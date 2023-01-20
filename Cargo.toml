@@ -11,11 +11,8 @@ edition = "2021"
 [features]
 default = ["flume"]
 crossbeam = ["crossbeam-channel"]
-fair = []
 profiler = []
 async-tokio = ["tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
-deque-flatten = []
-deque-start = []
 
 [dependencies]
 # for logging to the console
