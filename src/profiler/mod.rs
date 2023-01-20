@@ -69,22 +69,19 @@ mod with_profiler {
     use crate::profiler::backend::ProfilerBackend;
     use crate::profiler::metrics::ProfilerResult;
 
-    lazy_static! {
-        /// The sender and receiver pair of the current profilers.
-        ///
-        /// These are options since they can be consumed.
-        static ref CHANNEL: Mutex<(Option<ProfilerSender>, Option<ProfilerReceiver>)> = {
+    /// The sender and receiver pair of the current profilers.
+    ///
+    /// These are options since they can be consumed.
+    static CHANNEL: Lazy<Mutex<(Option<ProfilerSender>, Option<ProfilerReceiver>)>> =
+        Lazy::new(|| {
             let (sender, receiver) = ProfilerReceiver::new();
             Mutex::new((Some(sender), Some(receiver)))
-        };
-    }
+        });
 
-    lazy_static! {
-        /// The sender and receiver pair of the current profilers.
-        ///
-        /// These are options since they can be consumed.
-        static ref START_TIME: Instant = Instant::now();
-    }
+    /// The sender and receiver pair of the current profilers.
+    ///
+    /// These are options since they can be consumed.
+    static START_TIME: Lazy<Instant> = Lazy::new(|| Instant::now());
 
     thread_local! {
         /// The actual profiler for the current thread, if the `profiler` feature is enabled.

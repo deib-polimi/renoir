@@ -20,12 +20,10 @@ use noir::{EnvironmentConfig, StreamEnvironment};
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;
 
-lazy_static::lazy_static! {
-    /// The index of the current test.
-    ///
-    /// It will be used to generate unique local IP addresses for each test.
-    static ref TEST_INDEX: AtomicU16 = AtomicU16::new(0);
-}
+/// The index of the current test.
+///
+/// It will be used to generate unique local IP addresses for each test.
+static TEST_INDEX: AtomicU16 = AtomicU16::new(0);
 
 /// A fake operator that makes sure the watermarks are consistent with the data.
 ///

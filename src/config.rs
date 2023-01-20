@@ -8,8 +8,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
+#[cfg(feature = "clap")]
+use clap::Parser;
 use serde::{Deserialize, Serialize};
-use structopt::StructOpt;
 
 use crate::runner::{CONFIG_ENV_VAR, HOST_ID_ENV_VAR};
 use crate::scheduler::HostId;
@@ -150,19 +151,20 @@ pub struct RemoteHostSSHConfig {
     pub key_passphrase: Option<String>,
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "noir", about = "Network of Operators In Rust")]
+#[cfg(feature = "clap")]
+#[derive(Debug, Parser)]
+#[clap(name = "noir", about = "Network of Operators In Rust")]
 struct CommandLineOptions {
     /// Path to the configuration file for remote execution.
     ///
     /// When this is specified the execution will be remote. This conflicts with `--threads`.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     remote: Option<PathBuf>,
 
     /// Number of cores in the local execution.
     ///
     /// When this is specified the execution will be local. This conflicts with `--remote`.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     local: Option<CoordUInt>,
 
     /// The rest of the arguments.
@@ -171,8 +173,9 @@ struct CommandLineOptions {
 
 impl EnvironmentConfig {
     /// Build the configuration from the specified args list.
+    #[cfg(feature = "clap")]
     pub fn from_args() -> (EnvironmentConfig, Vec<String>) {
-        let opt: CommandLineOptions = CommandLineOptions::from_args();
+        let opt: CommandLineOptions = CommandLineOptions::parse();
         opt.validate();
         if let Some(num_cores) = opt.local {
             (Self::local(num_cores), opt.args)
@@ -265,6 +268,7 @@ impl Display for RemoteHostConfig {
     }
 }
 
+#[cfg(feature = "clap")]
 impl CommandLineOptions {
     /// Check that the configuration provided is valid.
     fn validate(&self) {

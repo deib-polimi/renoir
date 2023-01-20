@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -11,9 +12,8 @@ use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
 use crate::CoordUInt;
 
-lazy_static! {
-    static ref LAST_REMOTE_CONFIG: Mutex<Option<RemoteRuntimeConfig>> = Mutex::new(None);
-}
+static LAST_REMOTE_CONFIG: Lazy<Mutex<Option<RemoteRuntimeConfig>>> =
+    Lazy::new(|| Mutex::new(None));
 
 /// Actual content of the StreamEnvironment. This is stored inside a `Rc` and it's shared among all
 /// the blocks.

@@ -8,15 +8,15 @@ authors = [
     "Marco Donadoni <marco.donadoni@mail.polimi.it>"
 ]
 license = "LGPL-3.0-or-later"
-# homepage = "https://github.com/deib-polimi/noir"
 repository = "https://github.com/deib-polimi/noir"
 readme = "README.md"
 
 [features]
-default = ["flume"]
+default = ["flume", "clap", "ts"]
 crossbeam = ["crossbeam-channel"]
+ts = []
 profiler = []
-async-tokio = ["tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
+async-tokio = ["tokio", "flume", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 
 [dependencies]
 # for logging to the console
@@ -46,15 +46,13 @@ thiserror = "1.0.38"
 itertools = "0.10.5"
 
 # for storing non-mutable static variables with non-trivial initialization
-lazy_static = "1.4.0"
+once_cell = "1.17.0"
 
 # used for spawning the remote workers
 ssh2 = { version = "0.9.3", features = ["vendored-openssl"] }
 whoami = "1.3.0"
 shell-escape = "0.1.5"
-
-# command line parsing utility
-structopt = "0.3.26"
+clap = { version = "4.1.1", features = ["derive"], optional = true }
 
 # channel implementation
 crossbeam-channel = { version = "0.5.6", optional = true }
@@ -79,7 +77,6 @@ tokio = { version = "1.24.2", features = ["rt"], default-features = false, optio
 futures = { version = "0.3.25", optional = true }
 
 parking_lot = "0.12.1"
-once_cell = "1.17.0"
 
 wyhash = "0.5.0"
 fxhash = "0.2.1"
