@@ -145,7 +145,7 @@ where
     ) -> KeyedStream<Key, Value, impl Operator<KeyValue<Key, Value>>>
     where
         Keyer: KeyerFn<Key, Out> + Fn(&Out) -> Key,
-        GetValue: KeyerFn<Value, Out> + Fn(&Out) -> Value,
+        GetValue: Fn(Out) -> Value + Clone + Send + 'static,
         Value: ExchangeData + AddAssign,
     {
         self.group_by_fold(
@@ -153,9 +153,9 @@ where
             None,
             move |acc, value| {
                 if let Some(acc) = acc {
-                    *acc += get_value(&value);
+                    *acc += get_value(value);
                 } else {
-                    *acc = Some(get_value(&value));
+                    *acc = Some(get_value(value));
                 }
             },
             |acc, value| match acc {

@@ -62,7 +62,7 @@ fn main() {
                         adj.into_iter().map(move |y| (y, rank_to_distribute))
                     })
                     .drop_key()
-                    .group_by_sum(|(y, _)| *y, |&(_y, rank_to_distribute)| rank_to_distribute)
+                    .group_by_sum(|(y, _)| *y, |(_y, rank_to_distribute)| rank_to_distribute)
                     // apply dampening factor
                     .map(move |(_y, rank)| rank * DAMPENING + (1.0 - DAMPENING) / num_pages as f64)
                     .unkey()
@@ -93,8 +93,12 @@ fn main() {
     if let Some(mut res) = result.get() {
         eprintln!("Output: {:?}", res.len());
         if cfg!(debug_assertions) {
-            res.sort_by_key(|(x, _, _)| *x);
-            for (x, _, rank) in res {
+            res.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+            for (x, _, rank) in res.iter().take(3) {
+                eprintln!("{}: {}", x, rank);
+            }
+            eprintln!("...");
+            for (x, _, rank) in res.iter().rev().take(3).rev() {
                 eprintln!("{}: {}", x, rank);
             }
         }

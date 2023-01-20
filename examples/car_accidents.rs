@@ -8,13 +8,16 @@ use noir::operator::Operator;
 use noir::{prelude::*, Stream};
 use serde::{Deserialize, Serialize};
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 const DAYS_BEFORE: [u16; 13] = [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 
 type Week = (u16, u16);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Accident {
-    #[serde(rename = "CRASH DATE")]
+    #[serde(rename = "DATE")]
     date: String,
     #[serde(rename = "BOROUGH")]
     borough: String,
@@ -51,7 +54,7 @@ fn query1_with_source(
     source
         // map to the week with 1 if it was lethal, 0 otherwise
         .map(|a| (a.week(), (a.killed > 0) as u32))
-        .group_by_sum(|(week, _killed)| *week, |(_week, killed)| *killed)
+        .group_by_sum(|(week, _killed)| *week, |(_week, killed)| killed)
         .collect_vec()
 }
 

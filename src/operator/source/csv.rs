@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use csv::{Reader, ReaderBuilder, Terminator, Trim};
 use serde::Deserialize;
@@ -416,7 +416,7 @@ impl crate::StreamEnvironment {
     /// Convenience method, creates a `CsvSource` and makes a stream using `StreamEnvironment::stream`
     pub fn stream_csv<T: Data + for<'a> Deserialize<'a>>(
         &mut self,
-        path: &Path,
+        path: impl Into<PathBuf>,
     ) -> Stream<T, CsvSource<T>> {
         let source = CsvSource::new(path);
         self.stream(source)
