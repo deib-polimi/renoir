@@ -1,12 +1,16 @@
 [package]
 name = "noir"
 version = "0.1.0"
+edition = "2021"
 authors = [
     "Luca De Martini <luca.de.martini@protonmail.com>",
     "Edoardo Morassutto <edoardo.morassutto@gmail.com>",
     "Marco Donadoni <marco.donadoni@mail.polimi.it>"
 ]
-edition = "2021"
+license = "LGPL-3.0-or-later"
+# homepage = "https://github.com/deib-polimi/noir"
+repository = "https://github.com/deib-polimi/noir"
+readme = "README.md"
 
 [features]
 default = ["flume"]
@@ -29,14 +33,14 @@ derivative = "2.2.0"
 
 # serialization library used for reading the config file (yaml) and serializing
 # the messages on the network
-serde = { version = "1.0.146", features = ["derive"] }
-serde_yaml = "0.9.13"
-serde_json = "1.0.87"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_yaml = "0.9.17"
+serde_json = "1.0.91"
 bincode = "1.3.3"
 
 # handy Result type
-anyhow = "1.0.66"
-thiserror = "1.0.37"
+anyhow = "1.0.68"
+thiserror = "1.0.38"
 
 # handy iterators functions
 itertools = "0.10.5"
@@ -46,7 +50,7 @@ lazy_static = "1.4.0"
 
 # used for spawning the remote workers
 ssh2 = { version = "0.9.3", features = ["vendored-openssl"] }
-whoami = "1.2.3"
+whoami = "1.3.0"
 shell-escape = "0.1.5"
 
 # command line parsing utility
@@ -57,7 +61,7 @@ crossbeam-channel = { version = "0.5.6", optional = true }
 flume = { version = "0.10.14", optional = true }
 
 # Used for KeyedWindowManager
-hashbrown = "0.13.1"
+hashbrown = "0.13.2"
 
 # used for csv file source
 csv = "1.1.6"
@@ -66,23 +70,23 @@ csv = "1.1.6"
 lazy-init = "0.5.1"
 
 # Format dates and times
-chrono = "0.4.22"
+chrono = "0.4.23"
 
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
 coarsetime = "0.1.22"
 
-tokio = { version = "1.21.2", features = ["rt"], default-features = false, optional = true }
+tokio = { version = "1.24.2", features = ["rt"], default-features = false, optional = true }
 futures = { version = "0.3.25", optional = true }
 
 parking_lot = "0.12.1"
-once_cell = "1.15.0"
+once_cell = "1.17.0"
 
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 
 # For execution deduplication
 sha2 = "0.10.6"
-base64 = "0.13.1"
+base64 = "0.21.0"
 
 [dev-dependencies]
 # for the tests
@@ -91,11 +95,11 @@ rand = "0.8.5"
 tempfile = "3.3.0"
 criterion = { version = "0.4.0", features = ["html_reports"] }
 fake = "2.5.0"
-mimalloc = { version = "0.1.30", default-features = false }
+mimalloc = { version = "0.1.34", default-features = false }
 tracing-subscriber = "0.3.16"
 
 # for the examples
-regex = "1.6.0"
+regex = "1.7.1"
 
 # used in the benchmarks
 crossbeam-channel = "0.5.6"

@@ -75,8 +75,8 @@ pub(crate) struct FakeNetworkTopology<T: ExchangeData> {
 
 impl<T: ExchangeData> FakeNetworkTopology<T> {
     /// Build a fake network topology for a single replica (with coord b0 h0 r0), that receives data
-    /// of type `T` from `num_prev_blocks`, each with `num_replicas_per_block` replicas.
-    pub fn new(num_prev_blocks: CoordUInt, num_replicas_per_block: CoordUInt) -> Self {
+    /// of type `T` from `num_prev_blocks`, each with `instances_per_block` replicas.
+    pub fn new(num_prev_blocks: CoordUInt, instances_per_block: CoordUInt) -> Self {
         let config = EnvironmentConfig::local(1);
         let mut topology = NetworkTopology::new(config);
 
@@ -87,7 +87,7 @@ impl<T: ExchangeData> FakeNetworkTopology<T> {
         let mut prev = vec![];
         for block_id in 1..num_prev_blocks + 1 {
             let mut block_senders = vec![];
-            for replica_id in 0..num_replicas_per_block {
+            for replica_id in 0..instances_per_block {
                 let coord = Coord::new(block_id, 0, replica_id);
                 topology.connect(coord, dest, typ, false);
                 let sender = topology.get_sender(ReceiverEndpoint::new(dest, block_id));

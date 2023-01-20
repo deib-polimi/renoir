@@ -32,7 +32,7 @@ struct SideReceiver<Out: ExchangeData, Item: ExchangeData> {
     /// The internal receiver for this side.
     receiver: SingleStartBlockReceiver<Out>,
     /// The number of replicas this side has.
-    num_replicas: usize,
+    instances: usize,
     /// How many replicas from this side has not yet sent `StreamElement::FlushAndRestart`.
     missing_flush_and_restart: usize,
     /// How many replicas from this side has not yet sent `StreamElement::Terminate`.
@@ -51,7 +51,7 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
     fn new(previous_block_id: BlockId, cached: bool) -> Self {
         Self {
             receiver: SingleStartBlockReceiver::new(previous_block_id),
-            num_replicas: 0,
+            instances: 0,
             missing_flush_and_restart: 0,
             missing_terminate: 0,
             cached,
@@ -63,9 +63,9 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.receiver.setup(metadata);
-        self.num_replicas = self.receiver.prev_replicas().len();
-        self.missing_flush_and_restart = self.num_replicas;
-        self.missing_terminate = self.num_replicas;
+        self.instances = self.receiver.prev_replicas().len();
+        self.missing_flush_and_restart = self.instances;
+        self.missing_terminate = self.instances;
     }
 
     fn recv(&mut self, timeout: Option<Duration>) -> Result<NetworkMessage<Out>, RecvTimeoutError> {
@@ -77,7 +77,7 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
     }
 
     fn reset(&mut self) {
-        self.missing_flush_and_restart = self.num_replicas;
+        self.missing_flush_and_restart = self.instances;
         if self.cached {
             self.cache_full = true;
             self.cache_pointer = 0;
@@ -199,9 +199,9 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
         // been emitted
         if self.left.is_terminated() && self.right.is_terminated() {
             let num_terminates = if self.left.cached {
-                self.left.num_replicas
+                self.left.instances
             } else if self.right.cached {
-                self.right.num_replicas
+                self.right.instances
             } else {
                 0
             };
@@ -327,10 +327,10 @@ impl<OutL: ExchangeData, OutR: ExchangeData> StartBlockReceiver<TwoSidesItem<Out
     fn cached_replicas(&self) -> usize {
         let mut cached = 0;
         if self.left.cached {
-            cached += self.left.num_replicas
+            cached += self.left.instances
         }
         if self.right.cached {
-            cached += self.right.num_replicas
+            cached += self.right.instances
         }
         cached
     }

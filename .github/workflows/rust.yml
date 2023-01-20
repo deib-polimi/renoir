@@ -52,7 +52,7 @@ jobs:
       - name: Run cargo test
         timeout-minutes: 20
         run: |
-          ./tools/run_tests.sh --all --no-fail-fast
+          cargo test --all --no-fail-fast
 
   rustfmt:
     name: Format

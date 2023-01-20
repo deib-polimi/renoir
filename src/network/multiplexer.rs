@@ -64,7 +64,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
             .unwrap();
         (Self { tx: Some(tx) }, join_handle)
     }
-    
+
     pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
         use super::mux_sender;
 

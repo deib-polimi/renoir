@@ -8,8 +8,8 @@ mod utils;
 fn parallel_iterator() {
     TestHelper::local_remote_env(|mut env| {
         let n = 100;
-        let source = ParallelIteratorSource::new(move |id, num_replicas| {
-            let chunk_size = (n + num_replicas - 1) / num_replicas;
+        let source = ParallelIteratorSource::new(move |id, instances| {
+            let chunk_size = (n + instances - 1) / instances;
             let remaining = n - n.min(chunk_size * id);
             let range = remaining.min(chunk_size);
 

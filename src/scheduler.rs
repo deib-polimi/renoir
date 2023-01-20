@@ -366,19 +366,19 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let num_replicas = local
+        let instances = local
             .num_cores
             .min(max_parallelism.unwrap_or(CoordUInt::MAX));
         log::debug!(
             "Block {} will have {} local replicas (max_parallelism={:?}), is_only_one_strategy={}",
             block.id,
-            num_replicas,
+            instances,
             max_parallelism,
             block.is_only_one_strategy
         );
         let host_id = self.config.host_id.unwrap();
-        let replicas = (0..num_replicas).map(|r| Coord::new(block.id, host_id, r));
-        let global_ids = (0..num_replicas).map(|r| (Coord::new(block.id, host_id, r), r));
+        let replicas = (0..instances).map(|r| Coord::new(block.id, host_id, r));
+        let global_ids = (0..instances).map(|r| (Coord::new(block.id, host_id, r), r));
         SchedulerBlockInfo {
             repr: block.to_string(),
             replicas: vec![(host_id, replicas.collect())].into_iter().collect(),
@@ -404,7 +404,7 @@ impl Scheduler {
         log::debug!("Allocating block {} on remote runtime", block.id);
         // number of replicas we can assign at most
         let mut remaining_replicas = max_parallelism.unwrap_or(CoordUInt::MAX);
-        let mut num_replicas = 0;
+        let mut instances = 0;
         let mut replicas: HashMap<_, Vec<_>, crate::block::CoordHasherBuilder> = HashMap::default();
         let mut global_ids = HashMap::default();
         // FIXME: if the next_strategy of the previous blocks are OnlyOne the replicas of this block
@@ -425,9 +425,9 @@ impl Scheduler {
             for replica_id in 0..num_host_replicas {
                 let coord = Coord::new(block.id, host_id, replica_id);
                 host_replicas.push(coord);
-                global_ids.insert(coord, num_replicas + replica_id);
+                global_ids.insert(coord, instances + replica_id);
             }
-            num_replicas += num_host_replicas;
+            instances += num_host_replicas;
         }
         SchedulerBlockInfo {
             repr: block.to_string(),

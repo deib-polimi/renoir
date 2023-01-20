@@ -8,6 +8,8 @@ use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
+
 use itertools::Itertools;
 use sha2::Digest;
 use ssh2::Session;
@@ -54,7 +56,7 @@ fn executable_hash() -> String {
     }
 
     let digest = hasher.finalize();
-    base64::encode_config(digest, base64::URL_SAFE_NO_PAD)
+    B64.encode(digest)
 }
 
 /// Spawn all the remote workers via ssh and wait until all of them complete, after that exit from

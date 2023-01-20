@@ -33,10 +33,10 @@ where
     /// Consume the generator function and store the produced iterator.
     ///
     /// This method can be called only once.
-    fn generate(&mut self, global_id: CoordUInt, num_replicas: CoordUInt) {
+    fn generate(&mut self, global_id: CoordUInt, instances: CoordUInt) {
         let gen = std::mem::replace(self, IteratorGenerator::Generating);
         let iter = match gen {
-            IteratorGenerator::Generator(gen) => gen(global_id, num_replicas),
+            IteratorGenerator::Generator(gen) => gen(global_id, instances),
             _ => unreachable!("generate on non-Generator variant"),
         };
         *self = IteratorGenerator::Iterator(iter);
@@ -115,8 +115,8 @@ where
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// // generate the numbers from 0 to 99 using multiple replicas
     /// let n = 100;
-    /// let source = ParallelIteratorSource::new(move |id, num_replicas| {
-    ///     let chunk_size = (n + num_replicas - 1) / num_replicas;
+    /// let source = ParallelIteratorSource::new(move |id, instances| {
+    ///     let chunk_size = (n + instances - 1) / instances;
     ///     let remaining = n - n.min(chunk_size * id);
     ///     let range = remaining.min(chunk_size);
     ///     

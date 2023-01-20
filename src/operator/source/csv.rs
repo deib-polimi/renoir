@@ -267,7 +267,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Source<Out> for CsvSource<Out> {
 impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let global_id = metadata.global_id;
-        let num_replicas = metadata.replicas.len();
+        let instances = metadata.replicas.len();
 
         let file = File::options()
             .read(true)
@@ -302,9 +302,9 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
 
         // Calculate start and end offset of this replica
         let body_size = file_size - header_size;
-        let range_size = body_size / num_replicas as u64;
+        let range_size = body_size / instances as u64;
         let mut start = header_size + range_size * global_id;
-        let mut end = if global_id as usize == num_replicas - 1 {
+        let mut end = if global_id as usize == instances - 1 {
             file_size
         } else {
             start + range_size
@@ -324,7 +324,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
         }
 
         // Align end byte
-        if global_id as usize != num_replicas - 1 {
+        if global_id as usize != instances - 1 {
             // Seek reader to the last byte to be read
             buf_reader
                 .seek(SeekFrom::Start(end))

@@ -75,7 +75,7 @@ impl Source<String> for FileSource {
 impl Operator<String> for FileSource {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let global_id = metadata.global_id;
-        let num_replicas = metadata.replicas.len();
+        let instances = metadata.replicas.len();
 
         let file = File::open(&self.path).unwrap_or_else(|err| {
             panic!(
@@ -85,10 +85,10 @@ impl Operator<String> for FileSource {
         });
         let file_size = file.metadata().unwrap().len() as usize;
 
-        let range_size = file_size / num_replicas;
+        let range_size = file_size / instances;
         let start = range_size * global_id as usize;
         self.current = start;
-        self.end = if global_id as usize == num_replicas - 1 {
+        self.end = if global_id as usize == instances - 1 {
             file_size
         } else {
             start + range_size
