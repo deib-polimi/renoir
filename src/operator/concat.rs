@@ -57,6 +57,7 @@ where
         })
     }
 
+    #[cfg(feature = "timestamp")]
     pub(crate) fn map_concat<Out2, OperatorChain2>(
         self,
         right: Stream<Out2, OperatorChain2>,

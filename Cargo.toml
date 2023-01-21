@@ -12,9 +12,9 @@ repository = "https://github.com/deib-polimi/noir"
 readme = "README.md"
 
 [features]
-default = ["flume", "clap", "ts"]
+default = ["flume", "clap", "timestamp"]
 crossbeam = ["crossbeam-channel"]
-ts = []
+timestamp = []
 profiler = []
 async-tokio = ["tokio", "flume", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 

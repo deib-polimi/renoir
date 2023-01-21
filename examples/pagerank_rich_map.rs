@@ -142,9 +142,7 @@ fn main() {
 
                                     update.push((
                                         *x,
-                                        Msg::Update(
-                                            (1.0 - DAMPENING) / num_pages as f64 - rank,
-                                        ),
+                                        Msg::Update((1.0 - DAMPENING) / num_pages as f64 - rank),
                                     ));
 
                                     update

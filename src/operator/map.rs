@@ -151,6 +151,7 @@ mod tests {
     use crate::test::FakeOperator;
 
     #[test]
+    #[cfg(feature = "timestamp")]
     fn map_stream() {
         let mut fake_operator = FakeOperator::new(0..10u8);
         for i in 0..10 {

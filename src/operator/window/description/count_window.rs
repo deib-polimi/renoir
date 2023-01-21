@@ -138,6 +138,7 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
             let size = self.descr.size.get().min(self.buffer.len());
             let timestamp_items = self.timestamp_buffer.iter().take(size).max().cloned();
             let timestamp = match &(timestamp_items, self.last_watermark) {
+                #[cfg(feature = "timestamp")]
                 (Some(ts), Some(w)) => {
                     // Make sure timestamp is correct with respect to watermarks
                     Some((*ts).max(*w + Timestamp::from_nanos(1)))
@@ -177,6 +178,7 @@ mod tests {
     use crate::operator::StreamElement;
 
     #[test]
+    #[cfg(feature = "timestamp")]
     fn count_window_watermark() {
         let descr = CountWindow::sliding(3, 2);
         let mut generator: CountWindowGenerator<u32, _> = descr.new_generator();
@@ -197,6 +199,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "timestamp")]
     fn count_window_timestamp() {
         let descr = CountWindow::sliding(3, 2);
         let mut generator: CountWindowGenerator<u32, _> = descr.new_generator();

@@ -131,6 +131,7 @@ mod tests {
     use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
 
+    #[cfg(feature = "timestamp")]
     #[test]
     fn reorder() {
         let mut fake = FakeOperator::empty();

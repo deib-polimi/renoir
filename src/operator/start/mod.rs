@@ -11,7 +11,9 @@ use crate::network::{Coord, NetworkDataIterator, NetworkMessage};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::start::watermark_frontier::WatermarkFrontier;
-use crate::operator::{timestamp_max, ExchangeData, Operator, StreamElement};
+#[cfg(feature = "timestamp")]
+use crate::operator::timestamp_max;
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
 mod multiple;
@@ -225,7 +227,10 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                             }
                             StreamElement::FlushAndRestart => {
                                 // mark this replica as ended and let the frontier ignore it from now on
-                                self.watermark_frontier.update(sender, timestamp_max());
+                                #[cfg(feature = "timestamp")]
+                                {
+                                    self.watermark_frontier.update(sender, timestamp_max());
+                                }
                                 self.missing_flush_and_restart -= 1;
                                 continue;
                             }
@@ -303,6 +308,7 @@ mod tests {
     use crate::operator::{Operator, StartBlock, StreamElement, Timestamp, TwoSidesItem};
     use crate::test::FakeNetworkTopology;
 
+    #[cfg(feature = "timestamp")]
     fn ts(millis: u64) -> Timestamp {
         Timestamp::from_millis(millis)
     }
@@ -347,6 +353,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "timestamp")]
     fn test_single_watermark() {
         let mut t = FakeNetworkTopology::new(1, 2);
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
@@ -395,6 +402,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "timestamp")]
     fn test_multiple_no_cache() {
         let mut t = FakeNetworkTopology::new(2, 1);
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();

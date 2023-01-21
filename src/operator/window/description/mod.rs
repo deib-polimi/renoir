@@ -1,16 +1,21 @@
+#[cfg(feature = "timestamp")]
 use std::time::Duration;
 
 pub use count_window::CountWindow;
 
+#[cfg(feature = "timestamp")]
 pub use crate::operator::window::description::session_window::{
     SessionEventTimeWindowDescr, SessionProcessingTimeWindowDescr,
 };
+#[cfg(feature = "timestamp")]
 pub use crate::operator::window::description::sliding_window::{
     SlidingEventTimeWindowDescr, SlidingProcessingTimeWindowDescr,
 };
 
 mod count_window;
+#[cfg(feature = "timestamp")]
 mod session_window;
+#[cfg(feature = "timestamp")]
 mod sliding_window;
 
 /// Processing-time windows divide elements into windows based on their arrival time.
@@ -24,8 +29,10 @@ mod sliding_window;
 ///  - [`ProcessingTimeWindow::session`]
 ///
 /// Windows have an inclusive start timestamp and an exclusive end timestamp.
+#[cfg(feature = "timestamp")]
 pub struct ProcessingTimeWindow {}
 
+#[cfg(feature = "timestamp")]
 impl ProcessingTimeWindow {
     /// Processing-time sliding windows have a fixed size and they may overlap.
     /// The first window starts at timestamp zero, the second one at timestamp `step`, the third
@@ -124,8 +131,10 @@ impl ProcessingTimeWindow {
 ///  - [`EventTimeWindow::session`]
 ///
 /// Windows have an inclusive start timestamp and an exclusive end timestamp.
+#[cfg(feature = "timestamp")]
 pub struct EventTimeWindow {}
 
+#[cfg(feature = "timestamp")]
 impl EventTimeWindow {
     /// Event-time sliding windows have a fixed size and they may overlap.
     /// The first window starts at timestamp zero, the second one at timestamp `step`, the third

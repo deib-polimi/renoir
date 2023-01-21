@@ -129,7 +129,7 @@ where
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s
-    ///     .group_by_sum(|&n| n % 2, |&n| n)
+    ///     .group_by_sum(|&n| n % 2, |n| n)
     ///     .collect_vec();
     ///
     /// env.execute();

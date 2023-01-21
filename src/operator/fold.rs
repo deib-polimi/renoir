@@ -251,6 +251,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::identity_op)]
+    #[cfg(feature = "timestamp")]
     fn test_fold_timestamped() {
         let mut fake_operator = FakeOperator::empty();
         fake_operator.push(StreamElement::Timestamped(0, Duration::from_secs(1)));

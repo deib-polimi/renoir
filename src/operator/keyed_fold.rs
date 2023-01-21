@@ -326,6 +326,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "timestamp")]
     #[allow(clippy::identity_op)]
     fn test_keyed_fold_timestamp() {
         let mut fake_operator = FakeOperator::empty();

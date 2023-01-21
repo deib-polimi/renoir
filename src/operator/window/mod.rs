@@ -11,6 +11,7 @@ use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, Windowed
 mod aggregator;
 mod description;
 mod generic_operator;
+#[cfg(feature = "timestamp")]
 mod processing_time;
 mod window_manager;
 

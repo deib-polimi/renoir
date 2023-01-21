@@ -29,6 +29,7 @@ mod inner {
         // Takes `Out` as input, returns an `Iterator` with items of type `NewOut`
         #[derivative(Debug = "ignore")]
         frontiter: Option<InnerIterator>,
+        #[cfg(feature = "timestamp")]
         timestamp: Option<Duration>,
         _out: PhantomData<In>,
         _iter_out: PhantomData<Out>,
@@ -64,6 +65,7 @@ mod inner {
             Self {
                 prev,
                 frontiter: None,
+                #[cfg(feature = "timestamp")]
                 timestamp: None,
                 _out: Default::default(),
                 _iter_out: Default::default(),
@@ -88,6 +90,9 @@ mod inner {
                 if let Some(ref mut inner) = self.frontiter {
                     match inner.next() {
                         None => self.frontiter = None,
+                        #[cfg(not(feature = "timestamp"))]
+                        Some(item) => return StreamElement::Item(item),
+                        #[cfg(feature = "timestamp")]
                         Some(item) => match self.timestamp {
                             None => return StreamElement::Item(item),
                             Some(ts) => return StreamElement::Timestamped(item, ts),
@@ -95,10 +100,17 @@ mod inner {
                     }
                 }
                 match self.prev.next() {
+                    #[cfg(not(feature = "timestamp"))]
+                    StreamElement::Item(inner) | StreamElement::Timestamped(inner, _) => {
+                        self.frontiter = Some(inner.into_iter());
+                    }
+
+                    #[cfg(feature = "timestamp")]
                     StreamElement::Item(inner) => {
                         self.frontiter = Some(inner.into_iter());
                         self.timestamp = None;
                     }
+                    #[cfg(feature = "timestamp")]
                     StreamElement::Timestamped(inner, ts) => {
                         self.frontiter = Some(inner.into_iter());
                         self.timestamp = Some(ts);
@@ -269,6 +281,9 @@ mod inner {
                 if let Some((ref key, ref mut inner)) = self.frontiter {
                     match inner.next() {
                         None => self.frontiter = None,
+                        #[cfg(not(feature = "timestamp"))]
+                        Some(item) => return StreamElement::Item((key.clone(), item)),
+                        #[cfg(feature = "timestamp")]
                         Some(item) => match self.timestamp {
                             None => return StreamElement::Item((key.clone(), item)),
                             Some(ts) => return StreamElement::Timestamped((key.clone(), item), ts),
@@ -276,10 +291,17 @@ mod inner {
                     }
                 }
                 match self.prev.next() {
+                    #[cfg(not(feature = "timestamp"))]
+                    StreamElement::Item((key, inner))
+                    | StreamElement::Timestamped((key, inner), _) => {
+                        self.frontiter = Some((key, inner.into_iter()));
+                    }
+                    #[cfg(feature = "timestamp")]
                     StreamElement::Item((key, inner)) => {
                         self.frontiter = Some((key, inner.into_iter()));
                         self.timestamp = None;
                     }
+                    #[cfg(feature = "timestamp")]
                     StreamElement::Timestamped((key, inner), ts) => {
                         self.frontiter = Some((key, inner.into_iter()));
                         self.timestamp = Some(ts);
@@ -655,6 +677,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "timestamp")]
     fn test_flatten_timestamped() {
         let mut fake_operator = FakeOperator::empty();
         fake_operator.push(StreamElement::Timestamped(vec![], Duration::from_secs(0)));
