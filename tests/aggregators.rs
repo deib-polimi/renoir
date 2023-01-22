@@ -42,7 +42,7 @@ fn group_by_sum() {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
-            .group_by_sum(|&x| x % 2, |&x| x)
+            .group_by_sum(|&x| x % 2, |x| x)
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

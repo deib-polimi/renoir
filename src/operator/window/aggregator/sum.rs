@@ -33,7 +33,7 @@ where
     /// assert_eq!(res, vec![(0, 0 + 2), (0, 4), (1, 1 + 3)]);
     /// ```
     pub fn sum(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        self.add_generic_window_operator("WindowSum", |window| window.items().sum())
+        self.add_generic_window_operator("WindowSum", |window| window.sum())
     }
 }
 

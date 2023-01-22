@@ -66,9 +66,8 @@ where
             .add_generic_window_operator("WindowJoin", move |window| {
                 // divide the elements coming from the left stream from the elements
                 // coming from the right stream
-                let (left, right) = window
-                    .items()
-                    .partition::<Vec<_>, _>(|x| matches!(x, ConcatElement::Left(_)));
+                let (left, right) =
+                    window.partition::<Vec<_>, _>(|x| matches!(x, ConcatElement::Left(_)));
 
                 // calculate all the pairs of elements in the current window
                 let mut res = Vec::new();

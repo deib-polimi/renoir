@@ -15,6 +15,7 @@ pub use crate::operator::window::description::sliding_window::{
 mod count_window;
 #[cfg(feature = "timestamp")]
 mod session_window;
+
 #[cfg(feature = "timestamp")]
 mod sliding_window;
 

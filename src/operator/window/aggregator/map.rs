@@ -1,4 +1,4 @@
-use crate::operator::window::WindowDescription;
+use crate::operator::window::{Window, WindowDescription};
 use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
 
@@ -38,9 +38,9 @@ where
         map_func: F,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
     where
-        F: Fn(&mut dyn ExactSizeIterator<Item = &Out>) -> NewOut + Clone + Send + 'static,
+        F: Fn(Window<Out>) -> NewOut + Clone + Send + 'static,
     {
-        self.add_generic_window_operator("WindowMap", move |window| (map_func)(&mut window.items()))
+        self.add_generic_window_operator("WindowMap", move |window| (map_func)(window))
     }
 }
 
@@ -74,7 +74,7 @@ where
     /// ```
     pub fn map<NewOut: Data, F>(self, map_func: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        F: Fn(&mut dyn ExactSizeIterator<Item = &Out>) -> NewOut + Clone + Send + 'static,
+        F: Fn(Window<Out>) -> NewOut + Clone + Send + 'static,
     {
         self.inner.map(map_func).drop_key()
     }

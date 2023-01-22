@@ -30,9 +30,7 @@ where
     /// assert_eq!(res, vec![(0, 0.max(2)), (0, 4), (1, 1.max(3))]);
     /// ```
     pub fn max(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        self.add_generic_window_operator("WindowMax", |window| {
-            window.items().max().unwrap().clone()
-        })
+        self.add_generic_window_operator("WindowMax", |window| window.max().unwrap().clone())
     }
 }
 

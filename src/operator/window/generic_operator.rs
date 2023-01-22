@@ -21,7 +21,7 @@ pub(crate) struct GenericWindowOperator<
     WindowDescr,
     OperatorChain,
 > where
-    ProcessFunc: Fn(&Window<Key, Out>) -> NewOut + Clone,
+    ProcessFunc: Fn(Window<Out>) -> NewOut + Clone,
     WindowDescr: WindowDescription<Key, Out> + Clone,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
@@ -42,7 +42,7 @@ pub(crate) struct GenericWindowOperator<
 impl<Key: DataKey, Out: Data, NewOut: Data, ProcessFunc, WindowDescr, OperatorChain> Display
     for GenericWindowOperator<Key, Out, NewOut, ProcessFunc, WindowDescr, OperatorChain>
 where
-    ProcessFunc: Fn(&Window<Key, Out>) -> NewOut + Clone,
+    ProcessFunc: Fn(Window<Out>) -> NewOut + Clone,
     WindowDescr: WindowDescription<Key, Out> + Clone,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
@@ -61,7 +61,7 @@ where
 impl<Key: DataKey, Out: Data, NewOut: Data, F, WindowDescr, OperatorChain>
     GenericWindowOperator<Key, Out, NewOut, F, WindowDescr, OperatorChain>
 where
-    F: Fn(&Window<Key, Out>) -> NewOut + Clone,
+    F: Fn(Window<Out>) -> NewOut + Clone,
     WindowDescr: WindowDescription<Key, Out> + Clone,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
@@ -85,7 +85,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, F, WindowDescr, OperatorChain>
     Operator<KeyValue<Key, NewOut>>
     for GenericWindowOperator<Key, Out, NewOut, F, WindowDescr, OperatorChain>
 where
-    F: Fn(&Window<Key, Out>) -> NewOut + Clone + Send,
+    F: Fn(Window<Out>) -> NewOut + Clone + Send,
     WindowDescr: WindowDescription<Key, Out> + Clone,
     OperatorChain: Operator<KeyValue<Key, Out>>,
 {
@@ -107,8 +107,10 @@ where
 
             for (key, window_gen) in self.manager.add(item) {
                 while let Some(window) = window_gen.next_window() {
-                    let value = (self.process_func)(&window);
-                    self.buffer.push_back(if let Some(ts) = window.timestamp {
+                    let ts = window.timestamp;
+                    let value = (self.process_func)(window);
+                    window_gen.advance();
+                    self.buffer.push_back(if let Some(ts) = ts {
                         StreamElement::Timestamped((key.clone(), value), ts)
                     } else {
                         StreamElement::Item((key.clone(), value))
@@ -160,7 +162,7 @@ where
     where
         NewOut: Data,
         S: Into<String>,
-        F: Fn(&Window<Key, Out>) -> NewOut + Clone + Send + 'static,
+        F: Fn(Window<Out>) -> NewOut + Clone + Send + 'static,
     {
         let stream = self.inner;
         let descr = self.descr;

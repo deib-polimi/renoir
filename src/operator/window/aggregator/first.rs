@@ -30,9 +30,7 @@ where
     /// assert_eq!(res, vec![(0, 0), (0, 4), (1, 1)]);
     /// ```
     pub fn first(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        self.add_generic_window_operator("WindowFirst", |window| {
-            window.items().next().unwrap().clone()
-        })
+        self.add_generic_window_operator("WindowFirst", |mut window| window.next().unwrap().clone())
     }
 }
 

@@ -149,7 +149,7 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for SlidingWindowGenerat
         }
     }
 
-    fn next_window(&mut self) -> Option<Window<Key, Out>> {
+    fn next_window(&mut self) -> Option<Window<Out>> {
         if !self.items.is_empty() && self.win_end <= self.last_seen {
             let size = self
                 .timestamps
@@ -159,7 +159,8 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for SlidingWindowGenerat
             let timestamp = Some(self.win_end);
 
             Some(Window {
-                gen: self,
+                idx: 0,
+                buffer: &self.items,
                 size,
                 timestamp,
             })
@@ -186,10 +187,6 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for SlidingWindowGenerat
             // make sure to skip empty windows
             self.win_end = self.get_window_end(ts).max(self.win_end);
         }
-    }
-
-    fn buffer(&self) -> &VecDeque<Out> {
-        &self.items
     }
 }
 
@@ -220,9 +217,9 @@ mod tests {
 
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Timestamp::from_secs(3)));
-        let items = window.items().copied().collect_vec();
+        let items = window.copied().collect_vec();
         assert_eq!(items, vec![0, 1, 2]);
-        drop(window);
+        generator.advance();
 
         // current window [2.5, 5.5)
         generator.add(StreamElement::Watermark(Timestamp::from_secs(5)));
@@ -232,9 +229,9 @@ mod tests {
 
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Timestamp::from_millis(5500)));
-        let items = window.items().copied().collect_vec();
+        let items = window.copied().collect_vec();
         assert_eq!(items, vec![3]);
-        drop(window);
+        generator.advance();
 
         // current window [7.5, 10.5)
         generator.add(StreamElement::Timestamped(10, Timestamp::from_secs(10)));
@@ -243,16 +240,16 @@ mod tests {
 
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Timestamp::from_millis(10500)));
-        let items = window.items().copied().collect_vec();
+        let items = window.copied().collect_vec();
         assert_eq!(items, vec![10]);
-        drop(window);
+        generator.advance();
 
         // current window [10, 13)
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Timestamp::from_secs(13)));
-        let items = window.items().copied().collect_vec();
+        let items = window.copied().collect_vec();
         assert_eq!(items, vec![10]);
-        drop(window);
+        generator.advance();
 
         assert!(generator.next_window().is_none());
     }

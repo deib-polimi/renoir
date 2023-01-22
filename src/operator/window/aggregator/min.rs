@@ -30,9 +30,7 @@ where
     /// assert_eq!(res, vec![(0, 0.min(2)), (0, 4), (1, 1.min(3))]);
     /// ```
     pub fn min(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        self.add_generic_window_operator("WindowMin", |window| {
-            window.items().min().unwrap().clone()
-        })
+        self.add_generic_window_operator("WindowMin", |window| window.min().unwrap().clone())
     }
 }
 

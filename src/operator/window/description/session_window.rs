@@ -104,7 +104,7 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for SessionWindowGenerat
         }
     }
 
-    fn next_window(&mut self) -> Option<Window<Key, Out>> {
+    fn next_window(&mut self) -> Option<Window<Out>> {
         // find all gaps between consecutive elements and find out if at least one of them is larger
         // than the gap chosen by the user
         let mut size = self
@@ -130,8 +130,9 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for SessionWindowGenerat
                 self.last_window_size = size;
                 let timestamp = self.timestamp_buffer.iter().take(size).max().cloned();
                 Some(Window {
+                    idx: 0,
                     size,
-                    gen: self,
+                    buffer: &self.buffer,
                     timestamp,
                 })
             }
@@ -144,10 +145,6 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for SessionWindowGenerat
             self.buffer.pop_front();
             self.timestamp_buffer.pop_front();
         }
-    }
-
-    fn buffer(&self) -> &VecDeque<Out> {
-        &self.buffer
     }
 }
 
@@ -176,7 +173,7 @@ mod tests {
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Duration::from_secs(2)));
         assert_eq!(window.size, 2);
-        drop(window);
+        generator.advance();
         assert!(generator.next_window().is_none());
     }
 
@@ -195,7 +192,7 @@ mod tests {
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Duration::from_secs(2)));
         assert_eq!(window.size, 2);
-        drop(window);
+        generator.advance();
         assert!(generator.next_window().is_none());
     }
 
@@ -212,7 +209,7 @@ mod tests {
         let window = generator.next_window().unwrap();
         assert_eq!(window.timestamp, Some(Duration::from_secs(2)));
         assert_eq!(window.size, 2);
-        drop(window);
+        generator.advance();
         assert!(generator.next_window().is_none());
     }
 }

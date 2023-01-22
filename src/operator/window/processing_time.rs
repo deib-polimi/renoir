@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::time::UNIX_EPOCH;
 
@@ -57,7 +56,7 @@ impl<Key: DataKey, Out: Data, WindowGen: WindowGenerator<Key, Out>> WindowGenera
         }
     }
 
-    fn next_window(&mut self) -> Option<Window<Key, Out>> {
+    fn next_window(&mut self) -> Option<Window<Out>> {
         let mut window = self.generator.next_window();
         if let Some(w) = &mut window {
             // TODO: should we keep the timestamp?
@@ -68,9 +67,5 @@ impl<Key: DataKey, Out: Data, WindowGen: WindowGenerator<Key, Out>> WindowGenera
 
     fn advance(&mut self) {
         self.generator.advance()
-    }
-
-    fn buffer(&self) -> &VecDeque<Out> {
-        self.generator.buffer()
     }
 }

@@ -46,7 +46,7 @@ where
     {
         self.add_generic_window_operator("WindowFold", move |window| {
             let mut res = init.clone();
-            for value in window.items() {
+            for value in window {
                 (fold)(&mut res, value);
             }
             res

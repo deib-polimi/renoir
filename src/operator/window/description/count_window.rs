@@ -131,7 +131,7 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
         }
     }
 
-    fn next_window(&mut self) -> Option<Window<Key, Out>> {
+    fn next_window(&mut self) -> Option<Window<Out>> {
         if self.buffer.len() >= self.descr.size.get()
             || (self.received_end && !self.buffer.is_empty())
         {
@@ -148,8 +148,9 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
             };
 
             Some(Window {
+                idx: 0,
                 size,
-                gen: self,
+                buffer: &self.buffer,
                 timestamp,
             })
         } else {
@@ -162,10 +163,6 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
             self.buffer.pop_front();
             self.timestamp_buffer.pop_front();
         }
-    }
-
-    fn buffer(&self) -> &VecDeque<Out> {
-        &self.buffer
     }
 }
 

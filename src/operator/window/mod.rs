@@ -32,39 +32,49 @@ pub trait WindowGenerator<Key: DataKey, Out: Data>: Send {
     /// Handle a new element of the stream.
     fn add(&mut self, item: StreamElement<Out>);
     /// If a window is ready, return it so that it can be processed.
-    fn next_window(&mut self) -> Option<Window<Key, Out>>;
+    fn next_window(&mut self) -> Option<Window<Out>>;
     /// Close the current open window.
     /// This method is called when a `Window` is dropped after being processed.
     fn advance(&mut self);
-    /// Return the buffer from which `Window` will get the elements of the window.
-    fn buffer(&self) -> &VecDeque<Out>;
 }
 
 /// A window is a collection of elements and may be associated with a timestamp.
-pub struct Window<'a, Key: DataKey, Out: Data> {
+pub struct Window<'a, Out: Data> {
     /// A reference to the generator that produced this window.
     ///
     /// This will be used for fetching the window elements and for advancing the window when this
     /// is dropped.
-    gen: &'a mut dyn WindowGenerator<Key, Out>,
+    buffer: &'a VecDeque<Out>,
     /// The number of elements of this window.
     size: usize,
+    /// Iterator index
+    idx: usize,
     /// If this window contains elements with a timestamp, a timestamp for this window is built.
     timestamp: Option<Timestamp>,
 }
 
-impl<'a, Key: DataKey, Out: Data> Window<'a, Key, Out> {
-    /// An iterator to the elements of the window.
-    fn items(&self) -> impl ExactSizeIterator<Item = &Out> {
-        self.gen.buffer().iter().take(self.size)
+impl<'a, Out: Data> Iterator for Window<'a, Out> {
+    type Item = &'a Out;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx == self.size {
+            return None;
+        }
+
+        let item = self.buffer.get(self.idx);
+        self.idx += 1;
+        item
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.size - self.idx;
+        (len, Some(len))
     }
 }
 
-impl<'a, Key: DataKey, Out: Data> Drop for Window<'a, Key, Out> {
-    fn drop(&mut self) {
-        self.gen.advance();
-    }
-}
+impl<'a, Out: Data> ExactSizeIterator for Window<'a, Out> {}
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
