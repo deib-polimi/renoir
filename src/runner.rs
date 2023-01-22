@@ -12,19 +12,16 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
 
 use itertools::Itertools;
 use sha2::Digest;
+#[cfg(feature = "ssh")]
 use ssh2::Session;
 
+use crate::config::CONFIG_ENV_VAR;
+use crate::config::HOST_ID_ENV_VAR;
 use crate::config::{RemoteHostConfig, RemoteRuntimeConfig};
 use crate::profiler::Stopwatch;
 use crate::scheduler::HostId;
 use crate::TracingData;
 
-/// Environment variable set by the runner with the host id of the process. If it's missing the
-/// process will have to spawn the processes by itself.
-pub(crate) const HOST_ID_ENV_VAR: &str = "noir_HOST_ID";
-/// Environment variable set by the runner with the content of the config file so that it's not
-/// required to have it on all the hosts.
-pub(crate) const CONFIG_ENV_VAR: &str = "noir_CONFIG";
 /// Size of the buffer usedahash to send the executable file via SCP.
 pub(crate) const SCP_BUFFER_SIZE: usize = 512 * 1024;
 

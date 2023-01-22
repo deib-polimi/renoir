@@ -75,6 +75,7 @@ pub(crate) mod environment;
 pub(crate) mod network;
 pub mod operator;
 mod profiler;
+#[cfg(feature = "ssh")]
 pub(crate) mod runner;
 pub(crate) mod scheduler;
 pub(crate) mod stream;

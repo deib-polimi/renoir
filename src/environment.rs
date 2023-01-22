@@ -7,6 +7,7 @@ use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};
 use crate::operator::source::Source;
 use crate::operator::Data;
 use crate::profiler::Stopwatch;
+#[cfg(feature = "ssh")]
 use crate::runner::spawn_remote_workers;
 use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
@@ -88,8 +89,13 @@ impl StreamEnvironment {
     pub fn spawn_remote_workers(&self) {
         match &self.inner.lock().config.runtime {
             ExecutionRuntime::Local(_) => {}
+            #[cfg(feature = "ssh")]
             ExecutionRuntime::Remote(remote) => {
                 spawn_remote_workers(remote.clone());
+            }
+            #[cfg(not(feature = "ssh"))]
+            ExecutionRuntime::Remote(_) => {
+                panic!("spawn_remote_workers() requires the `ssh` feature for remote configs.");
             }
         }
     }
