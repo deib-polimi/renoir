@@ -10,7 +10,9 @@ use crate::operator::end::EndBlock;
 use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
-use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
+use crate::operator::iteration::{
+    IterationResult, IterationStateHandle, IterationStateLock, StateFeedback,
+};
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 use crate::stream::Stream;
@@ -38,7 +40,7 @@ where
     content_index: usize,
 
     /// Whether the input stream has ended or not.
-    has_input_ended: bool,
+    input_finished: bool,
 }
 
 impl<Out: Data, State: ExchangeData, OperatorChain> Display for Replay<Out, State, OperatorChain>
@@ -72,9 +74,102 @@ where
             prev,
             content: Default::default(),
             content_index: 0,
-            has_input_ended: false,
+            input_finished: false,
             state: IterationStateHandler::new(leader_block_id, state_ref, state_lock),
         }
+    }
+
+    fn input_next(&mut self) -> Option<StreamElement<Out>> {
+        if self.input_finished {
+            return None;
+        }
+
+        let item = match self.prev.next() {
+            StreamElement::FlushAndRestart => {
+                log::debug!(
+                    "Replay at {} received all the input: {} elements total",
+                    self.coord,
+                    self.content.len()
+                );
+                self.input_finished = true;
+                self.content.push(StreamElement::FlushAndRestart);
+                // the first iteration has already happened
+                self.content_index = self.content.len();
+                // since this moment accessing the state for the next iteration must wait
+                self.state.lock();
+                StreamElement::FlushAndRestart
+            }
+            // messages to save for the replay
+            el @ StreamElement::Item(_)
+            | el @ StreamElement::Timestamped(_, _)
+            | el @ StreamElement::Watermark(_) => {
+                self.content.push(el.clone());
+                el
+            }
+            // messages to forward without replaying
+            StreamElement::FlushBatch => StreamElement::FlushBatch,
+            StreamElement::Terminate => {
+                log::debug!("Replay at {} is terminating", self.coord);
+                StreamElement::Terminate
+            }
+        };
+        Some(item)
+    }
+}
+
+impl<Out: Data, State: ExchangeData + Sync, OperatorChain> Operator<Out>
+    for Replay<Out, State, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        self.coord = metadata.coord;
+        self.prev.setup(metadata);
+        self.state.setup(metadata);
+    }
+
+    fn next(&mut self) -> StreamElement<Out> {
+        loop {
+            if let Some(value) = self.input_next() {
+                return value;
+            }
+            // replay
+
+            // this iteration has not ended yet
+            if self.content_index < self.content.len() {
+                let item = self.content[self.content_index].clone();
+                self.content_index += 1;
+                if matches!(item, StreamElement::FlushAndRestart) {
+                    // since this moment accessing the state for the next iteration must wait
+                    self.state.lock();
+                }
+                return item;
+            }
+
+            log::debug!("Replay at {} has ended the iteration", self.coord);
+
+            self.content_index = 0;
+
+            if let IterationResult::Finished = self.state.wait_leader() {
+                log::debug!("Replay block at {} ended the iteration", self.coord);
+                // cleanup so that if this is a nested iteration next time we'll be good to start again
+                self.content.clear();
+                self.input_finished = false;
+            }
+
+            // This iteration has ended but FlushAndRestart has already been sent. To avoid sending
+            // twice the FlushAndRestart repeat.
+        }
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("Replay");
+        operator
+            .receivers
+            .push(OperatorReceiver::new::<StateFeedback<State>>(
+                self.state.leader_block_id,
+            ));
+        self.prev.structure().add_operator(operator)
     }
 }
 
@@ -216,7 +311,7 @@ where
         scheduler.connect_blocks(
             leader_block_id,
             replay_block_id,
-            TypeId::of::<NewIterationState<State>>(),
+            TypeId::of::<StateFeedback<State>>(),
         );
         drop(env);
 
@@ -230,96 +325,5 @@ where
         //        the connections made by the scheduler and if accidentally set to OnlyOne will
         //        break the connections.
         output_stream.add_block(EndBlock::new, NextStrategy::random())
-    }
-}
-
-impl<Out: Data, State: ExchangeData + Sync, OperatorChain> Operator<Out>
-    for Replay<Out, State, OperatorChain>
-where
-    OperatorChain: Operator<Out>,
-{
-    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
-        self.coord = metadata.coord;
-        self.prev.setup(metadata);
-        self.state.setup(metadata);
-    }
-
-    fn next(&mut self) -> StreamElement<Out> {
-        loop {
-            if !self.has_input_ended {
-                let item = self.prev.next();
-
-                return match &item {
-                    StreamElement::FlushAndRestart => {
-                        log::debug!(
-                            "Replay at {} received all the input: {} elements total",
-                            self.coord,
-                            self.content.len()
-                        );
-                        self.has_input_ended = true;
-                        self.content.push(StreamElement::FlushAndRestart);
-                        // the first iteration has already happened
-                        self.content_index = self.content.len();
-                        // since this moment accessing the state for the next iteration must wait
-                        self.state.lock();
-                        StreamElement::FlushAndRestart
-                    }
-                    // messages to save for the replay
-                    StreamElement::Item(_)
-                    | StreamElement::Timestamped(_, _)
-                    | StreamElement::Watermark(_) => {
-                        self.content.push(item.clone());
-                        item
-                    }
-                    // messages to forward without replaying
-                    StreamElement::FlushBatch => item,
-                    StreamElement::Terminate => {
-                        log::debug!("Replay at {} is terminating", self.coord);
-                        item
-                    }
-                };
-            }
-
-            // from here the input has for sure ended, so we need to replay it...
-
-            // this iteration has not ended yet
-            if self.content_index < self.content.len() {
-                let item = self.content.get(self.content_index).unwrap().clone();
-                self.content_index += 1;
-                if matches!(item, StreamElement::FlushAndRestart) {
-                    // since this moment accessing the state for the next iteration must wait
-                    self.state.lock();
-                }
-                return item;
-            }
-
-            log::debug!("Replay at {} has ended the iteration", self.coord);
-
-            self.content_index = 0;
-
-            // this iteration has ended, wait here for the leader
-            let should_continue = self.state.wait_leader();
-
-            // the loop has ended
-            if !should_continue {
-                log::debug!("Replay block at {} ended the iteration", self.coord);
-                // cleanup so that if this is a nested iteration next time we'll be good to start again
-                self.content.clear();
-                self.has_input_ended = false;
-            }
-
-            // This iteration has ended but FlushAndRestart has already been sent. To avoid sending
-            // twice the FlushAndRestart repeat.
-        }
-    }
-
-    fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("Replay");
-        operator
-            .receivers
-            .push(OperatorReceiver::new::<NewIterationState<State>>(
-                self.state.leader_block_id,
-            ));
-        self.prev.structure().add_operator(operator)
     }
 }

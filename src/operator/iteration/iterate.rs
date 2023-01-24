@@ -11,7 +11,9 @@ use crate::operator::end::EndBlock;
 use crate::operator::iteration::iteration_end::IterationEndBlock;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
-use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
+use crate::operator::iteration::{
+    IterationResult, IterationStateHandle, IterationStateLock, StateFeedback,
+};
 use crate::operator::start::StartBlock;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
@@ -51,13 +53,11 @@ where
 
     /// The content of the stream to put back in the loop.
     content: VecDeque<StreamElement<Out>>,
-    /// The index inside `content` of the first message to be sent.
-    content_index: usize,
     /// The content to feed in the loop in the next iteration.
-    next_content: VecDeque<StreamElement<Out>>,
+    feedback_content: VecDeque<StreamElement<Out>>,
 
     /// Whether the input stream has ended or not.
-    has_input_ended: bool,
+    input_finished: bool,
 }
 
 impl<Out: ExchangeData, State: ExchangeData, OperatorChain> Iterate<Out, State, OperatorChain>
@@ -82,11 +82,160 @@ where
 
             prev,
             content: Default::default(),
-            content_index: 0,
-            next_content: Default::default(),
-            has_input_ended: false,
+            feedback_content: Default::default(),
+            input_finished: false,
             state: IterationStateHandler::new(leader_block_id, state_ref, state_lock),
         }
+    }
+
+    fn input_next(&mut self) -> Option<StreamElement<Out>> {
+        if self.input_finished {
+            return None;
+        }
+
+        let item = self.prev.next();
+        let el = match &item {
+            StreamElement::FlushAndRestart => {
+                log::debug!(
+                    "Iterate at {} received all the input: {} elements total",
+                    self.coord,
+                    self.content.len()
+                );
+                self.input_finished = true;
+                // since this moment accessing the state for the next iteration must wait
+                self.state.lock();
+                StreamElement::FlushAndRestart
+            }
+            StreamElement::Item(_)
+            | StreamElement::Timestamped(_, _)
+            | StreamElement::Watermark(_)
+            | StreamElement::FlushBatch => item,
+            StreamElement::Terminate => {
+                log::debug!("Iterate at {} is terminating", self.coord);
+                let message = NetworkMessage::new_single(StreamElement::Terminate, self.coord);
+                self.output_sender.as_ref().unwrap().send(message).unwrap();
+                item
+            }
+        };
+
+        Some(el)
+    }
+
+    fn stored_next(&mut self) -> Option<StreamElement<Out>> {
+        let item = self.content.pop_front()?;
+        if matches!(item, StreamElement::FlushAndRestart) {
+            // since this moment accessing the state for the next iteration must wait
+            self.state.lock();
+        }
+        Some(item)
+    }
+
+    /// Blocks until all feedback for this iteration has been received and placed in feedback_content
+    fn recv_all_feedback(&mut self) {
+        let rx = self.feedback_receiver.as_ref().unwrap();
+        while !matches!(
+            self.feedback_content.back(),
+            Some(StreamElement::FlushAndRestart)
+        ) {
+            let message = rx.recv().unwrap();
+            self.feedback_content.extend(&mut message.into_iter());
+        }
+    }
+}
+
+impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Operator<Out>
+    for Iterate<Out, State, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        self.coord = metadata.coord;
+
+        let feedback_end_block_id = self.feedback_end_block_id.load(Ordering::Acquire) as BlockId;
+        let feedback_endpoint = ReceiverEndpoint::new(metadata.coord, feedback_end_block_id);
+        self.feedback_receiver = Some(metadata.network.get_receiver(feedback_endpoint));
+
+        let output_block_id = self.output_block_id.load(Ordering::Acquire) as BlockId;
+        let output_endpoint = ReceiverEndpoint::new(
+            Coord::new(
+                output_block_id,
+                metadata.coord.host_id,
+                metadata.coord.replica_id,
+            ),
+            metadata.coord.block_id,
+        );
+        self.output_sender = Some(metadata.network.get_sender(output_endpoint));
+
+        self.prev.setup(metadata);
+        self.state.setup(metadata);
+    }
+
+    fn next(&mut self) -> StreamElement<Out> {
+        loop {
+            // try to make progress on the feedback
+            while let Ok(message) = self.feedback_receiver.as_ref().unwrap().try_recv() {
+                self.feedback_content.extend(&mut message.into_iter());
+            }
+
+            if let Some(el) = self.input_next() {
+                return el;
+            }
+            if let Some(el) = self.stored_next() {
+                return el;
+            }
+
+            self.recv_all_feedback();
+
+            log::debug!("Iterate at {} has finished the iteration", self.coord);
+            assert!(self.content.is_empty());
+            std::mem::swap(&mut self.content, &mut self.feedback_content);
+
+            if let IterationResult::Finished = self.state.wait_leader() {
+                log::debug!("Iterate block at {} finished", self.coord,);
+                // cleanup so that if this is a nested iteration next time we'll be good to start again
+                self.input_finished = false;
+
+                let message =
+                    NetworkMessage::new_batch(self.content.drain(..).collect(), self.coord);
+                self.output_sender.as_ref().unwrap().send(message).unwrap();
+            }
+
+            // This iteration has ended but FlushAndRestart has already been sent. To avoid sending
+            // twice the FlushAndRestart repeat.
+        }
+    }
+
+    fn structure(&self) -> BlockStructure {
+        let mut operator = OperatorStructure::new::<Out, _>("Iterate");
+        operator
+            .receivers
+            .push(OperatorReceiver::new::<StateFeedback<State>>(
+                self.state.leader_block_id,
+            ));
+        operator.receivers.push(OperatorReceiver::new::<Out>(
+            self.feedback_end_block_id.load(Ordering::Acquire) as BlockId,
+        ));
+        let output_block_id = self.output_block_id.load(Ordering::Acquire);
+        operator.connections.push(Connection::new::<Out, _>(
+            output_block_id as BlockId,
+            &NextStrategy::only_one(),
+        ));
+        self.prev.structure().add_operator(operator)
+    }
+}
+
+impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Display
+    for Iterate<Out, State, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> Iterate<{}>",
+            self.prev,
+            std::any::type_name::<Out>()
+        )
     }
 }
 
@@ -147,7 +296,7 @@ where
     /// ```
     pub fn iterate<
         Body,
-        DeltaUpdate: ExchangeData + Default,
+        StateUpdate: ExchangeData + Default,
         State: ExchangeData + Sync,
         OperatorChain2,
     >(
@@ -155,8 +304,8 @@ where
         num_iterations: usize,
         initial_state: State,
         body: Body,
-        local_fold: impl Fn(&mut DeltaUpdate, Out) + Send + Clone + 'static,
-        global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Clone + 'static,
+        local_fold: impl Fn(&mut StateUpdate, Out) + Send + Clone + 'static,
+        global_fold: impl Fn(&mut State, StateUpdate) + Send + Clone + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
     ) -> (
         Stream<State, impl Operator<State>>,
@@ -218,6 +367,13 @@ where
         });
         let iterate_block_id = iter_start.block.id;
 
+        iter_start
+            .block
+            .iteration_state_lock_stack
+            .push(state_lock.clone());
+        // save the stack of the iteration for checking the stream returned by the body
+        let pre_iter_stack = iter_start.block.iteration_stack();
+
         // prepare the stream that will output the content of the loop
         let output = StreamEnvironmentInner::stream(
             env.clone(),
@@ -228,19 +384,12 @@ where
         );
         let output_block_id = output.block.id;
 
-        iter_start
-            .block
-            .iteration_state_lock_stack
-            .push(state_lock.clone());
-        // save the stack of the iteration for checking the stream returned by the body
-        let pre_iter_stack = iter_start.block.iteration_stack();
-
         // attach the body of the loop to the Iterate operator
-        let body_end = body(iter_start, state_clone);
+        let body = body(iter_start, state_clone);
 
         // Split the body of the loop in 2: the end block of the loop must ignore the output stream
         // since it's manually handled by the Iterate operator.
-        let mut body_end = body_end.add_block(
+        let mut body = body.add_block(
             move |prev, next_strategy, batch_mode| {
                 let mut end = EndBlock::new(prev, next_strategy, batch_mode);
                 end.ignore_destination(output_block_id);
@@ -248,28 +397,28 @@ where
             },
             NextStrategy::only_one(),
         );
-        let body_end_block_id = body_end.block.id;
+        let body_block_id = body.block.id;
 
-        let post_iter_stack = body_end.block.iteration_stack();
+        let post_iter_stack = body.block.iteration_stack();
         if pre_iter_stack != post_iter_stack {
             panic!("The body of the iteration should return the stream given as parameter");
         }
-        body_end.block.iteration_state_lock_stack.pop().unwrap();
+        body.block.iteration_state_lock_stack.pop().unwrap();
 
         // First split of the body: the data will be reduced into delta updates
-        let delta_update_end = StreamEnvironmentInner::stream(
+        let state_update_end = StreamEnvironmentInner::stream(
             env.clone(),
-            StartBlock::single(body_end_block_id, Some(state_lock)),
+            StartBlock::single(body.block.id, Some(state_lock)),
         )
         .key_by(|_| ())
-        .fold(DeltaUpdate::default(), local_fold)
+        .fold(StateUpdate::default(), local_fold)
         .drop_key()
         .add_operator(|prev| IterationEndBlock::new(prev, leader_block_id));
-        let delta_update_end_block_id = delta_update_end.block.id;
+        let state_update_end_block_id = state_update_end.block.id;
 
         // Second split of the body: the data will be fed back to the Iterate block
-        let batch_mode = body_end.block.batch_mode;
-        let mut feedback_end = body_end.add_operator(|prev| {
+        let batch_mode = body.block.batch_mode;
+        let mut feedback_end = body.add_operator(|prev| {
             let mut end = EndBlock::new(prev, NextStrategy::only_one(), batch_mode);
             end.mark_feedback(iterate_block_id);
             end
@@ -279,25 +428,25 @@ where
 
         let mut env = env.lock();
         let scheduler = env.scheduler_mut();
-        scheduler.add_block(delta_update_end.block);
+        scheduler.add_block(state_update_end.block);
         scheduler.add_block(feedback_end.block);
         // connect the end of the loop to the IterationEndBlock
         scheduler.connect_blocks(
-            body_end_block_id,
-            delta_update_end_block_id,
+            body_block_id,
+            state_update_end_block_id,
             TypeId::of::<Out>(),
         );
         // connect the IterationEndBlock to the IterationLeader
         scheduler.connect_blocks(
-            delta_update_end_block_id,
+            state_update_end_block_id,
             leader_block_id,
-            TypeId::of::<DeltaUpdate>(),
+            TypeId::of::<StateUpdate>(),
         );
         // connect the IterationLeader to the Iterate
         scheduler.connect_blocks(
             leader_block_id,
             iterate_block_id,
-            TypeId::of::<NewIterationState<State>>(),
+            TypeId::of::<StateFeedback<State>>(),
         );
         // connect the feedback
         scheduler.connect_blocks(feedback_end_block_id, iterate_block_id, TypeId::of::<Out>());
@@ -307,7 +456,7 @@ where
 
         // store the id of the blocks we now know
         shared_delta_update_end_block_id
-            .store(delta_update_end_block_id as usize, Ordering::Release);
+            .store(state_update_end_block_id as usize, Ordering::Release);
         shared_feedback_end_block_id.store(feedback_end_block_id as usize, Ordering::Release);
         shared_output_block_id.store(output_block_id as usize, Ordering::Release);
 
@@ -320,147 +469,6 @@ where
         (
             leader_stream.add_block(EndBlock::new, NextStrategy::random()),
             output,
-        )
-    }
-}
-
-impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Operator<Out>
-    for Iterate<Out, State, OperatorChain>
-where
-    OperatorChain: Operator<Out>,
-{
-    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
-        self.coord = metadata.coord;
-
-        let feedback_end_block_id = self.feedback_end_block_id.load(Ordering::Acquire) as BlockId;
-        let feedback_endpoint = ReceiverEndpoint::new(metadata.coord, feedback_end_block_id);
-        self.feedback_receiver = Some(metadata.network.get_receiver(feedback_endpoint));
-
-        let output_block_id = self.output_block_id.load(Ordering::Acquire) as BlockId;
-        let output_endpoint = ReceiverEndpoint::new(
-            Coord::new(
-                output_block_id,
-                metadata.coord.host_id,
-                metadata.coord.replica_id,
-            ),
-            metadata.coord.block_id,
-        );
-        self.output_sender = Some(metadata.network.get_sender(output_endpoint));
-
-        self.prev.setup(metadata);
-        self.state.setup(metadata);
-    }
-
-    fn next(&mut self) -> StreamElement<Out> {
-        loop {
-            // try to make progress on the feedback
-            while let Ok(message) = self.feedback_receiver.as_ref().unwrap().try_recv() {
-                self.next_content.extend(&mut message.into_iter());
-            }
-
-            if !self.has_input_ended {
-                let item = self.prev.next();
-                return match &item {
-                    StreamElement::FlushAndRestart => {
-                        log::debug!(
-                            "Iterate at {} received all the input: {} elements total",
-                            self.coord,
-                            self.content.len()
-                        );
-                        self.has_input_ended = true;
-                        // since this moment accessing the state for the next iteration must wait
-                        self.state.lock();
-                        StreamElement::FlushAndRestart
-                    }
-                    StreamElement::Item(_)
-                    | StreamElement::Timestamped(_, _)
-                    | StreamElement::Watermark(_)
-                    | StreamElement::FlushBatch => item,
-                    StreamElement::Terminate => {
-                        log::debug!("Iterate at {} is terminating", self.coord);
-                        let message =
-                            NetworkMessage::new_single(StreamElement::Terminate, self.coord);
-                        self.output_sender.as_ref().unwrap().send(message).unwrap();
-                        item
-                    }
-                };
-            } else if !self.content.is_empty() {
-                let item = self.content.pop_front().unwrap();
-                if matches!(item, StreamElement::FlushAndRestart) {
-                    // since this moment accessing the state for the next iteration must wait
-                    self.state.lock();
-                }
-                return item;
-            }
-
-            // make sure to consume all the feedback
-            while !matches!(
-                self.next_content.back(),
-                Some(StreamElement::FlushAndRestart)
-            ) {
-                let message = self.feedback_receiver.as_ref().unwrap().recv().unwrap();
-                self.next_content.extend(&mut message.into_iter());
-            }
-
-            log::debug!("Iterate at {} has ended the iteration", self.coord);
-
-            // make sure not to lose anything
-            debug_assert!(self.content.is_empty());
-            // the next iteration
-            std::mem::swap(&mut self.content, &mut self.next_content);
-
-            // this iteration has ended, wait here for the leader
-            let should_continue = self.state.wait_leader();
-
-            if !should_continue {
-                log::debug!(
-                    "Iterate block at {} ended the iteration, producing: {:?}",
-                    self.coord,
-                    self.content.iter().map(|x| x.variant()).collect::<Vec<_>>()
-                );
-                // cleanup so that if this is a nested iteration next time we'll be good to start again
-                self.has_input_ended = false;
-
-                let message =
-                    NetworkMessage::new_batch(self.content.drain(..).collect(), self.coord);
-                self.output_sender.as_ref().unwrap().send(message).unwrap();
-            }
-
-            // This iteration has ended but FlushAndRestart has already been sent. To avoid sending
-            // twice the FlushAndRestart repeat.
-        }
-    }
-
-    fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("Iterate");
-        operator
-            .receivers
-            .push(OperatorReceiver::new::<NewIterationState<State>>(
-                self.state.leader_block_id,
-            ));
-        operator.receivers.push(OperatorReceiver::new::<Out>(
-            self.feedback_end_block_id.load(Ordering::Acquire) as BlockId,
-        ));
-        let output_block_id = self.output_block_id.load(Ordering::Acquire);
-        operator.connections.push(Connection::new::<Out, _>(
-            output_block_id as BlockId,
-            &NextStrategy::only_one(),
-        ));
-        self.prev.structure().add_operator(operator)
-    }
-}
-
-impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Display
-    for Iterate<Out, State, OperatorChain>
-where
-    OperatorChain: Operator<Out>,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} -> Iterate<{}>",
-            self.prev,
-            std::any::type_name::<Out>()
         )
     }
 }

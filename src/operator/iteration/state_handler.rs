@@ -3,10 +3,12 @@ use std::sync::{Arc, Barrier};
 use lazy_init::Lazy;
 
 use crate::network::Coord;
-use crate::operator::iteration::{IterationStateHandle, IterationStateLock, NewIterationState};
+use crate::operator::iteration::{IterationStateHandle, IterationStateLock, StateFeedback};
 use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock};
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
+
+use super::IterationResult;
 
 /// Helper struct that handles the state of an iteration block.
 ///
@@ -18,7 +20,7 @@ pub(crate) struct IterationStateHandler<State: ExchangeData> {
     pub coord: Coord,
 
     /// Receiver of the new state from the leader.
-    pub new_state_receiver: SingleStartBlockReceiverOperator<NewIterationState<State>>,
+    pub new_state_receiver: SingleStartBlockReceiverOperator<StateFeedback<State>>,
     /// The id of the block where `IterationLeader` is.
     pub leader_block_id: BlockId,
 
@@ -84,7 +86,7 @@ impl<State: ExchangeData> IterationStateHandler<State> {
         self.state_lock.lock();
     }
 
-    pub(crate) fn wait_leader(&mut self) -> bool {
+    pub(crate) fn wait_leader(&mut self) -> IterationResult {
         let (should_continue, new_state) = loop {
             let message = self.new_state_receiver.next();
             match message {

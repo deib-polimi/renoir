@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkSender};
-use crate::operator::iteration::NewIterationState;
+use crate::operator::iteration::{IterationResult, StateFeedback};
 use crate::operator::source::Source;
 use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock, StartBlockReceiver};
 use crate::operator::{ExchangeData, Operator, StreamElement};
@@ -23,9 +23,9 @@ use crate::scheduler::{BlockId, ExecutionMetadata};
 /// followed by a `StreamElement::FlushAndReset`.
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
-pub struct IterationLeader<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond>
+pub struct IterationLeader<StateUpdate: ExchangeData, State: ExchangeData, Global, LoopCond>
 where
-    Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
+    Global: Fn(&mut State, StateUpdate) + Send + Clone,
     LoopCond: Fn(&mut State) -> bool + Send + Clone,
 {
     /// The coordinates of this block.
@@ -34,7 +34,7 @@ where
     /// The index of the current iteration (0-based).
     iteration_index: usize,
     /// The maximum number of iterations to perform.
-    num_iterations: usize,
+    max_iterations: usize,
 
     /// The current global state of the iteration.
     ///
@@ -49,7 +49,7 @@ where
     /// The receiver from the `IterationEndBlock`s at the end of the loop.
     ///
     /// This will be set inside `setup` when we will know the id of that block.
-    delta_update_receiver: Option<SingleStartBlockReceiverOperator<DeltaUpdate>>,
+    state_update_receiver: Option<SingleStartBlockReceiverOperator<StateUpdate>>,
     /// The number of replicas of `IterationEndBlock`.
     num_receivers: usize,
     /// The id of the block where `IterationEndBlock` is.
@@ -62,9 +62,9 @@ where
     /// before the call to `setup`.
     feedback_block_id: Arc<AtomicUsize>,
     /// The senders to the start block of the iteration for the information about the new iteration.
-    new_state_senders: Vec<NetworkSender<NewIterationState<State>>>,
+    feedback_senders: Vec<NetworkSender<StateFeedback<State>>>,
     /// Whether `next` should emit a `FlushAndRestart` in the next call.
-    emit_flush_and_restart: bool,
+    flush_and_restart: bool,
 
     /// The function that combines the global state with a delta update.
     #[derivative(Debug = "ignore")]
@@ -100,19 +100,76 @@ where
     ) -> Self {
         Self {
             // these fields will be set inside the `setup` method
-            delta_update_receiver: None,
-            new_state_senders: Default::default(),
+            state_update_receiver: None,
+            feedback_senders: Default::default(),
             coord: Coord::new(0, 0, 0),
             num_receivers: 0,
 
-            num_iterations,
+            max_iterations: num_iterations,
             iteration_index: 0,
             state: Some(initial_state.clone()),
             initial_state,
             feedback_block_id,
-            emit_flush_and_restart: false,
+            flush_and_restart: false,
             global_fold,
             loop_condition,
+        }
+    }
+
+    fn process_updates(&mut self) -> Option<StreamElement<State>> {
+        let mut missing_state_updates = self.num_receivers;
+        let rx = self.state_update_receiver.as_mut().unwrap();
+        while missing_state_updates > 0 {
+            match rx.next() {
+                StreamElement::Item(state_update) => {
+                    missing_state_updates -= 1;
+                    log::debug!(
+                        "IterationLeader at {} received a delta update, {} missing",
+                        self.coord,
+                        missing_state_updates
+                    );
+                    (self.global_fold)(self.state.as_mut().unwrap(), state_update);
+                }
+                StreamElement::Terminate => {
+                    log::debug!("IterationLeader {} received Terminate", self.coord);
+                    return Some(StreamElement::Terminate);
+                }
+                StreamElement::FlushAndRestart | StreamElement::FlushBatch => {}
+                update => unreachable!(
+                    "IterationLeader received an invalid message: {}",
+                    update.variant()
+                ),
+            }
+        }
+        None
+    }
+
+    /// Returns Some if it's the last loop and the state should be returned
+    fn final_result(&mut self) -> Option<State> {
+        let loop_condition = (self.loop_condition)(self.state.as_mut().unwrap());
+        let more_iterations = self.iteration_index < self.max_iterations;
+        let should_continue = loop_condition && more_iterations;
+
+        if !loop_condition {
+            log::debug!(
+                "IterationLeader at {} finished because of loop condition",
+                self.coord,
+            );
+        }
+        if !more_iterations {
+            log::debug!(
+                "IterationLeader at {} finished because of iteration limit",
+                self.coord
+            );
+        }
+
+        if should_continue {
+            None
+        } else {
+            // reset the global state at the end of the iteration
+            let state = self.state.take();
+            self.state = Some(self.initial_state.clone());
+            state
         }
     }
 }
@@ -125,7 +182,7 @@ where
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
-        self.new_state_senders = metadata
+        self.feedback_senders = metadata
             .network
             .get_senders(metadata.coord)
             .into_iter()
@@ -138,12 +195,12 @@ where
         let mut delta_update_receiver = StartBlock::single(feedback_block_id, None);
         delta_update_receiver.setup(metadata);
         self.num_receivers = delta_update_receiver.receiver().prev_replicas().len();
-        self.delta_update_receiver = Some(delta_update_receiver);
+        self.state_update_receiver = Some(delta_update_receiver);
     }
 
     fn next(&mut self) -> StreamElement<State> {
-        if self.emit_flush_and_restart {
-            self.emit_flush_and_restart = false;
+        if self.flush_and_restart {
+            self.flush_and_restart = false;
             return StreamElement::FlushAndRestart;
         }
         loop {
@@ -152,67 +209,28 @@ where
                 self.coord,
                 self.num_receivers
             );
-            let mut missing_delta_updates = self.num_receivers;
-            while missing_delta_updates > 0 {
-                let update = self.delta_update_receiver.as_mut().unwrap().next();
-                match update {
-                    StreamElement::Item(delta_update) => {
-                        missing_delta_updates -= 1;
-                        log::debug!(
-                            "IterationLeader at {} received a delta update, {} missing",
-                            self.coord,
-                            missing_delta_updates
-                        );
-                        (self.global_fold)(self.state.as_mut().unwrap(), delta_update);
-                    }
-                    StreamElement::Terminate => {
-                        log::debug!("IterationLeader {} received Terminate", self.coord);
-                        return StreamElement::Terminate;
-                    }
-                    StreamElement::FlushAndRestart => {}
-                    StreamElement::FlushBatch => {}
-                    _ => unreachable!(
-                        "IterationLeader received an invalid message: {}",
-                        update.variant()
-                    ),
-                }
-            }
-            // the loop condition may change the state
-            let mut should_continue = (self.loop_condition)(self.state.as_mut().unwrap());
-            log::debug!(
-                "IterationLeader at {} checked loop condition and resulted in {}",
-                self.coord,
-                should_continue
-            );
-            self.iteration_index += 1;
-            if self.iteration_index >= self.num_iterations {
-                log::debug!("IterationLeader at {} reached iteration limit", self.coord);
-                should_continue = false;
+            if let Some(value) = self.process_updates() {
+                return value;
             }
 
             get_profiler().iteration_boundary(self.coord.block_id);
+            self.iteration_index += 1;
+            let result = self.final_result();
 
-            let to_return = if !should_continue {
-                // reset the global state at the end of the iteration
-                let to_return = self.state.take();
-                self.state = Some(self.initial_state.clone());
-                to_return
-            } else {
-                None
-            };
-
-            let new_state_message = (should_continue, self.state.clone().unwrap());
-            for sender in &self.new_state_senders {
+            let state_feedback = (
+                IterationResult::from_condition(result.is_none()),
+                self.state.clone().unwrap(),
+            );
+            for sender in &self.feedback_senders {
                 let message = NetworkMessage::new_single(
-                    StreamElement::Item(new_state_message.clone()),
+                    StreamElement::Item(state_feedback.clone()),
                     self.coord,
                 );
                 sender.send(message).unwrap();
             }
 
-            if let Some(state) = to_return {
-                assert!(!should_continue);
-                self.emit_flush_and_restart = true;
+            if let Some(state) = result {
+                self.flush_and_restart = true;
                 self.iteration_index = 0;
                 return StreamElement::Item(state);
             }
@@ -223,11 +241,11 @@ where
         let mut operator = OperatorStructure::new::<State, _>("IterationLeader");
         operator
             .connections
-            .push(Connection::new::<NewIterationState<State>, _>(
-                self.new_state_senders[0].receiver_endpoint.coord.block_id,
+            .push(Connection::new::<StateFeedback<State>, _>(
+                self.feedback_senders[0].receiver_endpoint.coord.block_id,
                 &NextStrategy::only_one(),
             ));
-        self.delta_update_receiver
+        self.state_update_receiver
             .as_ref()
             .unwrap()
             .structure()

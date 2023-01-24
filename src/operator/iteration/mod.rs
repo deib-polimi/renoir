@@ -2,6 +2,8 @@ use std::cell::UnsafeCell;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Condvar, Mutex};
 
+use serde::{Deserialize, Serialize};
+
 mod iterate;
 // mod iterate_diff;
 mod iteration_end;
@@ -9,11 +11,28 @@ mod leader;
 mod replay;
 mod state_handler;
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) enum IterationResult {
+    /// Continue iterating
+    Continue,
+    /// The iteration cycle has finished
+    Finished,
+}
+impl IterationResult {
+    pub(crate) fn from_condition(should_continue: bool) -> IterationResult {
+        if should_continue {
+            Self::Continue
+        } else {
+            Self::Finished
+        }
+    }
+}
+
 /// The information about the new state of an iteration:
 ///
 /// - a boolean indicating if a new iteration should start
 /// - the new state for the next iteration
-pub(crate) type NewIterationState<State> = (bool, State);
+pub(crate) type StateFeedback<State> = (IterationResult, State);
 
 /// A shared reference to the state of an iteration,
 ///

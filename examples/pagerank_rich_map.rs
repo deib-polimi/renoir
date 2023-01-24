@@ -1,7 +1,4 @@
-use std::{
-    ops::{Add, AddAssign},
-    time::Instant,
-};
+use std::{ops::AddAssign, time::Instant};
 
 use noir::{prelude::*, IterationStateHandle};
 use serde::{Deserialize, Serialize};
@@ -31,33 +28,9 @@ impl Msg {
 
 impl AddAssign<Self> for Msg {
     fn add_assign(&mut self, rhs: Self) {
-        if let Msg::Output(rank) = rhs {
-            *self = Msg::Output(rank);
-            return;
-        }
-
-        let Msg::Update(b) = rhs else {
-            panic!("summing incompatible msg values");
-        };
-
-        match self {
-            Msg::Update(a) => *a += b,
-            _ => panic!("summing incompatible  msg values"),
-        }
-    }
-}
-
-impl Add for Msg {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> <Self as Add>::Output {
-        let Msg::Update(b) = rhs else {
-            panic!("summing incompatible msg values");
-        };
-
-        match self {
-            Msg::Update(a) => Msg::Update(a + b),
-            _ => panic!("summing incompatible  msg values"),
+        match (self, rhs) {
+            (Msg::Update(a), Msg::Update(b)) => *a += b,
+            _ => panic!("Summing incompatible Msg"),
         }
     }
 }
@@ -107,54 +80,47 @@ fn main() {
 
     let (state, out) = init.iterate(
         num_iterations,
-        TerminationCond {
-            something_changed: false,
-            last_iteration: false,
-        },
-        {
-            move |s, state: IterationStateHandle<TerminationCond>| {
-                s.to_keyed()
-                    .rich_flat_map({
-                        let mut adj_list = vec![];
-                        let mut rank = 0f64;
+        TerminationCond::default(),
+        move |s, state: IterationStateHandle<TerminationCond>| {
+            s.to_keyed()
+                .rich_flat_map({
+                    let mut adj_list = vec![];
+                    let mut rank = 0f64;
 
-                        move |(x, msg): (_, Msg)| {
-                            if state.get().last_iteration {
-                                return vec![(*x, Msg::Output(rank))];
-                            }
-                            match msg {
-                                Msg::Init { rank_init, adj } => {
-                                    adj_list = adj;
-                                    vec![(*x, Msg::Update(rank_init))]
-                                }
-                                Msg::Update(rank_update) => {
-                                    rank += rank_update;
-                                    let mut update = Vec::with_capacity(adj_list.len() + 1);
-
-                                    if !adj_list.is_empty() {
-                                        let distribute = (rank * DAMPENING) / adj_list.len() as f64;
-                                        update.extend(
-                                            adj_list
-                                                .iter()
-                                                .map(move |y| (*y, Msg::Update(distribute))),
-                                        );
-                                    }
-
-                                    update.push((
-                                        *x,
-                                        Msg::Update((1.0 - DAMPENING) / num_pages as f64 - rank),
-                                    ));
-
-                                    update
-                                }
-                                Msg::Output(_) => panic!("should never have output here"),
-                            }
+                    move |(x, msg): (_, Msg)| {
+                        if state.get().last_iteration {
+                            return vec![(*x, Msg::Output(rank))];
                         }
-                    })
-                    .drop_key()
-                    .group_by_sum(|x| x.0, |x| x.1)
-                    .unkey()
-            }
+                        match msg {
+                            Msg::Init { rank_init, adj } => {
+                                adj_list = adj;
+                                vec![(*x, Msg::Update(rank_init))]
+                            }
+                            Msg::Update(rank_update) => {
+                                rank += rank_update;
+                                let mut update = Vec::with_capacity(adj_list.len() + 1);
+
+                                if !adj_list.is_empty() {
+                                    let distribute = (rank * DAMPENING) / adj_list.len() as f64;
+                                    update.extend(
+                                        adj_list.iter().map(move |y| (*y, Msg::Update(distribute))),
+                                    );
+                                }
+
+                                update.push((
+                                    *x,
+                                    Msg::Update((1.0 - DAMPENING) / num_pages as f64 - rank),
+                                ));
+
+                                update
+                            }
+                            Msg::Output(_) => panic!("should never have output here"),
+                        }
+                    }
+                })
+                .drop_key()
+                .group_by_sum(|x| x.0, |x| x.1)
+                .unkey()
         },
         |changed: &mut TerminationCond, x| {
             changed.something_changed = if let Msg::Update(a) = x.1 {
