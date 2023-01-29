@@ -66,7 +66,7 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out> + 'static>(
     let structure = block.operators.structure();
 
     let join_handle = std::thread::Builder::new()
-        .name(format!("noir-block-{}", block.id))
+        .name(format!("block-{}", block.id))
         .spawn(move || {
             // remember in the thread-local the coordinate of this block
             COORD.with(|x| *x.borrow_mut() = Some(coord));

@@ -85,7 +85,7 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
         let config = config.clone();
         let host = host.clone();
         let join_handle = std::thread::Builder::new()
-            .name(format!("noir-remote-{:02}", host_id))
+            .name(format!("remote-{:02}", host_id))
             .spawn(move || remote_worker(host_id as _, host, config, exe_uid))
             .unwrap();
         join_handles.push(join_handle);

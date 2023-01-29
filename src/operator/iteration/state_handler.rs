@@ -2,10 +2,9 @@ use std::sync::{Arc, Barrier};
 
 use lazy_init::Lazy;
 
-use crate::network::Coord;
+use crate::network::{Coord, NetworkReceiver, ReceiverEndpoint};
 use crate::operator::iteration::{IterationStateHandle, IterationStateLock, StateFeedback};
-use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock};
-use crate::operator::{ExchangeData, Operator, StreamElement};
+use crate::operator::ExchangeData;
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
 use super::IterationResult;
@@ -14,13 +13,13 @@ use super::IterationResult;
 ///
 /// This will keep track of the state locks and barriers for updating the state, as well as
 /// receiving the state from the leader.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct IterationStateHandler<State: ExchangeData> {
     /// The coordinate of this replica.
     pub coord: Coord,
 
     /// Receiver of the new state from the leader.
-    pub new_state_receiver: SingleStartBlockReceiverOperator<StateFeedback<State>>,
+    pub new_state_receiver: Option<NetworkReceiver<StateFeedback<State>>>,
     /// The id of the block where `IterationLeader` is.
     pub leader_block_id: BlockId,
 
@@ -44,6 +43,21 @@ pub(crate) struct IterationStateHandler<State: ExchangeData> {
     pub state_lock: Arc<IterationStateLock>,
 }
 
+impl<State: ExchangeData + Clone> Clone for IterationStateHandler<State> {
+    fn clone(&self) -> Self {
+        Self {
+            coord: self.coord,
+            new_state_receiver: None,
+            leader_block_id: self.leader_block_id,
+            is_local_leader: self.is_local_leader,
+            num_local_replicas: self.num_local_replicas,
+            state_ref: self.state_ref.clone(),
+            state_barrier: self.state_barrier.clone(),
+            state_lock: self.state_lock.clone(),
+        }
+    }
+}
+
 /// Given a list of replicas, deterministically select a leader between them.
 fn select_leader(replicas: &[Coord]) -> Coord {
     *replicas.iter().min().unwrap()
@@ -60,7 +74,7 @@ impl<State: ExchangeData> IterationStateHandler<State> {
             is_local_leader: false,
             num_local_replicas: 0,
 
-            new_state_receiver: StartBlock::single(leader_block_id, None),
+            new_state_receiver: None,
             leader_block_id,
             state_ref,
             state_barrier: Arc::new(Default::default()),
@@ -79,28 +93,23 @@ impl<State: ExchangeData> IterationStateHandler<State> {
         self.num_local_replicas = local_replicas.len();
         self.coord = metadata.coord;
 
-        self.new_state_receiver.setup(metadata);
+        let endpoint = ReceiverEndpoint::new(metadata.coord, self.leader_block_id);
+        self.new_state_receiver = Some(metadata.network.get_receiver(endpoint));
     }
 
     pub(crate) fn lock(&self) {
         self.state_lock.lock();
     }
 
-    pub(crate) fn wait_leader(&mut self) -> IterationResult {
-        let (should_continue, new_state) = loop {
-            let message = self.new_state_receiver.next();
-            match message {
-                StreamElement::Item((should_continue, new_state)) => {
-                    break (should_continue, new_state);
-                }
-                StreamElement::FlushBatch => {}
-                StreamElement::FlushAndRestart => {}
-                _ => unreachable!(
-                    "Iterate received invalid message from IterationLeader: {}",
-                    message.variant()
-                ),
-            }
-        };
+    pub(crate) fn state_receiver(&self) -> Option<&NetworkReceiver<StateFeedback<State>>> {
+        self.new_state_receiver.as_ref()
+    }
+
+    pub(crate) fn wait_sync_state(
+        &mut self,
+        state_update: StateFeedback<State>,
+    ) -> IterationResult {
+        let (should_continue, new_state) = state_update;
 
         // update the state only once per host
         if self.is_local_leader {

@@ -4,7 +4,11 @@ use std::fmt::Display;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::block::{BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure};
+use crate::block::{
+    BlockStructure, Connection, InnerBlock, NextStrategy, OperatorReceiver, OperatorStructure,
+};
+use crate::channel::RecvError::Disconnected;
+use crate::channel::SelectResult;
 use crate::environment::StreamEnvironmentInner;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
 use crate::operator::end::EndBlock;
@@ -14,6 +18,7 @@ use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::iteration::{
     IterationResult, IterationStateHandle, IterationStateLock, StateFeedback,
 };
+use crate::operator::source::Source;
 use crate::operator::start::StartBlock;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
@@ -28,24 +33,23 @@ fn clone_with_default<T: Default>(_: &T) -> T {
 /// After an iteration what comes out of the loop will come back inside for the next iteration.
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
-pub struct Iterate<Out: ExchangeData, State: ExchangeData, OperatorChain>
-where
-    OperatorChain: Operator<Out>,
-{
+pub struct Iterate<Out: ExchangeData, State: ExchangeData> {
     /// The coordinate of this replica.
     coord: Coord,
-
-    /// The chain of previous operators where the initial dataset is read from.
-    prev: OperatorChain,
 
     /// Helper structure that manages the iteration's state.
     state: IterationStateHandler<State>,
 
     /// The receiver of the data coming from the previous iteration of the loop.
     #[derivative(Clone(clone_with = "clone_with_default"))]
+    input_receiver: Option<NetworkReceiver<Out>>,
+
+    #[derivative(Clone(clone_with = "clone_with_default"))]
     feedback_receiver: Option<NetworkReceiver<Out>>,
+
     /// The id of the block that handles the feedback connection.
     feedback_end_block_id: Arc<AtomicUsize>,
+    input_block_id: BlockId,
     /// The sender that will feed the data to the output of the iteration.
     output_sender: Option<NetworkSender<Out>>,
     /// The id of the block where the output of the iteration comes out.
@@ -53,6 +57,9 @@ where
 
     /// The content of the stream to put back in the loop.
     content: VecDeque<StreamElement<Out>>,
+
+    /// Used to store outside input arriving early
+    input_stash: VecDeque<StreamElement<Out>>,
     /// The content to feed in the loop in the next iteration.
     feedback_content: VecDeque<StreamElement<Out>>,
 
@@ -60,13 +67,10 @@ where
     input_finished: bool,
 }
 
-impl<Out: ExchangeData, State: ExchangeData, OperatorChain> Iterate<Out, State, OperatorChain>
-where
-    OperatorChain: Operator<Out>,
-{
+impl<Out: ExchangeData, State: ExchangeData> Iterate<Out, State> {
     fn new(
-        prev: OperatorChain,
         state_ref: IterationStateHandle<State>,
+        input_block_id: BlockId,
         leader_block_id: BlockId,
         feedback_end_block_id: Arc<AtomicUsize>,
         output_block_id: Arc<AtomicUsize>,
@@ -75,32 +79,27 @@ where
         Self {
             // these fields will be set inside the `setup` method
             coord: Coord::new(0, 0, 0),
+            input_receiver: None,
             feedback_receiver: None,
             feedback_end_block_id,
+            input_block_id,
             output_sender: None,
             output_block_id,
 
-            prev,
             content: Default::default(),
+            input_stash: Default::default(),
             feedback_content: Default::default(),
             input_finished: false,
             state: IterationStateHandler::new(leader_block_id, state_ref, state_lock),
         }
     }
 
-    fn input_next(&mut self) -> Option<StreamElement<Out>> {
-        if self.input_finished {
-            return None;
-        }
+    fn next_input(&mut self) -> Option<StreamElement<Out>> {
+        let item = self.input_stash.pop_front()?;
 
-        let item = self.prev.next();
         let el = match &item {
             StreamElement::FlushAndRestart => {
-                log::debug!(
-                    "Iterate at {} received all the input: {} elements total",
-                    self.coord,
-                    self.content.len()
-                );
+                log::debug!("input finished for iterate {}", self.coord);
                 self.input_finished = true;
                 // since this moment accessing the state for the next iteration must wait
                 self.state.lock();
@@ -111,17 +110,16 @@ where
             | StreamElement::Watermark(_)
             | StreamElement::FlushBatch => item,
             StreamElement::Terminate => {
-                log::debug!("Iterate at {} is terminating", self.coord);
+                log::error!("Iterate at {} is terminating", self.coord);
                 let message = NetworkMessage::new_single(StreamElement::Terminate, self.coord);
                 self.output_sender.as_ref().unwrap().send(message).unwrap();
                 item
             }
         };
-
         Some(el)
     }
 
-    fn stored_next(&mut self) -> Option<StreamElement<Out>> {
+    fn next_stored(&mut self) -> Option<StreamElement<Out>> {
         let item = self.content.pop_front()?;
         if matches!(item, StreamElement::FlushAndRestart) {
             // since this moment accessing the state for the next iteration must wait
@@ -130,26 +128,87 @@ where
         Some(item)
     }
 
-    /// Blocks until all feedback for this iteration has been received and placed in feedback_content
-    fn recv_all_feedback(&mut self) {
-        let rx = self.feedback_receiver.as_ref().unwrap();
-        while !matches!(
+    fn feedback_finished(&self) -> bool {
+        matches!(
             self.feedback_content.back(),
             Some(StreamElement::FlushAndRestart)
-        ) {
-            let message = rx.recv().unwrap();
-            self.feedback_content.extend(&mut message.into_iter());
+        )
+    }
+
+    pub(crate) fn input_or_feedback(&mut self) {
+        let rx_feedback = self.feedback_receiver.as_ref().unwrap();
+
+        if let Some(rx_input) = self.input_receiver.as_ref() {
+            match rx_input.select(rx_feedback) {
+                SelectResult::A(Ok(msg)) => {
+                    self.input_stash.extend(msg.into_iter());
+                }
+                SelectResult::B(Ok(msg)) => {
+                    self.feedback_content.extend(msg.into_iter());
+                }
+                SelectResult::A(Err(Disconnected)) => {
+                    self.input_receiver = None;
+                    self.input_or_feedback();
+                }
+                SelectResult::B(Err(Disconnected)) => {
+                    log::error!("feedback_receiver disconnected!");
+                    panic!("feedback_receiver disconnected!");
+                }
+            }
+        } else {
+            self.feedback_content
+                .extend(rx_feedback.recv().unwrap().into_iter());
+        }
+    }
+
+    pub(crate) fn wait_update(&mut self) -> StateFeedback<State> {
+        // We need to stash inputs that arrive early to avoid deadlocks
+
+        let rx_state = self.state.state_receiver().unwrap();
+        loop {
+            let state_msg = if let Some(rx_input) = self.input_receiver.as_ref() {
+                match rx_state.select(rx_input) {
+                    SelectResult::A(Ok(state_msg)) => state_msg,
+                    SelectResult::A(Err(Disconnected)) => {
+                        log::error!("state_receiver disconnected!");
+                        panic!("state_receiver disconnected!");
+                    }
+                    SelectResult::B(Ok(msg)) => {
+                        self.input_stash.extend(msg.into_iter());
+                        continue;
+                    }
+                    SelectResult::B(Err(Disconnected)) => {
+                        self.input_receiver = None;
+                        continue;
+                    }
+                }
+            } else {
+                rx_state.recv().unwrap()
+            };
+
+            assert!(state_msg.num_items() == 1);
+
+            match state_msg.into_iter().next().unwrap() {
+                StreamElement::Item((should_continue, new_state)) => {
+                    return (should_continue, new_state);
+                }
+                StreamElement::FlushBatch => {}
+                StreamElement::FlushAndRestart => {}
+                m => unreachable!(
+                    "Iterate received invalid message from IterationLeader: {}",
+                    m.variant()
+                ),
+            }
         }
     }
 }
 
-impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Operator<Out>
-    for Iterate<Out, State, OperatorChain>
-where
-    OperatorChain: Operator<Out>,
-{
+impl<Out: ExchangeData, State: ExchangeData + Sync> Operator<Out> for Iterate<Out, State> {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
+
+        let endpoint = ReceiverEndpoint::new(metadata.coord, self.input_block_id);
+        self.input_receiver = Some(metadata.network.get_receiver(endpoint));
 
         let feedback_end_block_id = self.feedback_end_block_id.load(Ordering::Acquire) as BlockId;
         let feedback_endpoint = ReceiverEndpoint::new(metadata.coord, feedback_end_block_id);
@@ -166,7 +225,6 @@ where
         );
         self.output_sender = Some(metadata.network.get_sender(output_endpoint));
 
-        self.prev.setup(metadata);
         self.state.setup(metadata);
     }
 
@@ -177,20 +235,31 @@ where
                 self.feedback_content.extend(&mut message.into_iter());
             }
 
-            if let Some(el) = self.input_next() {
-                return el;
-            }
-            if let Some(el) = self.stored_next() {
-                return el;
+            if !self.input_finished {
+                while self.input_stash.is_empty() {
+                    self.input_or_feedback();
+                }
+
+                return self.next_input().unwrap();
             }
 
-            self.recv_all_feedback();
+            if !self.content.is_empty() {
+                return self.next_stored().unwrap();
+            }
+
+            while !self.feedback_finished() {
+                self.input_or_feedback();
+            }
+
+            // All feedback received
 
             log::debug!("Iterate at {} has finished the iteration", self.coord);
             assert!(self.content.is_empty());
             std::mem::swap(&mut self.content, &mut self.feedback_content);
 
-            if let IterationResult::Finished = self.state.wait_leader() {
+            let state_update = self.wait_update();
+
+            if let IterationResult::Finished = self.state.wait_sync_state(state_update) {
                 log::debug!("Iterate block at {} finished", self.coord,);
                 // cleanup so that if this is a nested iteration next time we'll be good to start again
                 self.input_finished = false;
@@ -215,27 +284,21 @@ where
         operator.receivers.push(OperatorReceiver::new::<Out>(
             self.feedback_end_block_id.load(Ordering::Acquire) as BlockId,
         ));
+        operator
+            .receivers
+            .push(OperatorReceiver::new::<Out>(self.input_block_id));
         let output_block_id = self.output_block_id.load(Ordering::Acquire);
         operator.connections.push(Connection::new::<Out, _>(
             output_block_id as BlockId,
             &NextStrategy::only_one(),
         ));
-        self.prev.structure().add_operator(operator)
+        BlockStructure::default().add_operator(operator)
     }
 }
 
-impl<Out: ExchangeData, State: ExchangeData + Sync, OperatorChain> Display
-    for Iterate<Out, State, OperatorChain>
-where
-    OperatorChain: Operator<Out>,
-{
+impl<Out: ExchangeData, State: ExchangeData + Sync> Display for Iterate<Out, State> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} -> Iterate<{}>",
-            self.prev,
-            std::any::type_name::<Out>()
-        )
+        write!(f, "Iterate<{}>", std::any::type_name::<Out>())
     }
 }
 
@@ -313,7 +376,7 @@ where
     )
     where
         Body: FnOnce(
-            Stream<Out, Iterate<Out, State, OperatorChain>>,
+            Stream<Out, Iterate<Out, State>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,
         OperatorChain2: Operator<Out> + 'static,
@@ -354,18 +417,34 @@ where
         // the lock for synchronizing the access to the state of this iteration
         let state_lock = Arc::new(IterationStateLock::default());
 
-        // prepare the loop body stream
-        let mut iter_start = self.add_operator(|prev| {
-            Iterate::new(
-                prev,
-                state,
-                leader_block_id,
-                shared_feedback_end_block_id.clone(),
-                shared_output_block_id.clone(),
-                state_lock.clone(),
-            )
-        });
-        let iterate_block_id = iter_start.block.id;
+        let input_block_id = self.block.id;
+        let batch_mode = self.block.batch_mode;
+        let mut input =
+            self.add_operator(|prev| EndBlock::new(prev, NextStrategy::only_one(), batch_mode));
+        input.block.is_only_one_strategy = true;
+
+        let iterate_block_id = {
+            let mut env = env.lock();
+            env.new_block()
+        };
+        let iter_source = Iterate::new(
+            state,
+            input_block_id,
+            leader_block_id,
+            shared_feedback_end_block_id.clone(),
+            shared_output_block_id.clone(),
+            state_lock.clone(),
+        );
+
+        let mut iter_start = Stream {
+            block: InnerBlock::new(
+                iterate_block_id,
+                iter_source,
+                batch_mode,
+                input.block.iteration_state_lock_stack.clone(),
+            ),
+            env: env.clone(),
+        };
 
         iter_start
             .block
@@ -430,6 +509,8 @@ where
         let scheduler = env.scheduler_mut();
         scheduler.add_block(state_update_end.block);
         scheduler.add_block(feedback_end.block);
+        scheduler.add_block(input.block);
+        scheduler.connect_blocks(input_block_id, iterate_block_id, TypeId::of::<Out>());
         // connect the end of the loop to the IterationEndBlock
         scheduler.connect_blocks(
             body_block_id,
@@ -470,5 +551,11 @@ where
             leader_stream.add_block(EndBlock::new, NextStrategy::random()),
             output,
         )
+    }
+}
+
+impl<Out: ExchangeData, State: ExchangeData + Sync> Source<Out> for Iterate<Out, State> {
+    fn get_max_parallelism(&self) -> Option<usize> {
+        None
     }
 }

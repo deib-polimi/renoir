@@ -121,10 +121,12 @@ where
                             continue;
                         }
                         sender.1.enqueue(message.clone());
-                        // make sure to flush at the end of each iteration
-                        if matches!(message, StreamElement::FlushAndRestart) {
-                            sender.1.flush();
-                        }
+                    }
+                }
+                // make sure to flush at the end of each iteration
+                if matches!(message, StreamElement::FlushAndRestart) {
+                    for (_, batcher) in self.senders.iter_mut() {
+                        batcher.flush();
                     }
                 }
             }

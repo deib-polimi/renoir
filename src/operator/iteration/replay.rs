@@ -115,6 +115,32 @@ where
         };
         Some(item)
     }
+
+    fn wait_update(&mut self) -> StateFeedback<State> {
+        let state_receiver = self.state.state_receiver().unwrap();
+        // TODO: check if affected by deadlock like iterate was in commit eb481da525850febe7cfb0963c6f3285252ecfaa
+        // If there is the possibility of input staying still in the channel
+        // waiting for the state, the iteration may deadlock
+        // to solve instead of blocking on the state receiver,
+        // a select must be performed allowing inputs to be stashed and
+        // be pulled off the channel
+        loop {
+            let message = state_receiver.recv().unwrap();
+            assert!(message.num_items() == 1);
+
+            match message.into_iter().next().unwrap() {
+                StreamElement::Item((should_continue, new_state)) => {
+                    return (should_continue, new_state);
+                }
+                StreamElement::FlushBatch => {}
+                StreamElement::FlushAndRestart => {}
+                m => unreachable!(
+                    "Iterate received invalid message from IterationLeader: {}",
+                    m.variant()
+                ),
+            }
+        }
+    }
 }
 
 impl<Out: Data, State: ExchangeData + Sync, OperatorChain> Operator<Out>
@@ -150,7 +176,9 @@ where
 
             self.content_index = 0;
 
-            if let IterationResult::Finished = self.state.wait_leader() {
+            let state_update = self.wait_update();
+
+            if let IterationResult::Finished = self.state.wait_sync_state(state_update) {
                 log::debug!("Replay block at {} ended the iteration", self.coord);
                 // cleanup so that if this is a nested iteration next time we'll be good to start again
                 self.content.clear();

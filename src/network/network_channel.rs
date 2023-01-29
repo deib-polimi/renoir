@@ -11,7 +11,7 @@ use crate::operator::ExchangeData;
 use crate::profiler::{get_profiler, Profiler};
 
 /// The capacity of the in-buffer.
-const CHANNEL_CAPACITY: usize = 10;
+const CHANNEL_CAPACITY: usize = 16;
 
 pub(crate) fn local_channel<T: ExchangeData>(
     receiver_endpoint: ReceiverEndpoint,

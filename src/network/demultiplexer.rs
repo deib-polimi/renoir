@@ -47,7 +47,10 @@ impl<In: ExchangeData> DemuxHandle<In> {
     ) -> (Self, JoinHandle<()>) {
         let (tx_senders, rx_senders) = channel::unbounded();
         let join_handle = std::thread::Builder::new()
-            .name(format!("noir-demux-reg-{}", coord))
+            .name(format!(
+                "reg-{}:{}-{}",
+                coord.coord.host_id, coord.prev_block_id, coord.coord.block_id
+            ))
             .spawn(move || bind_remotes(coord, address, num_clients, rx_senders))
             .unwrap();
         (Self { coord, tx_senders }, join_handle)
@@ -129,7 +132,10 @@ fn bind_remotes<In: ExchangeData>(
 
         let (demux_tx, demux_rx) = channel::unbounded();
         let join_handle = std::thread::Builder::new()
-            .name(format!("noir-demux-{}", coord))
+            .name(format!(
+                "demux-{}:{}-{}",
+                coord.coord.host_id, coord.prev_block_id, coord.coord.block_id
+            ))
             .spawn(move || {
                 let mut senders = HashMap::new();
                 while let Ok((endpoint, sender)) = demux_rx.recv() {
@@ -143,6 +149,7 @@ fn bind_remotes<In: ExchangeData>(
         tx_broadcast.push(demux_tx);
     }
     log::debug!("All connection to {} started, waiting for senders", coord);
+    drop(listener);
 
     // Broadcast senders
     while let Ok(t) = rx_senders.recv() {

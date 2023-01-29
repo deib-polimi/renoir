@@ -51,7 +51,10 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         let (tx, rx) = channel::bounded(MUX_CHANNEL_CAPACITY);
 
         let join_handle = std::thread::Builder::new()
-            .name(format!("noir-mux-{}", coord))
+            .name(format!(
+                "mux-{}:{}-{}",
+                coord.coord.host_id, coord.prev_block_id, coord.coord.block_id
+            ))
             .spawn(move || {
                 log::debug!(
                     "mux connecting to {}",
@@ -66,9 +69,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     }
 
     pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
-        use super::mux_sender;
-
-        mux_sender(receiver_endpoint, self.tx.as_ref().unwrap().clone())
+        super::mux_sender(receiver_endpoint, self.tx.as_ref().unwrap().clone())
     }
 }
 
