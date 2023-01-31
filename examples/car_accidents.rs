@@ -83,15 +83,15 @@ fn print_query1(res: Vec<(Week, u32)>) {
         .unwrap();
     print!("\t\x1b[1m");
     for year in min_year..=max_year {
-        print!("{}\t", year);
+        print!("{year}\t");
     }
     println!("\x1b[0m");
     for week in 0..=52 {
-        print!("\x1b[1m{}\x1b[0m\t", week);
+        print!("\x1b[1m{week}\x1b[0m\t");
         for year in min_year..=max_year {
             if let Some(r) = res_map.get(&(year, week)) {
                 if *r > 0 {
-                    print!("{}\t", r);
+                    print!("{r}\t");
                 } else {
                     print!("\t");
                 }
@@ -259,7 +259,7 @@ fn print_query3(
         .sorted_by_key(|(b, yw, _, _)| (b, yw))
         .group_by(|(b, _, _, _)| b);
     for (borough, data) in groups.into_iter() {
-        print!("\n\x1b[1m{:<width$}\t", borough, width = max_len);
+        print!("\n\x1b[1m{borough:<max_len$}\t");
         let data = data.into_iter().collect_vec();
         let grouped: HashMap<_, _> = data.iter().map(|(_, yw, a, k)| (yw, (a, k))).collect();
         let (min_year, max_year) = data
@@ -269,7 +269,7 @@ fn print_query3(
             .into_option()
             .unwrap();
         for year in min_year..=max_year {
-            print!("{}\t\t", year);
+            print!("{year}\t\t");
         }
         println!("average");
 
@@ -280,16 +280,16 @@ fn print_query3(
         println!("%let\x1b[0m");
 
         for week in 0..=52 {
-            print!("\x1b[1m{:>width$}\x1b[0m\t", week, width = max_len);
+            print!("\x1b[1m{week:>max_len$}\x1b[0m\t");
             for year in min_year..=max_year {
                 if let Some((a, k)) = grouped.get(&(year, week)) {
-                    print!("{}\t{}\t", a, k);
+                    print!("{a}\t{k}\t");
                 } else {
                     print!("\t\t");
                 }
             }
             if let Some((a, k, perc)) = avg_per_week.get(&(borough.clone(), week)) {
-                print!("{}\t{}\t{:.4}%", a, k, perc);
+                print!("{a}\t{k}\t{perc:.4}%");
             }
             println!();
         }
@@ -309,10 +309,7 @@ fn main() {
     let share_source = match share_source.as_str() {
         "true" => true,
         "false" => false,
-        _ => panic!(
-            "share_source must be either `true` or `false`, not `{}`",
-            share_source
-        ),
+        _ => panic!("share_source must be either `true` or `false`, not `{share_source}`"),
     };
 
     let mut env = StreamEnvironment::new(config);
@@ -341,7 +338,7 @@ fn main() {
     let start = Instant::now();
     env.execute();
     let elapsed = start.elapsed();
-    eprintln!("Elapsed: {:?}", elapsed);
+    eprintln!("Elapsed: {elapsed:?}");
 
     // print only in debug mode
     if !cfg!(debug_assertions) {

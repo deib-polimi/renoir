@@ -39,7 +39,7 @@ fn main() {
     let elapsed = start.elapsed();
     if let Some(_res) = result.get() {
         eprintln!("Output: {:?}", _res.len());
-        println!("{:?}", elapsed);
+        println!("{elapsed:?}");
     }
 }
 

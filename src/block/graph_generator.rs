@@ -34,10 +34,7 @@ impl JobGraphGenerator {
         let attributes = vec!["ranksep=0.1"];
         format!(
             "digraph noir {{\n{attributes}\n{subgraphs}\n{connections}\n}}",
-            attributes = attributes
-                .into_iter()
-                .map(|s| format!("  {};", s))
-                .join("\n"),
+            attributes = attributes.into_iter().map(|s| format!("  {s};")).join("\n"),
             subgraphs = self.gen_subgraphs(),
             connections = self.gen_connections()
         )
@@ -60,13 +57,13 @@ impl JobGraphGenerator {
     /// This will generate all the nodes and attributes, as well as all the connection from an
     /// operator to the next inside the block.
     fn gen_subgraph(&self, block_id: BlockId, block: &BlockStructure) -> String {
-        let cluster_id = format!("cluster_block{}", block_id);
+        let cluster_id = format!("cluster_block{block_id}");
         let attributes = vec![
             "style=filled".to_string(),
             "color=lightgrey".to_string(),
             "labeljust=l".to_string(),
             "edge[fontname=\"monospace\"]".to_string(),
-            format!("label=\"Block {}\"", block_id),
+            format!("label=\"Block {block_id}\""),
         ];
         let mut nodes = vec![];
         let mut connections = vec![];
@@ -80,30 +77,26 @@ impl JobGraphGenerator {
                 OperatorKind::Source => "invhouse",
             };
             let typ = &operator.out_type;
-            nodes.push(format!("{} [label=\"{}\",shape={}]", id, label, shape));
+            nodes.push(format!("{id} [label=\"{label}\",shape={shape}]"));
             if index < block.operators.len() - 1 {
                 let next = Self::operator_id(block_id, index + 1);
                 connections.push(format!(
-                    "{} -> {} [label=\"    {}\",labeljust=l,labelfloat=true]",
-                    id, next, typ
+                    "{id} -> {next} [label=\"    {typ}\",labeljust=l,labelfloat=true]"
                 ));
             }
         }
 
         let attributes = attributes
             .into_iter()
-            .map(|s| format!("    {};", s))
+            .map(|s| format!("    {s};"))
             .join("\n");
-        let nodes = nodes.into_iter().map(|s| format!("    {};", s)).join("\n");
+        let nodes = nodes.into_iter().map(|s| format!("    {s};")).join("\n");
         let connections = connections
             .into_iter()
-            .map(|s| format!("    {};", s))
+            .map(|s| format!("    {s};",))
             .join("\n");
 
-        format!(
-            "  subgraph {} {{\n{}\n{}\n{}\n  }}\n",
-            cluster_id, attributes, nodes, connections
-        )
+        format!("  subgraph {cluster_id} {{\n{attributes}\n{nodes}\n{connections}\n  }}\n",)
     }
 
     /// Generate the connections between the operators in different blocks,
@@ -152,17 +145,16 @@ impl JobGraphGenerator {
                     let from_id = Self::operator_id(from_block, from_index);
                     let to_id = Self::operator_id(to_block, to_index);
                     result.push(format!(
-                        "{} -> {} [label=\"{}\\n{}\",labelfloat=true,style={}]",
-                        from_id, to_id, data_type, sublabel, style
+                        "{from_id} -> {to_id} [label=\"{data_type}\\n{sublabel}\",labelfloat=true,style={style}]",
                     ));
                 }
             }
         }
-        result.into_iter().map(|s| format!("  {};", s)).join("\n")
+        result.into_iter().map(|s| format!("  {s};")).join("\n")
     }
 
     /// Return the identifier of an operator.
     fn operator_id(block_id: BlockId, index: usize) -> String {
-        format!("block{}_operator{}", block_id, index)
+        format!("block{block_id}_operator{index}")
     }
 }

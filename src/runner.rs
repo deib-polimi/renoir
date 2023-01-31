@@ -85,7 +85,7 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
         let config = config.clone();
         let host = host.clone();
         let join_handle = std::thread::Builder::new()
-            .name(format!("remote-{:02}", host_id))
+            .name(format!("remote-{host_id:02}",))
             .spawn(move || remote_worker(host_id as _, host, config, exe_uid))
             .unwrap();
         join_handles.push(join_handle);
@@ -190,9 +190,7 @@ fn remote_worker(
     }
     assert!(
         session.authenticated(),
-        "Failed to authenticate to remote host {} at {:?}",
-        host_id,
-        address
+        "Failed to authenticate to remote host {host_id} at {address:?}"
     );
     log::debug!("Authentication succeeded to host {}", host_id);
 
@@ -239,7 +237,7 @@ fn remote_worker(
         println!(
             "{}|{}",
             host_id,
-            l.unwrap_or_else(|e| format!("ERROR: {}", e))
+            l.unwrap_or_else(|e| format!("ERROR: {e}"))
         );
     }
 
@@ -257,7 +255,7 @@ fn remote_worker(
             }
         } else {
             // prefix each line with the id of the host
-            eprintln!("{}|{}", host_id, line);
+            eprintln!("{host_id}|{line}");
         }
     }
 
@@ -327,7 +325,7 @@ fn send_executable(
         metadata.len()
     );
 
-    let (_, result) = run_remote_command(session, &format!("ls {}", remote_path_str));
+    let (_, result) = run_remote_command(session, &format!("ls {remote_path_str}",));
     if result == 0 {
         info!(
             "Remote file with matching hash `{}` already exists, skipping transfer.",

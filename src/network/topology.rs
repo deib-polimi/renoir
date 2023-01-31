@@ -246,10 +246,7 @@ impl NetworkTopology {
         receiver_endpoint: ReceiverEndpoint,
     ) -> NetworkReceiver<T> {
         if self.used_receivers.contains(&receiver_endpoint) {
-            panic!(
-                "The receiver for {} has already been got",
-                receiver_endpoint
-            );
+            panic!("The receiver for {receiver_endpoint} has already been got",);
         }
         self.used_receivers.insert(receiver_endpoint);
 
@@ -359,15 +356,14 @@ impl NetworkTopology {
         log::debug!("Registering {}", receiver_endpoint);
         assert!(
             !self.registered_receivers.contains(&receiver_endpoint),
-            "Receiver {} has already been registered",
-            receiver_endpoint
+            "Receiver {receiver_endpoint} has already been registered",
         );
         self.registered_receivers.insert(receiver_endpoint);
 
         let sender_metadata = self
             .senders_metadata
             .get(&receiver_endpoint)
-            .unwrap_or_else(|| panic!("Channel for endpoint {} not registered", receiver_endpoint));
+            .unwrap_or_else(|| panic!("Channel for endpoint {receiver_endpoint} not registered",));
 
         match &self.config.runtime {
             ExecutionRuntime::Remote(_) => {
@@ -543,7 +539,7 @@ impl NetworkTopology {
     pub fn log(&self) {
         let mut topology = "Execution graph:".to_owned();
         for ((coord, _typ), next) in self.next.iter().sorted() {
-            write!(&mut topology, "\n  {}:", coord).unwrap();
+            write!(&mut topology, "\n  {coord}:",).unwrap();
             for (next, fragile) in next.iter().sorted() {
                 write!(
                     &mut topology,

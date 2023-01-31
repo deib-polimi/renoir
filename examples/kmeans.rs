@@ -191,5 +191,5 @@ fn main() {
         eprintln!("Iterations: {}", state.iter_count);
         eprintln!("Output: {:?}", state.centroids.len());
     }
-    eprintln!("Elapsed: {:?}", elapsed);
+    eprintln!("Elapsed: {elapsed:?}");
 }

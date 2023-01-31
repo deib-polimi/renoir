@@ -125,10 +125,7 @@ impl TestHelper {
         match receiver.recv_timeout(timeout) {
             Ok(_) => {}
             Err(RecvTimeoutError::Timeout) => {
-                panic!(
-                    "Worker thread didn't complete before the timeout of {:?}",
-                    timeout
-                );
+                panic!("Worker thread didn't complete before the timeout of {timeout:?}");
             }
             Err(RecvTimeoutError::Disconnected) => {
                 panic!("Worker thread has panicked!");
@@ -157,7 +154,7 @@ impl TestHelper {
             let test_id = TEST_INDEX.fetch_add(1, Ordering::SeqCst) + 1;
             let high_part = (test_id & 0xff00) >> 8;
             let low_part = test_id & 0xff;
-            let address = format!("127.{}.{}.{}", high_part, low_part, host_id);
+            let address = format!("127.{high_part}.{low_part}.{host_id}");
             hosts.push(RemoteHostConfig {
                 address,
                 base_port: TEST_BASE_PORT,
@@ -183,7 +180,7 @@ impl TestHelper {
             let body = body.clone();
             join_handles.push(
                 std::thread::Builder::new()
-                    .name(format!("Test host{}", host_id))
+                    .name(format!("Test host{host_id}"))
                     .spawn(move || Self::env_with_config(config, body))
                     .unwrap(),
             )
@@ -191,7 +188,7 @@ impl TestHelper {
         for (host_id, handle) in join_handles.into_iter().enumerate() {
             handle
                 .join()
-                .unwrap_or_else(|e| panic!("Remote worker for host {} crashed: {:?}", host_id, e));
+                .unwrap_or_else(|e| panic!("Remote worker for host {host_id} crashed: {e:?}"));
         }
     }
 

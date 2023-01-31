@@ -55,10 +55,7 @@ pub(crate) fn remote_send<T: ExchangeData, W: Write>(
     let serialized_len = BINCODE_MSG_CONFIG
         .serialized_size(&msg)
         .unwrap_or_else(|e| {
-            panic!(
-                "Failed to compute serialized length of outgoing message to {}: {:?}",
-                dest, e
-            )
+            panic!("Failed to compute serialized length of outgoing message to {dest}: {e:?}",)
         });
 
     let header = MessageHeader {
@@ -73,8 +70,7 @@ pub(crate) fn remote_send<T: ExchangeData, W: Write>(
         .serialize_into(&mut buf, &header)
         .unwrap_or_else(|e| {
             panic!(
-                "Failed to serialize header of message (was {} bytes) to {} at {}: {:?}",
-                serialized_len, dest, address, e
+                "Failed to serialize header of message (was {serialized_len} bytes) to {dest} at {address}: {e:?}",
             )
         });
 
@@ -82,18 +78,14 @@ pub(crate) fn remote_send<T: ExchangeData, W: Write>(
         .serialize_into(&mut buf, &msg)
         .unwrap_or_else(|e| {
             panic!(
-                "Failed to serialize message, {} bytes to {} at {}: {:?}",
-                serialized_len, dest, address, e
+                "Failed to serialize message, {serialized_len} bytes to {dest} at {address}: {e:?}",
             )
         });
 
     assert_eq!(buf.len(), HEADER_SIZE + serialized_len as usize);
 
     writer.write_all(buf.as_ref()).unwrap_or_else(|e| {
-        panic!(
-            "Failed to send message {} bytes to {} at {}: {:?}",
-            serialized_len, dest, address, e
-        )
+        panic!("Failed to send message {serialized_len} bytes to {dest} at {address}: {e:?}",)
     });
 
     get_profiler().net_bytes_out(

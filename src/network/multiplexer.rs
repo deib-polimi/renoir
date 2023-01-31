@@ -83,7 +83,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
 fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
     let socket_addrs: Vec<_> = address
         .to_socket_addrs()
-        .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
+        .map_err(|e| format!("Failed to get the address for {coord}: {e:?}",))
         .unwrap()
         .collect();
     let mut retry_delay = RETRY_INITIAL_TIMEOUT;
@@ -124,10 +124,7 @@ fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
         sleep(retry_delay);
         retry_delay = (2 * retry_delay).min(RETRY_MAX_TIMEOUT);
     }
-    panic!(
-        "Failed to connect to remote {} at {:?} after {} attempts",
-        coord, address, CONNECT_ATTEMPTS
-    );
+    panic!("Failed to connect to remote {coord} at {address:?} after {CONNECT_ATTEMPTS} attempts",);
 }
 
 #[cfg(not(feature = "async-tokio"))]

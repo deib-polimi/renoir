@@ -135,7 +135,7 @@ struct TopicSource {
 impl TopicSource {
     fn new(id: u64, instances: u64) -> Self {
         Self {
-            tester: ThroughputTester::new(format!("source{}", id), 50_000),
+            tester: ThroughputTester::new(format!("source{id}"), 50_000),
             start: Instant::now(),
             id,
             instances,

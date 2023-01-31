@@ -111,7 +111,7 @@ fn test_iterate_with_shuffle() {
                 |delta: &mut u64, x| *delta += x,
                 |old_state, delta| *old_state += delta,
                 |state| {
-                    println!("XX: End of iteration: state is {}", state);
+                    println!("XX: End of iteration: state is {state}");
                     true
                 },
             );

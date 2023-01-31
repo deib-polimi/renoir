@@ -84,7 +84,7 @@ fn bind_remotes<In: ExchangeData>(
     let address = (address.0.as_ref(), address.1);
     let address: Vec<_> = address
         .to_socket_addrs()
-        .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
+        .map_err(|e| format!("Failed to get the address for {coord}: {e:?}"))
         .unwrap()
         .collect();
 

@@ -467,7 +467,7 @@ mod tests {
         for num_records in 0..100 {
             for terminator in &["\n", "\r\n"] {
                 let file = NamedTempFile::new().unwrap();
-                write!(file.as_file(), "a,b{}", terminator).unwrap();
+                write!(file.as_file(), "a,b{terminator}").unwrap();
                 for i in 0..num_records {
                     write!(file.as_file(), "{},{}{}", i, i + 1, terminator).unwrap();
                 }

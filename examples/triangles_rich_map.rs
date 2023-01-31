@@ -62,7 +62,7 @@ fn main() {
     if let Some(res) = result.get() {
         assert!(res.len() <= 1);
         let triangles = if let Some(x) = res.first() { *x } else { 0 };
-        eprintln!("Output: {:?}", triangles);
+        eprintln!("Output: {triangles:?}");
     }
-    eprintln!("Elapsed: {:?}", elapsed);
+    eprintln!("Elapsed: {elapsed:?}");
 }

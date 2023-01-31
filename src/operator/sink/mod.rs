@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::operator::Operator;
 
+mod collect;
 mod collect_channel;
 mod collect_count;
 mod collect_vec;

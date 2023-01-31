@@ -35,7 +35,7 @@ fn main() {
 
     if let Some(_res) = result.get() {
         eprintln!("Output: {:?}", _res.len());
-        println!("{:?}", elapsed);
+        println!("{elapsed:?}");
 
         // use itertools::Itertools;
         // _res.iter()

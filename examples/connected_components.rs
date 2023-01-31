@@ -109,12 +109,12 @@ fn main() {
         let final_state = &res[0];
         if cfg!(debug_assertions) {
             for (x, component) in final_state.component.iter().enumerate() {
-                eprintln!("{} -> {}", x, component);
+                eprintln!("{x} -> {component}");
             }
         }
         let components = final_state.component.iter().collect::<HashSet<_>>().len();
-        eprintln!("Number of components: {:?}", components);
+        eprintln!("Number of components: {components:?}");
         eprintln!("Iterations: {:?}", final_state.iteration_count);
     }
-    eprintln!("Elapsed: {:?}", elapsed);
+    eprintln!("Elapsed: {elapsed:?}");
 }

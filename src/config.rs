@@ -242,7 +242,7 @@ impl EnvironmentConfig {
         };
         let host_id = match HostId::from_str(&host_id) {
             Ok(host_id) => host_id,
-            Err(e) => panic!("Invalid value for environment {}: {:?}", HOST_ID_ENV_VAR, e),
+            Err(e) => panic!("Invalid value for environment {HOST_ID_ENV_VAR}: {e:?}"),
         };
         if host_id >= num_hosts {
             panic!(

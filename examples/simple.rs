@@ -15,6 +15,6 @@ fn main() {
         .collect_vec();
     env.execute();
     if let Some(result) = result.get() {
-        println!("{:?}", result);
+        println!("{result:?}");
     }
 }

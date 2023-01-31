@@ -56,7 +56,7 @@ fn main() {
 
     // we are interested in the stream output
     let result = result.collect_vec();
-    state.for_each(|(_, _, iter)| eprintln!("Iterations: {}", iter));
+    state.for_each(|(_, _, iter)| eprintln!("Iterations: {iter}"));
 
     let start = Instant::now();
     env.execute();
@@ -67,9 +67,9 @@ fn main() {
         if cfg!(debug_assertions) {
             res.sort_unstable();
             for (x, y) in res {
-                eprintln!("{} -> {}", x, y);
+                eprintln!("{x} -> {y}");
             }
         }
     }
-    eprintln!("Elapsed: {:?}", elapsed);
+    eprintln!("Elapsed: {elapsed:?}");
 }

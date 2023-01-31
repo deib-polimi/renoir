@@ -54,8 +54,8 @@ fn main() {
     }
     if let Some(remaining) = remaining.get() {
         for rem in remaining {
-            eprintln!("Remaining: {:?}", rem);
+            eprintln!("Remaining: {rem:?}");
         }
     }
-    eprintln!("Elapsed: {:?}", elapsed);
+    eprintln!("Elapsed: {elapsed:?}");
 }

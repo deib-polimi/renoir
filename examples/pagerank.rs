@@ -95,13 +95,13 @@ fn main() {
         if cfg!(debug_assertions) {
             res.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
             for (x, _, rank) in res.iter().take(3) {
-                eprintln!("{}: {}", x, rank);
+                eprintln!("{x}: {rank}");
             }
             eprintln!("...");
             for (x, _, rank) in res.iter().rev().take(3).rev() {
-                eprintln!("{}: {}", x, rank);
+                eprintln!("{x}: {rank}");
             }
         }
     }
-    eprintln!("Elapsed: {:?}", elapsed);
+    eprintln!("Elapsed: {elapsed:?}");
 }

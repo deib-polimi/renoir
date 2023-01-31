@@ -322,16 +322,16 @@ impl Scheduler {
                     .map(|(x, _, fragile)| format!("{}{}", x, if *fragile { "*" } else { "" }))
                     .sorted()
                     .collect_vec();
-                write!(&mut topology, "\n    -> {:?}", sorted).unwrap();
+                write!(&mut topology, "\n    -> {sorted:?}",).unwrap();
             }
         }
         log::debug!("{}", topology);
         let mut assignments = "Replicas:".to_string();
         for (block_id, block) in self.block_info.iter() {
-            write!(&mut assignments, "\n  {}:", block_id).unwrap();
+            write!(&mut assignments, "\n  {block_id}:",).unwrap();
             let replicas = block.replicas.values().flatten().sorted();
             for &coord in replicas {
-                write!(&mut assignments, " {}", coord).unwrap();
+                write!(&mut assignments, " {coord}").unwrap();
             }
         }
         log::debug!("{}", assignments);

@@ -132,7 +132,7 @@ impl Operator<String> for FileSource {
                     self.terminated = true;
                     StreamElement::FlushAndRestart
                 }
-                Err(e) => panic!("Error while reading file: {:?}", e),
+                Err(e) => panic!("Error while reading file: {e:?}",),
             }
         } else {
             self.terminated = true;

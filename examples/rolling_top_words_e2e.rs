@@ -154,7 +154,7 @@ fn main() {
         })
         .flatten()
         .fold(0, |acc, _| *acc += 1)
-        .for_each(|c| println!("{}", c));
+        .for_each(|c| println!("{c}"));
     let start = Instant::now();
     env.execute();
     println!("Elapsed: {:?}", start.elapsed());
