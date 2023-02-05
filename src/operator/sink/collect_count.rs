@@ -36,11 +36,11 @@ where
 
     fn next(&mut self) -> StreamElement<()> {
         match self.prev.next() {
-            StreamElement::Item(c) => {
+            StreamElement::Item(c) | StreamElement::Timestamped(c, _) => {
                 self.result += c;
                 StreamElement::Item(())
             }
-            StreamElement::Watermark(_) | StreamElement::Timestamped(_, _) => unreachable!(),
+            StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::Terminate => {
                 *self.output.lock().unwrap() = Some(self.result);
                 StreamElement::Terminate
