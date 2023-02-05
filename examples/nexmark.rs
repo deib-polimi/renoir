@@ -20,7 +20,7 @@ fn watermark_gen(e: &Event, ts: &Duration) -> Option<Duration> {
         Event::Bid(x) => (x.auction ^ x.bidder ^ x.date_time as usize) % WATERMARK_INTERVAL == 0,
     };
     if w {
-        Some(ts.clone())
+        Some(*ts)
     } else {
         None
     }
