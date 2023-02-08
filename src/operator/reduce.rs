@@ -33,8 +33,8 @@ where
     /// # use noir::{StreamEnvironment, EnvironmentConfig};
     /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
-    /// let res = s.reduce(|acc, value| *acc += value).collect_vec();
+    /// let s = env.stream_iter(0..5);
+    /// let res = s.reduce(|a, b| a + b).collect::<Vec<_>>();
     ///
     /// env.execute();
     ///
@@ -42,11 +42,10 @@ where
     /// ```
     pub fn reduce<F>(self, f: F) -> Stream<Out, impl Operator<Out>>
     where
-        F: Fn(&mut Out, Out) + Send + Clone + 'static,
+        F: Fn(Out, Out) -> Out + Send + Clone + 'static,
     {
-        self.fold(None, move |acc, value| match acc {
-            None => *acc = Some(value),
-            Some(acc) => f(acc, value),
+        self.fold(None, move |acc, b| {
+            *acc = Some(if let Some(a) = acc.take() { f(a, b) } else { b })
         })
         .map(|value| value.unwrap())
     }
@@ -80,7 +79,7 @@ where
     /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new((0..5)));
-    /// let res = s.reduce_assoc(|acc, value| *acc += value).collect_vec();
+    /// let res = s.reduce_assoc(|a, b| a + b).collect_vec();
     ///
     /// env.execute();
     ///
@@ -88,22 +87,18 @@ where
     /// ```
     pub fn reduce_assoc<F>(self, f: F) -> Stream<Out, impl Operator<Out>>
     where
-        F: Fn(&mut Out, Out) + Send + Clone + 'static,
+        F: Fn(Out, Out) -> Out + Send + Clone + 'static,
     {
         let f2 = f.clone();
 
         self.fold_assoc(
             None,
-            move |acc, value| match acc {
-                None => *acc = Some(value),
-                Some(acc) => f(acc, value),
-            },
-            move |acc1, acc2| match acc1 {
-                None => *acc1 = acc2,
-                Some(acc1) => {
-                    if let Some(acc2) = acc2 {
-                        f2(acc1, acc2)
-                    }
+            move |acc, b| *acc = Some(if let Some(a) = acc.take() { f(a, b) } else { b }),
+            move |acc1, mut acc2| {
+                *acc1 = match (acc1.take(), acc2.take()) {
+                    (Some(a), Some(b)) => Some(f2(a, b)),
+                    (None, Some(a)) | (Some(a), None) => Some(a),
+                    (None, None) => None,
                 }
             },
         )

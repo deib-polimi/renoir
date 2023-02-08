@@ -28,7 +28,7 @@ fn reduce(dataset: &'static [u32]) {
     let stream = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
-        .reduce(|a, b| *a = a.wrapping_add(b));
+        .reduce(|a, b| a.wrapping_add(b));
     let _result = stream.collect_vec();
     env.execute();
 }
@@ -58,7 +58,7 @@ fn reduce_assoc(dataset: &'static [u32]) {
     let stream = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
-        .reduce_assoc(|a, b| *a = a.wrapping_add(b));
+        .reduce_assoc(|a, b| a.wrapping_add(b));
     let _result = stream.collect_vec();
     env.execute();
 }

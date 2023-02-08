@@ -13,7 +13,7 @@ fn broadcast_test() {
             .stream(source)
             .shuffle()
             .broadcast()
-            .reduce(|x, y| *x += y)
+            .reduce(|x, y| x + y)
             .collect_vec();
 
         env.execute();

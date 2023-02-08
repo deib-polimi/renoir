@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::sync::Arc;
+use std::thread::available_parallelism;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};
@@ -46,6 +47,14 @@ pub struct StreamEnvironment {
     inner: Arc<Mutex<StreamEnvironmentInner>>,
     /// Measure the time for building the graph.
     build_time: Stopwatch,
+}
+
+impl Default for StreamEnvironment {
+    fn default() -> Self {
+        Self::new(EnvironmentConfig::local(
+            available_parallelism().map(|q| q.get()).unwrap_or(1) as u64,
+        ))
+    }
 }
 
 impl StreamEnvironment {

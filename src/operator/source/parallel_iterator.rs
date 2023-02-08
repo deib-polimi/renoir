@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::ops::Range;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::source::Source;
@@ -6,44 +7,105 @@ use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::{CoordUInt, Stream};
 
+pub trait IntoParallelSource: Clone + Send {
+    type Item;
+    type Iter: Iterator<Item = Self::Item>;
+    fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter;
+}
+
+impl<It, GenIt, Out> IntoParallelSource for GenIt
+where
+    It: Iterator<Item = Out> + Send + 'static,
+    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
+{
+    type Item = Out;
+
+    type Iter = It;
+
+    fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter {
+        self(index, peers)
+    }
+}
+
+impl IntoParallelSource for Range<u64> {
+    type Item = u64;
+
+    type Iter = Range<u64>;
+
+    fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter {
+        let n = self.end - self.start;
+        let chunk_size = (n.saturating_add(peers - 1)) / peers;
+        let start = self.start.saturating_add(index * chunk_size);
+        let end = (start.saturating_add(chunk_size)).min(self.end - 1);
+
+        start..end
+    }
+}
+
+macro_rules! impl_into_parallel_source {
+    ($t:ty) => {
+        impl IntoParallelSource for Range<$t> {
+            type Item = $t;
+
+            type Iter = Range<$t>;
+
+            fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter {
+                let index: i64 = index.try_into().unwrap();
+                let peers: i64 = peers.try_into().unwrap();
+                let n = self.end as i64 - self.start as i64;
+                let chunk_size = (n.saturating_add(peers - 1)) / peers;
+                let start = (self.start as i64).saturating_add(index * chunk_size);
+                let end = (start.saturating_add(chunk_size)).min(self.end as i64 - 1);
+
+                let (start, end) = (start.try_into().unwrap(), end.try_into().unwrap());
+                start..end
+            }
+        }
+    };
+}
+
+impl_into_parallel_source!(u8);
+impl_into_parallel_source!(u16);
+impl_into_parallel_source!(u32);
+
+impl_into_parallel_source!(usize);
+
+impl_into_parallel_source!(i8);
+impl_into_parallel_source!(i16);
+impl_into_parallel_source!(i32);
+impl_into_parallel_source!(i64);
+impl_into_parallel_source!(isize);
+
 /// This enum wraps either an `Iterator` that yields the items, or a generator function that
 /// produces such iterator.
 ///
 /// This enum is `Clone` only _before_ generating the iterator. The generator function must be
 /// `Clone`, but the resulting iterator doesn't have to be so.
-enum IteratorGenerator<It, GenIt, Out>
-where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
-{
+enum IteratorGenerator<Source: IntoParallelSource> {
     /// The function that generates the iterator.
-    Generator(GenIt),
+    Generator(Source),
     /// The actual iterator that produces the items.
-    Iterator(It),
+    Iterator(Source::Iter),
     /// An extra variant used when moving the generator out of the enum, and before putting back the
     /// iterator. This makes this enum panic-safe in the `generate` method.
     Generating,
 }
 
-impl<It, GenIt, Out> IteratorGenerator<It, GenIt, Out>
-where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
-{
+impl<Source: IntoParallelSource> IteratorGenerator<Source> {
     /// Consume the generator function and store the produced iterator.
     ///
     /// This method can be called only once.
     fn generate(&mut self, global_id: CoordUInt, instances: CoordUInt) {
         let gen = std::mem::replace(self, IteratorGenerator::Generating);
         let iter = match gen {
-            IteratorGenerator::Generator(gen) => gen(global_id, instances),
+            IteratorGenerator::Generator(gen) => gen.generate_iterator(global_id, instances),
             _ => unreachable!("generate on non-Generator variant"),
         };
         *self = IteratorGenerator::Iterator(iter);
     }
 
     /// If the `generate` method has been called, get the next element from the iterator.
-    fn next(&mut self) -> Option<Out> {
+    fn next(&mut self) -> Option<Source::Item> {
         match self {
             IteratorGenerator::Iterator(iter) => iter.next(),
             _ => unreachable!("next on non-Iterator variant"),
@@ -51,11 +113,7 @@ where
     }
 }
 
-impl<It, GenIt, Out> Clone for IteratorGenerator<It, GenIt, Out>
-where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
-{
+impl<Source: IntoParallelSource> Clone for IteratorGenerator<Source> {
     fn clone(&self) -> Self {
         match self {
             Self::Generator(gen) => Self::Generator(gen.clone()),
@@ -71,34 +129,34 @@ where
 /// generating function passed to the [`ParallelIteratorSource::new`] method.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct ParallelIteratorSource<Out: Data, It, GenIt>
+pub struct ParallelIteratorSource<Source>
 where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
+    Source: IntoParallelSource,
+    Source::Item: Data,
 {
     #[derivative(Debug = "ignore")]
-    inner: IteratorGenerator<It, GenIt, Out>,
+    inner: IteratorGenerator<Source>,
     terminated: bool,
 }
 
-impl<Out: Data, It, GenIt> Display for ParallelIteratorSource<Out, It, GenIt>
+impl<Source> Display for ParallelIteratorSource<Source>
 where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
+    Source: IntoParallelSource,
+    Source::Item: Data,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "ParallelIteratorSource<{}>",
-            std::any::type_name::<Out>()
+            std::any::type_name::<Source::Item>()
         )
     }
 }
 
-impl<Out: Data, It, GenIt> ParallelIteratorSource<Out, It, GenIt>
+impl<Source> ParallelIteratorSource<Source>
 where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
+    Source: IntoParallelSource,
+    Source::Item: Data,
 {
     /// Create a new source that ingest items into the stream using the maximum parallelism
     /// available.
@@ -126,7 +184,7 @@ where
     /// });
     /// let s = env.stream(source);
     /// ```
-    pub fn new(generator: GenIt) -> Self {
+    pub fn new(generator: Source) -> Self {
         Self {
             inner: IteratorGenerator::Generator(generator),
             terminated: false,
@@ -134,20 +192,22 @@ where
     }
 }
 
-impl<Out: Data, It, GenIt> Source<Out> for ParallelIteratorSource<Out, It, GenIt>
+impl<S> Source<S::Item> for ParallelIteratorSource<S>
 where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
+    S: IntoParallelSource,
+    S::Item: Data,
+    S::Iter: Send,
 {
     fn get_max_parallelism(&self) -> Option<usize> {
         None
     }
 }
 
-impl<Out: Data, It, GenIt> Operator<Out> for ParallelIteratorSource<Out, It, GenIt>
+impl<Source> Operator<Source::Item> for ParallelIteratorSource<Source>
 where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
+    Source: IntoParallelSource,
+    Source::Iter: Send,
+    Source::Item: Data,
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.inner.generate(
@@ -160,7 +220,7 @@ where
         );
     }
 
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Source::Item> {
         if self.terminated {
             return StreamElement::Terminate;
         }
@@ -175,16 +235,16 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("ParallelIteratorSource");
+        let mut operator = OperatorStructure::new::<Source::Item, _>("ParallelIteratorSource");
         operator.kind = OperatorKind::Source;
         BlockStructure::default().add_operator(operator)
     }
 }
 
-impl<Out: Data, It, GenIt> Clone for ParallelIteratorSource<Out, It, GenIt>
+impl<Source> Clone for ParallelIteratorSource<Source>
 where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
+    Source: IntoParallelSource,
+    Source::Item: Data,
 {
     fn clone(&self) -> Self {
         Self {
@@ -196,14 +256,38 @@ where
 
 impl crate::StreamEnvironment {
     /// Convenience method, creates a `ParallelIteratorSource` and makes a stream using `StreamEnvironment::stream`
-    pub fn stream_par_iter<Out, It, GenIt>(
+    /// # Example:
+    /// ```
+    /// use noir::prelude::*;
+    ///
+    /// let mut env = StreamEnvironment::default();
+    ///
+    /// env.stream_par_iter(0..10)
+    ///     .for_each(|q| println!("a: {q}"));
+    ///
+    /// let n = 10;
+    /// env.stream_par_iter(
+    ///     move |id, instances| {
+    ///         let chunk_size = (n + instances - 1) / instances;
+    ///         let remaining = n - n.min(chunk_size * id);
+    ///         let range = remaining.min(chunk_size);
+    ///         
+    ///         let start = id * chunk_size;
+    ///         let stop = id * chunk_size + range;
+    ///         start..stop
+    ///     })
+    ///    .for_each(|q| println!("b: {q}"));
+    ///
+    /// env.execute();
+    /// ```
+    pub fn stream_par_iter<Source>(
         &mut self,
-        generator: GenIt,
-    ) -> Stream<Out, ParallelIteratorSource<Out, It, GenIt>>
+        generator: Source,
+    ) -> Stream<Source::Item, ParallelIteratorSource<Source>>
     where
-        Out: Data,
-        It: Iterator<Item = Out> + Send + 'static,
-        GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone + 'static,
+        Source: IntoParallelSource + 'static,
+        Source::Iter: Send,
+        Source::Item: Data,
     {
         let source = ParallelIteratorSource::new(generator);
         self.stream(source)
