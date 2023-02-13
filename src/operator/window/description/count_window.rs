@@ -141,7 +141,7 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
                 #[cfg(feature = "timestamp")]
                 (Some(ts), Some(w)) => {
                     // Make sure timestamp is correct with respect to watermarks
-                    Some((*ts).max(*w + Timestamp::from_nanos(1)))
+                    Some((*ts).max(*w))
                 }
                 (Some(ts), _) => Some(*ts),
                 _ => None,
@@ -168,8 +168,6 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for CountWindowGenerator
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::operator::window::description::count_window::{CountWindow, CountWindowGenerator};
     use crate::operator::window::{WindowDescription, WindowGenerator};
     use crate::operator::StreamElement;
@@ -180,18 +178,15 @@ mod tests {
         let descr = CountWindow::sliding(3, 2);
         let mut generator: CountWindowGenerator<u32, _> = descr.new_generator();
 
-        generator.add(StreamElement::Timestamped(1, Duration::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, 1));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(2, Duration::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, 2));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Watermark(Duration::from_secs(4)));
+        generator.add(StreamElement::Watermark(4));
         assert!(generator.next_window().is_none());
         generator.add(StreamElement::FlushAndRestart);
         let window = generator.next_window().unwrap();
-        assert_eq!(
-            window.timestamp,
-            Some(Duration::from_nanos(1) + Duration::from_secs(4))
-        );
+        assert_eq!(window.timestamp, Some(4));
         assert_eq!(window.size, 2);
     }
 
@@ -201,13 +196,13 @@ mod tests {
         let descr = CountWindow::sliding(3, 2);
         let mut generator: CountWindowGenerator<u32, _> = descr.new_generator();
 
-        generator.add(StreamElement::Timestamped(1, Duration::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, 1));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(2, Duration::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, 2));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(3, Duration::from_secs(3)));
+        generator.add(StreamElement::Timestamped(3, 3));
         let window = generator.next_window().unwrap();
-        assert_eq!(window.timestamp, Some(Duration::from_secs(3)));
+        assert_eq!(window.timestamp, Some(3));
         assert_eq!(window.size, 3);
     }
 }

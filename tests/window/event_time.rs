@@ -1,8 +1,5 @@
-use std::time::Duration;
-
 use noir::operator::source::IteratorSource;
 use noir::operator::window::EventTimeWindow;
-use noir::operator::Timestamp;
 
 use super::utils::TestHelper;
 
@@ -14,14 +11,11 @@ fn sliding_event_time() {
         let res = env
             .stream(source)
             .add_timestamps(
-                |&x| Timestamp::from_secs(x),
+                |&x| x * 1000,
                 |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
             )
             .group_by(|x| x % 2)
-            .window(EventTimeWindow::sliding(
-                Duration::from_secs(3),
-                Duration::from_millis(2500),
-            ))
+            .window(EventTimeWindow::sliding(3000, 2500))
             .first()
             .drop_key()
             .collect_vec();
@@ -46,12 +40,9 @@ fn tumbling_event_time() {
 
         let res = env
             .stream(source)
-            .add_timestamps(
-                |&x| Timestamp::from_secs(x),
-                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 1 { Some(ts) } else { None })
             .group_by(|x| x % 2)
-            .window(EventTimeWindow::tumbling(Duration::from_secs(3)))
+            .window(EventTimeWindow::tumbling(3))
             .first()
             .drop_key()
             .collect_vec();

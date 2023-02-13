@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::time::Duration;
 
 use crate::operator::window::processing_time::ProcessingTimeWindowGenerator;
 use crate::operator::window::{Window, WindowDescription, WindowGenerator};
@@ -9,12 +8,12 @@ use crate::operator::{Data, DataKey, StreamElement, Timestamp};
 /// Window description for session event time windows
 #[derive(Clone, Debug)]
 pub struct SessionEventTimeWindowDescr {
-    gap: Duration,
+    gap: Timestamp,
 }
 
 impl SessionEventTimeWindowDescr {
     /// Create a new session window with the given minimum gap of time between two windows.
-    pub fn new(gap: Duration) -> Self {
+    pub fn new(gap: Timestamp) -> Self {
         Self { gap }
     }
 }
@@ -33,12 +32,12 @@ impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SessionEventTimeWi
 /// Window description for session processing time windows
 #[derive(Clone, Debug)]
 pub struct SessionProcessingTimeWindowDescr {
-    gap: Duration,
+    gap: Timestamp,
 }
 
 impl SessionProcessingTimeWindowDescr {
     /// Create a new session window with the given minimum gap of time between two windows.
-    pub fn new(gap: Duration) -> Self {
+    pub fn new(gap: Timestamp) -> Self {
         Self { gap }
     }
 }
@@ -57,7 +56,7 @@ impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SessionProcessingT
 
 #[derive(Clone, Debug)]
 pub struct SessionWindowGenerator<Key: DataKey, Out: Data> {
-    gap: Duration,
+    gap: Timestamp,
     buffer: VecDeque<Out>,
     timestamp_buffer: VecDeque<Timestamp>,
     received_end: bool,
@@ -67,7 +66,7 @@ pub struct SessionWindowGenerator<Key: DataKey, Out: Data> {
 }
 
 impl<Key: DataKey, Out: Data> SessionWindowGenerator<Key, Out> {
-    fn new(gap: Duration) -> Self {
+    fn new(gap: Timestamp) -> Self {
         Self {
             gap,
             buffer: Default::default(),
@@ -150,8 +149,6 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for SessionWindowGenerat
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::operator::window::description::session_window::{
         SessionEventTimeWindowDescr, SessionWindowGenerator,
     };
@@ -160,18 +157,18 @@ mod tests {
 
     #[test]
     fn session_window_watermark() {
-        let descr = SessionEventTimeWindowDescr::new(Duration::from_secs(10));
+        let descr = SessionEventTimeWindowDescr::new(10);
         let mut generator: SessionWindowGenerator<u32, _> = descr.new_generator();
 
-        generator.add(StreamElement::Timestamped(1, Duration::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, 1));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(2, Duration::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, 2));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Watermark(Duration::from_secs(11)));
+        generator.add(StreamElement::Watermark(11));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Watermark(Duration::from_secs(12)));
+        generator.add(StreamElement::Watermark(12));
         let window = generator.next_window().unwrap();
-        assert_eq!(window.timestamp, Some(Duration::from_secs(2)));
+        assert_eq!(window.timestamp, Some(2));
         assert_eq!(window.size, 2);
         generator.advance();
         assert!(generator.next_window().is_none());
@@ -179,18 +176,18 @@ mod tests {
 
     #[test]
     fn session_window_flush() {
-        let descr = SessionEventTimeWindowDescr::new(Duration::from_secs(10));
+        let descr = SessionEventTimeWindowDescr::new(10);
         let mut generator: SessionWindowGenerator<u32, _> = descr.new_generator();
 
-        generator.add(StreamElement::Timestamped(1, Duration::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, 1));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(2, Duration::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, 2));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Watermark(Duration::from_secs(11)));
+        generator.add(StreamElement::Watermark(11));
         assert!(generator.next_window().is_none());
         generator.add(StreamElement::FlushAndRestart);
         let window = generator.next_window().unwrap();
-        assert_eq!(window.timestamp, Some(Duration::from_secs(2)));
+        assert_eq!(window.timestamp, Some(2));
         assert_eq!(window.size, 2);
         generator.advance();
         assert!(generator.next_window().is_none());
@@ -198,16 +195,16 @@ mod tests {
 
     #[test]
     fn session_window_timestamp() {
-        let descr = SessionEventTimeWindowDescr::new(Duration::from_secs(10));
+        let descr = SessionEventTimeWindowDescr::new(10);
         let mut generator: SessionWindowGenerator<u32, _> = descr.new_generator();
 
-        generator.add(StreamElement::Timestamped(1, Duration::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, 1));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(2, Duration::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, 2));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(2, Duration::from_secs(12)));
+        generator.add(StreamElement::Timestamped(2, 12));
         let window = generator.next_window().unwrap();
-        assert_eq!(window.timestamp, Some(Duration::from_secs(2)));
+        assert_eq!(window.timestamp, Some(2));
         assert_eq!(window.size, 2);
         generator.advance();
         assert!(generator.next_window().is_none());

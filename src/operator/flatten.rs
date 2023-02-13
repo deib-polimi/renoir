@@ -5,10 +5,9 @@ mod inner {
     use core::iter::{IntoIterator, Iterator};
     use std::fmt::Display;
     use std::marker::PhantomData;
-    use std::time::Duration;
 
     use crate::block::{BlockStructure, OperatorStructure};
-    use crate::operator::{Data, DataKey, Operator, StreamElement};
+    use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
     use crate::scheduler::ExecutionMetadata;
     use crate::stream::{KeyValue, KeyedStream, Stream};
 
@@ -30,7 +29,7 @@ mod inner {
         #[derivative(Debug = "ignore")]
         frontiter: Option<InnerIterator>,
         #[cfg(feature = "timestamp")]
-        timestamp: Option<Duration>,
+        timestamp: Option<Timestamp>,
         _out: PhantomData<In>,
         _iter_out: PhantomData<Out>,
     }
@@ -216,7 +215,7 @@ mod inner {
         // Takes `Out` as input, returns an `Iterator` with items of type `NewOut`
         #[derivative(Debug = "ignore")]
         frontiter: Option<(Key, InnerIterator)>,
-        timestamp: Option<Duration>,
+        timestamp: Option<Timestamp>,
         _key: PhantomData<Key>,
         _in: PhantomData<In>,
         _iter_out: PhantomData<Out>,
@@ -650,8 +649,6 @@ mod inner {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::operator::flatten::Flatten;
     use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
@@ -680,37 +677,19 @@ mod tests {
     #[cfg(feature = "timestamp")]
     fn test_flatten_timestamped() {
         let mut fake_operator = FakeOperator::empty();
-        fake_operator.push(StreamElement::Timestamped(vec![], Duration::from_secs(0)));
-        fake_operator.push(StreamElement::Timestamped(
-            vec![1, 2, 3],
-            Duration::from_secs(1),
-        ));
-        fake_operator.push(StreamElement::Timestamped(vec![4], Duration::from_secs(2)));
-        fake_operator.push(StreamElement::Timestamped(vec![], Duration::from_secs(3)));
-        fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
+        fake_operator.push(StreamElement::Timestamped(vec![], 0));
+        fake_operator.push(StreamElement::Timestamped(vec![1, 2, 3], 1));
+        fake_operator.push(StreamElement::Timestamped(vec![4], 2));
+        fake_operator.push(StreamElement::Timestamped(vec![], 3));
+        fake_operator.push(StreamElement::Watermark(4));
 
         let mut flatten = Flatten::new(fake_operator);
 
-        assert_eq!(
-            flatten.next(),
-            StreamElement::Timestamped(1, Duration::from_secs(1))
-        );
-        assert_eq!(
-            flatten.next(),
-            StreamElement::Timestamped(2, Duration::from_secs(1))
-        );
-        assert_eq!(
-            flatten.next(),
-            StreamElement::Timestamped(3, Duration::from_secs(1))
-        );
-        assert_eq!(
-            flatten.next(),
-            StreamElement::Timestamped(4, Duration::from_secs(2))
-        );
-        assert_eq!(
-            flatten.next(),
-            StreamElement::Watermark(Duration::from_secs(4))
-        );
+        assert_eq!(flatten.next(), StreamElement::Timestamped(1, 1));
+        assert_eq!(flatten.next(), StreamElement::Timestamped(2, 1));
+        assert_eq!(flatten.next(), StreamElement::Timestamped(3, 1));
+        assert_eq!(flatten.next(), StreamElement::Timestamped(4, 2));
+        assert_eq!(flatten.next(), StreamElement::Watermark(4));
         assert_eq!(flatten.next(), StreamElement::Terminate);
     }
 }

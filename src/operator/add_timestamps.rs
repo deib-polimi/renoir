@@ -116,7 +116,7 @@ where
     ///
     /// let s = env.stream(IteratorSource::new((0..10)));
     /// s.add_timestamps(
-    ///     |&n| Timestamp::from_millis(n),
+    ///     |&n| n,
     ///     |&n, &ts| if n % 2 == 0 { Some(ts) } else { None }
     /// );
     /// ```
@@ -165,7 +165,7 @@ where
     /// s
     ///     .group_by(|i| i % 2)
     ///     .add_timestamps(
-    ///     |&(_k, n)| Timestamp::from_millis(n),
+    ///     |&(_k, n)| n,
     ///     |&(_k, n), &ts| if n % 2 == 0 { Some(ts) } else { None }
     /// );
     /// ```
@@ -186,7 +186,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::operator::add_timestamps::AddTimestamp;
-    use crate::operator::{Operator, StreamElement, Timestamp};
+    use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
 
     #[test]
@@ -195,7 +195,7 @@ mod tests {
 
         let mut oper = AddTimestamp::new(
             fake_operator,
-            |n| Timestamp::from_secs(*n),
+            |n| *n as i64,
             |n, ts| {
                 if n % 2 == 0 {
                     Some(*ts)
@@ -207,18 +207,9 @@ mod tests {
 
         for i in 0..5u64 {
             let t = i * 2;
-            assert_eq!(
-                oper.next(),
-                StreamElement::Timestamped(t, Timestamp::from_secs(t))
-            );
-            assert_eq!(
-                oper.next(),
-                StreamElement::Watermark(Timestamp::from_secs(t))
-            );
-            assert_eq!(
-                oper.next(),
-                StreamElement::Timestamped(t + 1, Timestamp::from_secs(t + 1))
-            );
+            assert_eq!(oper.next(), StreamElement::Timestamped(t, t as i64));
+            assert_eq!(oper.next(), StreamElement::Watermark(t as i64));
+            assert_eq!(oper.next(), StreamElement::Timestamped(t + 1, t as i64 + 1));
         }
         assert_eq!(oper.next(), StreamElement::Terminate);
     }

@@ -1,13 +1,10 @@
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
-use std::time::Duration;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::concat::ConcatElement;
 use crate::operator::reorder::Reorder;
-use crate::operator::{
-    timestamp_max, ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp,
-};
+use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
@@ -38,9 +35,9 @@ where
     /// Timestamp of the last element (item or watermark).
     last_seen: Timestamp,
     /// Upper bound duration of the interval.
-    upper_bound: Duration,
+    upper_bound: Timestamp,
     /// Lower bound duration of the interval.
-    lower_bound: Duration,
+    lower_bound: Timestamp,
     /// Whether the operator has received a `FlushAndRestart` message.
     received_restart: bool,
 }
@@ -71,7 +68,7 @@ where
     Out2: ExchangeData,
     OperatorChain: Operator<KeyValue<Key, ConcatElement<Out, Out2>>>,
 {
-    fn new(prev: OperatorChain, lower_bound: Duration, upper_bound: Duration) -> Self {
+    fn new(prev: OperatorChain, lower_bound: Timestamp, upper_bound: Timestamp) -> Self {
         Self {
             prev,
             left: Default::default(),
@@ -90,10 +87,10 @@ where
             // find lower and upper limits of the interval
             let lower = left_ts
                 .checked_sub(self.lower_bound)
-                .unwrap_or_else(|| Duration::new(0, 0));
+                .unwrap_or(Timestamp::MIN);
             let upper = left_ts
                 .checked_add(self.upper_bound)
-                .unwrap_or_else(timestamp_max);
+                .unwrap_or(Timestamp::MAX);
 
             if upper >= self.last_seen && !self.received_restart {
                 // there could be some elements in the interval that have not been received yet
@@ -222,8 +219,8 @@ where
     pub fn interval_join<Out2, OperatorChain2>(
         self,
         right: Stream<Out2, OperatorChain2>,
-        lower_bound: Duration,
-        upper_bound: Duration,
+        lower_bound: Timestamp,
+        upper_bound: Timestamp,
     ) -> Stream<(Out, Out2), impl Operator<(Out, Out2)>>
     where
         Out2: ExchangeData,
@@ -257,8 +254,8 @@ where
     pub fn interval_join<Out2, OperatorChain2>(
         self,
         right: KeyedStream<Key, Out2, OperatorChain2>,
-        lower_bound: Duration,
-        upper_bound: Duration,
+        lower_bound: Timestamp,
+        upper_bound: Timestamp,
     ) -> KeyedStream<Key, (Out, Out2), impl Operator<KeyValue<Key, (Out, Out2)>>>
     where
         Out2: ExchangeData,

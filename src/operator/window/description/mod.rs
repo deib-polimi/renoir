@@ -1,4 +1,3 @@
-#[cfg(feature = "timestamp")]
 use std::time::Duration;
 
 pub use count_window::CountWindow;
@@ -11,6 +10,7 @@ pub use crate::operator::window::description::session_window::{
 pub use crate::operator::window::description::sliding_window::{
     SlidingEventTimeWindowDescr, SlidingProcessingTimeWindowDescr,
 };
+use crate::operator::Timestamp;
 
 mod count_window;
 #[cfg(feature = "timestamp")]
@@ -110,14 +110,14 @@ impl ProcessingTimeWindow {
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new(vec![0, 1, 4, 5, 6, 9].into_iter()));
     /// let res = s
-    ///     .window_all(ProcessingTimeWindow::session(Duration::from_secs(2)))
+    ///     .window_all(ProcessingTimeWindow::session(2))
     ///     .map(|window| window.cloned().collect_vec())
     ///     .collect_vec();
     ///
     /// env.execute();
     /// let mut res = res.get().unwrap();
     /// ```
-    pub fn session(gap: Duration) -> SessionProcessingTimeWindowDescr {
+    pub fn session(gap: Timestamp) -> SessionProcessingTimeWindowDescr {
         SessionProcessingTimeWindowDescr::new(gap)
     }
 }
@@ -156,10 +156,10 @@ impl EventTimeWindow {
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s
     ///     .add_timestamps(
-    ///         |&n| Timestamp::from_secs(n),
+    ///         |&n| n,
     ///         |&n, &ts| if n % 2 == 0 { Some(ts) } else { None }
     ///     )
-    ///     .window_all(EventTimeWindow::sliding(Duration::from_secs(2), Duration::from_secs(1)))
+    ///     .window_all(EventTimeWindow::sliding(2, 1))
     ///     .map(|window| window.cloned().collect_vec())
     ///     .collect_vec();
     ///
@@ -168,7 +168,7 @@ impl EventTimeWindow {
     /// let mut res = res.get().unwrap();
     /// assert_eq!(res, vec![vec![0, 1], vec![1, 2], vec![2, 3], vec![3, 4], vec![4]]);
     /// ```
-    pub fn sliding(size: Duration, step: Duration) -> SlidingEventTimeWindowDescr {
+    pub fn sliding(size: Timestamp, step: Timestamp) -> SlidingEventTimeWindowDescr {
         SlidingEventTimeWindowDescr::new(size, step)
     }
 
@@ -192,10 +192,10 @@ impl EventTimeWindow {
     /// let s = env.stream(IteratorSource::new((0..7)));
     /// let res = s
     ///     .add_timestamps(
-    ///         |&n| Timestamp::from_secs(n),
+    ///         |&n| n,
     ///         |&n, &ts| if n % 2 == 0 { Some(ts) } else { None }
     ///     )
-    ///     .window_all(EventTimeWindow::tumbling(Duration::from_secs(2)))
+    ///     .window_all(EventTimeWindow::tumbling(2))
     ///     .map(|window| window.cloned().collect_vec())
     ///     .collect_vec();
     ///
@@ -204,7 +204,7 @@ impl EventTimeWindow {
     /// let mut res = res.get().unwrap();
     /// assert_eq!(res, vec![vec![0, 1], vec![2, 3], vec![4, 5], vec![6]]);
     /// ```
-    pub fn tumbling(size: Duration) -> SlidingEventTimeWindowDescr {
+    pub fn tumbling(size: Timestamp) -> SlidingEventTimeWindowDescr {
         Self::sliding(size, size)
     }
 
@@ -230,10 +230,10 @@ impl EventTimeWindow {
     /// let s = env.stream(IteratorSource::new(vec![0, 1, 4, 5, 6, 9].into_iter()));
     /// let res = s
     ///     .add_timestamps(
-    ///         |&n| Timestamp::from_secs(n),
+    ///         |&n| n,
     ///         |&n, &ts| if n % 2 == 0 { Some(ts) } else { None }
     ///     )
-    ///     .window_all(EventTimeWindow::session(Duration::from_secs(2)))
+    ///     .window_all(EventTimeWindow::session(2))
     ///     .map(|window| window.cloned().collect_vec())
     ///     .collect_vec();
     ///
@@ -242,7 +242,7 @@ impl EventTimeWindow {
     /// let mut res = res.get().unwrap();
     /// assert_eq!(res, vec![vec![0, 1], vec![4, 5, 6], vec![9]]);
     /// ```
-    pub fn session(gap: Duration) -> SessionEventTimeWindowDescr {
+    pub fn session(gap: Timestamp) -> SessionEventTimeWindowDescr {
         SessionEventTimeWindowDescr::new(gap)
     }
 }

@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -90,7 +90,7 @@ impl TopicSource {
 }
 
 impl Iterator for TopicSource {
-    type Item = (Duration, String);
+    type Item = (i64, String);
 
     fn next(&mut self) -> Option<Self::Item> {
         let nth = self.num_gen * self.instances + self.id;
@@ -98,16 +98,16 @@ impl Iterator for TopicSource {
             return None;
         }
         let topic = random_topic();
-        let ts = Duration::from_millis(nth);
+        let ts_millis = nth as i64;
         self.num_gen += 1;
 
-        Some((ts, topic))
+        Some((ts_millis, topic))
     }
 }
 
 fn main() {
-    let win_size = 1000;
-    let win_step = 500;
+    let win_size_millis = 1000;
+    let win_step_millis = 500;
     let k = 4;
 
     let (config, args) = EnvironmentConfig::from_args();
@@ -136,15 +136,12 @@ fn main() {
         .map(|(_ts, w)| w)
         // count each word separately
         .group_by(|w| w.clone())
-        .window(EventTimeWindow::sliding(
-            Duration::from_millis(win_size),
-            Duration::from_millis(win_step),
-        ))
+        .window(EventTimeWindow::sliding(win_size_millis, win_step_millis))
         // count how many times each word appears in the window
         .map(|w| w.len())
         .unkey()
         // this window has the same alignment of the previous one, so it will contain the same items
-        .window_all(EventTimeWindow::tumbling(Duration::from_millis(win_step)))
+        .window_all(EventTimeWindow::tumbling(win_step_millis))
         .map(move |w| {
             // find the k most frequent words for each window
             let mut words = w.cloned().collect::<Vec<(String, usize)>>();

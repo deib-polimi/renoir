@@ -42,7 +42,7 @@ fn main() {
     env.execute();
     let elapsed = start.elapsed();
     if let Some(state) = output.get() {
-        eprintln!("Best: {:?}", state);
+        eprintln!("Best: {state:?}");
     }
     eprintln!("Elapsed: {elapsed:?}");
 }

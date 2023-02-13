@@ -6,8 +6,6 @@
 
 use std::fmt::Display;
 use std::hash::Hash;
-#[cfg(feature = "timestamp")]
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -75,17 +73,10 @@ impl<Key, Out, T: Fn(&Out) -> Key + Clone + Send + 'static> KeyerFn<Key, Out> fo
 /// When using timestamps and watermarks, this type expresses the timestamp of a message or of a
 /// watermark.
 #[cfg(feature = "timestamp")]
-pub type Timestamp = Duration;
+pub type Timestamp = i64;
 
 #[cfg(not(feature = "timestamp"))]
 pub type Timestamp = ();
-/// Returns `Duration::new(u64::MAX, 1_000_000_000 - 1)`, which is equivalent to `Duration::MAX`.
-/// This is needed because `Duration::MAX` is unstable and `Duration::new` cannot be used to
-/// initialize a constant value.
-#[cfg(feature = "timestamp")]
-pub(crate) fn timestamp_max() -> Duration {
-    Duration::new(u64::MAX, 1_000_000_000 - 1)
-}
 
 /// An element of the stream. This is what enters and exits from the operators.
 ///

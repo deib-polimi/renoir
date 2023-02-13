@@ -81,6 +81,7 @@ where
         self.prev.setup(metadata);
     }
 
+    /// WARN: HeapSort is not stable!!
     fn next(&mut self) -> StreamElement<Out> {
         while !self.received_end && self.last_watermark.is_none() {
             match self.prev.next() {
@@ -125,8 +126,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::operator::reorder::Reorder;
     use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
@@ -136,11 +135,11 @@ mod tests {
     fn reorder() {
         let mut fake = FakeOperator::empty();
         for i in &[1, 3, 2] {
-            fake.push(StreamElement::Timestamped(*i, Duration::new(*i, 0)));
+            fake.push(StreamElement::Timestamped(*i, *i));
         }
-        fake.push(StreamElement::Watermark(Duration::new(3, 0)));
+        fake.push(StreamElement::Watermark(3));
         for i in &[6, 4, 5] {
-            fake.push(StreamElement::Timestamped(*i, Duration::new(*i, 0)));
+            fake.push(StreamElement::Timestamped(*i, *i));
         }
         fake.push(StreamElement::FlushAndRestart);
         fake.push(StreamElement::Terminate);
@@ -148,15 +147,9 @@ mod tests {
         let mut reorder = Reorder::new(fake);
 
         for i in 1..=6 {
-            assert_eq!(
-                reorder.next(),
-                StreamElement::Timestamped(i, Duration::new(i, 0))
-            );
+            assert_eq!(reorder.next(), StreamElement::Timestamped(i, i));
             if i == 3 {
-                assert_eq!(
-                    reorder.next(),
-                    StreamElement::Watermark(Duration::new(3, 0))
-                );
+                assert_eq!(reorder.next(), StreamElement::Watermark(3));
             }
         }
 

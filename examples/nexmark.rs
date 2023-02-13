@@ -1,19 +1,20 @@
-use std::time::Duration;
-
 use noir::operator::Operator;
+use noir::operator::Timestamp;
 use noir::prelude::*;
 use noir::Stream;
 use std::time::Instant;
 
 use nexmark::event::*;
 
-const WATERMARK_INTERVAL: usize = 256;
+const WATERMARK_INTERVAL: usize = 512;
+const BATCH_SIZE: usize = 4096;
+const SECOND_MILLIS: i64 = 1_000;
 
-fn timestamp_gen(e: &Event) -> Duration {
-    Duration::from_millis(e.timestamp())
+fn timestamp_gen(e: &Event) -> Timestamp {
+    e.timestamp() as i64
 }
 
-fn watermark_gen(e: &Event, ts: &Duration) -> Option<Duration> {
+fn watermark_gen(e: &Event, ts: &Timestamp) -> Option<Timestamp> {
     let w = match e {
         Event::Person(x) => x.id % WATERMARK_INTERVAL == 0,
         Event::Auction(x) => x.id % WATERMARK_INTERVAL == 0,
@@ -86,13 +87,7 @@ fn query1(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 fn query2(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
     events
         .filter_map(filter_bid)
-        .filter(|b| {
-            b.auction == 1007
-                || b.auction == 1020
-                || b.auction == 2001
-                || b.auction == 2019
-                || b.auction == 2007
-        })
+        .filter(|b| b.auction % 123 == 0)
         .collect_count()
 }
 
@@ -166,10 +161,7 @@ fn query4(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 ///                   GROUP BY B2.auction);
 /// ```
 fn query5(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
-    let window_descr = EventTimeWindow::sliding(
-        Duration::from_secs(60 * 60), // 60 min
-        Duration::from_secs(60),      // 1 min
-    );
+    let window_descr = EventTimeWindow::sliding(10 * SECOND_MILLIS, 2 * SECOND_MILLIS);
     let bid = events
         .add_timestamps(timestamp_gen, watermark_gen)
         .filter_map(filter_bid);
@@ -184,7 +176,6 @@ fn query5(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
         .unkey();
     counts
         .window_all(window_descr)
-        // for every window: WHERE num >= ALL (...)
         .map(|w| w.max_by_key(|(_, v)| *v).unwrap().0)
         .collect_count()
 }
@@ -232,7 +223,7 @@ fn query7(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
     let bid = events
         .add_timestamps(timestamp_gen, watermark_gen)
         .filter_map(filter_bid);
-    let window_descr = EventTimeWindow::tumbling(Duration::from_secs(60));
+    let window_descr = EventTimeWindow::tumbling(10 * SECOND_MILLIS);
     bid.key_by(|_| ())
         .window(window_descr.clone())
         .map(|w| w.max_by_key(|b| b.price).unwrap().clone())
@@ -250,7 +241,7 @@ fn query7(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// WHERE P.id = A.seller;
 /// ```
 fn query8(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
-    let window_descr = EventTimeWindow::tumbling(Duration::from_secs(60 * 60 * 12)); // 12h
+    let window_descr = EventTimeWindow::tumbling(10 * SECOND_MILLIS);
 
     let mut events = events
         .filter(|e| matches!(e.event_type(), EventType::Auction | EventType::Person))
@@ -275,7 +266,7 @@ fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<Event, impl Operato
             .with_step(n)
             .take(tot / n as usize + (i < tot as u64 % n) as usize)
     })
-    .batch_mode(BatchMode::fixed(1024))
+    .batch_mode(BatchMode::fixed(BATCH_SIZE))
 }
 
 fn filter_bid(e: Event) -> Option<Bid> {

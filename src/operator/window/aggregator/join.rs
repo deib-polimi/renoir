@@ -31,18 +31,18 @@ where
     /// let s1 = env
     ///     .stream(IteratorSource::new((0..4)))
     ///     .add_timestamps(
-    ///         |&n| Timestamp::from_millis(n),
+    ///         |&n| n,
     ///         |&n, &ts| Some(ts)
     ///     );
     /// let s2 = env
     ///     .stream(IteratorSource::new((4..8)))
     ///     .add_timestamps(
-    ///         |&n| Timestamp::from_millis(n - 4),
+    ///         |&n| n - 4,
     ///         |&n, &ts| Some(ts)
     ///     );
     /// let res = s1
     ///     .group_by(|&n| n % 2)
-    ///     .window(EventTimeWindow::tumbling(Duration::from_millis(2)))
+    ///     .window(EventTimeWindow::tumbling(2))
     ///     .join(s2.group_by(|&n| n % 2))
     ///     .collect_vec();
     ///
@@ -117,17 +117,17 @@ where
     /// let s1 = env
     ///     .stream(IteratorSource::new((0..4)))
     ///     .add_timestamps(
-    ///         |&n| Timestamp::from_millis(n),
+    ///         |&n| n,
     ///         |&n, &ts| Some(ts)
     ///     );
     /// let s2 = env
     ///     .stream(IteratorSource::new((4..8)))
     ///     .add_timestamps(
-    ///         |&n| Timestamp::from_millis(n - 4),
+    ///         |&n| n - 4,
     ///         |&n, &ts| Some(ts)
     ///     );
     /// let res = s1
-    ///     .window_all(EventTimeWindow::tumbling(Duration::from_millis(2)))
+    ///     .window_all(EventTimeWindow::tumbling(2))
     ///     .join(s2)
     ///     .collect_vec();
     ///

@@ -5,14 +5,14 @@ use std::time::Duration;
 pub(crate) use multiple::*;
 pub(crate) use single::*;
 
+#[cfg(feature = "timestamp")]
+use super::Timestamp;
 use crate::block::BlockStructure;
 use crate::channel::RecvTimeoutError;
 use crate::network::{Coord, NetworkDataIterator, NetworkMessage};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::start::watermark_frontier::WatermarkFrontier;
-#[cfg(feature = "timestamp")]
-use crate::operator::timestamp_max;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
@@ -229,7 +229,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
                                 // mark this replica as ended and let the frontier ignore it from now on
                                 #[cfg(feature = "timestamp")]
                                 {
-                                    self.watermark_frontier.update(sender, timestamp_max());
+                                    self.watermark_frontier.update(sender, Timestamp::MAX);
                                 }
                                 self.missing_flush_and_restart -= 1;
                                 continue;
@@ -310,7 +310,7 @@ mod tests {
 
     #[cfg(feature = "timestamp")]
     fn ts(millis: u64) -> Timestamp {
-        Timestamp::from_millis(millis)
+        millis as i64
     }
 
     #[test]

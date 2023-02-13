@@ -4,7 +4,6 @@ use std::sync::Arc;
 use itertools::Itertools;
 
 use noir::operator::source::IteratorSource;
-use noir::operator::Timestamp;
 use utils::{TestHelper, WatermarkChecker};
 
 mod utils;
@@ -92,14 +91,14 @@ fn concat_with_timestamps() {
         let stream1 = env
             .stream(source1)
             .add_timestamps(
-                |&x| Timestamp::from_secs(x),
+                |&x| x as i64,
                 |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
             )
             .shuffle();
         let stream2 = env
             .stream(source2)
             .add_timestamps(
-                |&x| Timestamp::from_secs(x % 10),
+                |&x| x as i64 % 10,
                 |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
             )
             .shuffle();

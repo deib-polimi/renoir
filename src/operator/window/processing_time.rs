@@ -37,8 +37,12 @@ impl<Key: DataKey, Out: Data, WindowGen: WindowGenerator<Key, Out>> WindowGenera
     fn add(&mut self, element: StreamElement<Out>) {
         match element {
             StreamElement::Item(item) => {
-                // TODO: consider not using `SystemTime`
-                let elapsed = UNIX_EPOCH.elapsed().unwrap();
+                let elapsed: i64 = UNIX_EPOCH
+                    .elapsed()
+                    .unwrap()
+                    .as_nanos()
+                    .try_into()
+                    .expect("Timestamp exceeds i64 nanos limit. File an issue!");
                 // Make sure timestamps are monotonic
                 let timestamp = match self.last_timestamp {
                     None => elapsed,

@@ -234,8 +234,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::operator::fold::Fold;
     use crate::operator::{Operator, StreamElement};
     use crate::test::FakeOperator;
@@ -254,21 +252,15 @@ mod tests {
     #[cfg(feature = "timestamp")]
     fn test_fold_timestamped() {
         let mut fake_operator = FakeOperator::empty();
-        fake_operator.push(StreamElement::Timestamped(0, Duration::from_secs(1)));
-        fake_operator.push(StreamElement::Timestamped(1, Duration::from_secs(2)));
-        fake_operator.push(StreamElement::Timestamped(2, Duration::from_secs(3)));
-        fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
+        fake_operator.push(StreamElement::Timestamped(0, 1));
+        fake_operator.push(StreamElement::Timestamped(1, 2));
+        fake_operator.push(StreamElement::Timestamped(2, 3));
+        fake_operator.push(StreamElement::Watermark(4));
 
         let mut fold = Fold::new(fake_operator, 0, |a, b| *a += b);
 
-        assert_eq!(
-            fold.next(),
-            StreamElement::Timestamped(0 + 1 + 2, Duration::from_secs(3))
-        );
-        assert_eq!(
-            fold.next(),
-            StreamElement::Watermark(Duration::from_secs(4))
-        );
+        assert_eq!(fold.next(), StreamElement::Timestamped(0 + 1 + 2, 3));
+        assert_eq!(fold.next(), StreamElement::Watermark(4));
         assert_eq!(fold.next(), StreamElement::Terminate);
     }
 

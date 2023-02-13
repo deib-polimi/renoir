@@ -1,6 +1,5 @@
 use noir::operator::source::IteratorSource;
 use noir::operator::window::EventTimeWindow;
-use noir::operator::Timestamp;
 
 use super::utils::TestHelper;
 
@@ -12,24 +11,18 @@ fn window_join() {
 
         let stream1 = env
             .stream(source1)
-            .add_timestamps(
-                |&x| Timestamp::from_secs(x),
-                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 1 { Some(ts) } else { None })
             .shuffle()
             .group_by(|x| x % 2);
         let stream2 = env
             .stream(source2)
-            .add_timestamps(
-                |&x| Timestamp::from_secs(x),
-                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 0 { Some(ts) } else { None })
             .shuffle()
             .group_by(|x| x % 2)
             .map(|(_, x)| ('a'..='z').nth(x as usize).unwrap());
 
         let res = stream1
-            .window(EventTimeWindow::tumbling(Timestamp::from_secs(3)))
+            .window(EventTimeWindow::tumbling(3))
             .join(stream2)
             .collect_vec();
         env.execute();
@@ -72,22 +65,16 @@ fn window_all_join() {
 
         let stream1 = env
             .stream(source1)
-            .add_timestamps(
-                |&x| Timestamp::from_secs(x),
-                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 1 { Some(ts) } else { None })
             .shuffle();
         let stream2 = env
             .stream(source2)
-            .add_timestamps(
-                |&x| Timestamp::from_secs(x),
-                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 0 { Some(ts) } else { None })
             .shuffle()
             .map(|x| ('a'..='z').nth(x as usize).unwrap());
 
         let res = stream1
-            .window_all(EventTimeWindow::tumbling(Timestamp::from_secs(3)))
+            .window_all(EventTimeWindow::tumbling(3))
             .join(stream2)
             .collect_vec();
         env.execute();
@@ -120,23 +107,17 @@ fn session_window_join() {
 
         let stream1 = env
             .stream(source1)
-            .add_timestamps(
-                |&x| Timestamp::from_secs(x),
-                |&x, &ts| if x % 2 == 1 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 1 { Some(ts) } else { None })
             .shuffle()
             .group_by(|x| x % 2);
         let stream2 = env
             .stream(source2)
-            .add_timestamps(
-                |&x| Timestamp::from_secs(x),
-                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 0 { Some(ts) } else { None })
             .shuffle()
             .group_by(|x| x % 2);
 
         let res = stream1
-            .window(EventTimeWindow::session(Timestamp::from_secs(3)))
+            .window(EventTimeWindow::session(3))
             .join(stream2)
             .collect_vec();
         env.execute();

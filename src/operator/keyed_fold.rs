@@ -294,8 +294,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use itertools::Itertools;
 
     use crate::operator::keyed_fold::KeyedFold;
@@ -330,10 +328,10 @@ mod tests {
     #[allow(clippy::identity_op)]
     fn test_keyed_fold_timestamp() {
         let mut fake_operator = FakeOperator::empty();
-        fake_operator.push(StreamElement::Timestamped((0, 0), Duration::from_secs(1)));
-        fake_operator.push(StreamElement::Timestamped((1, 1), Duration::from_secs(2)));
-        fake_operator.push(StreamElement::Timestamped((0, 2), Duration::from_secs(3)));
-        fake_operator.push(StreamElement::Watermark(Duration::from_secs(4)));
+        fake_operator.push(StreamElement::Timestamped((0, 0), 1));
+        fake_operator.push(StreamElement::Timestamped((1, 1), 2));
+        fake_operator.push(StreamElement::Timestamped((0, 2), 3));
+        fake_operator.push(StreamElement::Watermark(4));
 
         let mut keyed_fold = KeyedFold::new(fake_operator, 0, |a, b| *a += b);
 
@@ -349,17 +347,14 @@ mod tests {
             }
         }
 
-        assert_eq!(
-            keyed_fold.next(),
-            StreamElement::Watermark(Duration::from_secs(4))
-        );
+        assert_eq!(keyed_fold.next(), StreamElement::Watermark(4));
         assert_eq!(keyed_fold.next(), StreamElement::Terminate);
 
         res.sort_unstable();
         assert_eq!(res[0].0 .1, 0 + 2);
-        assert_eq!(res[0].1, Duration::from_secs(3));
+        assert_eq!(res[0].1, 3);
         assert_eq!(res[1].0 .1, 1);
-        assert_eq!(res[1].1, Duration::from_secs(2));
+        assert_eq!(res[1].1, 2);
     }
 
     #[test]

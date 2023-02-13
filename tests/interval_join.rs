@@ -1,7 +1,4 @@
-use std::time::Duration;
-
 use noir::operator::source::IteratorSource;
-use noir::operator::Timestamp;
 use utils::TestHelper;
 
 mod utils;
@@ -14,19 +11,13 @@ fn interval_join_keyed_stream() {
 
         let right = env
             .stream(source2)
-            .add_timestamps(
-                |&x| Timestamp::from_nanos(x as u64),
-                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 0 { Some(ts) } else { None })
             .group_by(|x| x % 2);
         let res = env
             .stream(source)
-            .add_timestamps(
-                |&x| Timestamp::from_nanos(x as u64),
-                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
-            )
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 0 { Some(ts) } else { None })
             .group_by(|x| x % 2)
-            .interval_join(right, Duration::from_nanos(1), Duration::from_nanos(2))
+            .interval_join(right, 1, 2)
             .collect_vec();
 
         env.execute();
@@ -54,17 +45,13 @@ fn interval_join_stream() {
         let source = IteratorSource::new(0..10);
         let source2 = IteratorSource::new(0..10);
 
-        let right = env.stream(source2).add_timestamps(
-            |&x| Timestamp::from_nanos(x as u64),
-            |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
-        );
+        let right = env
+            .stream(source2)
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 0 { Some(ts) } else { None });
         let res = env
             .stream(source)
-            .add_timestamps(
-                |&x| Timestamp::from_nanos(x as u64),
-                |&x, &ts| if x % 2 == 0 { Some(ts) } else { None },
-            )
-            .interval_join(right, Duration::from_nanos(1), Duration::from_nanos(2))
+            .add_timestamps(|&x| x, |&x, &ts| if x % 2 == 0 { Some(ts) } else { None })
+            .interval_join(right, 1, 2)
             .collect_vec();
 
         env.execute();

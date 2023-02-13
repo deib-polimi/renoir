@@ -4,13 +4,13 @@ use std::time::Duration;
 
 use crate::operator::window::processing_time::ProcessingTimeWindowGenerator;
 use crate::operator::window::{Window, WindowDescription, WindowGenerator};
-use crate::operator::{timestamp_max, Data, DataKey, StreamElement, Timestamp};
+use crate::operator::{Data, DataKey, StreamElement, Timestamp};
 
 /// Window description for sliding event time windows
 #[derive(Clone, Debug)]
 pub struct SlidingEventTimeWindowDescr {
-    size: Duration,
-    step: Duration,
+    size: Timestamp,
+    step: Timestamp,
 }
 
 impl SlidingEventTimeWindowDescr {
@@ -18,10 +18,10 @@ impl SlidingEventTimeWindowDescr {
     ///
     /// Each window has the given size, and will slide with the given steps. The first window is
     /// aligned with the epoch time.
-    pub fn new(size: Duration, step: Duration) -> Self {
+    pub fn new(size: Timestamp, step: Timestamp) -> Self {
         assert!(step <= size);
-        assert_ne!(size, Duration::new(0, 0));
-        assert_ne!(step, Duration::new(0, 0));
+        assert_ne!(size, 0);
+        assert_ne!(step, 0);
         Self { size, step }
     }
 }
@@ -36,8 +36,7 @@ impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SlidingEventTimeWi
     fn to_string(&self) -> String {
         format!(
             "SlidingEventTimeWindow[event, size={}, step={}]",
-            self.size.as_secs_f64(),
-            self.step.as_secs_f64()
+            self.size, self.step
         )
     }
 }
@@ -45,15 +44,23 @@ impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SlidingEventTimeWi
 /// Window description for sliding processing time windows
 #[derive(Clone, Debug)]
 pub struct SlidingProcessingTimeWindowDescr {
-    size: Duration,
-    step: Duration,
+    size: Timestamp,
+    step: Timestamp,
 }
 
 impl SlidingProcessingTimeWindowDescr {
     pub(crate) fn new(size: Duration, step: Duration) -> Self {
+        let size = size
+            .as_nanos()
+            .try_into()
+            .expect("Timestamp out of range. File an issue!");
+        let step = step
+            .as_nanos()
+            .try_into()
+            .expect("Timestamp out of range. File an issue!");
         assert!(step <= size);
-        assert_ne!(size, Duration::new(0, 0));
-        assert_ne!(step, Duration::new(0, 0));
+        assert_ne!(size, 0);
+        assert_ne!(step, 0);
         Self { size, step }
     }
 }
@@ -68,8 +75,7 @@ impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SlidingProcessingT
     fn to_string(&self) -> String {
         format!(
             "SlidingProcessingTimeWindow[processing, size={}, step={}]",
-            self.size.as_secs_f64(),
-            self.step.as_secs_f64()
+            self.size, self.step
         )
     }
 }
@@ -77,8 +83,8 @@ impl<Key: DataKey, Out: Data> WindowDescription<Key, Out> for SlidingProcessingT
 /// This generator is used for event time and processing time windows.
 #[derive(Clone)]
 pub struct SlidingWindowGenerator<Key: DataKey, Out: Data> {
-    size: Duration,
-    step: Duration,
+    size: Timestamp,
+    step: Timestamp,
     win_end: Timestamp,
     items: VecDeque<Out>,
     timestamps: VecDeque<Timestamp>,
@@ -87,7 +93,7 @@ pub struct SlidingWindowGenerator<Key: DataKey, Out: Data> {
 }
 
 impl<Key: DataKey, Out: Data> SlidingWindowGenerator<Key, Out> {
-    pub(crate) fn new(size: Duration, step: Duration) -> Self {
+    pub(crate) fn new(size: Timestamp, step: Timestamp) -> Self {
         SlidingWindowGenerator {
             size,
             step,
@@ -101,19 +107,15 @@ impl<Key: DataKey, Out: Data> SlidingWindowGenerator<Key, Out> {
 
     /// Return the closing time of the oldest window containing `t`, making
     /// sure the first window starts at time 0.
-    fn get_window_end(&self, t: Timestamp) -> Duration {
+    fn get_window_end(&self, t: Timestamp) -> Timestamp {
         if t < self.size {
             // the given timestamp is part of the first window
             return self.size;
         }
 
-        let offset = self.size.as_nanos() % self.step.as_nanos();
-        let nanos = (t.as_nanos() - offset) / self.step.as_nanos() * self.step.as_nanos() + offset;
-        let dur = Duration::new(
-            (nanos / 1_000_000_000) as u64,
-            (nanos % 1_000_000_000) as u32,
-        );
-        dur + self.step
+        let offset = self.size % self.step;
+        let delta = (t - offset) / self.step * self.step + offset;
+        delta + self.step
     }
 }
 
@@ -142,7 +144,7 @@ impl<Key: DataKey, Out: Data> WindowGenerator<Key, Out> for SlidingWindowGenerat
                 self.last_seen = ts;
             }
             StreamElement::FlushAndRestart => {
-                self.last_seen = timestamp_max();
+                self.last_seen = Timestamp::MAX;
             }
             StreamElement::FlushBatch => unreachable!("Windows do not handle FlushBatch"),
             StreamElement::Terminate => unreachable!("Windows do not handle Terminate"),
@@ -198,55 +200,58 @@ mod tests {
 
     use crate::operator::window::description::sliding_window::SlidingWindowGenerator;
     use crate::operator::window::{EventTimeWindow, WindowDescription, WindowGenerator};
-    use crate::operator::{StreamElement, Timestamp};
+    use crate::operator::StreamElement;
 
     #[test]
     fn sliding_event_time() {
-        let descr = EventTimeWindow::sliding(Duration::from_secs(3), Duration::from_millis(2500));
+        let descr = EventTimeWindow::sliding(
+            Duration::from_secs(3).as_millis() as i64,
+            Duration::from_millis(2500).as_millis() as i64,
+        );
         let mut generator: SlidingWindowGenerator<u32, _> = descr.new_generator();
 
         // current window [0, 3)
-        generator.add(StreamElement::Timestamped(0, Timestamp::from_secs(0)));
+        generator.add(StreamElement::Timestamped(0, 0_000));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(1, Timestamp::from_secs(1)));
+        generator.add(StreamElement::Timestamped(1, 1_000));
         assert!(generator.next_window().is_none());
-        generator.add(StreamElement::Timestamped(2, Timestamp::from_secs(2)));
+        generator.add(StreamElement::Timestamped(2, 2_000));
         assert!(generator.next_window().is_none());
         // this closes the window
-        generator.add(StreamElement::Timestamped(3, Timestamp::from_secs(3)));
+        generator.add(StreamElement::Timestamped(3, 3_000));
 
         let window = generator.next_window().unwrap();
-        assert_eq!(window.timestamp, Some(Timestamp::from_secs(3)));
+        assert_eq!(window.timestamp, Some(3_000));
         let items = window.copied().collect_vec();
         assert_eq!(items, vec![0, 1, 2]);
         generator.advance();
 
         // current window [2.5, 5.5)
-        generator.add(StreamElement::Watermark(Timestamp::from_secs(5)));
+        generator.add(StreamElement::Watermark(5_000));
         assert!(generator.next_window().is_none());
         // this closes the window
-        generator.add(StreamElement::Watermark(Timestamp::from_secs(6)));
+        generator.add(StreamElement::Watermark(6_000));
 
         let window = generator.next_window().unwrap();
-        assert_eq!(window.timestamp, Some(Timestamp::from_millis(5500)));
+        assert_eq!(window.timestamp, Some(5_500));
         let items = window.copied().collect_vec();
         assert_eq!(items, vec![3]);
         generator.advance();
 
         // current window [7.5, 10.5)
-        generator.add(StreamElement::Timestamped(10, Timestamp::from_secs(10)));
+        generator.add(StreamElement::Timestamped(10, 10_000));
         assert!(generator.next_window().is_none());
         generator.add(StreamElement::FlushAndRestart);
 
         let window = generator.next_window().unwrap();
-        assert_eq!(window.timestamp, Some(Timestamp::from_millis(10500)));
+        assert_eq!(window.timestamp, Some(10_500));
         let items = window.copied().collect_vec();
         assert_eq!(items, vec![10]);
         generator.advance();
 
         // current window [10, 13)
         let window = generator.next_window().unwrap();
-        assert_eq!(window.timestamp, Some(Timestamp::from_secs(13)));
+        assert_eq!(window.timestamp, Some(13_000));
         let items = window.copied().collect_vec();
         assert_eq!(items, vec![10]);
         generator.advance();

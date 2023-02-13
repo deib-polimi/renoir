@@ -144,7 +144,6 @@ where
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use std::time::Duration;
 
     use crate::operator::map::Map;
     use crate::operator::{Operator, StreamElement};
@@ -155,9 +154,9 @@ mod tests {
     fn map_stream() {
         let mut fake_operator = FakeOperator::new(0..10u8);
         for i in 0..10 {
-            fake_operator.push(StreamElement::Timestamped(i, Duration::from_secs(i as u64)));
+            fake_operator.push(StreamElement::Timestamped(i, i as i64));
         }
-        fake_operator.push(StreamElement::Watermark(Duration::from_secs(100)));
+        fake_operator.push(StreamElement::Watermark(100));
 
         let map = Map::new(fake_operator, |x| x.to_string());
         let map = Map::new(map, |x| x + "000");
@@ -169,15 +168,9 @@ mod tests {
         }
         for i in 0..10 {
             let elem = map.next();
-            assert_eq!(
-                elem,
-                StreamElement::Timestamped(i * 1000, Duration::from_secs(i as u64))
-            );
+            assert_eq!(elem, StreamElement::Timestamped(i * 1000, i as i64));
         }
-        assert_eq!(
-            map.next(),
-            StreamElement::Watermark(Duration::from_secs(100))
-        );
+        assert_eq!(map.next(), StreamElement::Watermark(100));
         assert_eq!(map.next(), StreamElement::Terminate);
     }
 }
