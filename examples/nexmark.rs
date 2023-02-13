@@ -311,7 +311,7 @@ fn main() {
         6 => query6(events(&mut env, n)),
         7 => query7(events(&mut env, n)),
         8 => query8(events(&mut env, n)),
-        _ => panic!("Invalid query"),
+        _ => panic!("Invalid query! {i}"),
     };
 
     let start = Instant::now();

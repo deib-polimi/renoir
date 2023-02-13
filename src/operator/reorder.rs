@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::VecDeque;
 use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -7,28 +7,26 @@ use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Clone)]
-struct HeapElement<Out> {
+struct TimestampedItem<Out> {
     item: Out,
     timestamp: Timestamp,
 }
 
-impl<Out> Ord for HeapElement<Out> {
+impl<Out> Ord for TimestampedItem<Out> {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Returns the opposite of the actual order of the timestamps
-        // This is needed to have a min-heap
-        other.timestamp.cmp(&self.timestamp)
+        self.timestamp.cmp(&other.timestamp)
     }
 }
 
-impl<Out> PartialOrd for HeapElement<Out> {
+impl<Out> PartialOrd for TimestampedItem<Out> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<Out> Eq for HeapElement<Out> {}
+impl<Out> Eq for TimestampedItem<Out> {}
 
-impl<Out> PartialEq for HeapElement<Out> {
+impl<Out> PartialEq for TimestampedItem<Out> {
     fn eq(&self, other: &Self) -> bool {
         self.timestamp == other.timestamp
     }
@@ -39,7 +37,9 @@ pub(crate) struct Reorder<Out: Data, PreviousOperators>
 where
     PreviousOperators: Operator<Out>,
 {
-    buffer: BinaryHeap<HeapElement<Out>>,
+    buffer: VecDeque<TimestampedItem<Out>>,
+    // Scratch memory used for glidesort
+    scratch: Vec<TimestampedItem<Out>>,
     last_watermark: Option<Timestamp>,
     prev: PreviousOperators,
     received_end: bool,
@@ -66,6 +66,7 @@ where
     pub(crate) fn new(prev: PreviousOperators) -> Self {
         Self {
             buffer: Default::default(),
+            scratch: Default::default(),
             last_watermark: None,
             prev,
             received_end: false,
@@ -81,32 +82,34 @@ where
         self.prev.setup(metadata);
     }
 
-    /// WARN: HeapSort is not stable!!
     fn next(&mut self) -> StreamElement<Out> {
         while !self.received_end && self.last_watermark.is_none() {
             match self.prev.next() {
                 element @ StreamElement::Item(_) => return element,
                 StreamElement::Timestamped(item, timestamp) => {
-                    self.buffer.push(HeapElement { item, timestamp })
+                    self.buffer.push_back(TimestampedItem { item, timestamp })
                 }
-                StreamElement::Watermark(ts) => self.last_watermark = Some(ts),
+                StreamElement::Watermark(ts) => {
+                    self.last_watermark = Some(ts);
+                    glidesort::sort_with_vec(self.buffer.make_contiguous(), &mut self.scratch);
+                }
                 StreamElement::FlushBatch => return StreamElement::FlushBatch,
                 StreamElement::FlushAndRestart => self.received_end = true,
                 StreamElement::Terminate => return StreamElement::Terminate,
             }
         }
 
-        if let Some(ts) = self.last_watermark {
-            match self.buffer.peek() {
-                Some(top) if top.timestamp <= ts => {
-                    let element = self.buffer.pop().unwrap();
+        if let Some(w) = self.last_watermark {
+            match self.buffer.front() {
+                Some(front) if front.timestamp <= w => {
+                    let element = self.buffer.pop_front().unwrap();
                     StreamElement::Timestamped(element.item, element.timestamp)
                 }
                 _ => StreamElement::Watermark(self.last_watermark.take().unwrap()),
             }
         } else {
             // here we know that received_end must be true, otherwise we wouldn't have exited the loop
-            match self.buffer.pop() {
+            match self.buffer.pop_front() {
                 // pop remaining elements in the heap
                 Some(element) => StreamElement::Timestamped(element.item, element.timestamp),
                 None => {
