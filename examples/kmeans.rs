@@ -77,8 +77,8 @@ impl PartialOrd for Point {
 
 impl Hash for Point {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.x.to_be_bytes().hash(state);
-        self.y.to_be_bytes().hash(state);
+        self.x.to_le_bytes().hash(state);
+        self.y.to_le_bytes().hash(state);
     }
 }
 

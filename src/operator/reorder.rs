@@ -94,7 +94,10 @@ where
                     glidesort::sort_with_vec(self.buffer.make_contiguous(), &mut self.scratch);
                 }
                 StreamElement::FlushBatch => return StreamElement::FlushBatch,
-                StreamElement::FlushAndRestart => self.received_end = true,
+                StreamElement::FlushAndRestart => {
+                    self.received_end = true;
+                    glidesort::sort_with_vec(self.buffer.make_contiguous(), &mut self.scratch);
+                }
                 StreamElement::Terminate => return StreamElement::Terminate,
             }
         }
