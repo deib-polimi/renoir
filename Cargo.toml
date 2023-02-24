@@ -106,6 +106,18 @@ flume = "0.10.14"
 kstring = { version = "2.0.0", features = ["serde"] }
 nexmark = { version = "0.2.0", features = ["serde"] }
 
+[[example]]
+name = "nexmark"
+required-features = ["timestamp"]
+
+[[example]]
+name = "rolling_top_words"
+required-features = ["timestamp"]
+
+[[example]]
+name = "rolling_top_words_e2e"
+required-features = ["timestamp"]
+
 # The list of benchmarks, all of them require "harness = false" in order to
 # work with criterion.rs. Cannot set `[lib] harness = false` because the tests
 # require the harness.
@@ -132,6 +144,6 @@ name = "coarse_time"
 harness = false
 
 [profile.release]
-lto = "thin"
+lto = true
 strip = "symbols"
 # debug = 1

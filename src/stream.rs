@@ -167,7 +167,7 @@ where
         old_stream.block.is_only_one_strategy = matches!(next_strategy, NextStrategy::OnlyOne);
         let mut env = old_stream.env.lock();
         let old_id = old_stream.block.id;
-        let new_id = env.new_block();
+        let new_id = env.new_block_id();
         let scheduler = env.scheduler_mut();
         scheduler.add_block(old_stream.block);
         scheduler.connect_blocks(old_id, new_id, TypeId::of::<Out>());
@@ -264,7 +264,7 @@ where
         let mut env = old_stream1.env.lock();
         let old_id1 = old_stream1.block.id;
         let old_id2 = old_stream2.block.id;
-        let new_id = env.new_block();
+        let new_id = env.new_block_id();
 
         // add and connect the old blocks with the new one
         let scheduler = env.scheduler_mut();
@@ -304,7 +304,7 @@ where
     pub(crate) fn clone(&mut self) -> Self {
         let mut env = self.env.lock();
         let prev_nodes = env.scheduler_mut().prev_blocks(self.block.id).unwrap();
-        let new_id = env.new_block();
+        let new_id = env.new_block_id();
 
         for (prev_node, typ) in prev_nodes.into_iter() {
             env.scheduler_mut().connect_blocks(prev_node, new_id, typ);

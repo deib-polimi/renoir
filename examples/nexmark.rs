@@ -37,7 +37,9 @@ fn winning_bids(
         // WHERE A.id = B.auction
         .join(bid, |a| a.id, |b| b.auction)
         // WHERE B.datetime < A.expires
-        .filter(|(_, (a, b))| b.date_time < a.expires)
+        .filter(|(_, (a, b))| {
+            b.price >= a.reserve && (a.date_time..a.expires).contains(&b.date_time)
+        })
         // find the bid with the maximum price
         .fold(
             (None, None),
@@ -99,18 +101,21 @@ fn query2(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// WHERE A.seller = P.id AND (P.state = `OR' OR P.state = `ID' OR P.state = `CA') AND A.category = 10;
 /// ```
 fn query3(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
-    let mut events = events
-        .filter(|e| matches!(e.event_type(), EventType::Auction | EventType::Person))
-        .split(2);
+    let mut routes = events
+        .route()
+        .add_route(|e| matches!(e, Event::Person(_)))
+        .add_route(|e| matches!(e, Event::Auction(_)))
+        .build()
+        .into_iter();
     // WHERE P.state = `OR' OR P.state = `ID' OR P.state = `CA'
-    let person = events
-        .pop()
+    let person = routes
+        .next()
         .unwrap()
         .filter_map(filter_person)
         .filter(|p| p.state == "or" || p.state == "id" || p.state == "ca");
     // WHERE A.category = 10
-    let auction = events
-        .pop()
+    let auction = routes
+        .next()
         .unwrap()
         .filter_map(filter_auction)
         .filter(|a| a.category == 10);
@@ -135,12 +140,15 @@ fn query3(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// GROUP BY C.id;
 /// ```
 fn query4(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
-    let mut events = events
-        .filter(|e| matches!(e.event_type(), EventType::Auction | EventType::Bid))
-        .split(2);
+    let mut routes = events
+        .route()
+        .add_route(|e| matches!(e, Event::Auction(_)))
+        .add_route(|e| matches!(e, Event::Bid(_)))
+        .build()
+        .into_iter();
 
-    let auction = events.pop().unwrap().filter_map(filter_auction);
-    let bid = events.pop().unwrap().filter_map(filter_bid);
+    let auction = routes.next().unwrap().filter_map(filter_auction);
+    let bid = routes.next().unwrap().filter_map(filter_bid);
 
     winning_bids(auction, bid)
         // GROUP BY category, AVG(price)
@@ -191,20 +199,24 @@ fn query5(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// GROUP BY Q.seller;
 /// ```
 fn query6(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
-    let mut events = events
-        .filter(|e| matches!(e.event_type(), EventType::Auction | EventType::Bid))
-        .split(2);
+    let mut routes = events
+        .route()
+        .add_route(|e| matches!(e, Event::Auction(_)))
+        .add_route(|e| matches!(e, Event::Bid(_)))
+        .build()
+        .into_iter();
     // let person = event.pop().unwrap().filter_map(filter_person);
-    let auction = events.pop().unwrap().filter_map(filter_auction);
-    let bid = events.pop().unwrap().filter_map(filter_bid);
+    let auction = routes.next().unwrap().filter_map(filter_auction);
+    let bid = routes.next().unwrap().filter_map(filter_bid);
     winning_bids(auction, bid)
         // [PARTITION BY A.seller ROWS 10]
-        .group_by(|(a, _b)| a.seller)
+        .map(|(a, b)| (a.seller, b.price))
+        .group_by(|(seller, _)| *seller)
         .window(CountWindow::sliding(10, 1))
         // AVG(Q.final)
         .map(|w| {
             let l = w.len();
-            let sum: usize = w.map(|(_, b)| b.price).sum();
+            let sum: usize = w.map(|(_, price)| price).sum();
             sum as f32 / l as f32
         })
         .unkey()
@@ -243,12 +255,16 @@ fn query7(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 fn query8(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
     let window_descr = EventTimeWindow::tumbling(10 * SECOND_MILLIS);
 
-    let mut events = events
-        .filter(|e| matches!(e.event_type(), EventType::Auction | EventType::Person))
+    let mut routes = events
         .add_timestamps(timestamp_gen, watermark_gen)
-        .split(2);
-    let person = events.pop().unwrap().filter_map(filter_person);
-    let auction = events.pop().unwrap().filter_map(filter_auction);
+        .route()
+        .add_route(|e| matches!(e, Event::Person(_)))
+        .add_route(|e| matches!(e, Event::Auction(_)))
+        .build()
+        .into_iter();
+
+    let person = routes.next().unwrap().filter_map(filter_person);
+    let auction = routes.next().unwrap().filter_map(filter_auction);
 
     person
         .group_by(|p| p.id)

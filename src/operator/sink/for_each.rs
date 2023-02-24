@@ -110,15 +110,21 @@ where
     /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
-    /// s.for_each(|key, n| println!("Item: {} has key {}", n, key));
+    /// s.for_each(|(key, n)| println!("Item: {} has key {}", n, key));
     ///
     /// env.execute();
     /// ```
-    pub fn for_each<F>(self, mut f: F)
+    pub fn for_each<F>(self, f: F)
     where
-        F: FnMut(Key, Out) + Send + Clone + 'static,
+        F: FnMut((Key, Out)) + Send + Clone + 'static,
     {
-        self.0.for_each(move |(key, out)| f(key, out))
+        self.0
+            .add_operator(|prev| ForEachSink {
+                prev,
+                f,
+                _out: Default::default(),
+            })
+            .finalize_block();
     }
 }
 
@@ -152,7 +158,7 @@ mod tests {
         let sum2 = sum.clone();
         env.stream(source)
             .group_by(|x| x % 2)
-            .for_each(move |p, x| {
+            .for_each(move |(p, x)| {
                 sum.fetch_add(x * (p + 1), Ordering::Release);
             });
         env.execute();

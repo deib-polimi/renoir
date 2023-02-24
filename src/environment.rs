@@ -1,18 +1,20 @@
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use std::any::TypeId;
 use std::sync::Arc;
 use std::thread::available_parallelism;
 
 use crate::block::InnerBlock;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};
+use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
-use crate::operator::Data;
+use crate::operator::{Data, Operator};
 use crate::profiler::Stopwatch;
 #[cfg(feature = "ssh")]
 use crate::runner::spawn_remote_workers;
 use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
-use crate::CoordUInt;
+use crate::{BatchMode, CoordUInt};
 
 static LAST_REMOTE_CONFIG: Lazy<Mutex<Option<RemoteRuntimeConfig>>> =
     Lazy::new(|| Mutex::new(None));
@@ -181,13 +183,14 @@ impl StreamEnvironmentInner {
                 panic!("Call `StreamEnvironment::spawn_remote_workers` before calling stream!");
             }
         }
-        let block_id = env.new_block();
+
         let source_max_parallelism = source.get_max_parallelism();
+        let mut block = env.new_block(source, Default::default(), Default::default());
+
         info!(
             "Creating a new stream, block_id={} with max_parallelism {:?}",
-            block_id, source_max_parallelism
+            block.id, source_max_parallelism
         );
-        let mut block = InnerBlock::new(block_id, source, Default::default(), Default::default());
         if let Some(p) = source_max_parallelism {
             block
                 .scheduler_requirements
@@ -197,8 +200,33 @@ impl StreamEnvironmentInner {
         Stream { block, env: env_rc }
     }
 
+    pub(crate) fn new_block<Out: Data, S: Source<Out>>(
+        &mut self,
+        source: S,
+        batch_mode: BatchMode,
+        iteration_context: Vec<Arc<IterationStateLock>>,
+    ) -> InnerBlock<Out, S> {
+        let new_id = self.new_block_id();
+        InnerBlock::new(new_id, source, batch_mode, iteration_context)
+    }
+
+    pub(crate) fn close_block<Out: Data, Op: Operator<Out> + 'static>(
+        &mut self,
+        block: InnerBlock<Out, Op>,
+    ) -> BlockId {
+        let id = block.id;
+        let scheduler = self.scheduler_mut();
+        scheduler.add_block(block);
+        id
+    }
+
+    pub(crate) fn connect_blocks<Out: Data>(&mut self, from: BlockId, to: BlockId) {
+        let scheduler = self.scheduler_mut();
+        scheduler.connect_blocks(from, to, TypeId::of::<Out>());
+    }
+
     /// Allocate a new BlockId inside the environment.
-    pub(crate) fn new_block(&mut self) -> BlockId {
+    pub(crate) fn new_block_id(&mut self) -> BlockId {
         let new_id = self.block_count;
         self.block_count += 1;
         info!("Creating a new block, id={}", new_id);

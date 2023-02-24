@@ -83,6 +83,7 @@ where
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
 
+        // TODO: wrap sender-block assignment logic in a struct
         let senders = metadata.network.get_senders(metadata.coord);
         // remove the ignored destinations
         self.senders = senders

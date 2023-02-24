@@ -425,7 +425,7 @@ where
 
         let iterate_block_id = {
             let mut env = env.lock();
-            env.new_block()
+            env.new_block_id()
         };
         let iter_source = Iterate::new(
             state,

@@ -27,6 +27,7 @@ pub(crate) mod filter_map;
 pub(crate) mod flatten;
 pub(crate) mod fold;
 pub(crate) mod group_by;
+pub(crate) mod inspect;
 #[cfg(feature = "timestamp")]
 pub(crate) mod interval_join;
 pub(crate) mod iteration;
@@ -41,6 +42,7 @@ pub(crate) mod reorder;
 pub(crate) mod rich_filter_map;
 pub(crate) mod rich_flat_map;
 pub(crate) mod rich_map;
+pub(crate) mod route;
 pub(crate) mod shuffle;
 pub mod sink;
 pub mod source;
