@@ -4,16 +4,13 @@ use crate::stream::Stream;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 
-use crate::block::{
-    BatchMode, Batcher, BlockSenders, BlockStructure, Connection, OperatorStructure,
-};
+use crate::block::{BatchMode, Batcher, BlockStructure, Connection, OperatorStructure};
 use crate::network::{Coord, ReceiverEndpoint};
 use crate::operator::{KeyerFn, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
-use super::StartBlock;
-
-// type FilterFn<Out> = Box<dyn Fn(&Out) -> bool + Send + 'static>;
+use super::end::BlockSenders;
+use crate::operator::start::StartBlock;
 
 #[derive(Clone)]
 pub(crate) struct FilterFn<Out>(fn(&Out) -> bool);
@@ -139,6 +136,33 @@ where
             senders: Default::default(),
         }
     }
+
+    fn setup_endpoints(&mut self) {
+        self.senders.sort_unstable_by_key(|s| s.0);
+        let mut block_map: HashMap<BlockId, Vec<usize>> =
+            self.senders
+                .iter()
+                .enumerate()
+                .fold(HashMap::new(), |mut map, (i, s)| {
+                    map.entry(s.0.coord.block_id).or_default().push(i);
+                    map
+                });
+
+        for (block_id, filter) in self.routes.drain(..) {
+            let indexes = block_map
+                .remove(&block_id)
+                .expect("scheduler connection missing for RoutingEndBlock");
+            let block_senders = BlockSenders { indexes };
+            self.endpoints.push(Endpoint {
+                block_id,
+                filter,
+                block_senders,
+            });
+        }
+
+        assert!(self.routes.is_empty());
+        assert!(block_map.is_empty());
+    }
 }
 
 #[derive(Clone)]
@@ -174,28 +198,7 @@ where
             .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode, metadata.coord)))
             .collect();
 
-        self.senders.sort_unstable_by_key(|s| s.0);
-
-        let mut block_map: HashMap<BlockId, Vec<usize>> =
-            self.senders
-                .iter()
-                .enumerate()
-                .fold(HashMap::new(), |mut map, (i, s)| {
-                    map.entry(s.0.coord.block_id).or_default().push(i);
-                    map
-                });
-
-        for (block_id, filter) in self.routes.drain(..) {
-            let indexes = block_map
-                .remove(&block_id)
-                .expect("scheduler connection missing for RoutingEndBlock");
-            let block_senders = BlockSenders { indexes };
-            self.endpoints.push(Endpoint {
-                block_id,
-                filter,
-                block_senders,
-            });
-        }
+        self.setup_endpoints();
 
         self.coord = Some(metadata.coord);
     }
@@ -212,12 +215,8 @@ where
             StreamElement::Watermark(_)
             | StreamElement::Terminate
             | StreamElement::FlushAndRestart => {
-                for Endpoint {
-                    block_senders: senders,
-                    ..
-                } in self.endpoints.iter()
-                {
-                    for &sender_idx in senders.indexes.iter() {
+                for e in self.endpoints.iter() {
+                    for &sender_idx in e.block_senders.indexes.iter() {
                         let sender = &mut self.senders[sender_idx];
                         sender.1.enqueue(message.clone());
                     }
@@ -228,14 +227,9 @@ where
                 let index = self.next_strategy.index(item);
 
                 let mut sent = false;
-                for Endpoint {
-                    filter,
-                    block_senders,
-                    ..
-                } in self.endpoints.iter_mut()
-                {
-                    if filter.is_match(item) {
-                        let sender_idx = block_senders.indexes[index];
+                for e in self.endpoints.iter_mut() {
+                    if e.filter.is_match(item) {
+                        let sender_idx = e.block_senders.indexes[index];
                         self.senders[sender_idx].1.enqueue(message);
                         sent = true;
                         break;

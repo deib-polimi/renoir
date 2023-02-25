@@ -1,11 +1,25 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 
 use crate::block::{
-    BatchMode, Batcher, BlockSenders, BlockStructure, Connection, NextStrategy, OperatorStructure,
+    BatchMode, Batcher, BlockStructure, Connection, NextStrategy, OperatorStructure,
 };
 use crate::network::{Coord, ReceiverEndpoint};
 use crate::operator::{ExchangeData, KeyerFn, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
+
+/// The list with the interesting senders of a single block.
+#[derive(Debug, Clone)]
+pub(crate) struct BlockSenders {
+    /// Indexes of the senders for all the replicas of this box
+    pub indexes: Vec<usize>,
+}
+
+impl BlockSenders {
+    pub(crate) fn new(indexes: Vec<usize>) -> Self {
+        Self { indexes }
+    }
+}
 
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
@@ -61,6 +75,35 @@ where
         }
     }
 
+    // group the senders based on the strategy
+    fn setup_senders(&mut self) {
+        glidesort::sort_by_key(&mut self.senders, |s| s.0);
+
+        self.block_senders = match self.next_strategy {
+            NextStrategy::All => (0..self.senders.len())
+                .map(|i| vec![i])
+                .map(BlockSenders::new)
+                .collect(),
+            _ => self
+                .senders
+                .iter()
+                .enumerate()
+                .fold(HashMap::<_, Vec<_>>::new(), |mut map, (i, (coord, _))| {
+                    map.entry(coord.coord.block_id).or_default().push(i);
+                    map
+                })
+                .into_values()
+                .map(BlockSenders::new)
+                .collect(),
+        };
+
+        if matches!(self.next_strategy, NextStrategy::OnlyOne) {
+            self.block_senders
+                .iter()
+                .for_each(|s| assert_eq!(s.indexes.len(), 1));
+        }
+    }
+
     /// Mark this `EndBlock` as the end of a feedback loop.
     ///
     /// This will avoid this block from sending `Terminate` in the feedback loop, the destination
@@ -92,12 +135,7 @@ where
             .map(|(coord, sender)| (coord, Batcher::new(sender, self.batch_mode, metadata.coord)))
             .collect();
 
-        self.senders.sort_unstable_by_key(|s| s.0);
-
-        // group the senders based on the strategy
-        self.block_senders = self
-            .next_strategy
-            .block_senders(&self.senders, Some(metadata.coord.block_id));
+        self.setup_senders();
 
         self.coord = Some(metadata.coord);
     }
@@ -106,6 +144,7 @@ where
         let message = self.prev.next();
         let to_return = message.take();
         match &message {
+            // Broadcast messages
             StreamElement::Watermark(_)
             | StreamElement::Terminate
             | StreamElement::FlushAndRestart => {
@@ -124,13 +163,8 @@ where
                         sender.1.enqueue(message.clone());
                     }
                 }
-                // make sure to flush at the end of each iteration
-                if matches!(message, StreamElement::FlushAndRestart) {
-                    for (_, batcher) in self.senders.iter_mut() {
-                        batcher.flush();
-                    }
-                }
             }
+            // Direct messages
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
                 let index = self.next_strategy.index(item);
                 for block in self.block_senders.iter() {
@@ -139,24 +173,29 @@ where
                     self.senders[sender_idx].1.enqueue(message.clone());
                 }
             }
-            StreamElement::FlushBatch => {
+            StreamElement::FlushBatch => {}
+        };
+
+        // Flushing messages
+        match to_return {
+            StreamElement::FlushAndRestart | StreamElement::FlushBatch => {
                 for (_, batcher) in self.senders.iter_mut() {
                     batcher.flush();
                 }
             }
-        };
-
-        if matches!(to_return, StreamElement::Terminate) {
-            let coord = self.coord.unwrap();
-            log::debug!(
-                "EndBlock at {} received Terminate, closing {} channels",
-                coord,
-                self.senders.len()
-            );
-            for (_, batcher) in self.senders.drain(..) {
-                batcher.end();
+            StreamElement::Terminate => {
+                log::debug!(
+                    "EndBlock at {} received Terminate, closing {} channels",
+                    self.coord.unwrap(),
+                    self.senders.len()
+                );
+                for (_, batcher) in self.senders.drain(..) {
+                    batcher.end();
+                }
             }
+            _ => {}
         }
+
         to_return
     }
 
