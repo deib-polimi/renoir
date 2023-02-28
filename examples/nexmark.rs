@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use nexmark::event::*;
 
-const WATERMARK_INTERVAL: usize = 512;
+const WATERMARK_INTERVAL: usize = 1024;
 const BATCH_SIZE: usize = 4096;
 const SECOND_MILLIS: i64 = 1_000;
 
@@ -59,8 +59,8 @@ fn winning_bids(
 }
 
 /// Query 0: Passthrough
-fn query0(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
-    events.collect_count()
+fn query0(events: Stream<Event, impl Operator<Event> + 'static>) {
+    events.for_each(std::mem::drop)
 }
 
 /// Query 1: Currency Conversion
@@ -69,14 +69,14 @@ fn query0(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// SELECT Istream(auction, DOLTOEUR(price), bidder, datetime)
 /// FROM bid [ROWS UNBOUNDED];
 /// ```
-fn query1(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
+fn query1(events: Stream<Event, impl Operator<Event> + 'static>) {
     events
         .filter_map(filter_bid)
         .map(|mut b| {
             b.price = (b.price as f32 * 0.908) as usize;
             b
         })
-        .collect_count()
+        .for_each(std::mem::drop)
 }
 
 /// Query 2: Selection
@@ -86,11 +86,11 @@ fn query1(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// FROM Bid [NOW]
 /// WHERE auction = 1007 OR auction = 1020 OR auction = 2001 OR auction = 2019 OR auction = 2087;
 /// ```
-fn query2(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
+fn query2(events: Stream<Event, impl Operator<Event> + 'static>) {
     events
         .filter_map(filter_bid)
         .filter(|b| b.auction % 123 == 0)
-        .collect_count()
+        .for_each(std::mem::drop)
 }
 
 /// Query 3: Local Item Suggestion
@@ -100,7 +100,7 @@ fn query2(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// FROM Auction A [ROWS UNBOUNDED], Person P [ROWS UNBOUNDED]
 /// WHERE A.seller = P.id AND (P.state = `OR' OR P.state = `ID' OR P.state = `CA') AND A.category = 10;
 /// ```
-fn query3(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
+fn query3(events: Stream<Event, impl Operator<Event> + 'static>) {
     let mut routes = events
         .route()
         .add_route(|e| matches!(e, Event::Person(_)))
@@ -111,13 +111,13 @@ fn query3(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
     let person = routes
         .next()
         .unwrap()
-        .filter_map(filter_person)
+        .map(unwrap_person)
         .filter(|p| p.state == "or" || p.state == "id" || p.state == "ca");
     // WHERE A.category = 10
     let auction = routes
         .next()
         .unwrap()
-        .filter_map(filter_auction)
+        .map(unwrap_auction)
         .filter(|a| a.category == 10);
     person
         // WHERE A.seller = P.id
@@ -125,7 +125,8 @@ fn query3(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
         .drop_key()
         // SELECT person, auction.id
         .map(|(p, a)| (p.name, p.city, p.state, a.id))
-        .collect_count()
+        // .for_each(|q| println!("{q:?}"))
+        .for_each(std::mem::drop)
 }
 
 /// Query 4: Average Price for a Category
@@ -139,7 +140,7 @@ fn query3(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// WHERE Q.category = C.id
 /// GROUP BY C.id;
 /// ```
-fn query4(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
+fn query4(events: Stream<Event, impl Operator<Event> + 'static>) {
     let mut routes = events
         .route()
         .add_route(|e| matches!(e, Event::Auction(_)))
@@ -147,14 +148,15 @@ fn query4(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
         .build()
         .into_iter();
 
-    let auction = routes.next().unwrap().filter_map(filter_auction);
-    let bid = routes.next().unwrap().filter_map(filter_bid);
+    let auction = routes.next().unwrap().map(unwrap_auction);
+    let bid = routes.next().unwrap().map(unwrap_bid);
 
     winning_bids(auction, bid)
         // GROUP BY category, AVG(price)
-        .group_by_avg(|(auction, _)| auction.category, |(_, bid)| bid.price as f64)
+        .map(|(a, b)| (a.category, b.price))
+        .group_by_avg(|(category, _)| *category, |(_, price)| *price as f64)
         .unkey()
-        .collect_count()
+        .for_each(std::mem::drop)
 }
 
 /// Query 5: Hot Items
@@ -168,7 +170,7 @@ fn query4(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 ///                   FROM Bid [RANGE 60 MINUTE SLIDE 1 MINUTE] B2
 ///                   GROUP BY B2.auction);
 /// ```
-fn query5(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
+fn query5(events: Stream<Event, impl Operator<Event> + 'static>) {
     let window_descr = EventTimeWindow::sliding(10 * SECOND_MILLIS, 2 * SECOND_MILLIS);
     let bid = events
         .add_timestamps(timestamp_gen, watermark_gen)
@@ -184,8 +186,8 @@ fn query5(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
         .unkey();
     counts
         .window_all(window_descr)
-        .map(|w| w.max_by_key(|(_, v)| *v).unwrap().0)
-        .collect_count()
+        .map(|w| *w.max_by_key(|(_, v)| *v).unwrap())
+        .for_each(std::mem::drop)
 }
 
 /// Query 6: Average Selling Price by Seller
@@ -198,7 +200,7 @@ fn query5(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 ///       GROUP BY A.id, A.seller) [PARTITION BY A.seller ROWS 10] Q
 /// GROUP BY Q.seller;
 /// ```
-fn query6(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
+fn query6(events: Stream<Event, impl Operator<Event> + 'static>) {
     let mut routes = events
         .route()
         .add_route(|e| matches!(e, Event::Auction(_)))
@@ -206,8 +208,8 @@ fn query6(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
         .build()
         .into_iter();
     // let person = event.pop().unwrap().filter_map(filter_person);
-    let auction = routes.next().unwrap().filter_map(filter_auction);
-    let bid = routes.next().unwrap().filter_map(filter_bid);
+    let auction = routes.next().unwrap().map(unwrap_auction);
+    let bid = routes.next().unwrap().map(unwrap_bid);
     winning_bids(auction, bid)
         // [PARTITION BY A.seller ROWS 10]
         .map(|(a, b)| (a.seller, b.price))
@@ -220,7 +222,7 @@ fn query6(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
             sum as f32 / l as f32
         })
         .unkey()
-        .collect_count()
+        .for_each(std::mem::drop)
 }
 
 /// Query 7: Highest Bid
@@ -231,18 +233,19 @@ fn query6(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// WHERE B.price = (SELECT MAX(B1.price)
 ///                  FROM BID [RANGE 1 MINUTE SLIDE 1 MINUTE] B1);
 /// ```
-fn query7(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
+fn query7(events: Stream<Event, impl Operator<Event> + 'static>) {
     let bid = events
         .add_timestamps(timestamp_gen, watermark_gen)
         .filter_map(filter_bid);
     let window_descr = EventTimeWindow::tumbling(10 * SECOND_MILLIS);
-    bid.key_by(|_| ())
+    bid.map(|b| (b.auction, b.price, b.bidder))
+        .key_by(|_| ())
         .window(window_descr.clone())
-        .map(|w| w.max_by_key(|b| b.price).unwrap().clone())
+        .map(|w| w.max_by_key(|(_, price, _)| price).unwrap().clone())
         .drop_key()
         .window_all(window_descr)
-        .map(|w| w.max_by_key(|b| b.price).unwrap().clone())
-        .collect_count()
+        .map(|w| w.max_by_key(|(_, price, _)| price).unwrap().clone())
+        .for_each(std::mem::drop)
 }
 
 /// Query 8: Monitor New Users
@@ -252,7 +255,7 @@ fn query7(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
 /// FROM Person [RANGE 12 HOUR] P, Auction [RANGE 12 HOUR] A
 /// WHERE P.id = A.seller;
 /// ```
-fn query8(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput<usize> {
+fn query8(events: Stream<Event, impl Operator<Event> + 'static>) {
     let window_descr = EventTimeWindow::tumbling(10 * SECOND_MILLIS);
 
     let mut routes = events
@@ -263,16 +266,16 @@ fn query8(events: Stream<Event, impl Operator<Event> + 'static>) -> StreamOutput
         .build()
         .into_iter();
 
-    let person = routes.next().unwrap().filter_map(filter_person);
-    let auction = routes.next().unwrap().filter_map(filter_auction);
+    let person = routes.next().unwrap().map(unwrap_person).map(|p| (p.id, p.name));
+    let auction = routes.next().unwrap().map(unwrap_auction).map(|a| (a.seller, a.reserve));
 
     person
-        .group_by(|p| p.id)
+        .group_by(|(id, _)| *id)
         .window(window_descr)
-        .join(auction.group_by(|a| a.seller))
+        .join(auction.group_by(|(seller, _)| *seller))
         .drop_key()
-        .map(|(p, a)| (p, a.reserve))
-        .collect_count()
+        .map(|((id, name), (_, reserve))| (id, name, reserve))
+        .for_each(std::mem::drop)
 }
 
 fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<Event, impl Operator<Event>> {
@@ -285,24 +288,42 @@ fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<Event, impl Operato
     .batch_mode(BatchMode::fixed(BATCH_SIZE))
 }
 
+fn unwrap_bid(e: Event) -> Bid {
+    match e {
+        Event::Bid(x) => x,
+        _ => panic!("tried to unwrap wrong event type!"),
+    }
+}
+fn unwrap_auction(e: Event) -> Auction {
+    match e {
+        Event::Auction(x) => x,
+        _ => panic!("tried to unwrap wrong event type!"),
+    }
+}
+fn unwrap_person(e: Event) -> Person {
+    match e {
+        Event::Person(x) => x,
+        _ => panic!("tried to unwrap wrong event type!"),
+    }
+}
 fn filter_bid(e: Event) -> Option<Bid> {
     match e {
         Event::Bid(x) => Some(x),
         _ => None,
     }
 }
-fn filter_auction(e: Event) -> Option<Auction> {
-    match e {
-        Event::Auction(x) => Some(x),
-        _ => None,
-    }
-}
-fn filter_person(e: Event) -> Option<Person> {
-    match e {
-        Event::Person(x) => Some(x),
-        _ => None,
-    }
-}
+// fn filter_auction(e: Event) -> Option<Auction> {
+//     match e {
+//         Event::Auction(x) => Some(x),
+//         _ => None,
+//     }
+// }
+// fn filter_person(e: Event) -> Option<Person> {
+//     match e {
+//         Event::Person(x) => Some(x),
+//         _ => None,
+//     }
+// }
 // const N: usize = 100_000_000;
 
 fn main() {
@@ -317,7 +338,7 @@ fn main() {
     let mut env = StreamEnvironment::new(config);
     env.spawn_remote_workers();
 
-    let q = match i {
+    let _q = match i {
         0 => query0(events(&mut env, n)),
         1 => query1(events(&mut env, n)),
         2 => query2(events(&mut env, n)),
@@ -332,7 +353,7 @@ fn main() {
 
     let start = Instant::now();
     env.execute();
-    println!("elapsed: {:?}", start.elapsed());
+    println!("q{i}:elapsed:{:?}", start.elapsed());
 
-    eprintln!("Query{i}: {:?}", q.get());
+    // eprintln!("Query{i}: {:?}", q.get());
 }

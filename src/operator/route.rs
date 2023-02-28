@@ -9,6 +9,7 @@ use crate::network::{Coord, ReceiverEndpoint};
 use crate::operator::{KeyerFn, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
+use super::SingleStartBlockReceiver;
 use super::end::BlockSenders;
 use crate::operator::start::StartBlock;
 
@@ -41,6 +42,10 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Ou
     }
 
     pub fn build(self) -> Vec<Stream<Out, impl Operator<Out>>> {
+        self.build_inner()
+    }
+
+    pub(crate) fn build_inner(self) -> Vec<Stream<Out, StartBlock<Out, SingleStartBlockReceiver<Out>>>> {
         // This is needed to maintain the same parallelism of the split block
         let env_lock = self.stream.env.clone();
         let mut env = env_lock.lock();
@@ -251,10 +256,9 @@ where
                 }
             }
             StreamElement::Terminate => {
-                let coord = self.coord.unwrap();
                 log::debug!(
                     "RoutingEndBlock at {} received Terminate, closing {} channels",
-                    coord,
+                    self.coord.unwrap(),
                     self.senders.len()
                 );
                 for (_, batcher) in self.senders.drain(..) {
@@ -269,13 +273,9 @@ where
 
     fn structure(&self) -> BlockStructure {
         let mut operator = OperatorStructure::new::<Out, _>("RoutingEndBlock");
-        for Endpoint {
-            block_senders: senders,
-            ..
-        } in &self.endpoints
-        {
-            if !senders.indexes.is_empty() {
-                let block_id = self.senders[senders.indexes[0]].0.coord.block_id;
+        for e in &self.endpoints {
+            if !e.block_senders.indexes.is_empty() {
+                let block_id = self.senders[e.block_senders.indexes[0]].0.coord.block_id;
                 operator
                     .connections
                     .push(Connection::new::<Out, _>(block_id, &self.next_strategy));
