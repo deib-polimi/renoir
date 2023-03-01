@@ -1,10 +1,10 @@
 use std::fmt::Display;
 use std::marker::PhantomData;
 
-use crate::ExecutionMetadata;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::ExecutionMetadata;
 
 use super::StreamElement;
 
@@ -20,10 +20,11 @@ where
     _out: PhantomData<Out>,
 }
 
-impl<In: Data, Out: Data, PreviousOperator, Predicate> Display for FilterMap<In, Out, PreviousOperator, Predicate>
+impl<In: Data, Out: Data, PreviousOperator, Predicate> Display
+    for FilterMap<In, Out, PreviousOperator, Predicate>
 where
-Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-PreviousOperator: Operator<In> + 'static,
+    Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
+    PreviousOperator: Operator<In> + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -35,10 +36,11 @@ PreviousOperator: Operator<In> + 'static,
     }
 }
 
-impl<In: Data, Out: Data, PreviousOperator, Predicate> FilterMap<In, Out, PreviousOperator, Predicate>
+impl<In: Data, Out: Data, PreviousOperator, Predicate>
+    FilterMap<In, Out, PreviousOperator, Predicate>
 where
-Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-PreviousOperator: Operator<In> + 'static,
+    Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
+    PreviousOperator: Operator<In> + 'static,
 {
     fn new(prev: PreviousOperator, predicate: Predicate) -> Self {
         Self {
@@ -53,8 +55,8 @@ PreviousOperator: Operator<In> + 'static,
 impl<In: Data, Out: Data, PreviousOperator, Predicate> Operator<Out>
     for FilterMap<In, Out, PreviousOperator, Predicate>
 where
-Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-PreviousOperator: Operator<In> + 'static,
+    Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
+    PreviousOperator: Operator<In> + 'static,
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -63,11 +65,15 @@ PreviousOperator: Operator<In> + 'static,
     fn next(&mut self) -> StreamElement<Out> {
         loop {
             match self.prev.next() {
-                StreamElement::Item(item) => if let Some(el) = (self.predicate)(item) {
+                StreamElement::Item(item) => {
+                    if let Some(el) = (self.predicate)(item) {
                         return StreamElement::Item(el);
                     }
-                StreamElement::Timestamped(item, ts) => if let Some(el) = (self.predicate)(item) {
-                    return StreamElement::Timestamped(el, ts);
+                }
+                StreamElement::Timestamped(item, ts) => {
+                    if let Some(el) = (self.predicate)(item) {
+                        return StreamElement::Timestamped(el, ts);
+                    }
                 }
                 StreamElement::Watermark(w) => return StreamElement::Watermark(w),
                 StreamElement::Terminate => return StreamElement::Terminate,

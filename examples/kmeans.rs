@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fs::File;
 use std::hash::{Hash, Hasher};
-use std::ops::{Add, AddAssign, Div};
+use std::ops::{AddAssign, Div};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -18,25 +18,8 @@ struct Point {
 }
 
 impl Point {
-    #[allow(unused)]
-    fn new(x: f64, y: f64) -> Self {
-        Self { x, y }
-    }
-
-    #[inline(always)]
     fn distance_to(&self, other: &Point) -> f64 {
         ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt()
-    }
-}
-
-impl Add for Point {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Self {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        }
     }
 }
 
@@ -49,29 +32,26 @@ impl AddAssign for Point {
 
 impl PartialEq for Point {
     fn eq(&self, other: &Self) -> bool {
-        // FIXME
-        let precision = 1.5;
+        let precision = 0.1;
         (self.x - other.x).abs() < precision && (self.y - other.y).abs() < precision
     }
 }
 
 impl Eq for Point {}
 
-impl Ord for Point {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.x < other.x {
-            Ordering::Less
-        } else if self.x > other.x {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
+impl PartialOrd for Point {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.x.partial_cmp(&other.x) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
         }
+        self.y.partial_cmp(&other.y)
     }
 }
 
-impl PartialOrd for Point {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl Ord for Point {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
     }
 }
 
@@ -94,11 +74,7 @@ impl Div<f64> for Point {
 }
 
 fn read_centroids(filename: &str, n: usize) -> Vec<Point> {
-    let file = File::options()
-        .read(true)
-        .write(false)
-        .open(filename)
-        .unwrap();
+    let file = File::open(filename).unwrap();
     csv::ReaderBuilder::new()
         .has_headers(false)
         .from_reader(file)
@@ -117,21 +93,19 @@ fn select_nearest(point: Point, old_centroids: &[Point]) -> Point {
         .0
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 struct State {
     iter_count: i64,
     old_centroids: Vec<Point>,
     centroids: Vec<Point>,
-    finished_update: bool,
+    changed: bool,
 }
 
 impl State {
     fn new(centroids: Vec<Point>) -> State {
         State {
-            iter_count: 0,
-            old_centroids: vec![],
             centroids,
-            finished_update: true,
+            ..Default::default()
         }
     }
 }
@@ -166,15 +140,15 @@ fn main() {
             },
             |update: &mut Vec<Point>, p| update.push(p),
             move |state, mut update| {
-                if state.finished_update {
-                    state.finished_update = false;
+                if state.changed {
+                    state.changed = true;
                     state.old_centroids.clear();
                     state.old_centroids.append(&mut state.centroids);
                 }
                 state.centroids.append(&mut update);
             },
             |state| {
-                state.finished_update = true;
+                state.changed = false;
                 state.iter_count += 1;
                 state.centroids.sort_unstable();
                 state.old_centroids.sort_unstable();

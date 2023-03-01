@@ -241,10 +241,10 @@ fn query7(events: Stream<Event, impl Operator<Event> + 'static>) {
     bid.map(|b| (b.auction, b.price, b.bidder))
         .key_by(|_| ())
         .window(window_descr.clone())
-        .map(|w| w.max_by_key(|(_, price, _)| price).unwrap().clone())
+        .map(|w| *w.max_by_key(|(_, price, _)| price).unwrap())
         .drop_key()
         .window_all(window_descr)
-        .map(|w| w.max_by_key(|(_, price, _)| price).unwrap().clone())
+        .map(|w| *w.max_by_key(|(_, price, _)| price).unwrap())
         .for_each(std::mem::drop)
 }
 
@@ -266,8 +266,16 @@ fn query8(events: Stream<Event, impl Operator<Event> + 'static>) {
         .build()
         .into_iter();
 
-    let person = routes.next().unwrap().map(unwrap_person).map(|p| (p.id, p.name));
-    let auction = routes.next().unwrap().map(unwrap_auction).map(|a| (a.seller, a.reserve));
+    let person = routes
+        .next()
+        .unwrap()
+        .map(unwrap_person)
+        .map(|p| (p.id, p.name));
+    let auction = routes
+        .next()
+        .unwrap()
+        .map(unwrap_auction)
+        .map(|a| (a.seller, a.reserve));
 
     person
         .group_by(|(id, _)| *id)
@@ -338,7 +346,7 @@ fn main() {
     let mut env = StreamEnvironment::new(config);
     env.spawn_remote_workers();
 
-    let _q = match i {
+    match i {
         0 => query0(events(&mut env, n)),
         1 => query1(events(&mut env, n)),
         2 => query2(events(&mut env, n)),
@@ -349,7 +357,7 @@ fn main() {
         7 => query7(events(&mut env, n)),
         8 => query8(events(&mut env, n)),
         _ => panic!("Invalid query! {i}"),
-    };
+    }
 
     let start = Instant::now();
     env.execute();

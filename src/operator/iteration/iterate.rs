@@ -110,7 +110,7 @@ impl<Out: ExchangeData, State: ExchangeData> Iterate<Out, State> {
             | StreamElement::Watermark(_)
             | StreamElement::FlushBatch => item,
             StreamElement::Terminate => {
-                log::error!("Iterate at {} is terminating", self.coord);
+                log::debug!("Iterate at {} is terminating", self.coord);
                 let message = NetworkMessage::new_single(StreamElement::Terminate, self.coord);
                 self.output_sender.as_ref().unwrap().send(message).unwrap();
                 item

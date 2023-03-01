@@ -5,7 +5,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use serde::{Deserialize, Serialize};
 
 mod iterate;
-// mod iterate_diff;
+mod iterate_delta;
 mod iteration_end;
 mod leader;
 mod replay;

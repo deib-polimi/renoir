@@ -9,8 +9,8 @@ use crate::network::{Coord, ReceiverEndpoint};
 use crate::operator::{KeyerFn, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
-use super::SingleStartBlockReceiver;
 use super::end::BlockSenders;
+use super::SingleStartBlockReceiver;
 use crate::operator::start::StartBlock;
 
 #[derive(Clone)]
@@ -45,7 +45,9 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Ou
         self.build_inner()
     }
 
-    pub(crate) fn build_inner(self) -> Vec<Stream<Out, StartBlock<Out, SingleStartBlockReceiver<Out>>>> {
+    pub(crate) fn build_inner(
+        self,
+    ) -> Vec<Stream<Out, StartBlock<Out, SingleStartBlockReceiver<Out>>>> {
         // This is needed to maintain the same parallelism of the split block
         let env_lock = self.stream.env.clone();
         let mut env = env_lock.lock();
