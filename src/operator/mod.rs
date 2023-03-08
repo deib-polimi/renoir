@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) use start::*;
 
+pub use rich_map_custom::ElementGenerator;
+
 use crate::block::BlockStructure;
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyValue;
@@ -42,6 +44,7 @@ pub(crate) mod reorder;
 pub(crate) mod rich_filter_map;
 pub(crate) mod rich_flat_map;
 pub(crate) mod rich_map;
+pub(crate) mod rich_map_custom;
 pub(crate) mod route;
 pub(crate) mod shuffle;
 pub mod sink;
@@ -140,7 +143,7 @@ pub trait Operator<Out: Data>: Clone + Send + Display {
 impl<Out: Data> StreamElement<Out> {
     /// Create a new `StreamElement` with an `Item(())` if `self` contains an item, otherwise it
     /// returns the same variant of `self`.
-    pub(crate) fn take(&self) -> StreamElement<()> {
+    pub fn take(&self) -> StreamElement<()> {
         match self {
             StreamElement::Item(_) => StreamElement::Item(()),
             StreamElement::Timestamped(_, _) => StreamElement::Item(()),
@@ -152,7 +155,7 @@ impl<Out: Data> StreamElement<Out> {
     }
 
     /// Change the type of the element inside the `StreamElement`.
-    pub(crate) fn map<NewOut: Data>(self, f: impl FnOnce(Out) -> NewOut) -> StreamElement<NewOut> {
+    pub fn map<NewOut: Data>(self, f: impl FnOnce(Out) -> NewOut) -> StreamElement<NewOut> {
         match self {
             StreamElement::Item(item) => StreamElement::Item(f(item)),
             StreamElement::Timestamped(item, ts) => StreamElement::Timestamped(f(item), ts),
@@ -164,7 +167,7 @@ impl<Out: Data> StreamElement<Out> {
     }
 
     /// A string representation of the variant of this `StreamElement`.
-    pub(crate) fn variant(&self) -> &'static str {
+    pub fn variant(&self) -> &'static str {
         match self {
             StreamElement::Item(_) => "Item",
             StreamElement::Timestamped(_, _) => "Timestamped",
@@ -179,11 +182,14 @@ impl<Out: Data> StreamElement<Out> {
 impl<Key: DataKey, Out: Data> StreamElement<KeyValue<Key, Out>> {
     /// Map a `StreamElement<KeyValue(Key, Out)>` to a `StreamElement<Out>`,
     /// returning the key if possible
-    pub(crate) fn remove_key(self) -> (Option<Key>, StreamElement<Out>) {
+    pub fn take_key(self) -> (Option<Key>, StreamElement<Out>) {
         match self {
             StreamElement::Item((k, v)) => (Some(k), StreamElement::Item(v)),
             StreamElement::Timestamped((k, v), ts) => (Some(k), StreamElement::Timestamped(v, ts)),
-            _ => (None, self.map(|_| unreachable!())),
+            StreamElement::Watermark(w) => (None, StreamElement::Watermark(w)),
+            StreamElement::Terminate => (None, StreamElement::Terminate),
+            StreamElement::FlushAndRestart => (None, StreamElement::FlushAndRestart),
+            StreamElement::FlushBatch => (None, StreamElement::FlushBatch),
         }
     }
 }

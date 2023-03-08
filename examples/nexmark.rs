@@ -1,26 +1,27 @@
+use fxhash::FxHashMap;
+use noir::operator::ElementGenerator;
 use noir::operator::Operator;
+use noir::operator::StreamElement;
 use noir::operator::Timestamp;
 use noir::prelude::*;
 use noir::Stream;
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::time::Instant;
 
 use nexmark::event::*;
 
-const WATERMARK_INTERVAL: usize = 1024;
-const BATCH_SIZE: usize = 4096;
+const WATERMARK_INTERVAL: usize = 128 << 10;
+const BATCH_SIZE: usize = 16 << 10;
 const SECOND_MILLIS: i64 = 1_000;
 
 fn timestamp_gen(e: &Event) -> Timestamp {
     e.timestamp() as i64
 }
 
-fn watermark_gen(e: &Event, ts: &Timestamp) -> Option<Timestamp> {
-    let w = match e {
-        Event::Person(x) => x.id % WATERMARK_INTERVAL == 0,
-        Event::Auction(x) => x.id % WATERMARK_INTERVAL == 0,
-        Event::Bid(x) => (x.auction ^ x.bidder ^ x.date_time as usize) % WATERMARK_INTERVAL == 0,
-    };
-    if w {
+fn watermark_gen(ts: &Timestamp, count: &mut usize, interval: usize) -> Option<Timestamp> {
+    *count = (*count + 1) % interval;
+    if *count == 0 {
         Some(*ts)
     } else {
         None
@@ -154,8 +155,129 @@ fn query4(events: Stream<Event, impl Operator<Event> + 'static>) {
     winning_bids(auction, bid)
         // GROUP BY category, AVG(price)
         .map(|(a, b)| (a.category, b.price))
+        // .inspect(|a| println!("{a:?}"))
         .group_by_avg(|(category, _)| *category, |(_, price)| *price as f64)
         .unkey()
+        .for_each(std::mem::drop)
+}
+
+#[derive(Default, Clone)]
+struct Q4Unary {
+    state: FxHashMap<usize, AuctionState>,
+    open: BinaryHeap<(Reverse<u64>, usize)>,
+    watermark: u64,
+    closing: bool,
+}
+
+#[derive(Clone, Default)]
+struct AuctionState {
+    auction: Option<Auction>,
+    bids: Vec<Bid>,
+}
+
+impl Q4Unary {
+    fn process(
+        &mut self,
+        mut gen: ElementGenerator<(usize, Event), impl Operator<(usize, Event)>>,
+    ) -> StreamElement<(Auction, Bid)> {
+        fn is_valid_bid(bid: &Bid, auction: &Auction) -> bool {
+            bid.price >= auction.reserve
+                && auction.date_time <= bid.date_time
+                && bid.date_time < auction.expires
+        }
+
+        loop {
+            // Output all closed auctions
+            if self
+                .open
+                .peek()
+                .map(|e| e.0 .0 < self.watermark)
+                .unwrap_or_default()
+            {
+                let (_, a) = self.open.pop().unwrap();
+                let s = self.state.remove(&a).unwrap();
+                let Some(winner) = s.bids.into_iter().next() else { continue; };
+                return StreamElement::Item((s.auction.unwrap(), winner));
+            }
+
+            if self.closing {
+                self.closing = false;
+                return StreamElement::FlushAndRestart;
+            }
+
+            match gen.next() {
+                StreamElement::Item((key, e)) | StreamElement::Timestamped((key, e), _) => {
+                    match e {
+                        Event::Auction(a) => {
+                            self.open.push((Reverse(a.expires), key));
+                            let s = self.state.entry(key).or_default();
+                            s.bids.retain(|b| is_valid_bid(&b, &a));
+                            if let Some(b) = s.bids.iter().max_by_key(|b| b.price).cloned() {
+                                s.bids.clear();
+                                s.bids.push(b);
+                            }
+                            s.auction = Some(a);
+                        }
+                        Event::Bid(b) => {
+                            let s = self.state.entry(key).or_default();
+                            if let Some(a) = &s.auction {
+                                if is_valid_bid(&b, &a) {
+                                    if let Some(f) = s.bids.first() {
+                                        if b.price > f.price {
+                                            s.bids[0] = b;
+                                        }
+                                    } else {
+                                        s.bids.push(b);
+                                    }
+                                }
+                            } else {
+                                s.bids.push(b);
+                            }
+                        }
+                        Event::Person(_) => unreachable!(),
+                    }
+                }
+                StreamElement::Watermark(w) => self.watermark = w as u64 + 1,
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
+                StreamElement::Terminate => return StreamElement::Terminate,
+                StreamElement::FlushAndRestart => {
+                    // Close all open auctions
+                    self.open
+                        .iter()
+                        .map(|e| e.0 .0)
+                        .max()
+                        .map(|m| self.watermark = m);
+                    self.closing = true;
+                    continue;
+                }
+            }
+        }
+    }
+}
+
+fn query4_opt(events: Stream<Event, impl Operator<Event> + 'static>) {
+    events
+        .filter(|e| matches!(e, Event::Auction(_) | Event::Bid(_)))
+        .add_timestamps(timestamp_gen, {
+            let mut count = 0;
+            move |_, ts| watermark_gen(ts, &mut count, WATERMARK_INTERVAL)
+        })
+        .group_by(|e| match e {
+            Event::Auction(a) => a.id,
+            Event::Bid(b) => b.auction,
+            Event::Person(_) => unreachable!(),
+        })
+        .rich_map_custom({
+            let mut state = Q4Unary::default();
+            move |gen| state.process(gen)
+        })
+        .map(|(a, b)| (a.category, b.price))
+        // .inspect(|a| println!("{a:?}"))
+        .group_by(|(category, _)| *category)
+        .fold((0., 0), |acc, (_, p)| *acc = (acc.0 + p as f32, acc.1 + 1))
+        // .group_by_avg(|(category, _)| *category, |(_, price)| *price as f64)
+        .unkey()
+        .map(|(k, (sum, count))| (k, sum / count as f32))
         .for_each(std::mem::drop)
 }
 
@@ -173,7 +295,10 @@ fn query4(events: Stream<Event, impl Operator<Event> + 'static>) {
 fn query5(events: Stream<Event, impl Operator<Event> + 'static>) {
     let window_descr = EventTimeWindow::sliding(10 * SECOND_MILLIS, 2 * SECOND_MILLIS);
     let bid = events
-        .add_timestamps(timestamp_gen, watermark_gen)
+        .add_timestamps(timestamp_gen, {
+            let mut count = 0;
+            move |_, ts| watermark_gen(ts, &mut count, WATERMARK_INTERVAL)
+        })
         .filter_map(filter_bid);
 
     // count how bids in each auction, for every window
@@ -235,7 +360,10 @@ fn query6(events: Stream<Event, impl Operator<Event> + 'static>) {
 /// ```
 fn query7(events: Stream<Event, impl Operator<Event> + 'static>) {
     let bid = events
-        .add_timestamps(timestamp_gen, watermark_gen)
+        .add_timestamps(timestamp_gen, {
+            let mut count = 0;
+            move |_, ts| watermark_gen(ts, &mut count, WATERMARK_INTERVAL)
+        })
         .filter_map(filter_bid);
     let window_descr = EventTimeWindow::tumbling(10 * SECOND_MILLIS);
     bid.map(|b| (b.auction, b.price, b.bidder))
@@ -259,7 +387,10 @@ fn query8(events: Stream<Event, impl Operator<Event> + 'static>) {
     let window_descr = EventTimeWindow::tumbling(10 * SECOND_MILLIS);
 
     let mut routes = events
-        .add_timestamps(timestamp_gen, watermark_gen)
+        .add_timestamps(timestamp_gen, {
+            let mut count = 0;
+            move |_, ts| watermark_gen(ts, &mut count, WATERMARK_INTERVAL)
+        })
         .route()
         .add_route(|e| matches!(e, Event::Person(_)))
         .add_route(|e| matches!(e, Event::Auction(_)))
@@ -342,26 +473,29 @@ fn main() {
         panic!("Pass the element count as argument");
     }
     let n: usize = args[0].parse().unwrap();
-    let i: usize = args[1].parse().unwrap();
+    let q = &args[1][..];
     let mut env = StreamEnvironment::new(config);
     env.spawn_remote_workers();
 
-    match i {
-        0 => query0(events(&mut env, n)),
-        1 => query1(events(&mut env, n)),
-        2 => query2(events(&mut env, n)),
-        3 => query3(events(&mut env, n)),
-        4 => query4(events(&mut env, n)),
-        5 => query5(events(&mut env, n)),
-        6 => query6(events(&mut env, n)),
-        7 => query7(events(&mut env, n)),
-        8 => query8(events(&mut env, n)),
-        _ => panic!("Invalid query! {i}"),
+    match q {
+        "0" => query0(events(&mut env, n)),
+        "1" => query1(events(&mut env, n)),
+        "2" => query2(events(&mut env, n)),
+        "3" => query3(events(&mut env, n)),
+        "4" => query4(events(&mut env, n)),
+        "5" => query5(events(&mut env, n)),
+        "6" => query6(events(&mut env, n)),
+        "7" => query7(events(&mut env, n)),
+        "8" => query8(events(&mut env, n)),
+
+        "4-opt" => query4_opt(events(&mut env, n)),
+
+        _ => panic!("Invalid query! {q}"),
     }
 
     let start = Instant::now();
     env.execute();
-    println!("q{i}:elapsed:{:?}", start.elapsed());
+    println!("q{q}:elapsed:{:?}", start.elapsed());
 
     // eprintln!("Query{i}: {:?}", q.get());
 }

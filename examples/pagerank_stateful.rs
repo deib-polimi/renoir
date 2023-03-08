@@ -3,6 +3,7 @@ use std::fs::File;
 use std::hash::BuildHasherDefault;
 use std::io::BufReader;
 use std::mem::replace;
+use std::sync::Arc;
 use std::time::Instant;
 
 use noir::prelude::*;
@@ -41,6 +42,9 @@ fn main() {
                     acc
                 },
             );
+
+    let adjacency_list = Arc::new(adjacency_list);
+    
     eprintln!("adj: {:?}", q.elapsed());
 
     let pages_source = CsvSource::<u64>::new(path_pages).has_headers(false);

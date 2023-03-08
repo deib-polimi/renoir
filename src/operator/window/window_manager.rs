@@ -85,7 +85,7 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
 
         match &el {
             StreamElement::Item(_) | StreamElement::Timestamped(_, _) => {
-                let (key, el) = el.remove_key();
+                let (key, el) = el.take_key();
                 let key = key.unwrap();
 
                 self.generators
@@ -104,7 +104,7 @@ impl<Key: DataKey, Out: Data, WindowDescr: WindowDescription<Key, Out>>
                 self.should_reset = matches!(el, StreamElement::FlushAndRestart);
                 // Pass the element to every window generator
                 for (_key, gen) in self.generators.iter_mut() {
-                    gen.add(el.clone().remove_key().1);
+                    gen.add(el.clone().take_key().1);
                 }
                 // Save this element so that it can be forwarded downstream
                 self.extra_items.push_back(el);

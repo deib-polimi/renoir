@@ -2,9 +2,12 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt::Display;
 
+use crate::{KeyedStream, KeyValue, Stream};
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
+
+use super::DataKey;
 
 #[derive(Clone)]
 struct TimestampedItem<Out> {
@@ -127,6 +130,31 @@ where
         self.prev
             .structure()
             .add_operator(OperatorStructure::new::<Out, _>("Reorder"))
+    }
+}
+
+impl<Key: DataKey, Out, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+where
+    Key: DataKey,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    Out: Data + Clone,
+{
+    /// # TODO
+    /// Reorder timestamped items
+    pub fn reorder(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
+        self.add_operator(|prev| Reorder::new(prev))
+    }
+}
+
+impl<Out, OperatorChain> Stream<Out, OperatorChain>
+where
+    OperatorChain: Operator<Out> + 'static,
+    Out: Data + Clone,
+{
+    /// # TODO
+    /// Reorder timestamped items
+    pub fn reorder(self) -> Stream<Out, impl Operator<Out>> {
+        self.add_operator(|prev| Reorder::new(prev))
     }
 }
 
