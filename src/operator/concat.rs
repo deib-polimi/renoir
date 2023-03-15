@@ -50,7 +50,7 @@ where
             NextStrategy::only_one(),
             NextStrategy::only_one(),
         )
-        .flat_map(|e| match e {
+        .filter_map(|e| match e {
             TwoSidesItem::Left(item) => Some(item),
             TwoSidesItem::Right(item) => Some(item),
             _ => None,

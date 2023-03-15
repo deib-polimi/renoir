@@ -2,10 +2,10 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt::Display;
 
-use crate::{KeyedStream, KeyValue, Stream};
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
+use crate::{KeyValue, KeyedStream, Stream};
 
 use super::DataKey;
 

@@ -1,4 +1,5 @@
 use fxhash::FxHashMap;
+use nexmark::config::NexmarkConfig;
 use noir::operator::ElementGenerator;
 use noir::operator::Operator;
 use noir::operator::StreamElement;
@@ -211,7 +212,7 @@ impl Q4Unary {
                         Event::Auction(a) => {
                             self.open.push((Reverse(a.expires), key));
                             let s = self.state.entry(key).or_default();
-                            s.bids.retain(|b| is_valid_bid(&b, &a));
+                            s.bids.retain(|b| is_valid_bid(b, &a));
                             if let Some(b) = s.bids.iter().max_by_key(|b| b.price).cloned() {
                                 s.bids.clear();
                                 s.bids.push(b);
@@ -221,7 +222,7 @@ impl Q4Unary {
                         Event::Bid(b) => {
                             let s = self.state.entry(key).or_default();
                             if let Some(a) = &s.auction {
-                                if is_valid_bid(&b, &a) {
+                                if is_valid_bid(&b, a) {
                                     if let Some(f) = s.bids.first() {
                                         if b.price > f.price {
                                             s.bids[0] = b;
@@ -242,11 +243,9 @@ impl Q4Unary {
                 StreamElement::Terminate => return StreamElement::Terminate,
                 StreamElement::FlushAndRestart => {
                     // Close all open auctions
-                    self.open
-                        .iter()
-                        .map(|e| e.0 .0)
-                        .max()
-                        .map(|m| self.watermark = m);
+                    if let Some(m) = self.open.iter().map(|e| e.0 .0).max() {
+                        self.watermark = m;
+                    }
                     self.closing = true;
                     continue;
                 }
@@ -419,7 +418,13 @@ fn query8(events: Stream<Event, impl Operator<Event> + 'static>) {
 
 fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<Event, impl Operator<Event>> {
     env.stream_par_iter(move |i, n| {
-        nexmark::EventGenerator::default()
+        let conf = NexmarkConfig {
+            num_event_generators: n as usize,
+            first_rate: 10_000_000,
+            next_rate: 10_000_000,
+            ..Default::default()
+        };
+        nexmark::EventGenerator::new(conf)
             .with_offset(i)
             .with_step(n)
             .take(tot / n as usize + (i < tot as u64 % n) as usize)

@@ -162,41 +162,6 @@ mod inner {
         }
     }
 
-    impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
-    where
-        OperatorChain: Operator<Out> + 'static,
-    {
-        /// Apply a mapping operation to each element of the stream, the resulting stream will be the
-        /// flattened values of the result of the mapping.
-        ///
-        /// **Note**: this is very similar to [`Iteartor::flat_map`](std::iter::Iterator::flat_map)
-        ///
-        /// ## Example
-        ///
-        /// ```
-        /// # use noir::{StreamEnvironment, EnvironmentConfig};
-        /// # use noir::operator::source::IteratorSource;
-        /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-        /// let s = env.stream(IteratorSource::new((0..3)));
-        /// let res = s.flat_map(|n| vec![n, n]).collect_vec();
-        ///
-        /// env.execute();
-        ///
-        /// assert_eq!(res.get().unwrap(), vec![0, 0, 1, 1, 2, 2]);
-        /// ```
-        pub fn flat_map<MapOut: Data, NewOut: Data, F>(
-            self,
-            f: F,
-        ) -> Stream<NewOut, impl Operator<NewOut>>
-        where
-            MapOut: IntoIterator<Item = NewOut>,
-            <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-            F: Fn(Out) -> MapOut + Send + Clone + 'static,
-        {
-            self.map(f).flatten()
-        }
-    }
-
     #[derive(Clone, Derivative)]
     #[derivative(Debug)]
     pub struct KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
@@ -355,43 +320,6 @@ mod inner {
         /// ```
         pub fn flatten(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
             self.add_operator(|prev| KeyedFlatten::new(prev))
-        }
-    }
-
-    impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
-    where
-        OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
-    {
-        /// Apply a mapping operation to each element of the stream, the resulting stream will be the
-        /// flattened values of the result of the mapping.
-        ///
-        /// **Note**: this is very similar to [`Iteartor::flat_map`](std::iter::Iterator::flat_map).
-        ///
-        /// ## Example
-        ///
-        /// ```
-        /// # use noir::{StreamEnvironment, EnvironmentConfig};
-        /// # use noir::operator::source::IteratorSource;
-        /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-        /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
-        /// let res = s.flat_map(|(_key, n)| vec![n, n]).collect_vec();
-        ///
-        /// env.execute();
-        ///
-        /// let mut res = res.get().unwrap();
-        /// res.sort_unstable();
-        /// assert_eq!(res, vec![(0, 0), (0, 0), (0, 2), (0, 2), (1, 1), (1, 1)]);
-        /// ```
-        pub fn flat_map<NewOut: Data, MapOut: Data, F>(
-            self,
-            f: F,
-        ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
-        where
-            MapOut: IntoIterator<Item = NewOut>,
-            <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-            F: Fn(KeyValue<&Key, Out>) -> MapOut + Send + Clone + 'static,
-        {
-            self.map(f).flatten()
         }
     }
 }

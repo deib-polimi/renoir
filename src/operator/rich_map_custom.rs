@@ -16,9 +16,13 @@ pub struct ElementGenerator<'a, Out, Op> {
 
 impl<'a, Out: Data, Op: Operator<Out>> ElementGenerator<'a, Out, Op> {
     pub fn new(inner: &'a mut Op) -> Self {
-        Self {inner,_out: PhantomData,}
+        Self {
+            inner,
+            _out: PhantomData,
+        }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> StreamElement<Out> {
         self.inner.next()
     }
@@ -80,7 +84,7 @@ where
 
     fn next(&mut self) -> StreamElement<NewOut> {
         let eg = ElementGenerator::new(&mut self.prev);
-        return (self.map_fn)(eg);
+        (self.map_fn)(eg)
     }
 
     fn structure(&self) -> BlockStructure {

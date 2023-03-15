@@ -44,7 +44,7 @@ fn main() {
             );
 
     let adjacency_list = Arc::new(adjacency_list);
-    
+
     eprintln!("adj: {:?}", q.elapsed());
 
     let pages_source = CsvSource::<u64>::new(path_pages).has_headers(false);

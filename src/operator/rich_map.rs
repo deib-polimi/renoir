@@ -7,7 +7,7 @@ use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::{KeyValue, KeyedStream, Stream};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct RichMap<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain>
 where
     F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
@@ -18,6 +18,23 @@ where
     init_map: F,
     _out: PhantomData<Out>,
     _new_out: PhantomData<NewOut>,
+}
+
+impl<Key: DataKey, Out: Data, NewOut: Data, F: Clone, OperatorChain: Clone> Clone
+    for RichMap<Key, Out, NewOut, F, OperatorChain>
+where
+    F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
+    OperatorChain: Operator<KeyValue<Key, Out>>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            prev: self.prev.clone(),
+            maps_fn: self.maps_fn.clone(),
+            init_map: self.init_map.clone(),
+            _out: self._out,
+            _new_out: self._new_out,
+        }
+    }
 }
 
 impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain> Display

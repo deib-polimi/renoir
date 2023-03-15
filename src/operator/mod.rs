@@ -26,6 +26,7 @@ pub(crate) mod concat;
 pub(crate) mod end;
 pub(crate) mod filter;
 pub(crate) mod filter_map;
+pub(crate) mod flat_map;
 pub(crate) mod flatten;
 pub(crate) mod fold;
 pub(crate) mod group_by;

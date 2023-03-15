@@ -159,7 +159,11 @@ pub struct RemoteHostSSHConfig {
 
 #[cfg(feature = "clap")]
 #[derive(Debug, Parser)]
-#[clap(name = "noir", about = "Network of Operators In Rust")]
+#[clap(
+    name = "noir",
+    about = "Network of Operators In Rust",
+    trailing_var_arg = true
+)]
 struct CommandLineOptions {
     /// Path to the configuration file for remote execution.
     ///

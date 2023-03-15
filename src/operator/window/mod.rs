@@ -53,6 +53,12 @@ pub struct Window<'a, Out: Data> {
     timestamp: Option<Timestamp>,
 }
 
+impl<'a, Out: Data> Window<'a, Out> {
+    pub fn timestamp(&self) -> Option<i64> {
+        self.timestamp
+    }
+}
+
 impl<'a, Out: Data> Iterator for Window<'a, Out> {
     type Item = &'a Out;
 
