@@ -7,7 +7,7 @@ use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::end::EndBlock;
 use crate::operator::iteration::IterationStateLock;
-use crate::operator::window::{WindowBuilder};
+use crate::operator::window::WindowBuilder;
 use crate::operator::DataKey;
 use crate::operator::StartBlock;
 use crate::operator::{Data, ExchangeData, KeyerFn, Operator};

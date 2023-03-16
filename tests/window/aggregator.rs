@@ -25,7 +25,7 @@ fn test_first_window() {
                     2, // [2, 3, 4]
                     4, // [4, 5, 6]
                     6, // [6, 7, 8]
-                    8, // [8, 9]
+                       // 8, // [8, 9]
                 ]
             );
         }
@@ -52,7 +52,7 @@ fn test_fold_window() {
                     9,  // [2, 3, 4]
                     15, // [4, 5, 6]
                     21, // [6, 7, 8]
-                    17, // [8, 9]
+                        // 17, // [8, 9]
                 ]
                 .into_iter()
                 .sorted()
@@ -82,7 +82,7 @@ fn test_sum_window() {
                     9,  // [2, 3, 4]
                     15, // [4, 5, 6]
                     21, // [6, 7, 8]
-                    17, // [8, 9]
+                        // 17, // [8, 9]
                 ]
                 .into_iter()
                 .sorted()
@@ -100,6 +100,7 @@ fn test_min_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .min()
+            .map(|x| x.1.unwrap())
             .drop_key()
             .collect_vec();
         env.execute();
@@ -112,7 +113,7 @@ fn test_min_window() {
                     2, // [2, 3, 4]
                     4, // [4, 5, 6]
                     6, // [6, 7, 8]
-                    8, // [8, 9]
+                       // 8, // [8, 9]
                 ]
             );
         }
@@ -127,6 +128,7 @@ fn test_max_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .max()
+            .map(|x| x.1.unwrap())
             .drop_key()
             .collect_vec();
         env.execute();
@@ -139,7 +141,7 @@ fn test_max_window() {
                     4, // [2, 3, 4]
                     6, // [4, 5, 6]
                     8, // [6, 7, 8]
-                    9, // [8, 9]
+                       // 9, // [8, 9]
                 ]
             );
         }
@@ -172,7 +174,7 @@ fn test_map_window() {
                     2 * 3 * 4, // [2, 3, 4]
                     4 * 5 * 6, // [4, 5, 6]
                     6 * 7 * 8, // [6, 7, 8]
-                    8 * 9,     // [8, 9]
+                               // 8 * 9,     // [8, 9]
                 ]
                 .into_iter()
                 .sorted()

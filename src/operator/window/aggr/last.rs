@@ -5,17 +5,16 @@ use crate::stream::{KeyValue, KeyedStream, WindowedStream};
 #[derive(Clone)]
 pub(crate) struct Last<T>(Option<T>);
 
-impl<T: Data> WindowAccumulator for Last<T>
-{
+impl<T: Data> WindowAccumulator for Last<T> {
     type In = T;
-    type Out = T;
+    type Out = Option<T>;
 
     fn process(&mut self, el: Self::In) {
         self.0 = Some(el);
     }
 
     fn output(self) -> Self::Out {
-        self.0.expect("Last window accumulator empty! Should contain something if output is called")
+        self.0
     }
 }
 
@@ -26,10 +25,8 @@ where
     Key: DataKey,
     Out: Data,
 {
-    pub fn last(
-        self,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
+    pub fn last(self) -> KeyedStream<Key, Option<Out>, impl Operator<KeyValue<Key, Option<Out>>>> {
         let acc = Last(None);
-        self.add_window_operator("WindowSum", acc)
+        self.add_window_operator("WindowLast", acc)
     }
 }

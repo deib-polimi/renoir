@@ -101,8 +101,8 @@ pub struct TestHelper;
 impl TestHelper {
     fn setup() {
         let _ = env_logger::Builder::new()
-            .filter(None, log::LevelFilter::Debug)
             .is_test(true)
+            .parse_default_env()
             .try_init();
     }
 

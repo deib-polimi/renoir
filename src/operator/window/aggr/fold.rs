@@ -61,10 +61,7 @@ where
     F: FnMut(&mut I, I),
 {
     pub(crate) fn new(f: F) -> Self {
-        Self {
-            state: None,
-            f,
-        }
+        Self { state: None, f }
     }
 }
 
@@ -74,7 +71,7 @@ where
     F: FnMut(&mut I, I) + Clone + Send + 'static,
 {
     type In = I;
-    type Out = I;
+    type Out = Option<I>;
 
     fn process(&mut self, el: Self::In) {
         match self.state.as_mut() {
@@ -84,12 +81,11 @@ where
     }
 
     fn output(self) -> Self::Out {
-        self.state.expect("FoldFirst has not received any item!")
+        self.state
     }
 }
 
-impl<Key, Out, WindowDescr, OperatorChain>
-    WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
+impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowBuilder,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,

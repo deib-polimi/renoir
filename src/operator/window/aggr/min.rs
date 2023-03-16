@@ -9,10 +9,12 @@ where
     Key: DataKey,
     Out: Data + Ord,
 {
-    pub fn min(
-        self,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
-        let acc = FoldFirst::<Out, _>::new(|min, x| if x < *min { *min = x });
+    pub fn min(self) -> KeyedStream<Key, Option<Out>, impl Operator<KeyValue<Key, Option<Out>>>> {
+        let acc = FoldFirst::<Out, _>::new(|min, x| {
+            if x < *min {
+                *min = x
+            }
+        });
         self.add_window_operator("WindowMin", acc)
     }
 }

@@ -4,7 +4,8 @@ use crate::stream::{KeyValue, KeyedStream, WindowedStream};
 
 #[derive(Clone)]
 struct Map<I, O, F>
-    where F: Fn(Vec<I>) -> O,
+where
+    F: Fn(Vec<I>) -> O,
 {
     vec: Vec<I>,
     f: F,
@@ -12,7 +13,8 @@ struct Map<I, O, F>
 }
 
 impl<I, O, F> WindowAccumulator for Map<I, O, F>
-    where F: Fn(Vec<I>) -> O + Send + Clone + 'static,
+where
+    F: Fn(Vec<I>) -> O + Send + Clone + 'static,
     I: Clone + Send + 'static,
     O: Clone + Send + 'static,
 {
@@ -46,6 +48,6 @@ where
             f,
             _o: PhantomData,
         };
-        self.add_window_operator("WindowMin", acc)
+        self.add_window_operator("WindowMap", acc)
     }
 }

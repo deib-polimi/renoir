@@ -11,15 +11,10 @@ use hashbrown::HashMap;
 
 use crate::block::OperatorStructure;
 use crate::operator::{Data, DataKey, ExchangeData, Operator, StreamElement, Timestamp};
-use crate::stream::{KeyValue, KeyedStream, WindowedStream, Stream};
+use crate::stream::{KeyValue, KeyedStream, Stream, WindowedStream};
 
-// mod aggregator;
-mod descr;
 mod aggr;
-// mod generic_operator;
-// #[cfg(feature = "timestamp")]
-// mod processing_time;
-// mod window_manage
+mod descr;
 
 pub trait WindowBuilder {
     type Manager<A: WindowAccumulator>: WindowManager<In = A::In, Out = A::Out> + 'static;
@@ -155,6 +150,15 @@ where
                                 .map(|e| StreamElement::from(e).add_key(key.clone())),
                         );
                     }
+                    // Forward system messages and watermarks
+                    let msg = match el {
+                        StreamElement::Watermark(w) => StreamElement::Watermark(w),
+                        StreamElement::FlushBatch => StreamElement::FlushBatch,
+                        StreamElement::Terminate => StreamElement::Terminate,
+                        StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
+                        _ => unreachable!(),
+                    };
+                    self.output_buffer.push_back(msg);
                 }
             }
         }
@@ -185,8 +189,7 @@ where
     }
 }
 
-impl<Key, Out, WindowDescr, OperatorChain>
-    WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
+impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowBuilder,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,

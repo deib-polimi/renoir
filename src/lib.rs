@@ -62,7 +62,7 @@ pub use config::EnvironmentConfig;
 pub use environment::StreamEnvironment;
 pub use operator::iteration::IterationStateHandle;
 pub use scheduler::ExecutionMetadata;
-pub use stream::{KeyValue, KeyedStream, WindowedStream, Stream};
+pub use stream::{KeyValue, KeyedStream, Stream, WindowedStream};
 
 use crate::block::BlockStructure;
 use crate::network::Coord;
