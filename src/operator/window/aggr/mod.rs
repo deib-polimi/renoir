@@ -1,3 +1,9 @@
 mod fold;
+pub(super) use fold::{Fold, FoldFirst};
 
-pub(crate) use fold::FoldWrap;
+mod sum;
+mod first;
+mod last;
+mod max;
+mod min;
+mod map;

@@ -1,20 +1,12 @@
-//! The types related to the windowed streams.
-
-use std::collections::VecDeque;
-use std::fmt::Display;
 use std::marker::PhantomData;
 
-// pub use aggregator::*;
-// pub use description::*;
-use hashbrown::HashMap;
-
-use crate::block::OperatorStructure;
-use crate::operator::{Data, DataKey, ExchangeData, Operator, StreamElement, Timestamp};
-use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
+use crate::operator::{Data, DataKey, Operator};
+use crate::stream::{KeyValue, KeyedStream, WindowedStream};
 
 use super::super::*;
 
-pub(crate) struct FoldWrap<I, S, F>
+#[derive(Clone)]
+pub(crate) struct Fold<I, S, F>
 where
     F: FnMut(&mut S, I),
 {
@@ -23,7 +15,7 @@ where
     _in: PhantomData<I>,
 }
 
-impl<I, S, F> FoldWrap<I, S, F>
+impl<I, S, F> Fold<I, S, F>
 where
     F: FnMut(&mut S, I),
 {
@@ -36,24 +28,11 @@ where
     }
 }
 
-impl<I, S: Clone, F: Clone> Clone for FoldWrap<I, S, F>
-where
-    F: FnMut(&mut S, I),
-{
-    fn clone(&self) -> Self {
-        Self {
-            state: self.state.clone(),
-            f: self.f.clone(),
-            _in: PhantomData,
-        }
-    }
-}
-
-impl<I, S, F> WindowAccumulator for FoldWrap<I, S, F>
+impl<I, S, F> WindowAccumulator for Fold<I, S, F>
 where
     I: Clone + Send + 'static,
-    F: FnMut(&mut S, I) + Clone + Send + 'static,
     S: Clone + Send + 'static,
+    F: FnMut(&mut S, I) + Clone + Send + 'static,
 {
     type In = I;
 
@@ -68,8 +47,49 @@ where
     }
 }
 
+#[derive(Clone)]
+pub(crate) struct FoldFirst<I, F>
+where
+    F: FnMut(&mut I, I),
+{
+    state: Option<I>,
+    f: F,
+}
+
+impl<I, F> FoldFirst<I, F>
+where
+    F: FnMut(&mut I, I),
+{
+    pub(crate) fn new(f: F) -> Self {
+        Self {
+            state: None,
+            f,
+        }
+    }
+}
+
+impl<I, F> WindowAccumulator for FoldFirst<I, F>
+where
+    I: Clone + Send + 'static,
+    F: FnMut(&mut I, I) + Clone + Send + 'static,
+{
+    type In = I;
+    type Out = I;
+
+    fn process(&mut self, el: Self::In) {
+        match self.state.as_mut() {
+            None => self.state = Some(el),
+            Some(s) => (self.f)(s, el),
+        }
+    }
+
+    fn output(self) -> Self::Out {
+        self.state.expect("FoldFirst has not received any item!")
+    }
+}
+
 impl<Key, Out, WindowDescr, OperatorChain>
-    KeyedWindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
+    WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowBuilder,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
@@ -112,7 +132,7 @@ where
     where
         F: FnMut(&mut NewOut, Out) + Clone + Send + 'static,
     {
-        let acc = FoldWrap::new(init, fold);
+        let acc = Fold::new(init, fold);
         self.add_window_operator("WindowFold", acc)
     }
 }

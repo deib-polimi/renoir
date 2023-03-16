@@ -13,6 +13,7 @@ fn test_first_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .first()
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -39,6 +40,7 @@ fn test_fold_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .fold(0, |acc, x| *acc += x)
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -67,7 +69,8 @@ fn test_sum_window() {
         let res = env
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
-            .sum()
+            .sum::<u8>()
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -97,6 +100,7 @@ fn test_min_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .min()
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -123,6 +127,7 @@ fn test_max_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .max()
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -155,6 +160,7 @@ fn test_map_window() {
                 }
                 res
             })
+            .drop_key()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

@@ -1,16 +1,16 @@
 //! The types related to the windowed streams.
 
 use std::collections::VecDeque;
-use std::fmt::Display;
-use std::marker::PhantomData;
+
+
 
 // pub use aggregator::*;
 // pub use description::*;
-use hashbrown::HashMap;
 
-use crate::block::OperatorStructure;
-use crate::operator::{Data, DataKey, ExchangeData, Operator, StreamElement, Timestamp};
-use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
+
+
+use crate::operator::{Data, StreamElement, Timestamp};
+
 
 use super::super::*;
 
@@ -52,7 +52,7 @@ where
                 }
                 let k = self.ws.front().unwrap().0 / self.slide + 1; // TODO: Check
                 for i in 0..k {
-                    self.update_slot(i, item.clone(), ts.clone());
+                    self.update_slot(i, item.clone(), ts);
                 }
                 if self.ws[0].0 == self.size {
                     let r = self.ws.pop_front().unwrap();
@@ -105,7 +105,7 @@ impl WindowBuilder for CountWindow
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operator::window::aggr::FoldWrap;
+    use crate::operator::window::aggr::Fold;
 
     macro_rules! check_return {
         ($ret:expr, $v:expr) => {
@@ -130,7 +130,7 @@ mod tests {
         let slide = 2;
         let window = CountWindow::sliding(3, 2);
 
-        let fold: FoldWrap<isize, Vec<isize>, _> = FoldWrap::new(Vec::new(), |v, el| v.push(el));
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
         let mut manager = window.build(fold);
 
         for i in 1..100 {
@@ -152,7 +152,7 @@ mod tests {
         let slide = 2;
         let window = CountWindow::sliding(3, 2);
 
-        let fold: FoldWrap<isize, Vec<isize>, _> = FoldWrap::new(Vec::new(), |v, el| v.push(el));
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
         let mut manager = window.build(fold);
 
         for i in 1..100 {
