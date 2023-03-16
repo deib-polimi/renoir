@@ -141,7 +141,7 @@ pub trait Operator<Out: Data>: Clone + Send + Display {
     fn structure(&self) -> BlockStructure;
 }
 
-impl<Out: Data> StreamElement<Out> {
+impl<Out> StreamElement<Out> {
     /// Create a new `StreamElement` with an `Item(())` if `self` contains an item, otherwise it
     /// returns the same variant of `self`.
     pub fn take(&self) -> StreamElement<()> {
@@ -156,7 +156,7 @@ impl<Out: Data> StreamElement<Out> {
     }
 
     /// Change the type of the element inside the `StreamElement`.
-    pub fn map<NewOut: Data>(self, f: impl FnOnce(Out) -> NewOut) -> StreamElement<NewOut> {
+    pub fn map<NewOut>(self, f: impl FnOnce(Out) -> NewOut) -> StreamElement<NewOut> {
         match self {
             StreamElement::Item(item) => StreamElement::Item(f(item)),
             StreamElement::Timestamped(item, ts) => StreamElement::Timestamped(f(item), ts),
@@ -178,9 +178,28 @@ impl<Out: Data> StreamElement<Out> {
             StreamElement::FlushAndRestart => "FlushAndRestart",
         }
     }
+
+    /// A string representation of the variant of this `StreamElement`.
+    pub fn timestamp(&self) -> Option<&Timestamp> {
+        match self {
+            StreamElement::Timestamped(_, ts) | StreamElement::Watermark(ts) => Some(ts),
+            _ => None,
+        }
+    }
+
+    pub fn add_key<Key>(self, k: Key) -> StreamElement<KeyValue<Key, Out>> {
+        match self {
+            StreamElement::Item(v) => StreamElement::Item((k, v)),
+            StreamElement::Timestamped(v, ts) => StreamElement::Timestamped((k, v), ts),
+            StreamElement::Watermark(w) => StreamElement::Watermark(w),
+            StreamElement::Terminate => StreamElement::Terminate,
+            StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
+            StreamElement::FlushBatch => StreamElement::FlushBatch,
+        }
+    }
 }
 
-impl<Key: DataKey, Out: Data> StreamElement<KeyValue<Key, Out>> {
+impl<Key, Out> StreamElement<KeyValue<Key, Out>> {
     /// Map a `StreamElement<KeyValue(Key, Out)>` to a `StreamElement<Out>`,
     /// returning the key if possible
     pub fn take_key(self) -> (Option<Key>, StreamElement<Out>) {

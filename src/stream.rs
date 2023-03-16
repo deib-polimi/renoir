@@ -7,7 +7,7 @@ use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
 use crate::operator::end::EndBlock;
 use crate::operator::iteration::IterationStateLock;
-use crate::operator::window::WindowDescription;
+use crate::operator::window::{WindowBuilder, WindowAccumulator};
 use crate::operator::DataKey;
 use crate::operator::StartBlock;
 use crate::operator::{Data, ExchangeData, KeyerFn, Operator};
@@ -70,7 +70,7 @@ where
 pub struct WindowedStream<Out: Data, OperatorChain, WinOut: Data, WinDescr>
 where
     OperatorChain: Operator<KeyValue<(), Out>>,
-    WinDescr: WindowDescription<(), WinOut>,
+    WinDescr: WindowBuilder,
 {
     pub(crate) inner: KeyedWindowedStream<(), Out, OperatorChain, WinOut, WinDescr>,
 }
@@ -102,7 +102,7 @@ where
 pub struct KeyedWindowedStream<Key: DataKey, Out: Data, OperatorChain, WinOut: Data, WinDescr>
 where
     OperatorChain: Operator<KeyValue<Key, Out>>,
-    WinDescr: WindowDescription<Key, WinOut>,
+    WinDescr: WindowBuilder,
 {
     pub(crate) inner: KeyedStream<Key, Out, OperatorChain>,
     pub(crate) descr: WinDescr,

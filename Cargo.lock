@@ -896,6 +896,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "micrometer"
+version = "0.1.0"
+dependencies = [
+ "once_cell",
+ "parking_lot 0.12.1",
+ "thread_local",
+]
+
+[[package]]
 name = "mimalloc"
 version = "0.1.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -961,6 +970,7 @@ dependencies = [
  "kstring",
  "lazy-init",
  "log",
+ "micrometer",
  "mimalloc",
  "nanorand",
  "nexmark",
