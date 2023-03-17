@@ -142,13 +142,13 @@ fn main() {
         .unkey()
         // this window has the same alignment of the previous one, so it will contain the same items
         .window_all(EventTimeWindow::tumbling(win_step_millis))
-        .map(move |w| {
+        .map(move |mut words| {
             // find the k most frequent words for each window
-            let mut words = w.cloned().collect::<Vec<(String, usize)>>();
             words.sort_unstable_by_key(|(_w, c)| -(*c as i64));
             words.truncate(k);
             words
         })
+        .drop_key()
         .flatten()
         .fold(0, |acc, _| *acc += 1)
         .for_each(|c| println!("{c}"));

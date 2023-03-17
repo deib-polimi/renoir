@@ -164,7 +164,7 @@ where
                 .unkey();
                 let output_stream = routes.next().unwrap();
 
-                update_stream.concat(output_stream)
+                update_stream.merge(output_stream)
             },
             move |changed: &mut TerminationCond, x| match x.1 {
                 Msg::Delta(u) if (condition)(&u) => changed.something_changed = true,

@@ -17,6 +17,7 @@ fn sliding_event_time() {
             .group_by(|x| x % 2)
             .window(EventTimeWindow::sliding(3000, 2500))
             .first()
+            .flatten()
             .drop_key()
             .collect_vec();
         env.execute();
@@ -44,6 +45,7 @@ fn tumbling_event_time() {
             .group_by(|x| x % 2)
             .window(EventTimeWindow::tumbling(3))
             .first()
+            .flatten()
             .drop_key()
             .collect_vec();
         env.execute();

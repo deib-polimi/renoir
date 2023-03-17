@@ -37,7 +37,7 @@ fn main() {
                 .map(|(_, ((z, _), (_, y)))| (z, y))
                 .drop_key()
                 // concatenate the paths already present in the transitive closure
-                .concat(paths.pop().unwrap())
+                .merge(paths.pop().unwrap())
                 // delete duplicated paths
                 .group_by_reduce(|(x, y)| (*x, *y), |_, _| {})
                 .drop_key()

@@ -9,7 +9,7 @@ use utils::{TestHelper, WatermarkChecker};
 mod utils;
 
 #[test]
-fn concat_stream() {
+fn merge_stream() {
     TestHelper::local_remote_env(|mut env| {
         let source1 = IteratorSource::new(0..10000u16);
         let source2 = IteratorSource::new(10000..20000u16);
@@ -17,7 +17,7 @@ fn concat_stream() {
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
 
-        let res = stream1.concat(stream2).collect_vec();
+        let res = stream1.merge(stream2).collect_vec();
         env.execute();
         if let Some(res) = res.get() {
             let res_sorted = res.into_iter().sorted().collect_vec();
@@ -28,7 +28,7 @@ fn concat_stream() {
 }
 
 #[test]
-fn concat_stream_with_empty() {
+fn merge_stream_with_empty() {
     TestHelper::local_remote_env(|mut env| {
         let source1 = IteratorSource::new(0..10000u16);
         let source2 = IteratorSource::new(0..0u16);
@@ -36,7 +36,7 @@ fn concat_stream_with_empty() {
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
 
-        let res = stream1.concat(stream2).collect_vec();
+        let res = stream1.merge(stream2).collect_vec();
         env.execute();
         if let Some(res) = res.get() {
             let res_sorted = res.into_iter().sorted().collect_vec();
@@ -47,7 +47,7 @@ fn concat_stream_with_empty() {
 }
 
 #[test]
-fn concat_stream_with_empty_other_way() {
+fn merge_stream_with_empty_other_way() {
     TestHelper::local_remote_env(|mut env| {
         let source1 = IteratorSource::new(0..0u16);
         let source2 = IteratorSource::new(0..10000u16);
@@ -55,7 +55,7 @@ fn concat_stream_with_empty_other_way() {
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
 
-        let res = stream1.concat(stream2).collect_vec();
+        let res = stream1.merge(stream2).collect_vec();
         env.execute();
         if let Some(res) = res.get() {
             let res_sorted = res.into_iter().sorted().collect_vec();
@@ -66,7 +66,7 @@ fn concat_stream_with_empty_other_way() {
 }
 
 #[test]
-fn concat_empty_with_empty() {
+fn merge_empty_with_empty() {
     TestHelper::local_remote_env(|mut env| {
         let source1 = IteratorSource::new(0..0u16);
         let source2 = IteratorSource::new(0..0u16);
@@ -74,7 +74,7 @@ fn concat_empty_with_empty() {
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
 
-        let res = stream1.concat(stream2).collect_vec();
+        let res = stream1.merge(stream2).collect_vec();
         env.execute();
         if let Some(res) = res.get() {
             assert!(res.is_empty());
@@ -83,7 +83,7 @@ fn concat_empty_with_empty() {
 }
 
 #[test]
-fn concat_with_timestamps() {
+fn merge_with_timestamps() {
     TestHelper::local_remote_env(|mut env| {
         let source1 = IteratorSource::new(0..10u64);
         let source2 = IteratorSource::new(100..110u64);
@@ -105,7 +105,7 @@ fn concat_with_timestamps() {
 
         let num_watermarks = Arc::new(AtomicUsize::new(0));
         let stream = stream1
-            .concat(stream2)
+            .merge(stream2)
             .shuffle()
             .max_parallelism(1)
             .add_operator(|prev| WatermarkChecker::new(prev, num_watermarks.clone()));
@@ -120,7 +120,7 @@ fn concat_with_timestamps() {
 }
 
 #[test]
-fn concat_keyed_stream() {
+fn merge_keyed_stream() {
     TestHelper::local_remote_env(|mut env| {
         let source1 = IteratorSource::new(0..100u64);
         let source2 = IteratorSource::new(100..200u64);
@@ -128,7 +128,7 @@ fn concat_keyed_stream() {
         let stream1 = env.stream(source1).group_by(|x| x % 3);
         let stream2 = env.stream(source2).group_by(|x| x % 3);
 
-        let res = stream1.concat(stream2).reduce(|x, y| *x += y).collect_vec();
+        let res = stream1.merge(stream2).reduce(|x, y| *x += y).collect_vec();
         env.execute();
 
         if let Some(mut res) = res.get() {

@@ -88,9 +88,9 @@ pub type CoordUInt = u64;
 pub mod prelude {
     pub use super::operator::sink::StreamOutput;
     pub use super::operator::source::*;
-    // pub use super::operator::window::CountWindow;
-    // #[cfg(feature = "timestamp")]
-    // pub use super::operator::window::{EventTimeWindow, ProcessingTimeWindow};
+    pub use super::operator::window::CountWindow;
+    #[cfg(feature = "timestamp")]
+    pub use super::operator::window::{EventTimeWindow, ProcessingTimeWindow, SessionWindow};
     pub use super::{BatchMode, EnvironmentConfig, StreamEnvironment};
 }
 

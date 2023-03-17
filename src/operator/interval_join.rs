@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::concat::ConcatElement;
+use crate::operator::merge::MergeElement;
 use crate::operator::reorder::Reorder;
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
@@ -23,7 +23,7 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<KeyValue<Key, ConcatElement<Out, Out2>>>,
+    OperatorChain: Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
 {
     prev: OperatorChain,
     /// Elements of the left side to be processed.
@@ -47,7 +47,7 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<KeyValue<Key, ConcatElement<Out, Out2>>>,
+    OperatorChain: Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -66,7 +66,7 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<KeyValue<Key, ConcatElement<Out, Out2>>>,
+    OperatorChain: Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
 {
     fn new(prev: OperatorChain, lower_bound: Timestamp, upper_bound: Timestamp) -> Self {
         Self {
@@ -142,7 +142,7 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<KeyValue<Key, ConcatElement<Out, Out2>>>,
+    OperatorChain: Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -165,8 +165,8 @@ where
                     assert!(ts >= self.last_seen);
                     self.last_seen = ts;
                     match item {
-                        ConcatElement::Left(item) => self.left.push_back((ts, (key, item))),
-                        ConcatElement::Right(item) => {
+                        MergeElement::Left(item) => self.left.push_back((ts, (key, item))),
+                        MergeElement::Right(item) => {
                             self.right.entry(key).or_default().push_back((ts, item))
                         }
                     }
@@ -228,7 +228,7 @@ where
     {
         let left = self.max_parallelism(1);
         let right = right.max_parallelism(1);
-        left.map_concat(right)
+        left.merge_distinct(right)
             .key_by(|_| ())
             .add_operator(Reorder::new)
             .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
@@ -261,7 +261,7 @@ where
         Out2: ExchangeData,
         OperatorChain2: Operator<KeyValue<Key, Out2>> + 'static,
     {
-        self.map_concat(right)
+        self.merge_distinct(right)
             .add_operator(Reorder::new)
             .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
     }

@@ -3,7 +3,7 @@ use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, WindowedStream};
 
 #[derive(Clone)]
-struct Map<I, O, F>
+struct CollectVec<I, O, F>
 where
     F: Fn(Vec<I>) -> O,
 {
@@ -12,7 +12,7 @@ where
     _o: PhantomData<O>,
 }
 
-impl<I, O, F> WindowAccumulator for Map<I, O, F>
+impl<I, O, F> WindowAccumulator for CollectVec<I, O, F>
 where
     F: Fn(Vec<I>) -> O + Send + Clone + 'static,
     I: Clone + Send + 'static,
@@ -43,7 +43,7 @@ where
         self,
         f: F,
     ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
-        let acc = Map::<Out, NewOut, _> {
+        let acc = CollectVec::<Out, NewOut, _> {
             vec: Default::default(),
             f,
             _o: PhantomData,

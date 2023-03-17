@@ -79,6 +79,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct CountWindow {
     size: usize,
     slide: usize,

@@ -13,6 +13,7 @@ fn test_first_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .first()
+            .flatten()
             .drop_key()
             .collect_vec();
         env.execute();

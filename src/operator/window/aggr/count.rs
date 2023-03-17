@@ -3,16 +3,14 @@ use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyValue, KeyedStream, WindowedStream};
 
 #[derive(Clone)]
-pub(crate) struct First<T>(Option<T>);
+pub(crate) struct Count<T>(usize, PhantomData<T>);
 
-impl<T: Data> WindowAccumulator for First<T> {
+impl<T: Data> WindowAccumulator for Count<T> {
     type In = T;
-    type Out = Option<T>;
+    type Out = usize;
 
-    fn process(&mut self, el: Self::In) {
-        if self.0.is_none() {
-            self.0 = Some(el);
-        }
+    fn process(&mut self, _: Self::In) {
+        self.0 += 1;
     }
 
     fn output(self) -> Self::Out {
@@ -27,8 +25,8 @@ where
     Key: DataKey,
     Out: Data,
 {
-    pub fn first(self) -> KeyedStream<Key, Option<Out>, impl Operator<KeyValue<Key, Option<Out>>>> {
-        let acc = First(None);
-        self.add_window_operator("WindowFirst", acc)
+    pub fn count(self) -> KeyedStream<Key, usize, impl Operator<KeyValue<Key, usize>>> {
+        let acc = Count(0, PhantomData);
+        self.add_window_operator("WindowCount", acc)
     }
 }

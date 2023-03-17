@@ -6,3 +6,6 @@ pub use event_time::EventTimeWindow;
 
 mod processing_time;
 pub use processing_time::ProcessingTimeWindow;
+
+mod session;
+pub use session::SessionWindow;

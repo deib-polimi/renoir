@@ -14,6 +14,7 @@ fn test_first_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .first()
+            .flatten()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

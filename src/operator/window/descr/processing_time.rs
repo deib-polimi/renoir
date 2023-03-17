@@ -77,6 +77,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct ProcessingTimeWindow {
     size: Timestamp,
     slide: Timestamp,

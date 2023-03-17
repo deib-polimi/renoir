@@ -75,6 +75,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct EventTimeWindow {
     size: Timestamp,
     slide: Timestamp,
