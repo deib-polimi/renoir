@@ -370,7 +370,6 @@ fn query7(events: Stream<Event, impl Operator<Event> + 'static>) {
         .window(window_descr.clone())
         .max_by_key(|(_, price, _)| *price)
         .drop_key()
-        .map(|o| o.unwrap())
         .window_all(window_descr)
         .max_by_key(|(_, price, _)| *price)
         .for_each(std::mem::drop)

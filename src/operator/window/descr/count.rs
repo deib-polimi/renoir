@@ -14,6 +14,7 @@ pub struct CountWindowManager<A> {
     init: A,
     size: usize,
     slide: usize,
+    exact: bool,
     ws: VecDeque<Slot<A>>,
 }
 
@@ -73,7 +74,18 @@ where
                     None
                 }
             }
-            // Only return complete windows
+            StreamElement::FlushAndRestart | StreamElement::Terminate => {
+                let ret = if self.exact {
+                    None
+                } else {
+                    self.ws
+                        .pop_front()
+                        .filter(|r| r.count > 0)
+                        .map(|r| WindowResult::new(r.acc.output(), r.ts))
+                };
+                self.ws.drain(..);
+                ret
+            }
             _ => None,
         }
     }
@@ -81,20 +93,40 @@ where
 
 #[derive(Clone)]
 pub struct CountWindow {
-    size: usize,
-    slide: usize,
+    pub size: usize,
+    pub slide: usize,
+    /// If exact is `true`, only results from windows of size `size` will be returned.
+    /// If exact is `false`, on terminate, the first incomplete window result will be returned if present
+    pub exact: bool,
 }
 
 impl CountWindow {
+    /// Windows of `size` elements, generated each `slide` elements.
+    /// If exact is `true`, only results from windows of size `size` will be returned.
+    /// If exact is `false`, on terminate, the first incomplete window result will be returned if present
+    pub fn new(size: usize, slide: usize, exact: bool) -> Self {
+        Self { size, slide, exact }
+    }
+
+    /// Exact windows of `size` elements, generated each `slide` elements
     pub fn sliding(size: usize, slide: usize) -> Self {
         assert!(size > 0, "window size must be > 0"); // TODO: consider using NonZeroUsize
         assert!(slide > 0, "window slide must be > 0");
-        Self { size, slide }
+        Self {
+            size,
+            slide,
+            exact: true,
+        }
     }
 
+    /// Exact windows of `size` elements
     pub fn tumbling(size: usize) -> Self {
         assert!(size > 0, "window size must be > 0");
-        Self { size, slide: size }
+        Self {
+            size,
+            slide: size,
+            exact: true,
+        }
     }
 }
 
@@ -106,6 +138,7 @@ impl WindowBuilder for CountWindow {
             init: accumulator,
             size: self.size,
             slide: self.slide,
+            exact: self.exact,
             ws: Default::default(),
         }
     }

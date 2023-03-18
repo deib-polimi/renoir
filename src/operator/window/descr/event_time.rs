@@ -19,11 +19,17 @@ struct Slot<A> {
     acc: A,
     start: Timestamp,
     end: Timestamp,
+    active: bool,
 }
 
 impl<A> Slot<A> {
     fn new(acc: A, start: Timestamp, end: Timestamp) -> Self {
-        Self { acc, start, end }
+        Self {
+            acc,
+            start,
+            end,
+            active: false,
+        }
     }
 }
 
@@ -51,7 +57,10 @@ where
                     .iter_mut()
                     .skip_while(|w| w.end <= ts)
                     .take_while(|w| w.start <= ts)
-                    .for_each(|w| w.acc.process(item.clone()));
+                    .for_each(|w| {
+                        w.acc.process(item.clone());
+                        w.active = true;
+                    });
 
                 Vec::new()
             }
@@ -59,12 +68,14 @@ where
                 let split = self.ws.partition_point(|w| w.end < ts);
                 self.ws
                     .drain(..split)
+                    .filter(|w| w.active)
                     .map(|w| WindowResult::Timestamped(w.acc.output(), w.end))
                     .collect()
             }
             StreamElement::FlushAndRestart | StreamElement::Terminate => self
                 .ws
                 .drain(..)
+                .filter(|w| w.active)
                 .map(|w| WindowResult::Timestamped(w.acc.output(), w.end))
                 .collect(),
             StreamElement::Item(_) => {
@@ -112,64 +123,37 @@ mod tests {
     use super::*;
     use crate::operator::window::aggr::Fold;
 
-    macro_rules! check_return {
+    macro_rules! save_result {
         ($ret:expr, $v:expr) => {{
-            let mut ia = $ret.into_iter();
-            let mut ib = $v.into_iter();
-            loop {
-                let (a, b) = (ia.next(), ib.next());
-                assert_eq!(a, b);
-
-                if let (None, None) = (a, b) {
-                    break;
-                }
-            }
+            let iter = $ret.into_iter().map(|r| r.unwrap_item());
+            $v.extend(iter);
         }};
     }
 
     #[test]
-    fn count_window() {
-        let size = 3;
-        let slide = 2;
-        let window = EventTimeWindow::sliding(3, 2);
+    fn event_time_window() {
+        let window = EventTimeWindow::sliding(5, 4);
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold = Fold::new(Vec::new(), |v, el| v.push(el));
         let mut manager = window.build(fold);
 
-        for i in 1..100 {
-            let expected = if i >= size && (i - size) % slide == 0 {
-                let v = ((i - size + 1)..=(i)).collect::<Vec<_>>();
-                Some(WindowResult::Item(v))
-            } else {
-                None
-            };
-            eprintln!("{expected:?}");
-            check_return!(manager.process(StreamElement::Item(i)), expected);
-        }
-    }
-
-    #[test]
-    #[cfg(feature = "timestamp")]
-    fn count_window_timestamped() {
-        let size = 3;
-        let slide = 2;
-        let window = EventTimeWindow::sliding(3, 2);
-
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
-        let mut manager = window.build(fold);
-
-        for i in 1..100 {
-            let expected = if i >= size && (i - size) % slide == 0 {
-                let v = ((i - size + 1)..=(i)).collect::<Vec<_>>();
-                Some(WindowResult::Timestamped(v, i as i64 / 2))
-            } else {
-                None
-            };
-            eprintln!("{expected:?}");
-            check_return!(
-                manager.process(StreamElement::Timestamped(i, i as i64 / 2)),
-                expected
+        let mut received = Vec::new();
+        for i in 1..100i64 {
+            save_result!(
+                manager.process(StreamElement::Timestamped(i, i / 10)),
+                received
             );
+
+            if i % 7 == 0 {
+                save_result!(manager.process(StreamElement::Watermark(i / 10)), received);
+            }
         }
+        save_result!(manager.process(StreamElement::FlushAndRestart), received);
+
+        received.sort();
+
+        let expected: Vec<Vec<_>> =
+            vec![(1..50).collect(), (40..90).collect(), (80..100).collect()];
+        assert_eq!(received, expected)
     }
 }

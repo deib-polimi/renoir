@@ -7,7 +7,7 @@ pub(crate) struct First<T>(Option<T>);
 
 impl<T: Data> WindowAccumulator for First<T> {
     type In = T;
-    type Out = Option<T>;
+    type Out = T;
 
     fn process(&mut self, el: Self::In) {
         if self.0.is_none() {
@@ -16,7 +16,7 @@ impl<T: Data> WindowAccumulator for First<T> {
     }
 
     fn output(self) -> Self::Out {
-        self.0
+        self.0.expect("First::output() called before any element was processed")
     }
 }
 
@@ -27,7 +27,7 @@ where
     Key: DataKey,
     Out: Data,
 {
-    pub fn first(self) -> KeyedStream<Key, Option<Out>, impl Operator<KeyValue<Key, Option<Out>>>> {
+    pub fn first(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
         let acc = First(None);
         self.add_window_operator("WindowFirst", acc)
     }

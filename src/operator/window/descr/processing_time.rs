@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use super::super::*;
-use crate::operator::{Data, StreamElement, Timestamp};
+use crate::operator::{Data, StreamElement};
 
 #[derive(Clone)]
 pub struct ProcessingTimeWindowManager<A>
@@ -10,21 +10,27 @@ where
     A: WindowAccumulator,
 {
     init: A,
-    size: Timestamp,
-    slide: Timestamp,
+    size: Duration,
+    slide: Duration,
     ws: VecDeque<Slot<A>>,
 }
 
 #[derive(Clone)]
 struct Slot<A> {
     acc: A,
-    start: Timestamp,
-    end: Timestamp,
+    start: Instant,
+    end: Instant,
+    active: bool,
 }
 
 impl<A> Slot<A> {
-    fn new(acc: A, start: Timestamp, end: Timestamp) -> Self {
-        Self { acc, start, end }
+    fn new(acc: A, start: Instant, end: Instant) -> Self {
+        Self {
+            acc,
+            start,
+            end,
+            active: false,
+        }
     }
 }
 
@@ -38,15 +44,12 @@ where
     type Output = Vec<WindowResult<A::Out>>;
 
     fn process(&mut self, el: StreamElement<A::In>) -> Self::Output {
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+        let now = Instant::now();
         match el {
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
                 // TODO: Windows are not aligned if there are periods without windows, evaluate if it needs to be changed
-                while self.ws.back().map(|b| b.start < ts).unwrap_or(true) {
-                    let next_start = self.ws.back().map(|b| b.start + self.slide).unwrap_or(ts);
+                while self.ws.back().map(|b| b.start < now).unwrap_or(true) {
+                    let next_start = self.ws.back().map(|b| b.start + self.slide).unwrap_or(now);
                     self.ws.push_back(Slot::new(
                         self.init.clone(),
                         next_start,
@@ -55,23 +58,28 @@ where
                 }
                 self.ws
                     .iter_mut()
-                    .skip_while(|w| w.end <= ts)
-                    .take_while(|w| w.start <= ts)
-                    .for_each(|w| w.acc.process(item.clone()));
+                    .skip_while(|w| w.end <= now)
+                    .take_while(|w| w.start <= now)
+                    .for_each(|w| {
+                        w.acc.process(item.clone());
+                        w.active = true;
+                    });
             }
             StreamElement::Terminate | StreamElement::FlushAndRestart => {
                 return self
                     .ws
                     .drain(..)
+                    .filter(|w| w.active)
                     .map(|w| WindowResult::Item(w.acc.output()))
                     .collect();
             }
             _ => {}
         }
 
-        let split = self.ws.partition_point(|w| w.end < ts);
+        let split = self.ws.partition_point(|w| w.end < now);
         self.ws
             .drain(..split)
+            .filter(|w| w.active)
             .map(|w| WindowResult::Item(w.acc.output()))
             .collect()
     }
@@ -79,26 +87,20 @@ where
 
 #[derive(Clone)]
 pub struct ProcessingTimeWindow {
-    size: Timestamp,
-    slide: Timestamp,
+    size: Duration,
+    slide: Duration,
 }
 
 impl ProcessingTimeWindow {
-    pub fn sliding(size_millis: Timestamp, slide_millis: Timestamp) -> Self {
-        assert!(size_millis > 0, "window size must be > 0");
-        assert!(slide_millis > 0, "window slide must be > 0");
-        Self {
-            size: size_millis,
-            slide: slide_millis,
-        }
+    pub fn sliding(size: Duration, slide: Duration) -> Self {
+        assert!(!size.is_zero(), "window size must be > 0");
+        assert!(!slide.is_zero(), "window slide must be > 0");
+        Self { size, slide }
     }
 
-    pub fn tumbling(size_millis: Timestamp) -> Self {
-        assert!(size_millis > 0, "window size must be > 0");
-        Self {
-            size: size_millis,
-            slide: size_millis,
-        }
+    pub fn tumbling(size: Duration) -> Self {
+        assert!(!size.is_zero(), "window size must be > 0");
+        Self { size, slide: size }
     }
 }
 
@@ -120,64 +122,48 @@ mod tests {
     use super::*;
     use crate::operator::window::aggr::Fold;
 
-    macro_rules! check_return {
-        ($ret:expr, $v:expr) => {{
-            let mut ia = $ret.into_iter();
-            let mut ib = $v.into_iter();
-            loop {
-                let (a, b) = (ia.next(), ib.next());
-                assert_eq!(a, b);
-
-                if let (None, None) = (a, b) {
-                    break;
-                }
-            }
+    macro_rules! save_result {
+        ($ret:expr, $v:expr, $n:ident) => {{
+            let iter = $ret
+                .into_iter()
+                .inspect(|r| {
+                    if !r.item().is_empty() {
+                        $n += 1;
+                    }
+                })
+                .map(|r| r.unwrap_item())
+                .flatten();
+            $v.extend(iter);
         }};
     }
 
     #[test]
-    fn count_window() {
-        let size = 3;
-        let slide = 2;
-        let window = ProcessingTimeWindow::sliding(3, 2);
+    #[ignore]
+    fn processing_time_window() {
+        let size = Duration::from_micros(100);
+        let window = ProcessingTimeWindow::tumbling(size);
 
         let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
         let mut manager = window.build(fold);
 
+        let start = Instant::now();
+        let mut received = Vec::new();
+        let mut n_windows = 0;
         for i in 1..100 {
-            let expected = if i >= size && (i - size) % slide == 0 {
-                let v = ((i - size + 1)..=(i)).collect::<Vec<_>>();
-                Some(WindowResult::Item(v))
-            } else {
-                None
-            };
-            eprintln!("{expected:?}");
-            check_return!(manager.process(StreamElement::Item(i)), expected);
+            save_result!(manager.process(StreamElement::Item(i)), received, n_windows);
         }
-    }
+        let expected_n = start.elapsed().as_micros() / size.as_micros() + 1;
 
-    #[test]
-    #[cfg(feature = "timestamp")]
-    fn count_window_timestamped() {
-        let size = 3;
-        let slide = 2;
-        let window = ProcessingTimeWindow::sliding(3, 2);
+        save_result!(
+            manager.process(StreamElement::FlushAndRestart),
+            received,
+            n_windows
+        );
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
-        let mut manager = window.build(fold);
+        eprintln!("expected {expected_n} windows");
 
-        for i in 1..100 {
-            let expected = if i >= size && (i - size) % slide == 0 {
-                let v = ((i - size + 1)..=(i)).collect::<Vec<_>>();
-                Some(WindowResult::Timestamped(v, i as i64 / 2))
-            } else {
-                None
-            };
-            eprintln!("{expected:?}");
-            check_return!(
-                manager.process(StreamElement::Timestamped(i, i as i64 / 2)),
-                expected
-            );
-        }
+        received.sort();
+        assert_eq!(n_windows, expected_n);
+        assert_eq!(received, (1..100).collect::<Vec<_>>())
     }
 }

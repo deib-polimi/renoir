@@ -71,7 +71,7 @@ where
     F: FnMut(&mut I, I) + Clone + Send + 'static,
 {
     type In = I;
-    type Out = Option<I>;
+    type Out = I;
 
     fn process(&mut self, el: Self::In) {
         match self.state.as_mut() {
@@ -82,6 +82,7 @@ where
 
     fn output(self) -> Self::Out {
         self.state
+            .expect("FoldFirst output called when it has received no elements!")
     }
 }
 
@@ -111,14 +112,14 @@ where
     /// let res = s
     ///     .group_by(|&n| n % 2)
     ///     .window(CountWindow::tumbling(2))
-    ///     .fold(1, |acc, &n| *acc *= n)
+    ///     .fold(1, |acc, n| *acc *= n)
     ///     .collect_vec();
     ///
     /// env.execute();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
-    /// assert_eq!(res, vec![(0, 0 * 2), (0, 4), (1, 1 * 3)]);
+    /// assert_eq!(res, vec![(0, 0 * 2), (1, 1 * 3)]);
     /// ```
     pub fn fold<NewOut: Data, F>(
         self,

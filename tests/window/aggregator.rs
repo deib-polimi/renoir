@@ -13,7 +13,6 @@ fn test_first_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .first()
-            .flatten()
             .drop_key()
             .collect_vec();
         env.execute();
@@ -101,7 +100,6 @@ fn test_min_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .min()
-            .map(|x| x.1.unwrap())
             .drop_key()
             .collect_vec();
         env.execute();
@@ -129,7 +127,6 @@ fn test_max_window() {
             .stream(source)
             .window_all(CountWindow::sliding(3, 2))
             .max()
-            .map(|x| x.1.unwrap())
             .drop_key()
             .collect_vec();
         env.execute();

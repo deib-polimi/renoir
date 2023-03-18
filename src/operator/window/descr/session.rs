@@ -1,7 +1,7 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use super::super::*;
-use crate::operator::{Data, StreamElement, Timestamp};
+use crate::operator::{Data, StreamElement};
 
 #[derive(Clone)]
 pub struct SessionWindowManager<A>
@@ -9,18 +9,18 @@ where
     A: WindowAccumulator,
 {
     init: A,
-    gap: Timestamp,
+    gap: Duration,
     w: Option<Slot<A>>,
 }
 
 #[derive(Clone)]
 struct Slot<A> {
     acc: A,
-    last: Timestamp,
+    last: Instant,
 }
 
 impl<A> Slot<A> {
-    fn new(acc: A, last: Timestamp) -> Self {
+    fn new(acc: A, last: Instant) -> Self {
         Self { acc, last }
     }
 }
@@ -35,10 +35,7 @@ where
     type Output = Option<WindowResult<A::Out>>;
 
     fn process(&mut self, el: StreamElement<A::In>) -> Self::Output {
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+        let ts = Instant::now();
 
         let ret = match &self.w {
             Some(slot) if ts - slot.last > self.gap => {
@@ -67,12 +64,12 @@ where
 
 #[derive(Clone)]
 pub struct SessionWindow {
-    gap: Timestamp,
+    gap: Duration,
 }
 
 impl SessionWindow {
-    pub fn new(gap_millis: Timestamp) -> Self {
-        assert!(gap_millis > 0, "window size must be > 0");
+    pub fn new(gap_millis: Duration) -> Self {
+        assert!(!gap_millis.is_zero(), "window size must be > 0");
         Self { gap: gap_millis }
     }
 }
@@ -91,42 +88,41 @@ impl WindowBuilder for SessionWindow {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
     use crate::operator::window::aggr::Fold;
 
-    macro_rules! check_return {
+    macro_rules! save_result {
         ($ret:expr, $v:expr) => {{
-            let mut ia = $ret.into_iter();
-            let mut ib = $v.into_iter();
-            loop {
-                let (a, b) = (ia.next(), ib.next());
-                assert_eq!(a, b);
-
-                if let (None, None) = (a, b) {
-                    break;
-                }
-            }
+            let iter = $ret.into_iter().map(|r| r.unwrap_item());
+            $v.extend(iter);
         }};
     }
 
     #[test]
-    fn count_window() {
-        let size = 3;
-        let slide = 2;
-        let window = SessionWindow::new(100);
+    fn event_time_window() {
+        let window = SessionWindow::new(Duration::from_millis(10));
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold = Fold::new(Vec::new(), |v, el| v.push(el));
         let mut manager = window.build(fold);
 
-        for i in 1..100 {
-            let expected = if i >= size && (i - size) % slide == 0 {
-                let v = ((i - size + 1)..=(i)).collect::<Vec<_>>();
-                Some(WindowResult::Item(v))
-            } else {
-                None
-            };
-            eprintln!("{expected:?}");
-            check_return!(manager.process(StreamElement::Item(i)), expected);
+        let mut received = Vec::new();
+        for i in 0..100i64 {
+            if i == 33 || i == 80 {
+                std::thread::sleep(Duration::from_millis(11))
+            }
+            save_result!(
+                manager.process(StreamElement::Timestamped(i, i / 10)),
+                received
+            );
         }
+        save_result!(manager.process(StreamElement::FlushAndRestart), received);
+
+        received.sort();
+
+        let expected: Vec<Vec<_>> =
+            vec![(0..33).collect(), (33..80).collect(), (80..100).collect()];
+        assert_eq!(received, expected)
     }
 }

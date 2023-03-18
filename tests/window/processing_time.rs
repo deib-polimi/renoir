@@ -16,7 +16,7 @@ fn tumbling_processing_time() {
                 std::thread::sleep(Duration::from_millis(1));
                 x % 2
             })
-            .window(ProcessingTimeWindow::tumbling(100))
+            .window(ProcessingTimeWindow::tumbling(Duration::from_millis(100)))
             .fold(0, |acc, x| *acc += x)
             .drop_key()
             .collect_vec();

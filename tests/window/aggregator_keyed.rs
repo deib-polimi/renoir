@@ -14,7 +14,6 @@ fn test_first_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .first()
-            .flatten()
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -107,7 +106,6 @@ fn test_min_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .min()
-            .map(|x| x.1.unwrap())
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {
@@ -136,7 +134,6 @@ fn test_max_window_keyed() {
             .group_by(|x| x % 2)
             .window(CountWindow::sliding(3, 2))
             .max()
-            .map(|x| x.1.unwrap())
             .collect_vec();
         env.execute();
         if let Some(mut res) = res.get() {

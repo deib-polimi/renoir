@@ -1,27 +1,29 @@
 //! The types related to the windowed streams.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::marker::PhantomData;
 
 pub use descr::*;
 // pub use aggregator::*;
 // pub use description::*;
-use hashbrown::HashMap;
 
-use crate::block::OperatorStructure;
+use crate::block::{GroupHasherBuilder, OperatorStructure};
 use crate::operator::{Data, DataKey, ExchangeData, Operator, StreamElement, Timestamp};
 use crate::stream::{KeyValue, KeyedStream, Stream, WindowedStream};
 
 mod aggr;
 mod descr;
 
+/// Convention: WindowAccumulator expects output to be called after at least one element has been processed.
+/// Violating this convention may result in panics.
 pub trait WindowBuilder {
     type Manager<A: WindowAccumulator>: WindowManager<In = A::In, Out = A::Out> + 'static;
 
     fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A>;
 }
 
+/// Convention: output will always be called after at least one element has been processed
 pub trait WindowAccumulator: Clone + Send + 'static {
     type In: Data;
     type Out: Data;
@@ -32,7 +34,7 @@ pub trait WindowAccumulator: Clone + Send + 'static {
 
 #[derive(Clone)]
 pub(crate) struct KeyedWindowManager<Key, In, Out, W: WindowManager> {
-    windows: HashMap<Key, W>,
+    windows: HashMap<Key, W, GroupHasherBuilder>,
     init: W,
     _in: PhantomData<In>,
     _out: PhantomData<Out>,
@@ -56,6 +58,20 @@ impl<T> WindowResult<T> {
         match timestamp {
             Some(ts) => WindowResult::Timestamped(item, ts),
             None => WindowResult::Item(item),
+        }
+    }
+
+    pub fn item(&self) -> &T {
+        match self {
+            WindowResult::Item(item) => item,
+            WindowResult::Timestamped(item, _) => item,
+        }
+    }
+
+    pub fn unwrap_item(self) -> T {
+        match self {
+            WindowResult::Item(item) => item,
+            WindowResult::Timestamped(item, _) => item,
         }
     }
 }
@@ -239,7 +255,7 @@ where
     /// # use noir::operator::source::IteratorSource;
     /// # use noir::operator::window::CountWindow;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream(IteratorSource::new((0..9)));
     /// let res = s
     ///     .group_by(|&n| n % 2)
     ///     .window(CountWindow::sliding(3, 2))
@@ -250,7 +266,7 @@ where
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
-    /// assert_eq!(res, vec![(0, 4), (0, 0 + 2 + 4), (1, 1 + 3)]);
+    /// assert_eq!(res, vec![(0, 0 + 2 + 4), (0, 4 + 6 + 8), (1, 1 + 3 + 5)]);
     /// ```
     pub fn window<WinOut: Data, WinDescr: WindowBuilder>(
         self,
@@ -268,9 +284,9 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    /// Apply a window to the stream.
+    /// Send all elements to a single node and apply a window to the stream.
     ///
-    /// Returns a [`WindowedStream`], with windows created following the behavior specified
+    /// Returns a [`KeyedWindowedStream`], with key `()` with windows created following the behavior specified
     /// by the passed [`WindowDescription`].
     ///
     /// **Note**: this operator cannot be parallelized, so all the stream elements are sent to a
@@ -282,16 +298,17 @@ where
     /// # use noir::operator::source::IteratorSource;
     /// # use noir::operator::window::CountWindow;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream(IteratorSource::new((0..5usize)));
     /// let res = s
     ///     .window_all(CountWindow::tumbling(2))
-    ///     .sum()
+    ///     .sum::<usize>()
+    ///     .drop_key()
     ///     .collect_vec();
     ///
     /// env.execute();
     ///
     /// let mut res = res.get().unwrap();
-    /// assert_eq!(res, vec![0 + 1, 2 + 3, 4]);
+    /// assert_eq!(res, vec![0 + 1, 2 + 3]);
     /// ```
     pub fn window_all<WinOut: Data, WinDescr: WindowBuilder>(
         self,
