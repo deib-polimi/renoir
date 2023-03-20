@@ -138,11 +138,8 @@ where
     /// Folds the elements of each window into an accumulator value, starting with the first value
     ///
     /// TODO DOCS
-    /// 
-    pub fn fold_first<F>(
-        self,
-        fold: F,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ///
+    pub fn fold_first<F>(self, fold: F) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
     where
         F: FnMut(&mut Out, Out) + Clone + Send + 'static,
     {

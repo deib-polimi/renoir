@@ -84,8 +84,8 @@ mod inner {
             self.prev.setup(metadata);
         }
 
-    #[inline]
-    fn next(&mut self) -> StreamElement<Out> {
+        #[inline]
+        fn next(&mut self) -> StreamElement<Out> {
             loop {
                 if let Some(ref mut inner) = self.frontiter {
                     match inner.next() {

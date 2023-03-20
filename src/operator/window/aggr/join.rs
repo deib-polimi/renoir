@@ -11,7 +11,7 @@ struct Join<L, R> {
 
 impl<L: Data, R: Data> WindowAccumulator for Join<L, R> {
     type In = MergeElement<L, R>;
-    type Out = Vec<(L, R)>; // TODO: may have more efficient formulations
+    type Out = ProductIterator<L, R>; // TODO: may have more efficient formulations
 
     #[inline]
     fn process(&mut self, el: Self::In) {
@@ -23,10 +23,50 @@ impl<L: Data, R: Data> WindowAccumulator for Join<L, R> {
 
     #[inline]
     fn output(mut self) -> Self::Out {
-        self.left
-            .drain(..)
-            .flat_map(|l| self.right.iter().cloned().map(move |r| (l.clone(), r)))
-            .collect()
+        ProductIterator::new(
+            std::mem::take(&mut self.left),
+            std::mem::take(&mut self.right),
+        )
+    }
+}
+
+#[derive(Clone)]
+struct ProductIterator<L, R> {
+    left: Vec<L>,
+    right: Vec<R>,
+    i: usize,
+    j: usize,
+}
+
+impl<L, R> ProductIterator<L, R> {
+    fn new(left: Vec<L>, right: Vec<R>) -> Self {
+        Self {
+            left,
+            right,
+            i: 0,
+            j: 0,
+        }
+    }
+}
+
+impl<L: Clone, R: Clone> Iterator for ProductIterator<L, R> {
+    type Item = (L, R);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i >= self.left.len() || self.j >= self.right.len() {
+            return None;
+        }
+
+        let ret = (self.left[self.i].clone(), self.right[self.j].clone());
+
+        self.j += 1;
+        if self.j >= self.right.len() {
+            self.j = 0;
+            self.i += 1;
+        }
+
+        Some(ret)
     }
 }
 
@@ -56,5 +96,33 @@ where
             .window(descr)
             .add_window_operator("WindowJoin", acc)
             .flatten()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn product_iterator() {
+        let t = ProductIterator::new(vec![1], vec!["asd"]).collect::<Vec<_>>();
+        let expected = vec![(1, "asd")];
+
+        assert_eq!(expected, t);
+
+        let t = ProductIterator::new(vec![1, 3, 5], vec![2, 4]).collect::<Vec<_>>();
+        let expected = vec![(1, 2), (1, 4), (3, 2), (3, 4), (5, 2), (5, 4)];
+
+        assert_eq!(expected, t);
+
+        let t = ProductIterator::new(vec![1, 3, 5], vec![]).collect::<Vec<(usize, usize)>>();
+        let expected: Vec<(usize, usize)> = vec![];
+
+        assert_eq!(expected, t);
+
+        let t = ProductIterator::new(vec![], vec![1, 3, 5]).collect::<Vec<(usize, usize)>>();
+        let expected: Vec<(usize, usize)> = vec![];
+
+        assert_eq!(expected, t);
     }
 }

@@ -14,6 +14,7 @@ const WATERMARK_INTERVAL: usize = 32 << 10;
 // const BATCH_SIZE: usize = 32 << 10;
 const SECOND_MILLIS: i64 = 1_000;
 
+#[allow(unused)]
 fn timestamp_gen((_, e): &(SystemTime, Event)) -> Timestamp {
     e.timestamp() as i64
 }

@@ -13,7 +13,7 @@ use std::time::Instant;
 use nexmark::event::*;
 
 const WATERMARK_INTERVAL: usize = 128 << 10;
-const BATCH_SIZE: usize = 16 << 10;
+const BATCH_SIZE: usize = 32 << 10;
 const SECOND_MILLIS: i64 = 1_000;
 
 fn timestamp_gen(e: &Event) -> Timestamp {
@@ -413,7 +413,6 @@ fn query8(events: Stream<Event, impl Operator<Event> + 'static>) {
         .join(auction.group_by(|(seller, _)| *seller))
         .drop_key()
         .map(|((id, name), (_, reserve))| (id, name, reserve))
-        .inspect(|x| eprintln!("{x:?}"))
         .for_each(std::mem::drop)
 }
 
