@@ -26,6 +26,7 @@ struct Slot<A> {
 }
 
 impl<A> Slot<A> {
+    #[inline]
     fn new(acc: A) -> Self {
         Self {
             count: 0,
@@ -36,6 +37,7 @@ impl<A> Slot<A> {
 }
 
 impl<A: WindowAccumulator> CountWindowManager<A> {
+    #[inline]
     fn update_slot(&mut self, idx: usize, el: A::In, ts: Option<Timestamp>) {
         self.ws[idx].count += 1;
         self.ws[idx].ts = match (self.ws[idx].ts, ts) {
@@ -56,6 +58,7 @@ where
     type Out = A::Out;
     type Output = Option<WindowResult<A::Out>>;
 
+    #[inline]
     fn process(&mut self, el: StreamElement<A::In>) -> Self::Output {
         let ts = el.timestamp().cloned();
         match el {
@@ -104,11 +107,13 @@ impl CountWindow {
     /// Windows of `size` elements, generated each `slide` elements.
     /// If exact is `true`, only results from windows of size `size` will be returned.
     /// If exact is `false`, on terminate, the first incomplete window result will be returned if present
+    #[inline]
     pub fn new(size: usize, slide: usize, exact: bool) -> Self {
         Self { size, slide, exact }
     }
 
     /// Exact windows of `size` elements, generated each `slide` elements
+    #[inline]
     pub fn sliding(size: usize, slide: usize) -> Self {
         assert!(size > 0, "window size must be > 0"); // TODO: consider using NonZeroUsize
         assert!(slide > 0, "window slide must be > 0");
@@ -120,6 +125,7 @@ impl CountWindow {
     }
 
     /// Exact windows of `size` elements
+    #[inline]
     pub fn tumbling(size: usize) -> Self {
         assert!(size > 0, "window size must be > 0");
         Self {
@@ -133,6 +139,7 @@ impl CountWindow {
 impl WindowBuilder for CountWindow {
     type Manager<A: WindowAccumulator> = CountWindowManager<A>;
 
+    #[inline]
     fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A> {
         CountWindowManager {
             init: accumulator,

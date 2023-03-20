@@ -85,6 +85,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<Out> {
         while !self.received_end && self.last_watermark.is_none() {
             match self.prev.next() {

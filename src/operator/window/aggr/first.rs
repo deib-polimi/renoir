@@ -9,12 +9,14 @@ impl<T: Data> WindowAccumulator for First<T> {
     type In = T;
     type Out = T;
 
+    #[inline]
     fn process(&mut self, el: Self::In) {
         if self.0.is_none() {
             self.0 = Some(el);
         }
     }
 
+    #[inline]
     fn output(self) -> Self::Out {
         self.0.expect("First::output() called before any element was processed")
     }

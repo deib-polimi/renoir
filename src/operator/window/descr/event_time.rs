@@ -23,6 +23,7 @@ struct Slot<A> {
 }
 
 impl<A> Slot<A> {
+    #[inline]
     fn new(acc: A, start: Timestamp, end: Timestamp) -> Self {
         Self {
             acc,
@@ -42,6 +43,7 @@ where
     type Out = A::Out;
     type Output = Vec<WindowResult<A::Out>>;
 
+    #[inline]
     fn process(&mut self, el: StreamElement<A::In>) -> Self::Output {
         match el {
             StreamElement::Timestamped(item, ts) => {
@@ -93,12 +95,14 @@ pub struct EventTimeWindow {
 }
 
 impl EventTimeWindow {
+    #[inline]
     pub fn sliding(size: Timestamp, slide: Timestamp) -> Self {
         assert!(size > 0, "window size must be > 0");
         assert!(slide > 0, "window slide must be > 0");
         Self { size, slide }
     }
 
+    #[inline]
     pub fn tumbling(size: Timestamp) -> Self {
         assert!(size > 0, "window size must be > 0");
         Self { size, slide: size }
@@ -108,6 +112,7 @@ impl EventTimeWindow {
 impl WindowBuilder for EventTimeWindow {
     type Manager<A: WindowAccumulator> = EventTimeWindowManager<A>;
 
+    #[inline]
     fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A> {
         EventTimeWindowManager {
             init: accumulator,

@@ -25,10 +25,12 @@ where
 
     type Out = O;
 
+    #[inline]
     fn process(&mut self, el: Self::In) {
         self.vec.push(el);
     }
 
+    #[inline]
     fn output(self) -> Self::Out {
         (self.f)(self.vec)
     }

@@ -73,6 +73,7 @@ where
     type In = I;
     type Out = I;
 
+    #[inline]
     fn process(&mut self, el: Self::In) {
         match self.state.as_mut() {
             None => self.state = Some(el),
@@ -80,6 +81,7 @@ where
         }
     }
 
+    #[inline]
     fn output(self) -> Self::Out {
         self.state
             .expect("FoldFirst output called when it has received no elements!")
@@ -131,5 +133,20 @@ where
     {
         let acc = Fold::new(init, fold);
         self.add_window_operator("WindowFold", acc)
+    }
+
+    /// Folds the elements of each window into an accumulator value, starting with the first value
+    ///
+    /// TODO DOCS
+    /// 
+    pub fn fold_first<F>(
+        self,
+        fold: F,
+    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    where
+        F: FnMut(&mut Out, Out) + Clone + Send + 'static,
+    {
+        let acc = FoldFirst::new(fold);
+        self.add_window_operator("WindowFoldFirst", acc)
     }
 }

@@ -20,6 +20,7 @@ struct Slot<A> {
 }
 
 impl<A> Slot<A> {
+    #[inline]
     fn new(acc: A, last: Instant) -> Self {
         Self { acc, last }
     }
@@ -34,6 +35,7 @@ where
     type Out = A::Out;
     type Output = Option<WindowResult<A::Out>>;
 
+    #[inline]
     fn process(&mut self, el: StreamElement<A::In>) -> Self::Output {
         let ts = Instant::now();
 
@@ -68,6 +70,7 @@ pub struct SessionWindow {
 }
 
 impl SessionWindow {
+    #[inline]
     pub fn new(gap_millis: Duration) -> Self {
         assert!(!gap_millis.is_zero(), "window size must be > 0");
         Self { gap: gap_millis }
@@ -77,6 +80,7 @@ impl SessionWindow {
 impl WindowBuilder for SessionWindow {
     type Manager<A: WindowAccumulator> = SessionWindowManager<A>;
 
+    #[inline]
     fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A> {
         SessionWindowManager {
             init: accumulator,

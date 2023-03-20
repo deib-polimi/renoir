@@ -54,6 +54,7 @@ pub enum WindowResult<T> {
 }
 
 impl<T> WindowResult<T> {
+    #[inline]
     pub fn new(item: T, timestamp: Option<Timestamp>) -> Self {
         match timestamp {
             Some(ts) => WindowResult::Timestamped(item, ts),
@@ -61,6 +62,7 @@ impl<T> WindowResult<T> {
         }
     }
 
+    #[inline]
     pub fn item(&self) -> &T {
         match self {
             WindowResult::Item(item) => item,
@@ -68,6 +70,7 @@ impl<T> WindowResult<T> {
         }
     }
 
+    #[inline]
     pub fn unwrap_item(self) -> T {
         match self {
             WindowResult::Item(item) => item,
@@ -77,6 +80,7 @@ impl<T> WindowResult<T> {
 }
 
 impl<T> From<WindowResult<T>> for StreamElement<T> {
+    #[inline]
     fn from(value: WindowResult<T>) -> Self {
         match value {
             WindowResult::Item(item) => StreamElement::Item(item),
@@ -157,6 +161,7 @@ where
                             .map(|e| StreamElement::from(e).add_key(key.clone())),
                     );
                 }
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
                 el => {
                     let (_, el) = el.take_key();
                     for (key, mgr) in &mut self.manager.windows {
@@ -169,7 +174,6 @@ where
                     // Forward system messages and watermarks
                     let msg = match el {
                         StreamElement::Watermark(w) => StreamElement::Watermark(w),
-                        StreamElement::FlushBatch => StreamElement::FlushBatch,
                         StreamElement::Terminate => StreamElement::Terminate,
                         StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
                         _ => unreachable!(),

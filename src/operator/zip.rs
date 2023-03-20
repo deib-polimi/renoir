@@ -58,6 +58,7 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<(Out1, Out2)> {
         while self.stash1.is_empty() || self.stash2.is_empty() {
             let item = self.prev.next();

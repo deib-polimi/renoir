@@ -13,6 +13,7 @@ impl<L: Data, R: Data> WindowAccumulator for Join<L, R> {
     type In = MergeElement<L, R>;
     type Out = Vec<(L, R)>; // TODO: may have more efficient formulations
 
+    #[inline]
     fn process(&mut self, el: Self::In) {
         match el {
             MergeElement::Left(l) => self.left.push(l),
@@ -20,6 +21,7 @@ impl<L: Data, R: Data> WindowAccumulator for Join<L, R> {
         }
     }
 
+    #[inline]
     fn output(mut self) -> Self::Out {
         self.left
             .drain(..)

@@ -9,10 +9,12 @@ impl<T: Data> WindowAccumulator for Count<T> {
     type In = T;
     type Out = usize;
 
+    #[inline]
     fn process(&mut self, _: Self::In) {
         self.0 += 1;
     }
 
+    #[inline]
     fn output(self) -> Self::Out {
         self.0
     }

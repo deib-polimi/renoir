@@ -24,6 +24,7 @@ struct Slot<A> {
 }
 
 impl<A> Slot<A> {
+    #[inline]
     fn new(acc: A, start: Instant, end: Instant) -> Self {
         Self {
             acc,
@@ -43,6 +44,7 @@ where
     type Out = A::Out;
     type Output = Vec<WindowResult<A::Out>>;
 
+    #[inline]
     fn process(&mut self, el: StreamElement<A::In>) -> Self::Output {
         let now = Instant::now();
         match el {
@@ -92,12 +94,14 @@ pub struct ProcessingTimeWindow {
 }
 
 impl ProcessingTimeWindow {
+    #[inline]
     pub fn sliding(size: Duration, slide: Duration) -> Self {
         assert!(!size.is_zero(), "window size must be > 0");
         assert!(!slide.is_zero(), "window slide must be > 0");
         Self { size, slide }
     }
 
+    #[inline]
     pub fn tumbling(size: Duration) -> Self {
         assert!(!size.is_zero(), "window size must be > 0");
         Self { size, slide: size }
@@ -107,6 +111,7 @@ impl ProcessingTimeWindow {
 impl WindowBuilder for ProcessingTimeWindow {
     type Manager<A: WindowAccumulator> = ProcessingTimeWindowManager<A>;
 
+    #[inline]
     fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A> {
         ProcessingTimeWindowManager {
             init: accumulator,

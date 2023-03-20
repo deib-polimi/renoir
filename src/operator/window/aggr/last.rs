@@ -9,10 +9,12 @@ impl<T: Data> WindowAccumulator for Last<T> {
     type In = T;
     type Out = Option<T>;
 
+    #[inline]
     fn process(&mut self, el: Self::In) {
         self.0 = Some(el);
     }
 
+    #[inline]
     fn output(self) -> Self::Out {
         self.0
     }

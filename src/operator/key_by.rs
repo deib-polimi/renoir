@@ -62,6 +62,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
         match self.prev.next() {
             StreamElement::Item(t) => StreamElement::Item(((self.keyer)(&t), t)),
