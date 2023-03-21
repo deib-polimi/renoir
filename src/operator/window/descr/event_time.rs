@@ -109,11 +109,11 @@ impl EventTimeWindow {
     }
 }
 
-impl WindowBuilder for EventTimeWindow {
-    type Manager<A: WindowAccumulator> = EventTimeWindowManager<A>;
+impl<T: Data> WindowBuilder<T> for EventTimeWindow {
+    type Manager<A: WindowAccumulator<In = T>> = EventTimeWindowManager<A>;
 
     #[inline]
-    fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A> {
+    fn build<A: WindowAccumulator<In = T>>(&self, accumulator: A) -> Self::Manager<A> {
         EventTimeWindowManager {
             init: accumulator,
             size: self.size,

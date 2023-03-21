@@ -1,5 +1,7 @@
 use fxhash::FxHashMap;
 use nexmark::config::NexmarkConfig;
+use noir::operator::window::TransactionCommand;
+use noir::operator::window::TransactionWindow;
 use noir::operator::ElementGenerator;
 use noir::operator::Operator;
 use noir::operator::StreamElement;
@@ -31,33 +33,58 @@ fn watermark_gen(ts: &Timestamp, count: &mut usize, interval: usize) -> Option<T
 
 /// For each concluded auction, find its winning bid.
 fn winning_bids(
-    auction: Stream<Auction, impl Operator<Auction> + 'static>,
-    bid: Stream<Bid, impl Operator<Bid> + 'static>,
+    events: Stream<Event, impl Operator<Event> + 'static>,
 ) -> Stream<(Auction, Bid), impl Operator<(Auction, Bid)>> {
-    auction
-        // TODO: filter a.expires < CURRENT_TIME
-        // WHERE A.id = B.auction
-        .join(bid, |a| a.id, |b| b.auction)
-        // WHERE B.datetime < A.expires
-        .filter(|(_, (a, b))| {
-            b.price >= a.reserve && (a.date_time..a.expires).contains(&b.date_time)
+    events
+        .filter(|e| matches!(e, Event::Auction(_) | Event::Bid(_)))
+        .add_timestamps(timestamp_gen, {
+            let mut count = 0;
+            move |_, ts| watermark_gen(ts, &mut count, WATERMARK_INTERVAL)
         })
+        .group_by(|e| match e {
+            Event::Auction(a) => a.id,
+            Event::Bid(b) => b.auction,
+            _ => unreachable!(),
+        })
+        .window(TransactionWindow::new(|e| match e {
+            Event::Auction(a) => TransactionCommand::CommitAfter(a.expires as i64),
+            _ => TransactionCommand::None,
+        }))
         // find the bid with the maximum price
         .fold(
-            (None, None),
-            |(auc, win_bid): &mut (Option<Auction>, Option<Bid>), (a, bid)| {
-                if auc.is_some() {
-                    if win_bid.as_ref().unwrap().price < bid.price {
-                        *win_bid = Some(bid);
-                    }
-                } else {
-                    *auc = Some(a);
-                    *win_bid = Some(bid);
+            (None, Vec::new()),
+            |(auction, bids): &mut (Option<Auction>, Vec<Bid>), e| match e {
+                Event::Auction(a) => {
+                    let winner = bids
+                        .drain(..)
+                        .filter(|b| {
+                            b.price >= a.reserve && (a.date_time..a.expires).contains(&b.date_time)
+                        })
+                        .max_by_key(|b| b.price);
+
+                    *auction = Some(a);
+                    bids.extend(winner);
                 }
+                Event::Bid(b) => {
+                    if let Some(a) = auction {
+                        if b.price >= a.reserve
+                            && (a.date_time..a.expires).contains(&b.date_time)
+                            && bids.first().map(|w| b.price > w.price).unwrap_or(true)
+                        {
+                            bids.truncate(0);
+                            bids.push(b);
+                        }
+                    } else {
+                        // Save all out of order since we cannot filter yet
+                        bids.push(b);
+                    }
+                }
+                _ => unreachable!(),
             },
         )
         .drop_key()
-        .map(|(auction, bid)| (auction.unwrap(), bid.unwrap()))
+        .filter_map(|(auction, mut bid)| Some((auction.unwrap(), bid.pop()?)))
+    // .inspect(|e| eprintln!("{e:?}"))
 }
 
 /// Query 0: Passthrough
@@ -143,17 +170,7 @@ fn query3(events: Stream<Event, impl Operator<Event> + 'static>) {
 /// GROUP BY C.id;
 /// ```
 fn query4(events: Stream<Event, impl Operator<Event> + 'static>) {
-    let mut routes = events
-        .route()
-        .add_route(|e| matches!(e, Event::Auction(_)))
-        .add_route(|e| matches!(e, Event::Bid(_)))
-        .build()
-        .into_iter();
-
-    let auction = routes.next().unwrap().map(unwrap_auction);
-    let bid = routes.next().unwrap().map(unwrap_bid);
-
-    winning_bids(auction, bid)
+    winning_bids(events)
         // GROUP BY category, AVG(price)
         .map(|(a, b)| (a.category, b.price))
         // .inspect(|a| println!("{a:?}"))
@@ -325,16 +342,7 @@ fn query5(events: Stream<Event, impl Operator<Event> + 'static>) {
 /// GROUP BY Q.seller;
 /// ```
 fn query6(events: Stream<Event, impl Operator<Event> + 'static>) {
-    let mut routes = events
-        .route()
-        .add_route(|e| matches!(e, Event::Auction(_)))
-        .add_route(|e| matches!(e, Event::Bid(_)))
-        .build()
-        .into_iter();
-    // let person = event.pop().unwrap().filter_map(filter_person);
-    let auction = routes.next().unwrap().map(unwrap_auction);
-    let bid = routes.next().unwrap().map(unwrap_bid);
-    winning_bids(auction, bid)
+    winning_bids(events)
         // [PARTITION BY A.seller ROWS 10]
         .map(|(a, b)| (a.seller, b.price))
         .group_by(|(seller, _)| *seller)
@@ -409,8 +417,7 @@ fn query8(events: Stream<Event, impl Operator<Event> + 'static>) {
 
     person
         .group_by(|(id, _)| *id)
-        .window(window_descr)
-        .join(auction.group_by(|(seller, _)| *seller))
+        .window_join(window_descr, auction.group_by(|(seller, _)| *seller))
         .drop_key()
         .map(|((id, name), (_, reserve))| (id, name, reserve))
         .for_each(std::mem::drop)
@@ -432,12 +439,6 @@ fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<Event, impl Operato
     .batch_mode(BatchMode::fixed(BATCH_SIZE))
 }
 
-fn unwrap_bid(e: Event) -> Bid {
-    match e {
-        Event::Bid(x) => x,
-        _ => panic!("tried to unwrap wrong event type!"),
-    }
-}
 fn unwrap_auction(e: Event) -> Auction {
     match e {
         Event::Auction(x) => x,

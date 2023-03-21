@@ -136,11 +136,11 @@ impl CountWindow {
     }
 }
 
-impl WindowBuilder for CountWindow {
-    type Manager<A: WindowAccumulator> = CountWindowManager<A>;
+impl<T: Data> WindowBuilder<T> for CountWindow {
+    type Manager<A: WindowAccumulator<In = T>> = CountWindowManager<A>;
 
     #[inline]
-    fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A> {
+    fn build<A: WindowAccumulator<In = T>>(&self, accumulator: A) -> Self::Manager<A> {
         CountWindowManager {
             init: accumulator,
             size: self.size,

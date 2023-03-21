@@ -1,7 +1,7 @@
 use super::super::*;
 use crate::operator::merge::MergeElement;
 use crate::operator::{Data, DataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream, WindowedStream};
+use crate::stream::{KeyValue, KeyedStream};
 
 #[derive(Clone)]
 struct Join<L, R> {
@@ -70,29 +70,28 @@ impl<L: Clone, R: Clone> Iterator for ProductIterator<L, R> {
     }
 }
 
-impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
+impl<Key, Out, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    WindowDescr: WindowBuilder + 'static,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
     Key: ExchangeData + DataKey,
     Out: ExchangeData,
 {
-    pub fn join<Out2, OperatorChain2>(
+    pub fn window_join<Out2, OperatorChain2, WindowDescr>(
         self,
+        descr: WindowDescr,
         right: KeyedStream<Key, Out2, OperatorChain2>,
     ) -> KeyedStream<Key, (Out, Out2), impl Operator<KeyValue<Key, (Out, Out2)>>>
     where
         OperatorChain2: Operator<(Key, Out2)> + 'static,
         Out2: ExchangeData,
+        WindowDescr: WindowBuilder<MergeElement<Out, Out2>> + 'static,
     {
         let acc = Join::<Out, Out2> {
             left: Default::default(),
             right: Default::default(),
         };
-        let WindowedStream { inner, descr, .. } = self;
 
-        inner
-            .merge_distinct(right)
+        self.merge_distinct(right)
             .window(descr)
             .add_window_operator("WindowJoin", acc)
             .flatten()

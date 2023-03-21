@@ -10,5 +10,5 @@ pub use processing_time::ProcessingTimeWindow;
 mod session;
 pub use session::SessionWindow;
 
-// mod content_defined;
-// pub use content_defined::ContentWindowManager;
+mod transaction;
+pub use transaction::{TransactionWindow, TxCommand as TransactionCommand};

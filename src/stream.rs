@@ -102,7 +102,7 @@ where
 pub struct WindowedStream<Key: DataKey, Out: Data, OperatorChain, WinOut: Data, WinDescr>
 where
     OperatorChain: Operator<KeyValue<Key, Out>>,
-    WinDescr: WindowBuilder,
+    WinDescr: WindowBuilder<Out>,
 {
     pub(crate) inner: KeyedStream<Key, Out, OperatorChain>,
     pub(crate) descr: WinDescr,

@@ -22,7 +22,7 @@ impl<T: Data> WindowAccumulator for Count<T> {
 
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
-    WindowDescr: WindowBuilder,
+    WindowDescr: WindowBuilder<Out>,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
     Key: DataKey,
     Out: Data,

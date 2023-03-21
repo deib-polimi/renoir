@@ -17,10 +17,10 @@ mod descr;
 
 /// Convention: WindowAccumulator expects output to be called after at least one element has been processed.
 /// Violating this convention may result in panics.
-pub trait WindowBuilder {
-    type Manager<A: WindowAccumulator>: WindowManager<In = A::In, Out = A::Out> + 'static;
+pub trait WindowBuilder<T> {
+    type Manager<A: WindowAccumulator<In = T>>: WindowManager<In = T, Out = A::Out> + 'static;
 
-    fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A>;
+    fn build<A: WindowAccumulator<In = T>>(&self, accumulator: A) -> Self::Manager<A>;
 }
 
 /// Convention: output will always be called after at least one element has been processed
@@ -211,7 +211,7 @@ where
 
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
-    WindowDescr: WindowBuilder,
+    WindowDescr: WindowBuilder<Out>,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
     Key: DataKey,
     Out: Data,
@@ -272,7 +272,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0 + 2 + 4), (0, 4 + 6 + 8), (1, 1 + 3 + 5)]);
     /// ```
-    pub fn window<WinOut: Data, WinDescr: WindowBuilder>(
+    pub fn window<WinOut: Data, WinDescr: WindowBuilder<Out>>(
         self,
         descr: WinDescr,
     ) -> WindowedStream<Key, Out, impl Operator<KeyValue<Key, Out>>, WinOut, WinDescr> {
@@ -314,7 +314,7 @@ where
     /// let mut res = res.get().unwrap();
     /// assert_eq!(res, vec![0 + 1, 2 + 3]);
     /// ```
-    pub fn window_all<WinOut: Data, WinDescr: WindowBuilder>(
+    pub fn window_all<WinOut: Data, WinDescr: WindowBuilder<Out>>(
         self,
         descr: WinDescr,
     ) -> WindowedStream<(), Out, impl Operator<KeyValue<(), Out>>, WinOut, WinDescr> {

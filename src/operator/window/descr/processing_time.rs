@@ -108,11 +108,11 @@ impl ProcessingTimeWindow {
     }
 }
 
-impl WindowBuilder for ProcessingTimeWindow {
-    type Manager<A: WindowAccumulator> = ProcessingTimeWindowManager<A>;
+impl<T: Data> WindowBuilder<T> for ProcessingTimeWindow {
+    type Manager<A: WindowAccumulator<In = T>> = ProcessingTimeWindowManager<A>;
 
     #[inline]
-    fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A> {
+    fn build<A: WindowAccumulator<In = T>>(&self, accumulator: A) -> Self::Manager<A> {
         ProcessingTimeWindowManager {
             init: accumulator,
             size: self.size,

@@ -77,11 +77,11 @@ impl SessionWindow {
     }
 }
 
-impl WindowBuilder for SessionWindow {
-    type Manager<A: WindowAccumulator> = SessionWindowManager<A>;
+impl<T: Data> WindowBuilder<T> for SessionWindow {
+    type Manager<A: WindowAccumulator<In = T>> = SessionWindowManager<A>;
 
     #[inline]
-    fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A> {
+    fn build<A: WindowAccumulator<In = T>>(&self, accumulator: A) -> Self::Manager<A> {
         SessionWindowManager {
             init: accumulator,
             gap: self.gap,
