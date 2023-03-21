@@ -87,6 +87,10 @@ where
         }
         None
     }
+
+    fn recycle(&self) -> bool {
+        self.w.is_none()
+    }
 }
 
 #[derive(Clone)]

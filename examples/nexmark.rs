@@ -64,6 +64,7 @@ fn winning_bids(
 
                     *auction = Some(a);
                     bids.extend(winner);
+                    bids.shrink_to(1);
                 }
                 Event::Bid(b) => {
                     if let Some(a) = auction {

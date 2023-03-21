@@ -44,7 +44,13 @@ pub trait WindowManager: Clone + Send {
     type In: Data;
     type Out: Data;
     type Output: IntoIterator<Item = WindowResult<Self::Out>>;
+    /// Process an input element updating any interest window.
+    /// Output the results that have become ready after processing this element.
     fn process(&mut self, el: StreamElement<Self::In>) -> Self::Output;
+    /// Return true if the manager has no active windows and can be dropped
+    fn recycle(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,6 +155,7 @@ where
                 el @ (StreamElement::Item(_) | StreamElement::Timestamped(_, _)) => {
                     let (key, el) = el.take_key();
                     let key = key.unwrap();
+
                     let mgr = self
                         .manager
                         .windows
@@ -164,13 +171,16 @@ where
                 StreamElement::FlushBatch => return StreamElement::FlushBatch,
                 el => {
                     let (_, el) = el.take_key();
-                    for (key, mgr) in &mut self.manager.windows {
+
+                    self.manager.windows.retain(|key, mgr| {
                         let ret = mgr.process(el.clone());
                         self.output_buffer.extend(
                             ret.into_iter()
                                 .map(|e| StreamElement::from(e).add_key(key.clone())),
                         );
-                    }
+                        !mgr.recycle()
+                    });
+
                     // Forward system messages and watermarks
                     let msg = match el {
                         StreamElement::Watermark(w) => StreamElement::Watermark(w),
