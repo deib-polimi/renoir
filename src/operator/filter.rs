@@ -56,6 +56,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<Out> {
         loop {
             match self.prev.next() {

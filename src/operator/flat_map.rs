@@ -303,6 +303,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
         loop {
             if let Some((ref key, ref mut inner)) = self.frontiter {

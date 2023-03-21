@@ -6,6 +6,7 @@ use noir::prelude::*;
 use noir::Stream;
 use std::time::Instant;
 use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
 use nexmark::event::*;
 
@@ -13,6 +14,7 @@ const WATERMARK_INTERVAL: usize = 32 << 10;
 // const BATCH_SIZE: usize = 32 << 10;
 const SECOND_MILLIS: i64 = 1_000;
 
+#[allow(unused)]
 fn timestamp_gen((_, e): &(SystemTime, Event)) -> Timestamp {
     e.timestamp() as i64
 }
@@ -100,11 +102,11 @@ fn query3(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)>
 fn query5(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)> + 'static>) {
     let window_descr = EventTimeWindow::sliding(5 * SECOND_MILLIS, SECOND_MILLIS);
     let bid = events
-        .add_timestamps(timestamp_gen, {
+        .filter_map(filter_bid)
+        .add_timestamps(|(_, b)| b.date_time as i64, {
             let mut count = 0;
             move |_, ts| watermark_gen(ts, &mut count, WATERMARK_INTERVAL)
-        })
-        .filter_map(filter_bid);
+        });
 
     // count how bids in each auction, for every window
     let counts = bid
@@ -112,18 +114,16 @@ fn query5(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)>
         .group_by(|(_, a)| *a)
         .map(|(_, (t, _))| t)
         .window(window_descr.clone())
-        .map(|w| {
-            let l = w.len();
-            (*w.max().unwrap(), l)
+        .fold((UNIX_EPOCH, 0), |(t, count), t1| {
+            *t = t1.max(*t);
+            *count += 1;
         })
         .unkey();
     counts
         .window_all(window_descr)
-        .map(|w| {
-            eprintln!("{:?}", w.timestamp());
-            *w.max_by_key(|(_, (_t, s))| s).unwrap()
-        })
-        .map(|(_a, (t, _s))| t)
+        .max_by_key(|(_k, (_t, count))| *count)
+        .drop_key()
+        .map(|(_k, (t, _count))| t)
         .max_parallelism(1)
         .for_each(|t| TRACK_POINT.get_or_init("q5").record(t.elapsed().unwrap()))
 }

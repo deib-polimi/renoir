@@ -38,6 +38,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<Out> {
         let el = self.prev.next();
         match &el {

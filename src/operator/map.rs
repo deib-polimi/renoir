@@ -62,6 +62,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<NewOut> {
         self.prev.next().map(&self.f)
     }

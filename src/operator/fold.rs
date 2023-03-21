@@ -72,6 +72,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<NewOut> {
         while !self.received_end {
             match self.prev.next() {

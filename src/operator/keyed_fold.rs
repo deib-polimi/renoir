@@ -95,6 +95,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<KeyValue<Key, NewOut>> {
         while !self.received_end {
             match self.prev.next() {

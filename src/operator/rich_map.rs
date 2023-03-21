@@ -81,6 +81,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<(Key, NewOut)> {
         let element = self.prev.next();
         if matches!(element, StreamElement::FlushAndRestart) {

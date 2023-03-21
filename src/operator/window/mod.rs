@@ -1,86 +1,248 @@
 //! The types related to the windowed streams.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::fmt::Display;
+use std::marker::PhantomData;
 
-pub use aggregator::*;
-pub use description::*;
+pub use descr::*;
+// pub use aggregator::*;
+// pub use description::*;
 
+use crate::block::{GroupHasherBuilder, OperatorStructure};
 use crate::operator::{Data, DataKey, ExchangeData, Operator, StreamElement, Timestamp};
-use crate::stream::{KeyValue, KeyedStream, KeyedWindowedStream, Stream, WindowedStream};
+use crate::stream::{KeyValue, KeyedStream, Stream, WindowedStream};
 
-mod aggregator;
-mod description;
-mod generic_operator;
-#[cfg(feature = "timestamp")]
-mod processing_time;
-mod window_manager;
+mod aggr;
+mod descr;
 
-/// A WindowDescription describes how a window behaves.
-pub trait WindowDescription<Key: DataKey, Out: Data>: Send {
-    /// The type of the window generator of this window.
-    type Generator: WindowGenerator<Key, Out> + Clone + 'static;
+/// Convention: WindowAccumulator expects output to be called after at least one element has been processed.
+/// Violating this convention may result in panics.
+pub trait WindowBuilder {
+    type Manager<A: WindowAccumulator>: WindowManager<In = A::In, Out = A::Out> + 'static;
 
-    /// Construct a new window generator, ready to handle elements.
-    fn new_generator(&self) -> Self::Generator;
-
-    /// String representation of the description.
-    fn to_string(&self) -> String;
+    fn build<A: WindowAccumulator>(&self, accumulator: A) -> Self::Manager<A>;
 }
 
-/// A WindowGenerator handles the generation of windows for a given key.
-pub trait WindowGenerator<Key: DataKey, Out: Data>: Send {
-    /// Handle a new element of the stream.
-    fn add(&mut self, item: StreamElement<Out>);
-    /// If a window is ready, return it so that it can be processed.
-    fn next_window(&mut self) -> Option<Window<Out>>;
-    /// Close the current open window.
-    /// This method is called when a `Window` is dropped after being processed.
-    fn advance(&mut self);
+/// Convention: output will always be called after at least one element has been processed
+pub trait WindowAccumulator: Clone + Send + 'static {
+    type In: Data;
+    type Out: Data;
+
+    fn process(&mut self, el: Self::In);
+    fn output(self) -> Self::Out;
 }
 
-/// A window is a collection of elements and may be associated with a timestamp.
-pub struct Window<'a, Out: Data> {
-    /// A reference to the generator that produced this window.
-    ///
-    /// This will be used for fetching the window elements and for advancing the window when this
-    /// is dropped.
-    buffer: &'a VecDeque<Out>,
-    /// The number of elements of this window.
-    size: usize,
-    /// Iterator index
-    idx: usize,
-    /// If this window contains elements with a timestamp, a timestamp for this window is built.
-    timestamp: Option<Timestamp>,
+#[derive(Clone)]
+pub(crate) struct KeyedWindowManager<Key, In, Out, W: WindowManager> {
+    windows: HashMap<Key, W, GroupHasherBuilder>,
+    init: W,
+    _in: PhantomData<In>,
+    _out: PhantomData<Out>,
 }
 
-impl<'a, Out: Data> Window<'a, Out> {
-    pub fn timestamp(&self) -> Option<i64> {
-        self.timestamp
-    }
+pub trait WindowManager: Clone + Send {
+    type In: Data;
+    type Out: Data;
+    type Output: IntoIterator<Item = WindowResult<Self::Out>>;
+    fn process(&mut self, el: StreamElement<Self::In>) -> Self::Output;
 }
 
-impl<'a, Out: Data> Iterator for Window<'a, Out> {
-    type Item = &'a Out;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WindowResult<T> {
+    Item(T),
+    Timestamped(T, Timestamp),
+}
 
+impl<T> WindowResult<T> {
     #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.idx == self.size {
-            return None;
+    pub fn new(item: T, timestamp: Option<Timestamp>) -> Self {
+        match timestamp {
+            Some(ts) => WindowResult::Timestamped(item, ts),
+            None => WindowResult::Item(item),
         }
-
-        let item = self.buffer.get(self.idx);
-        self.idx += 1;
-        item
     }
 
     #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.size - self.idx;
-        (len, Some(len))
+    pub fn item(&self) -> &T {
+        match self {
+            WindowResult::Item(item) => item,
+            WindowResult::Timestamped(item, _) => item,
+        }
+    }
+
+    #[inline]
+    pub fn unwrap_item(self) -> T {
+        match self {
+            WindowResult::Item(item) => item,
+            WindowResult::Timestamped(item, _) => item,
+        }
     }
 }
 
-impl<'a, Out: Data> ExactSizeIterator for Window<'a, Out> {}
+impl<T> From<WindowResult<T>> for StreamElement<T> {
+    #[inline]
+    fn from(value: WindowResult<T>) -> Self {
+        match value {
+            WindowResult::Item(item) => StreamElement::Item(item),
+            WindowResult::Timestamped(item, ts) => StreamElement::Timestamped(item, ts),
+        }
+    }
+}
+
+/// This operator abstracts the window logic as an operator and delegates to the
+/// `KeyedWindowManager` and a `ProcessFunc` the job of building and processing the windows,
+/// respectively.
+#[derive(Clone)]
+pub(crate) struct WindowOperator<Key, In, Out, Prev, W>
+where
+    W: WindowManager,
+{
+    /// The previous operators in the chain.
+    prev: Prev,
+    /// The name of the actual operator that this one abstracts.
+    ///
+    /// It is used only for tracing purposes.
+    name: String,
+    /// The manager that will build the windows.
+    manager: KeyedWindowManager<Key, In, Out, W>,
+    /// A buffer for storing ready items.
+    output_buffer: VecDeque<StreamElement<KeyValue<Key, Out>>>,
+}
+
+impl<Key, In, Out, Prev, W> Display for WindowOperator<Key, In, Out, Prev, W>
+where
+    W: WindowManager,
+    Prev: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> {} -> WindowOperator[{}]<{}>",
+            self.prev,
+            std::any::type_name::<W>(),
+            self.name,
+            std::any::type_name::<Out>(),
+        )
+    }
+}
+
+impl<Key, In, Out, Prev, W> Operator<KeyValue<Key, Out>> for WindowOperator<Key, In, Out, Prev, W>
+where
+    W: WindowManager<In = In, Out = Out> + Send,
+    Prev: Operator<KeyValue<Key, In>>,
+    Key: DataKey,
+    In: Data,
+    Out: Data,
+{
+    fn setup(&mut self, metadata: &mut crate::ExecutionMetadata) {
+        self.prev.setup(metadata);
+    }
+
+    fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
+        loop {
+            if let Some(item) = self.output_buffer.pop_front() {
+                return item;
+            }
+
+            let el = self.prev.next();
+            match el {
+                el @ (StreamElement::Item(_) | StreamElement::Timestamped(_, _)) => {
+                    let (key, el) = el.take_key();
+                    let key = key.unwrap();
+                    let mgr = self
+                        .manager
+                        .windows
+                        .entry(key.clone())
+                        .or_insert_with(|| self.manager.init.clone());
+
+                    let ret = mgr.process(el);
+                    self.output_buffer.extend(
+                        ret.into_iter()
+                            .map(|e| StreamElement::from(e).add_key(key.clone())),
+                    );
+                }
+                StreamElement::FlushBatch => return StreamElement::FlushBatch,
+                el => {
+                    let (_, el) = el.take_key();
+                    for (key, mgr) in &mut self.manager.windows {
+                        let ret = mgr.process(el.clone());
+                        self.output_buffer.extend(
+                            ret.into_iter()
+                                .map(|e| StreamElement::from(e).add_key(key.clone())),
+                        );
+                    }
+                    // Forward system messages and watermarks
+                    let msg = match el {
+                        StreamElement::Watermark(w) => StreamElement::Watermark(w),
+                        StreamElement::Terminate => StreamElement::Terminate,
+                        StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
+                        _ => unreachable!(),
+                    };
+                    self.output_buffer.push_back(msg);
+                }
+            }
+        }
+    }
+
+    fn structure(&self) -> crate::block::BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<KeyValue<Key, Out>, _>(&self.name))
+    }
+}
+
+impl<Key, In, Out, Prev, W> WindowOperator<Key, In, Out, Prev, W>
+where
+    W: WindowManager,
+{
+    pub(crate) fn new(
+        prev: Prev,
+        name: String,
+        manager: KeyedWindowManager<Key, In, Out, W>,
+    ) -> Self {
+        Self {
+            prev,
+            name,
+            manager,
+            output_buffer: Default::default(),
+        }
+    }
+}
+
+impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
+where
+    WindowDescr: WindowBuilder,
+    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    Key: DataKey,
+    Out: Data,
+{
+    /// Add a new generic window operator to a `KeyedWindowedStream`,
+    /// after adding a Reorder operator.
+    /// This should be used by every custom window aggregator.
+    pub(crate) fn add_window_operator<A, NewOut>(
+        self,
+        name: &str,
+        accumulator: A,
+    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    where
+        NewOut: Data,
+        A: WindowAccumulator<In = Out, Out = NewOut>,
+    {
+        let stream = self.inner;
+        let init = self.descr.build::<A>(accumulator);
+
+        let manager: KeyedWindowManager<Key, Out, NewOut, WindowDescr::Manager<A>> =
+            KeyedWindowManager {
+                windows: HashMap::default(),
+                init,
+                _in: PhantomData,
+                _out: PhantomData,
+            };
+
+        stream // .add_operator(Reorder::new)
+            .add_operator(|prev| WindowOperator::new(prev, name.into(), manager))
+    }
+}
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
@@ -97,7 +259,7 @@ where
     /// # use noir::operator::source::IteratorSource;
     /// # use noir::operator::window::CountWindow;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream(IteratorSource::new((0..9)));
     /// let res = s
     ///     .group_by(|&n| n % 2)
     ///     .window(CountWindow::sliding(3, 2))
@@ -108,16 +270,16 @@ where
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
-    /// assert_eq!(res, vec![(0, 4), (0, 0 + 2 + 4), (1, 1 + 3)]);
+    /// assert_eq!(res, vec![(0, 0 + 2 + 4), (0, 4 + 6 + 8), (1, 1 + 3 + 5)]);
     /// ```
-    pub fn window<WinOut: Data, WinDescr: WindowDescription<Key, WinOut>>(
+    pub fn window<WinOut: Data, WinDescr: WindowBuilder>(
         self,
         descr: WinDescr,
-    ) -> KeyedWindowedStream<Key, Out, impl Operator<KeyValue<Key, Out>>, WinOut, WinDescr> {
-        KeyedWindowedStream {
+    ) -> WindowedStream<Key, Out, impl Operator<KeyValue<Key, Out>>, WinOut, WinDescr> {
+        WindowedStream {
             inner: self,
             descr,
-            _win_out: Default::default(),
+            _win_out: PhantomData,
         }
     }
 }
@@ -126,9 +288,9 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    /// Apply a window to the stream.
+    /// Send all elements to a single node and apply a window to the stream.
     ///
-    /// Returns a [`WindowedStream`], with windows created following the behavior specified
+    /// Returns a [`KeyedWindowedStream`], with key `()` with windows created following the behavior specified
     /// by the passed [`WindowDescription`].
     ///
     /// **Note**: this operator cannot be parallelized, so all the stream elements are sent to a
@@ -140,24 +302,24 @@ where
     /// # use noir::operator::source::IteratorSource;
     /// # use noir::operator::window::CountWindow;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream(IteratorSource::new((0..5usize)));
     /// let res = s
     ///     .window_all(CountWindow::tumbling(2))
-    ///     .sum()
+    ///     .sum::<usize>()
+    ///     .drop_key()
     ///     .collect_vec();
     ///
     /// env.execute();
     ///
     /// let mut res = res.get().unwrap();
-    /// assert_eq!(res, vec![0 + 1, 2 + 3, 4]);
+    /// assert_eq!(res, vec![0 + 1, 2 + 3]);
     /// ```
-    pub fn window_all<WinOut: Data, WinDescr: WindowDescription<(), WinOut>>(
+    pub fn window_all<WinOut: Data, WinDescr: WindowBuilder>(
         self,
         descr: WinDescr,
-    ) -> WindowedStream<Out, impl Operator<KeyValue<(), Out>>, WinOut, WinDescr> {
+    ) -> WindowedStream<(), Out, impl Operator<KeyValue<(), Out>>, WinOut, WinDescr> {
         // max_parallelism and key_by are used instead of group_by so that there is exactly one
         // replica, since window_all cannot be parallelized
-        let stream = self.max_parallelism(1).key_by(|_| ()).window(descr);
-        WindowedStream { inner: stream }
+        self.max_parallelism(1).key_by(|_| ()).window(descr)
     }
 }

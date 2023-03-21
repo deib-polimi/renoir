@@ -13,7 +13,7 @@ use std::time::Instant;
 use nexmark::event::*;
 
 const WATERMARK_INTERVAL: usize = 128 << 10;
-const BATCH_SIZE: usize = 16 << 10;
+const BATCH_SIZE: usize = 32 << 10;
 const SECOND_MILLIS: i64 = 1_000;
 
 fn timestamp_gen(e: &Event) -> Timestamp {
@@ -306,11 +306,11 @@ fn query5(events: Stream<Event, impl Operator<Event> + 'static>) {
         .group_by(|a| *a)
         .map(|_| ())
         .window(window_descr.clone())
-        .map(|w| w.len())
+        .count()
         .unkey();
     counts
         .window_all(window_descr)
-        .map(|w| *w.max_by_key(|(_, v)| *v).unwrap())
+        .max_by_key(|(_, v)| *v)
         .for_each(std::mem::drop)
 }
 
@@ -340,11 +340,11 @@ fn query6(events: Stream<Event, impl Operator<Event> + 'static>) {
         .group_by(|(seller, _)| *seller)
         .window(CountWindow::sliding(10, 1))
         // AVG(Q.final)
-        .map(|w| {
-            let l = w.len();
-            let sum: usize = w.map(|(_, price)| price).sum();
-            sum as f32 / l as f32
+        .fold((0, 0), |(sum, count), (_, price)| {
+            *sum += price;
+            *count += 1;
         })
+        .map(|(_, (sum, count))| sum as f32 / count as f32)
         .unkey()
         .for_each(std::mem::drop)
 }
@@ -368,10 +368,10 @@ fn query7(events: Stream<Event, impl Operator<Event> + 'static>) {
     bid.map(|b| (b.auction, b.price, b.bidder))
         .key_by(|_| ())
         .window(window_descr.clone())
-        .map(|w| *w.max_by_key(|(_, price, _)| price).unwrap())
+        .max_by_key(|(_, price, _)| *price)
         .drop_key()
         .window_all(window_descr)
-        .map(|w| *w.max_by_key(|(_, price, _)| price).unwrap())
+        .max_by_key(|(_, price, _)| *price)
         .for_each(std::mem::drop)
 }
 

@@ -61,6 +61,7 @@ where
         self.prev.setup(metadata);
     }
 
+    #[inline]
     fn next(&mut self) -> StreamElement<Out> {
         if let Some(ts) = self.pending_watermark.take() {
             return StreamElement::Watermark(ts);

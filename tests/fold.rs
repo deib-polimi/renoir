@@ -54,7 +54,7 @@ fn fold_shuffled_stream() {
         if let Some(mut res) = res.get() {
             assert_eq!(res.len(), 1);
             res[0].sort_unstable();
-            assert_eq!(res[0], (0..10u8).into_iter().collect_vec());
+            assert_eq!(res[0], (0..10u8).collect_vec());
         }
     });
 }
@@ -76,7 +76,7 @@ fn fold_assoc_shuffled_stream() {
         if let Some(mut res) = res.get() {
             assert_eq!(res.len(), 1);
             res[0].sort_unstable();
-            assert_eq!(res[0], (0..10u8).into_iter().collect_vec());
+            assert_eq!(res[0], (0..10u8).collect_vec());
         }
     });
 }
