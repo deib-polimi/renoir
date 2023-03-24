@@ -212,4 +212,15 @@ impl<Key, Out> StreamElement<KeyValue<Key, Out>> {
             StreamElement::FlushBatch => (None, StreamElement::FlushBatch),
         }
     }
+
+    pub fn key(self) -> Option<Key> {
+        match self {
+            StreamElement::Item((k, _)) => Some(k),
+            StreamElement::Timestamped((k, _), _) => Some(k),
+            StreamElement::Watermark(_) => None,
+            StreamElement::Terminate => None,
+            StreamElement::FlushAndRestart => None,
+            StreamElement::FlushBatch => None,
+        }
+    }
 }

@@ -14,8 +14,8 @@ use std::time::Instant;
 
 use nexmark::event::*;
 
-const WATERMARK_INTERVAL: usize = 128 << 10;
-const BATCH_SIZE: usize = 32 << 10;
+const WATERMARK_INTERVAL: usize = 1 << 20;
+const BATCH_SIZE: usize = 16 << 10;
 const SECOND_MILLIS: i64 = 1_000;
 
 fn timestamp_gen(e: &Event) -> Timestamp {

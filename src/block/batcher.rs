@@ -25,6 +25,23 @@ pub enum BatchMode {
     Single,
 }
 
+impl BatchMode {
+    pub fn max_size(&self) -> usize {
+        match self {
+            BatchMode::Fixed(s) => s.get(),
+            BatchMode::Adaptive(s, _) => s.get(),
+            BatchMode::Single => 1,
+        }
+    }
+
+    pub fn interval(&self) -> Option<Duration> {
+        match self {
+            BatchMode::Adaptive(_, ts) => Some(*ts),
+            _ => None,
+        }
+    }
+}
+
 /// A `Batcher` wraps a sender and sends the messages in batches to reduce the network overhead.
 ///
 /// Internally it spawns a new task to handle the timeouts and join it at the end.

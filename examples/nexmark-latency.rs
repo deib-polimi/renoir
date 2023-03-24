@@ -10,9 +10,7 @@ use std::time::UNIX_EPOCH;
 
 use nexmark::event::*;
 
-const WATERMARK_INTERVAL: usize = 32 << 10;
-// const BATCH_SIZE: usize = 32 << 10;
-const SECOND_MILLIS: i64 = 1_000;
+const WATERMARK_INTERVAL: usize = 1 << 20;
 
 #[allow(unused)]
 fn timestamp_gen((_, e): &(SystemTime, Event)) -> Timestamp {
@@ -44,10 +42,10 @@ fn query2(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)>
                 None
             }
         })
-        .shuffle()
+        // .shuffle()
         .filter(|(_, b)| b.auction % 123 == 0)
         .map(|(t, _)| t)
-        .max_parallelism(1)
+        // .max_parallelism(1)
         .for_each(|t| TRACK_POINT.get_or_init("q2").record(t.elapsed().unwrap()));
 }
 
@@ -100,7 +98,7 @@ fn query3(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)>
 ///                   GROUP BY B2.auction);
 /// ```
 fn query5(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)> + 'static>) {
-    let window_descr = EventTimeWindow::sliding(5 * SECOND_MILLIS, SECOND_MILLIS);
+    let window_descr = EventTimeWindow::sliding(1_000, 100);
     let bid = events
         .filter_map(filter_bid)
         .add_timestamps(|(_, b)| b.date_time as i64, {
@@ -121,10 +119,15 @@ fn query5(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)>
         .unkey();
     counts
         .window_all(window_descr)
-        .max_by_key(|(_k, (_t, count))| *count)
+        .fold_first(|(max, (t, max_count)), (id, (t1, count))| {
+            *t = t1.max(*t);
+            if count > *max_count {
+                *max = id;
+                *max_count = count;
+            }
+        })
         .drop_key()
         .map(|(_k, (t, _count))| t)
-        .max_parallelism(1)
         .for_each(|t| TRACK_POINT.get_or_init("q5").record(t.elapsed().unwrap()))
 }
 
@@ -216,5 +219,5 @@ fn main() {
 
     eprintln!("==================================================");
     micrometer::summary_grouped();
-    micrometer::append_csv("../results/csv/nexmark-latency.csv", "noir").unwrap();
+    micrometer::append_csv("/tmp/nexmark-latency.csv", "noir").unwrap();
 }

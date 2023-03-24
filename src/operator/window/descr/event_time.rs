@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use super::super::*;
 use crate::operator::{Data, StreamElement, Timestamp};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EventTimeWindowManager<A>
 where
     A: WindowAccumulator,
@@ -11,10 +11,31 @@ where
     init: A,
     size: Timestamp,
     slide: Timestamp,
+    last_watermark: Option<Timestamp>,
     ws: VecDeque<Slot<A>>,
 }
+impl<A: WindowAccumulator> EventTimeWindowManager<A> {
+    fn alloc_windows(&mut self, ts: Timestamp) {
+        assert!(self.last_watermark.map(|w| ts >= w).unwrap_or(true));
 
-#[derive(Clone)]
+        while self.ws.back().map(|b| b.start < ts).unwrap_or(true) {
+            let mut next_start = self.ws.back().map(|b| b.start + self.slide).unwrap_or(ts);
+            // Skip empty windows
+            if let Some(w) = self.last_watermark {
+                next_start += (w - next_start).max(0) / self.slide * self.slide
+            }
+
+            log::trace!("New window {}..{}", next_start, next_start + self.size);
+            self.ws.push_back(Slot::new(
+                self.init.clone(),
+                next_start,
+                next_start + self.size,
+            ));
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 struct Slot<A> {
     acc: A,
     start: Timestamp,
@@ -47,14 +68,7 @@ where
     fn process(&mut self, el: StreamElement<A::In>) -> Self::Output {
         match el {
             StreamElement::Timestamped(item, ts) => {
-                while self.ws.back().map(|b| b.start < ts).unwrap_or(true) {
-                    let next_start = self.ws.back().map(|b| b.start + self.slide).unwrap_or(ts);
-                    self.ws.push_back(Slot::new(
-                        self.init.clone(),
-                        next_start,
-                        next_start + self.size,
-                    ));
-                }
+                self.alloc_windows(ts);
                 self.ws
                     .iter_mut()
                     .skip_while(|w| w.end <= ts)
@@ -67,6 +81,7 @@ where
                 Vec::new()
             }
             StreamElement::Watermark(ts) => {
+                self.last_watermark = Some(ts);
                 let split = self.ws.partition_point(|w| w.end < ts);
                 self.ws
                     .drain(..split)
@@ -85,6 +100,10 @@ where
             }
             _ => Vec::new(),
         }
+    }
+
+    fn recycle(&self) -> bool {
+        self.ws.is_empty()
     }
 }
 
@@ -118,6 +137,7 @@ impl<T: Data> WindowBuilder<T> for EventTimeWindow {
             init: accumulator,
             size: self.size,
             slide: self.slide,
+            last_watermark: Default::default(),
             ws: Default::default(),
         }
     }
@@ -159,6 +179,30 @@ mod tests {
 
         let expected: Vec<Vec<_>> =
             vec![(1..50).collect(), (40..90).collect(), (80..100).collect()];
+        assert_eq!(received, expected)
+    }
+
+    #[test]
+    fn event_time_window_spars() {
+        let window = EventTimeWindow::sliding(5, 4);
+
+        let fold = Fold::new(Vec::new(), |v, el| v.push(el));
+        let mut manager = window.build(fold);
+
+        let mut received = Vec::new();
+        for i in 1..40 {
+            if i % 15 <= 1 {
+                save_result!(manager.process(StreamElement::Timestamped(i, i)), received);
+            }
+            if i % 3 == 0 {
+                save_result!(manager.process(StreamElement::Watermark(i)), received);
+            }
+        }
+        save_result!(manager.process(StreamElement::FlushAndRestart), received);
+
+        received.sort();
+
+        let expected: Vec<Vec<_>> = vec![vec![1], vec![15, 16], vec![30, 31]];
         assert_eq!(received, expected)
     }
 }

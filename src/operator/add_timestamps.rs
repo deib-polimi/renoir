@@ -89,6 +89,62 @@ where
     }
 }
 
+#[derive(Clone)]
+pub struct DropTimestamp<Out: Data, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    prev: OperatorChain,
+    _out: PhantomData<Out>,
+}
+
+impl<Out: Data, OperatorChain> Display for DropTimestamp<Out, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> DropTimestamp", self.prev)
+    }
+}
+
+impl<Out: Data, OperatorChain> DropTimestamp<Out, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn new(prev: OperatorChain) -> Self {
+        Self {
+            prev,
+            _out: Default::default(),
+        }
+    }
+}
+
+impl<Out: Data, OperatorChain> Operator<Out> for DropTimestamp<Out, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+        self.prev.setup(metadata);
+    }
+
+    #[inline]
+    fn next(&mut self) -> StreamElement<Out> {
+        loop {
+            match self.prev.next() {
+                StreamElement::Watermark(_) => continue,
+                StreamElement::Timestamped(item, _) => return StreamElement::Item(item),
+                el => return el,
+            }
+        }
+    }
+
+    fn structure(&self) -> BlockStructure {
+        self.prev
+            .structure()
+            .add_operator(OperatorStructure::new::<Out, _>("DropTimestamp"))
+    }
+}
+
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
@@ -131,6 +187,10 @@ where
         WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
     {
         self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
+    }
+
+    pub fn drop_timestamps(self) -> Stream<Out, impl Operator<Out>> {
+        self.add_operator(|prev| DropTimestamp::new(prev))
     }
 }
 
@@ -181,6 +241,10 @@ where
             FnMut(&KeyValue<Key, Out>, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
     {
         self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
+    }
+
+    pub fn drop_timestamps(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
+        self.add_operator(|prev| DropTimestamp::new(prev))
     }
 }
 
