@@ -2,6 +2,8 @@
 
 ### Network of Operators In Rust
 
+[API Docs](https://deib-polimi.github.io/noir/noir/)
+
 Noir is a distributed data processing platform based on the dataflow paradigm that provides an ergonomic programming interface, similar to that of Apache Flink, but has much better performance characteristics.
 
 
