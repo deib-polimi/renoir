@@ -10,19 +10,16 @@ jobs:
     name: Docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - name: cargo doc
-        uses: actions-rs/cargo@v1
-        with:
-          command: doc
-          args: --color=always --no-deps --all
-      - name: Publish
-        uses: JamesIves/github-pages-deploy-action@4.4.1
+      - uses: actions/checkout@v3
+      - name: Cargo Doc
+        run: cargo doc --verbose --color=always --no-deps --all
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
         with:
           branch: gh-pages
-          folder: target/doc
+          path: target/doc
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1

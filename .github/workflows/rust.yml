@@ -7,67 +7,51 @@ on:
       - 'staging'
   pull_request:
 
-
 env:
   RUST_BACKTRACE: full
   RUST_LOG: debug
 
 jobs:
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy
-          override: true
-      - name: Cargo clippy
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-targets --all -- -D warnings
-
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
         with:
-          toolchain: stable
-          override: true
-      - uses: actions/cache@v2
-        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Run cargo test
+      - name: Cargo Test
         timeout-minutes: 20
         run: |
           cargo test --all --no-fail-fast
 
-  rustfmt:
-    name: Format
+  lint:
+    name: Format and Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - name: Install Rust
-        id: component
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
         with:
-          toolchain: stable
-          components: rustfmt
-          override: true
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+      - name: Cargo Check
+        run: |
+          cargo check --all-targets
+      - name: Cargo Format
+        run: |
+          cargo fmt --all --check
+      - name: Cargo clippy
+        run: |
+          cargo clippy --all-targets --all -- -D warnings
+      
