@@ -1,11 +1,13 @@
-name: Website
+name: Docs
 
 on:
-  - workflow_dispatch
+  push:
+    branches:
+      - 'master'
 
 jobs:
-  website:
-    name: Website
+  docs:
+    name: Docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -19,14 +21,8 @@ jobs:
         with:
           command: doc
           args: --color=always --no-deps --all
-      - name: website pages
-        run: |
-          mkdir -p ./target/website
-          cp -r target/doc ./target/website
-          cp -r tools/visualizer ./target/website
-          cp tools/index.html ./target/website
       - name: Publish
-        uses: JamesIves/github-pages-deploy-action@4.1.1
+        uses: JamesIves/github-pages-deploy-action@4.4.1
         with:
           branch: gh-pages
-          folder: target/website
+          folder: target/doc

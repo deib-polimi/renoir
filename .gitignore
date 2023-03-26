@@ -1,7 +1,7 @@
 target
 .idea/
-*.yml
-*.yaml
-tracing/
-bench_conf.toml
-log.txt
+/*.yml
+/*.yaml
+/tracing/
+/bench_conf.toml
+/log.txt
