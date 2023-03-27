@@ -83,10 +83,10 @@ impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    /// Close the stream and store all the resulting items into a collection on a single host.
     ///
-    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
-    /// replicas sends the items to.
+    /// If the stream is distributed among multiple replicas, parallelism will
+    /// be set to 1 to gather all results
     ///
     /// **Note**: the order of items and keys is unspecified.
     ///
@@ -122,12 +122,11 @@ impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Ou
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
-    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    /// Close the stream and store all the resulting items into a collection on a single host.
     ///
-    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
-    /// replicas sends the items to.
+    /// If the stream is distributed among multiple replicas, parallelism will
+    /// be set to 1 to gather all results
     ///
-    /// **Note**: the collected items are the pairs `(key, value)`.
     ///
     /// **Note**: the order of items and keys is unspecified.
     ///

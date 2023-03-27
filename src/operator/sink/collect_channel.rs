@@ -11,7 +11,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 #[cfg(not(feature = "crossbeam"))]
 use flume::{unbounded, Receiver, Sender};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CollectChannelSink<Out: ExchangeData, PreviousOperators>
 where
     PreviousOperators: Operator<Out>,
@@ -66,23 +66,14 @@ impl<Out: ExchangeData, PreviousOperators> Sink for CollectChannelSink<Out, Prev
 {
 }
 
-impl<Out: ExchangeData, PreviousOperators> Clone for CollectChannelSink<Out, PreviousOperators>
-where
-    PreviousOperators: Operator<Out>,
-{
-    fn clone(&self) -> Self {
-        panic!("CollectChannelSink cannot be cloned, max_parallelism should be 1");
-    }
-}
-
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
     OperatorChain: Operator<Out> + 'static,
 {
-    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    /// Close the stream and send resulting items to a channel on a single host.
     ///
-    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
-    /// replicas sends the items to.
+    /// If the stream is distributed among multiple replicas, parallelism will
+    /// be set to 1 to gather all results
     ///
     /// **Note**: the order of items and keys is unspecified.
     ///
@@ -111,18 +102,46 @@ where
             .finalize_block();
         rx
     }
+    /// Close the stream and send resulting items to a channel on each single host.
+    ///
+    /// Each host sends its outputs to the channel without repartitioning.
+    /// Elements will be sent to the channel on the same host that produced
+    /// the output.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let rx = s.collect_channel();
+    ///
+    /// env.execute();
+    /// let mut v = Vec::new();
+    /// while let Ok(x) = rx.recv() {
+    ///     v.push(x)
+    /// }
+    /// assert_eq!(v, (0..10u32).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_channel_parallel(self) -> Receiver<Out> {
+        let (tx, rx) = unbounded();
+        self.add_operator(|prev| CollectChannelSink { prev, tx: Some(tx) })
+            .finalize_block();
+        rx
+    }
 }
 
 impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
 {
-    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    /// Close the stream and send resulting items to a channel on a single host.
     ///
-    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
-    /// replicas sends the items to.
-    ///
-    /// **Note**: the collected items are the pairs `(key, value)`.
+    /// If the stream is distributed among multiple replicas, parallelism will
+    /// be set to 1 to gather all results
     ///
     /// **Note**: the order of items and keys is unspecified.
     ///
@@ -134,7 +153,7 @@ where
     /// # use noir::{StreamEnvironment, EnvironmentConfig};
     /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let s = env.stream(IteratorSource::new((0..10u32)));
     /// let rx = s.collect_channel();
     ///
     /// env.execute();
@@ -142,11 +161,37 @@ where
     /// while let Ok(x) = rx.recv() {
     ///     v.push(x)
     /// }
-    /// v.sort_unstable(); // the output order is nondeterministic
-    /// assert_eq!(v, vec![(0, 0), (0, 2), (1, 1)]);
+    /// assert_eq!(v, (0..10u32).collect::<Vec<_>>());
     /// ```
     pub fn collect_channel(self) -> Receiver<(Key, Out)> {
         self.unkey().collect_channel()
+    }
+    /// Close the stream and send resulting items to a channel on each single host.
+    ///
+    /// Each host sends its outputs to the channel without repartitioning.
+    /// Elements will be sent to the channel on the same host that produced
+    /// the output.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let rx = s.collect_channel();
+    ///
+    /// env.execute();
+    /// let mut v = Vec::new();
+    /// while let Ok(x) = rx.recv() {
+    ///     v.push(x)
+    /// }
+    /// assert_eq!(v, (0..10u32).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_channel_parallel(self) -> Receiver<(Key, Out)> {
+        self.unkey().collect_channel_parallel()
     }
 }
 
