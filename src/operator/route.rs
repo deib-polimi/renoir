@@ -10,8 +10,8 @@ use crate::operator::{KeyerFn, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
 use super::end::BlockSenders;
-use super::SingleStartBlockReceiver;
-use crate::operator::start::StartBlock;
+use super::SimpleStartReceiver;
+use crate::operator::start::Start;
 
 #[derive(Clone)]
 pub(crate) struct FilterFn<Out>(fn(&Out) -> bool);
@@ -45,21 +45,19 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Ou
         self.build_inner()
     }
 
-    pub(crate) fn build_inner(
-        self,
-    ) -> Vec<Stream<Out, StartBlock<Out, SingleStartBlockReceiver<Out>>>> {
+    pub(crate) fn build_inner(self) -> Vec<Stream<Out, Start<Out, SimpleStartReceiver<Out>>>> {
         // This is needed to maintain the same parallelism of the split block
         let env_lock = self.stream.env.clone();
         let mut env = env_lock.lock();
         let scheduler_requirements = self.stream.block.scheduler_requirements.clone();
         let batch_mode = self.stream.block.batch_mode;
         let block_id = self.stream.block.id;
-        let iteration_context = self.stream.block.iteration_state_lock_stack.clone();
+        let iteration_context = self.stream.block.iteration_ctx.clone();
 
         let mut new_blocks = (0..self.routes.len())
             .map(|_| {
                 env.new_block(
-                    StartBlock::single(block_id, iteration_context.last().cloned()),
+                    Start::single(block_id, iteration_context.last().cloned()),
                     batch_mode,
                     iteration_context.clone(),
                 )
@@ -68,7 +66,7 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Ou
 
         let routes = new_blocks.iter().map(|b| b.id).zip(self.routes).collect();
         let stream = self.stream.add_operator(move |prev| {
-            RoutingEndBlock::new(prev, routes, NextStrategy::only_one(), batch_mode)
+            RoutingEnd::new(prev, routes, NextStrategy::only_one(), batch_mode)
         });
 
         env.close_block(stream.block);
@@ -91,7 +89,7 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Ou
 
 #[derive(Derivative)]
 #[derivative(Clone, Debug)]
-pub struct RoutingEndBlock<Out: ExchangeData, OperatorChain, IndexFn>
+pub struct RoutingEnd<Out: ExchangeData, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
     OperatorChain: Operator<Out>,
@@ -107,8 +105,7 @@ where
     routes: Vec<(BlockId, FilterFn<Out>)>,
 }
 
-impl<Out: ExchangeData, OperatorChain, IndexFn> Display
-    for RoutingEndBlock<Out, OperatorChain, IndexFn>
+impl<Out: ExchangeData, OperatorChain, IndexFn> Display for RoutingEnd<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
     OperatorChain: Operator<Out>,
@@ -122,7 +119,7 @@ where
     }
 }
 
-impl<Out: ExchangeData, OperatorChain, IndexFn> RoutingEndBlock<Out, OperatorChain, IndexFn>
+impl<Out: ExchangeData, OperatorChain, IndexFn> RoutingEnd<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
     OperatorChain: Operator<Out>,
@@ -158,7 +155,7 @@ where
         for (block_id, filter) in self.routes.drain(..) {
             let indexes = block_map
                 .remove(&block_id)
-                .expect("scheduler connection missing for RoutingEndBlock");
+                .expect("scheduler connection missing for RoutingEnd");
             let block_senders = BlockSenders { indexes };
             self.endpoints.push(Endpoint {
                 block_id,
@@ -190,7 +187,7 @@ impl<Out: Debug> Debug for Endpoint<Out> {
 }
 
 impl<Out: ExchangeData, OperatorChain, IndexFn> Operator<()>
-    for RoutingEndBlock<Out, OperatorChain, IndexFn>
+    for RoutingEnd<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
     OperatorChain: Operator<Out>,
@@ -213,7 +210,7 @@ where
     fn next(&mut self) -> StreamElement<()> {
         assert!(
             self.routes.is_empty(),
-            "RoutingEndBlock still has routes to be setup!"
+            "RoutingEnd still has routes to be setup!"
         );
         let message = self.prev.next();
         let to_return = message.take();
@@ -259,7 +256,7 @@ where
             }
             StreamElement::Terminate => {
                 log::debug!(
-                    "RoutingEndBlock at {} received Terminate, closing {} channels",
+                    "RoutingEnd at {} received Terminate, closing {} channels",
                     self.coord.unwrap(),
                     self.senders.len()
                 );
@@ -274,7 +271,7 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("RoutingEndBlock");
+        let mut operator = OperatorStructure::new::<Out, _>("RoutingEnd");
         for e in &self.endpoints {
             if !e.block_senders.indexes.is_empty() {
                 let block_id = self.senders[e.block_senders.indexes[0]].0.coord.block_id;

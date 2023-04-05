@@ -1,6 +1,6 @@
 use super::super::*;
 use crate::operator::{Data, DataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream, WindowedStream};
+use crate::stream::{KeyedStream, WindowedStream};
 
 #[derive(Clone)]
 pub(crate) struct Count<T>(usize, PhantomData<T>);
@@ -23,11 +23,11 @@ impl<T: Data> WindowAccumulator for Count<T> {
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowBuilder<Out>,
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
     Key: DataKey,
     Out: Data,
 {
-    pub fn count(self) -> KeyedStream<Key, usize, impl Operator<KeyValue<Key, usize>>> {
+    pub fn count(self) -> KeyedStream<Key, usize, impl Operator<(Key, usize)>> {
         let acc = Count(0, PhantomData);
         self.add_window_operator("WindowCount", acc)
     }

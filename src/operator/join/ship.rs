@@ -6,7 +6,7 @@ use crate::block::NextStrategy;
 use crate::operator::join::local_hash::JoinStreamLocalHash;
 use crate::operator::join::local_sort_merge::JoinStreamLocalSortMerge;
 use crate::operator::join::JoinStream;
-use crate::operator::start::{MultipleStartBlockReceiverOperator, StartBlock, TwoSidesItem};
+use crate::operator::start::{BinaryElement, BinaryStartOperator, Start};
 use crate::operator::{Data, DataKey, ExchangeData, KeyerFn, Operator};
 use crate::stream::Stream;
 
@@ -32,7 +32,7 @@ where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
-    inner: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+    inner: Stream<BinaryElement<Out1, Out2>, BinaryStartOperator<Out1, Out2>>,
     keyer1: Keyer1,
     keyer2: Keyer2,
     _key: PhantomData<Key>,
@@ -52,7 +52,7 @@ pub struct JoinStreamShipBroadcastRight<
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
-    inner: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+    inner: Stream<BinaryElement<Out1, Out2>, BinaryStartOperator<Out1, Out2>>,
     keyer1: Keyer1,
     keyer2: Keyer2,
     _key: PhantomData<Key>,
@@ -75,12 +75,9 @@ where
         let keyer2 = prev.keyer2;
         let next_strategy1 = NextStrategy::group_by(keyer1.clone());
         let next_strategy2 = NextStrategy::group_by(keyer2.clone());
-        let inner = prev.lhs.add_y_connection(
-            prev.rhs,
-            StartBlock::multiple,
-            next_strategy1,
-            next_strategy2,
-        );
+        let inner =
+            prev.lhs
+                .add_y_connection(prev.rhs, Start::multiple, next_strategy1, next_strategy2);
         JoinStreamShipHash {
             inner,
             keyer1,
@@ -126,7 +123,7 @@ where
         let keyer2 = prev.keyer2;
         let inner = prev.lhs.add_y_connection(
             prev.rhs,
-            StartBlock::multiple,
+            Start::multiple,
             NextStrategy::only_one(),
             NextStrategy::all(),
         );

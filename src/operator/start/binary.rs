@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::channel::{RecvTimeoutError, SelectResult};
 use crate::network::{Coord, NetworkMessage};
-use crate::operator::start::{SingleStartBlockReceiver, StartBlockReceiver};
+use crate::operator::start::{SimpleStartReceiver, StartReceiver};
 use crate::operator::{Data, ExchangeData, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
@@ -15,7 +15,7 @@ use crate::scheduler::{BlockId, ExecutionMetadata};
 /// Since those two parts are merged the information about which one ends is lost, therefore there
 /// are two extra variants to keep track of that.
 #[derive(Clone, Debug, Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq)]
-pub(crate) enum TwoSidesItem<OutL: Data, OutR: Data> {
+pub(crate) enum BinaryElement<OutL: Data, OutR: Data> {
     /// An element of the stream on the left.
     Left(OutL),
     /// An element of the stream on the right.
@@ -30,7 +30,7 @@ pub(crate) enum TwoSidesItem<OutL: Data, OutR: Data> {
 #[derive(Clone, Debug)]
 struct SideReceiver<Out: ExchangeData, Item: ExchangeData> {
     /// The internal receiver for this side.
-    receiver: SingleStartBlockReceiver<Out>,
+    receiver: SimpleStartReceiver<Out>,
     /// The number of replicas this side has.
     instances: usize,
     /// How many replicas from this side has not yet sent `StreamElement::FlushAndRestart`.
@@ -50,7 +50,7 @@ struct SideReceiver<Out: ExchangeData, Item: ExchangeData> {
 impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
     fn new(previous_block_id: BlockId, cached: bool) -> Self {
         Self {
-            receiver: SingleStartBlockReceiver::new(previous_block_id),
+            receiver: SimpleStartReceiver::new(previous_block_id),
             instances: 0,
             missing_flush_and_restart: 0,
             missing_terminate: 0,
@@ -120,13 +120,13 @@ impl<Out: ExchangeData, Item: ExchangeData> SideReceiver<Out, Item> {
 /// To do so it will first select on the two channels, and wrap each element into an enumeration
 /// that discriminates the two sides.
 #[derive(Clone, Debug)]
-pub(crate) struct MultipleStartBlockReceiver<OutL: ExchangeData, OutR: ExchangeData> {
-    left: SideReceiver<OutL, TwoSidesItem<OutL, OutR>>,
-    right: SideReceiver<OutR, TwoSidesItem<OutL, OutR>>,
+pub(crate) struct BinaryStartReceiver<OutL: ExchangeData, OutR: ExchangeData> {
+    left: SideReceiver<OutL, BinaryElement<OutL, OutR>>,
+    right: SideReceiver<OutR, BinaryElement<OutL, OutR>>,
     first_message: bool,
 }
 
-impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, OutR> {
+impl<OutL: ExchangeData, OutR: ExchangeData> BinaryStartReceiver<OutL, OutR> {
     pub(super) fn new(
         left_block_id: BlockId,
         right_block_id: BlockId,
@@ -151,11 +151,11 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
     /// `StreamElement::FlushAndRestart` messages and eventually emit the `LeftEnd`/`RightEnd`
     /// accordingly.
     fn process_side<Out: ExchangeData>(
-        side: &mut SideReceiver<Out, TwoSidesItem<OutL, OutR>>,
+        side: &mut SideReceiver<Out, BinaryElement<OutL, OutR>>,
         message: NetworkMessage<Out>,
-        wrap: fn(Out) -> TwoSidesItem<OutL, OutR>,
-        end: TwoSidesItem<OutL, OutR>,
-    ) -> NetworkMessage<TwoSidesItem<OutL, OutR>> {
+        wrap: fn(Out) -> BinaryElement<OutL, OutR>,
+        end: BinaryElement<OutL, OutR>,
+    ) -> NetworkMessage<BinaryElement<OutL, OutR>> {
         let sender = message.sender();
         let data = message
             .into_iter()
@@ -194,7 +194,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
     fn select(
         &mut self,
         timeout: Option<Duration>,
-    ) -> Result<NetworkMessage<TwoSidesItem<OutL, OutR>>, RecvTimeoutError> {
+    ) -> Result<NetworkMessage<BinaryElement<OutL, OutR>>, RecvTimeoutError> {
         // both sides received all the `StreamElement::Terminate`, but the cached ones have never
         // been emitted
         if self.left.is_terminated() && self.right.is_terminated() {
@@ -296,22 +296,22 @@ impl<OutL: ExchangeData, OutR: ExchangeData> MultipleStartBlockReceiver<OutL, Ou
             Side::Left(Ok(left)) => Ok(Self::process_side(
                 &mut self.left,
                 left,
-                TwoSidesItem::Left,
-                TwoSidesItem::LeftEnd,
+                BinaryElement::Left,
+                BinaryElement::LeftEnd,
             )),
             Side::Right(Ok(right)) => Ok(Self::process_side(
                 &mut self.right,
                 right,
-                TwoSidesItem::Right,
-                TwoSidesItem::RightEnd,
+                BinaryElement::Right,
+                BinaryElement::RightEnd,
             )),
             Side::Left(Err(e)) | Side::Right(Err(e)) => Err(e),
         }
     }
 }
 
-impl<OutL: ExchangeData, OutR: ExchangeData> StartBlockReceiver<TwoSidesItem<OutL, OutR>>
-    for MultipleStartBlockReceiver<OutL, OutR>
+impl<OutL: ExchangeData, OutR: ExchangeData> StartReceiver<BinaryElement<OutL, OutR>>
+    for BinaryStartReceiver<OutL, OutR>
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.left.setup(metadata);
@@ -338,16 +338,16 @@ impl<OutL: ExchangeData, OutR: ExchangeData> StartBlockReceiver<TwoSidesItem<Out
     fn recv_timeout(
         &mut self,
         timeout: Duration,
-    ) -> Result<NetworkMessage<TwoSidesItem<OutL, OutR>>, RecvTimeoutError> {
+    ) -> Result<NetworkMessage<BinaryElement<OutL, OutR>>, RecvTimeoutError> {
         self.select(Some(timeout))
     }
 
-    fn recv(&mut self) -> NetworkMessage<TwoSidesItem<OutL, OutR>> {
+    fn recv(&mut self) -> NetworkMessage<BinaryElement<OutL, OutR>> {
         self.select(None).expect("receiver failed")
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<TwoSidesItem<OutL, OutR>, _>("StartBlock");
+        let mut operator = OperatorStructure::new::<BinaryElement<OutL, OutR>, _>("Start");
         operator.receivers.push(OperatorReceiver::new::<OutL>(
             self.left.receiver.previous_block_id,
         ));

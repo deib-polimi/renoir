@@ -1,6 +1,6 @@
 use crate::block::BatchMode;
 use crate::operator::{Data, DataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -30,7 +30,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Change the batch mode for this stream.
     ///

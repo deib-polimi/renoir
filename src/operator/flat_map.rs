@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -198,7 +198,7 @@ where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<KeyValue<Key, In>>,
+    PreviousOperators: Operator<(Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -224,7 +224,7 @@ where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<KeyValue<Key, In>>,
+    PreviousOperators: Operator<(Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -248,7 +248,7 @@ where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<KeyValue<Key, In>>,
+    PreviousOperators: Operator<(Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -270,7 +270,7 @@ where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<KeyValue<Key, In>>,
+    PreviousOperators: Operator<(Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -288,13 +288,13 @@ where
     }
 }
 
-impl<Key, In, Out, Iter, F, PreviousOperators> Operator<KeyValue<Key, Out>>
+impl<Key, In, Out, Iter, F, PreviousOperators> Operator<(Key, Out)>
     for KeyedFlatMap<Key, In, Out, Iter, F, PreviousOperators>
 where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<KeyValue<Key, In>>,
+    PreviousOperators: Operator<(Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -304,7 +304,7 @@ where
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
+    fn next(&mut self) -> StreamElement<(Key, Out)> {
         loop {
             if let Some((ref key, ref mut inner)) = self.frontiter {
                 match inner.next() {
@@ -352,7 +352,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Apply a mapping operation to each element of the stream, the resulting stream will be the
     /// flatMaped values of the result of the mapping.
@@ -377,11 +377,11 @@ where
     pub fn flat_map<NewOut: Data, MapOut: 'static, F>(
         self,
         f: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
     where
         MapOut: IntoIterator<Item = NewOut>,
         <MapOut as IntoIterator>::IntoIter: Send + 'static,
-        F: Fn(KeyValue<&Key, Out>) -> MapOut + Send + Clone + 'static,
+        F: Fn((&Key, Out)) -> MapOut + Send + Clone + 'static,
     {
         self.add_operator(|prev| KeyedFlatMap::new(prev, f))
     }

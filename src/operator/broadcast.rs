@@ -1,5 +1,5 @@
 use crate::block::NextStrategy;
-use crate::operator::end::EndBlock;
+use crate::operator::end::End;
 use crate::operator::{ExchangeData, Operator};
 use crate::stream::Stream;
 
@@ -24,6 +24,6 @@ where
     /// s.broadcast();
     /// ```
     pub fn broadcast(self) -> Stream<Out, impl Operator<Out>> {
-        self.add_block(EndBlock::new, NextStrategy::all())
+        self.split_block(End::new, NextStrategy::all())
     }
 }

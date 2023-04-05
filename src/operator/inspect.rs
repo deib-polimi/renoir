@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
@@ -87,7 +87,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Apply the given function to all the elements of the stream, consuming the stream.
     ///
@@ -102,7 +102,7 @@ where
     ///
     /// env.execute();
     /// ```
-    pub fn inspect<F>(self, f: F) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    pub fn inspect<F>(self, f: F) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
         F: FnMut(&(Key, Out)) + Send + Clone + 'static,
     {

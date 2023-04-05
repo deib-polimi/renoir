@@ -4,19 +4,19 @@ use std::time::Duration;
 use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::channel::RecvTimeoutError;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, ReceiverEndpoint};
-use crate::operator::start::StartBlockReceiver;
+use crate::operator::start::StartReceiver;
 use crate::operator::ExchangeData;
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
 /// This will receive the data from a single previous block.
 #[derive(Debug)]
-pub(crate) struct SingleStartBlockReceiver<Out: ExchangeData> {
+pub(crate) struct SimpleStartReceiver<Out: ExchangeData> {
     pub(super) receiver: Option<NetworkReceiver<Out>>,
     previous_replicas: Vec<Coord>,
     pub(super) previous_block_id: BlockId,
 }
 
-impl<Out: ExchangeData> SingleStartBlockReceiver<Out> {
+impl<Out: ExchangeData> SimpleStartReceiver<Out> {
     pub(super) fn new(previous_block_id: BlockId) -> Self {
         Self {
             receiver: None,
@@ -26,7 +26,7 @@ impl<Out: ExchangeData> SingleStartBlockReceiver<Out> {
     }
 }
 
-impl<Out: ExchangeData> StartBlockReceiver<Out> for SingleStartBlockReceiver<Out> {
+impl<Out: ExchangeData> StartReceiver<Out> for SimpleStartReceiver<Out> {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let in_type = TypeId::of::<Out>();
 
@@ -34,7 +34,7 @@ impl<Out: ExchangeData> StartBlockReceiver<Out> for SingleStartBlockReceiver<Out
         self.receiver = Some(metadata.network.get_receiver(endpoint));
 
         for &(prev, typ) in metadata.prev.iter() {
-            // ignore this connection because it refers to a different type, another StartBlock
+            // ignore this connection because it refers to a different type, another Start
             // in this block will handle it
             if in_type != typ {
                 continue;
@@ -64,7 +64,7 @@ impl<Out: ExchangeData> StartBlockReceiver<Out> for SingleStartBlockReceiver<Out
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("StartBlock");
+        let mut operator = OperatorStructure::new::<Out, _>("Start");
         operator
             .receivers
             .push(OperatorReceiver::new::<Out>(self.previous_block_id));
@@ -72,7 +72,7 @@ impl<Out: ExchangeData> StartBlockReceiver<Out> for SingleStartBlockReceiver<Out
     }
 }
 
-impl<Out: ExchangeData> Clone for SingleStartBlockReceiver<Out> {
+impl<Out: ExchangeData> Clone for SimpleStartReceiver<Out> {
     fn clone(&self) -> Self {
         Self {
             receiver: None,

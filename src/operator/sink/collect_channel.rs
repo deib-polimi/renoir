@@ -4,7 +4,7 @@ use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::Sink;
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[cfg(feature = "crossbeam")]
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -136,7 +136,7 @@ where
 
 impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Close the stream and send resulting items to a channel on a single host.
     ///

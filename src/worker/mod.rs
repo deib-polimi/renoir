@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::thread::JoinHandle;
 
-use crate::block::{BlockStructure, InnerBlock};
+use crate::block::{Block, BlockStructure};
 use crate::network::Coord;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -55,7 +55,7 @@ impl<F: FnOnce()> Drop for CatchPanic<F> {
 }
 
 pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out> + 'static>(
-    mut block: InnerBlock<Out, OperatorChain>,
+    mut block: Block<Out, OperatorChain>,
     metadata: &mut ExecutionMetadata,
 ) -> (JoinHandle<()>, BlockStructure) {
     let coord = metadata.coord;
@@ -77,7 +77,7 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out> + 'static>(
     (join_handle, structure)
 }
 
-fn do_work<Out: Data, Op: Operator<Out> + 'static>(mut block: InnerBlock<Out, Op>, coord: Coord) {
+fn do_work<Out: Data, Op: Operator<Out> + 'static>(mut block: Block<Out, Op>, coord: Coord) {
     let mut catch_panic = CatchPanic::new(|| {
         error!("Worker {} has crashed!", coord);
     });

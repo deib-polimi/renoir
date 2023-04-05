@@ -62,7 +62,7 @@ pub use config::EnvironmentConfig;
 pub use environment::StreamEnvironment;
 pub use operator::iteration::IterationStateHandle;
 pub use scheduler::ExecutionMetadata;
-pub use stream::{KeyValue, KeyedStream, Stream, WindowedStream};
+pub use stream::{KeyedStream, Stream, WindowedStream};
 
 use crate::block::BlockStructure;
 use crate::network::Coord;
@@ -88,9 +88,9 @@ pub type CoordUInt = u64;
 pub mod prelude {
     pub use super::operator::sink::StreamOutput;
     pub use super::operator::source::*;
-    pub use super::operator::window::CountWindow;
+    pub use super::operator::window::{CountWindow, ProcessingTimeWindow, SessionWindow};
     #[cfg(feature = "timestamp")]
-    pub use super::operator::window::{EventTimeWindow, ProcessingTimeWindow, SessionWindow};
+    pub use super::operator::window::{EventTimeWindow, TransactionWindow};
     pub use super::{BatchMode, EnvironmentConfig, StreamEnvironment};
 }
 

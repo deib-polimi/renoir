@@ -5,7 +5,7 @@ use std::fmt::Display;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use crate::{KeyValue, KeyedStream, Stream};
+use crate::{KeyedStream, Stream};
 
 use super::DataKey;
 
@@ -137,12 +137,12 @@ where
 impl<Key: DataKey, Out, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
     Key: DataKey,
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
     Out: Data + Clone,
 {
     /// # TODO
     /// Reorder timestamped items
-    pub fn reorder(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
+    pub fn reorder(self) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>> {
         self.add_operator(|prev| Reorder::new(prev))
     }
 }

@@ -15,7 +15,6 @@ pub use rich_map_custom::ElementGenerator;
 
 use crate::block::BlockStructure;
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::KeyValue;
 
 #[cfg(feature = "timestamp")]
 pub(crate) mod add_timestamps;
@@ -187,7 +186,7 @@ impl<Out> StreamElement<Out> {
         }
     }
 
-    pub fn add_key<Key>(self, k: Key) -> StreamElement<KeyValue<Key, Out>> {
+    pub fn add_key<Key>(self, k: Key) -> StreamElement<(Key, Out)> {
         match self {
             StreamElement::Item(v) => StreamElement::Item((k, v)),
             StreamElement::Timestamped(v, ts) => StreamElement::Timestamped((k, v), ts),
@@ -199,7 +198,7 @@ impl<Out> StreamElement<Out> {
     }
 }
 
-impl<Key, Out> StreamElement<KeyValue<Key, Out>> {
+impl<Key, Out> StreamElement<(Key, Out)> {
     /// Map a `StreamElement<KeyValue(Key, Out)>` to a `StreamElement<Out>`,
     /// returning the key if possible
     pub fn take_key(self) -> (Option<Key>, StreamElement<Out>) {

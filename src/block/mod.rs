@@ -27,7 +27,7 @@ pub mod structure;
 /// `OperatorChain` is the type of the chain of operators inside the block. It must be an operator
 /// that yields values of type `Out`.
 #[derive(Debug, Clone)]
-pub(crate) struct InnerBlock<Out: Data, OperatorChain>
+pub(crate) struct Block<Out: Data, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -39,13 +39,35 @@ where
     pub(crate) batch_mode: BatchMode,
     /// This block may be inside a number of iteration loops, this stack keeps track of the state
     /// lock for each of them.
-    pub(crate) iteration_state_lock_stack: Vec<Arc<IterationStateLock>>,
+    pub(crate) iteration_ctx: Vec<Arc<IterationStateLock>>,
     /// Whether this block has `NextStrategy::OnlyOne`.
     pub(crate) is_only_one_strategy: bool,
     /// The set of requirements that the block imposes on the scheduler.
     pub(crate) scheduler_requirements: SchedulerRequirements,
 
     pub _out_type: PhantomData<Out>,
+}
+
+impl<Out: Data, OperatorChain> Block<Out, OperatorChain>
+where
+    OperatorChain: Operator<Out>,
+{
+    /// Add an operator to the end of the block
+    pub fn add_operator<NewOut: Data, Op, GetOp>(self, get_operator: GetOp) -> Block<NewOut, Op>
+    where
+        Op: Operator<NewOut> + 'static,
+        GetOp: FnOnce(OperatorChain) -> Op,
+    {
+        Block {
+            id: self.id,
+            operators: get_operator(self.operators),
+            batch_mode: self.batch_mode,
+            iteration_ctx: self.iteration_ctx,
+            is_only_one_strategy: false,
+            scheduler_requirements: self.scheduler_requirements,
+            _out_type: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -58,7 +80,7 @@ pub(crate) struct SchedulerRequirements {
     pub(crate) max_parallelism: Option<CoordUInt>,
 }
 
-impl<Out: Data, OperatorChain> InnerBlock<Out, OperatorChain>
+impl<Out: Data, OperatorChain> Block<Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {
@@ -66,13 +88,13 @@ where
         id: BlockId,
         operators: OperatorChain,
         batch_mode: BatchMode,
-        iteration_state_lock_stack: Vec<Arc<IterationStateLock>>,
+        iteration_ctx: Vec<Arc<IterationStateLock>>,
     ) -> Self {
         Self {
             id,
             operators,
             batch_mode,
-            iteration_state_lock_stack,
+            iteration_ctx,
             is_only_one_strategy: false,
             scheduler_requirements: Default::default(),
             _out_type: Default::default(),
@@ -84,14 +106,14 @@ where
     /// An empty vector is returned when the block is outside any iterations, more than one element
     /// if it's inside nested iterations.
     pub(crate) fn iteration_stack(&self) -> Vec<*const ()> {
-        self.iteration_state_lock_stack
+        self.iteration_ctx
             .iter()
             .map(|s| Arc::as_ptr(s) as *const ())
             .collect()
     }
 }
 
-impl<Out: Data, OperatorChain> Display for InnerBlock<Out, OperatorChain>
+impl<Out: Data, OperatorChain> Display for Block<Out, OperatorChain>
 where
     OperatorChain: Operator<Out>,
 {

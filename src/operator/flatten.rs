@@ -9,7 +9,7 @@ mod inner {
     use crate::block::{BlockStructure, OperatorStructure};
     use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
     use crate::scheduler::ExecutionMetadata;
-    use crate::stream::{KeyValue, KeyedStream, Stream};
+    use crate::stream::{KeyedStream, Stream};
 
     #[derive(Clone, Derivative)]
     #[derivative(Debug)]
@@ -168,7 +168,7 @@ mod inner {
     pub struct KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
     where
         Key: DataKey,
-        PreviousOperators: Operator<KeyValue<Key, In>>,
+        PreviousOperators: Operator<(Key, In)>,
         In: Data + IntoIterator<Item = Out>,
         Out: Data,
         InnerIterator: Iterator,
@@ -191,7 +191,7 @@ mod inner {
         for KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
     where
         Key: DataKey,
-        PreviousOperators: Operator<KeyValue<Key, In>>,
+        PreviousOperators: Operator<(Key, In)>,
         In: Data + IntoIterator<Item = Out>,
         Out: Data,
         InnerIterator: Iterator,
@@ -211,7 +211,7 @@ mod inner {
         KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
     where
         Key: DataKey,
-        PreviousOperators: Operator<KeyValue<Key, In>>,
+        PreviousOperators: Operator<(Key, In)>,
         In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
         Out: Data + Clone,
         InnerIterator: Iterator<Item = Out> + Clone + Send,
@@ -228,11 +228,11 @@ mod inner {
         }
     }
 
-    impl<Key, In, Out, InnerIterator, PreviousOperators> Operator<KeyValue<Key, Out>>
+    impl<Key, In, Out, InnerIterator, PreviousOperators> Operator<(Key, Out)>
         for KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
     where
         Key: DataKey,
-        PreviousOperators: Operator<KeyValue<Key, In>>,
+        PreviousOperators: Operator<(Key, In)>,
         In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
         Out: Data + Clone,
         InnerIterator: Iterator<Item = Out> + Clone + Send,
@@ -241,7 +241,7 @@ mod inner {
             self.prev.setup(metadata);
         }
 
-        fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
+        fn next(&mut self) -> StreamElement<(Key, Out)> {
             loop {
                 if let Some((ref key, ref mut inner)) = self.frontiter {
                     match inner.next() {
@@ -289,7 +289,7 @@ mod inner {
     impl<Key: DataKey, In, Out, InnerIterator, OperatorChain> KeyedStream<Key, In, OperatorChain>
     where
         Key: DataKey,
-        OperatorChain: Operator<KeyValue<Key, In>> + 'static,
+        OperatorChain: Operator<(Key, In)> + 'static,
         InnerIterator: Iterator<Item = Out> + Clone + Send + 'static,
         In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
         Out: Data + Clone,
@@ -319,7 +319,7 @@ mod inner {
         /// res.sort_unstable();
         /// assert_eq!(res, vec![(0, 0), (0, 1), (0, 2), (0, 6), (0, 7), (1, 3), (1, 4), (1, 5)]);
         /// ```
-        pub fn flatten(self) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>> {
+        pub fn flatten(self) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>> {
             self.add_operator(|prev| KeyedFlatten::new(prev))
         }
     }
@@ -336,7 +336,7 @@ mod inner {
     use crate::block::{BlockStructure, OperatorStructure};
     use crate::operator::{Data, DataKey, Operator, StreamElement};
     use crate::scheduler::ExecutionMetadata;
-    use crate::stream::{KeyValue, KeyedStream, Stream};
+    use crate::stream::{KeyedStream, Stream};
 
     #[derive(Clone, Derivative)]
     #[derivative(Debug)]
@@ -506,7 +506,7 @@ mod inner {
     where
         Out: IntoIterator<Item = NewOut>,
         <Out as IntoIterator>::IntoIter: Clone + Send + 'static,
-        OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+        OperatorChain: Operator<(Key, Out)> + 'static,
     {
         /// Transform this stream of containers into a stream of all the contained values.
         ///
@@ -533,14 +533,14 @@ mod inner {
         /// res.sort_unstable();
         /// assert_eq!(res, vec![(0, 0), (0, 1), (0, 2), (0, 6), (0, 7), (1, 3), (1, 4), (1, 5)]);
         /// ```
-        pub fn flatten(self) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
+        pub fn flatten(self) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>> {
             self.add_operator(|prev| Flatten::new(prev, |(k, x)| repeat(k).zip(x.into_iter())))
         }
     }
 
     impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
     where
-        OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+        OperatorChain: Operator<(Key, Out)> + 'static,
     {
         /// Apply a mapping operation to each element of the stream, the resulting stream will be the
         /// flattened values of the result of the mapping.
@@ -565,11 +565,11 @@ mod inner {
         pub fn flat_map<NewOut: Data, MapOut: Data, F>(
             self,
             f: F,
-        ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+        ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
         where
             MapOut: IntoIterator<Item = NewOut>,
             <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-            F: Fn(KeyValue<&Key, Out>) -> MapOut + Send + Clone + 'static,
+            F: Fn((&Key, Out)) -> MapOut + Send + Clone + 'static,
         {
             self.map(f).flatten()
         }

@@ -5,7 +5,7 @@ use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
@@ -52,7 +52,7 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Operator<KeyValue<Key, Out>>
+impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Operator<(Key, Out)>
     for KeyBy<Key, Out, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,
@@ -63,7 +63,7 @@ where
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
+    fn next(&mut self) -> StreamElement<(Key, Out)> {
         match self.prev.next() {
             StreamElement::Item(t) => StreamElement::Item(((self.keyer)(&t), t)),
             StreamElement::Timestamped(t, ts) => {
@@ -79,7 +79,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<KeyValue<Key, Out>, _>("KeyBy"))
+            .add_operator(OperatorStructure::new::<(Key, Out), _>("KeyBy"))
     }
 }
 
@@ -110,7 +110,7 @@ where
     pub fn key_by<Key: DataKey, Keyer>(
         self,
         keyer: Keyer,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
         Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
     {

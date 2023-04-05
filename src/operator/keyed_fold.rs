@@ -5,20 +5,20 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{group_by_hash, BlockStructure, NextStrategy, OperatorStructure};
-use crate::operator::end::EndBlock;
+use crate::operator::end::End;
 use crate::operator::key_by::KeyBy;
 use crate::operator::{
     Data, DataKey, ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp,
 };
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Derivative)]
 #[derivative(Debug, Clone)]
 pub struct KeyedFold<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<KeyValue<Key, Out>>,
+    PreviousOperators: Operator<(Key, Out)>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -26,7 +26,7 @@ where
     init: NewOut,
     accumulators: HashMap<Key, NewOut, crate::block::GroupHasherBuilder>,
     timestamps: HashMap<Key, Timestamp, crate::block::GroupHasherBuilder>,
-    ready: Vec<StreamElement<KeyValue<Key, NewOut>>>,
+    ready: Vec<StreamElement<(Key, NewOut)>>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
     received_end_iter: bool,
@@ -37,20 +37,20 @@ impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Display
     for KeyedFold<Key, Out, NewOut, F, PreviousOperators>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<KeyValue<Key, Out>>,
+    PreviousOperators: Operator<(Key, Out)>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> KeyedFold<{} -> {}>",
             self.prev,
-            std::any::type_name::<KeyValue<Key, Out>>(),
-            std::any::type_name::<KeyValue<Key, NewOut>>()
+            std::any::type_name::<(Key, Out)>(),
+            std::any::type_name::<(Key, NewOut)>()
         )
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators: Operator<KeyValue<Key, Out>>>
+impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators: Operator<(Key, Out)>>
     KeyedFold<Key, Out, NewOut, F, PreviousOperators>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
@@ -85,18 +85,18 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Operator<KeyValue<Key, NewOut>>
+impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Operator<(Key, NewOut)>
     for KeyedFold<Key, Out, NewOut, F, PreviousOperators>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<KeyValue<Key, Out>>,
+    PreviousOperators: Operator<(Key, Out)>,
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<KeyValue<Key, NewOut>> {
+    fn next(&mut self) -> StreamElement<(Key, NewOut)> {
         while !self.received_end {
             match self.prev.next() {
                 StreamElement::Terminate => self.received_end = true,
@@ -158,9 +158,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<KeyValue<Key, NewOut>, _>(
-                "KeyedFold",
-            ))
+            .add_operator(OperatorStructure::new::<(Key, NewOut), _>("KeyedFold"))
     }
 }
 
@@ -214,7 +212,7 @@ where
         init: NewOut,
         local: Local,
         global: Global,
-    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
     where
         Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
         Local: Fn(&mut NewOut, Out) + Send + Clone + 'static,
@@ -232,7 +230,7 @@ where
             // local fold
             .add_operator(|prev| KeyedFold::new(prev, init.clone(), local))
             // group by key
-            .add_block(EndBlock::new, next_strategy)
+            .split_block(End::new, next_strategy)
             // global fold
             .add_operator(|prev| KeyedFold::new(prev, init.clone(), global));
 
@@ -242,7 +240,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Perform the folding operation separately for each key.
     ///
@@ -285,7 +283,7 @@ where
         self,
         init: NewOut,
         f: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
     where
         F: Fn(&mut NewOut, Out) + Send + Clone + 'static,
     {

@@ -1,5 +1,5 @@
 use crate::operator::{Data, DataKey, ExchangeData, ExchangeDataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -48,7 +48,7 @@ where
         self,
         keyer: Keyer,
         f: F,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
         Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
         F: Fn(&mut Out, Out) + Send + Clone + 'static,
@@ -77,7 +77,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Perform the reduction operation separately for each key.
     ///
@@ -116,7 +116,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0 + 2 + 4), (1, 1 + 3)]);
     /// ```
-    pub fn reduce<F>(self, f: F) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    pub fn reduce<F>(self, f: F) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
         F: Fn(&mut Out, Out) + Send + Clone + 'static,
     {

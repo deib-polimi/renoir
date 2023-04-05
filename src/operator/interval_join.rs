@@ -6,9 +6,9 @@ use crate::operator::merge::MergeElement;
 use crate::operator::reorder::Reorder;
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
-type OutputElement<Key, Out, Out2> = KeyValue<Key, (Out, Out2)>;
+type OutputElement<Key, Out, Out2> = (Key, (Out, Out2));
 
 /// Operator that performs an interval join.
 ///
@@ -23,11 +23,11 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
+    OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
 {
     prev: OperatorChain,
     /// Elements of the left side to be processed.
-    left: VecDeque<(Timestamp, KeyValue<Key, Out>)>,
+    left: VecDeque<(Timestamp, (Key, Out))>,
     /// Elements of the right side that might still be matched.
     right: HashMap<Key, VecDeque<(Timestamp, Out2)>, crate::block::GroupHasherBuilder>,
     /// Elements ready to be sent downstream.
@@ -47,14 +47,14 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
+    OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> IntervalJoin<{}, {:?}, {:?}>",
             self.prev,
-            std::any::type_name::<KeyValue<Key, (Out, Out2)>>(),
+            std::any::type_name::<(Key, (Out, Out2))>(),
             self.lower_bound,
             self.upper_bound,
         )
@@ -66,7 +66,7 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
+    OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
 {
     fn new(prev: OperatorChain, lower_bound: Timestamp, upper_bound: Timestamp) -> Self {
         Self {
@@ -136,13 +136,13 @@ where
     }
 }
 
-impl<Key, Out, Out2, OperatorChain> Operator<KeyValue<Key, (Out, Out2)>>
+impl<Key, Out, Out2, OperatorChain> Operator<(Key, (Out, Out2))>
     for IntervalJoin<Key, Out, Out2, OperatorChain>
 where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
+    OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -193,7 +193,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<KeyValue<Key, (Out, Out2)>, _>(
+            .add_operator(OperatorStructure::new::<(Key, (Out, Out2)), _>(
                 "IntervalJoin",
             ))
     }
@@ -238,7 +238,7 @@ where
 
 impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Given two streams **with timestamps** join them according to an interval centered around the
     /// timestamp of the left side.
@@ -256,10 +256,10 @@ where
         right: KeyedStream<Key, Out2, OperatorChain2>,
         lower_bound: Timestamp,
         upper_bound: Timestamp,
-    ) -> KeyedStream<Key, (Out, Out2), impl Operator<KeyValue<Key, (Out, Out2)>>>
+    ) -> KeyedStream<Key, (Out, Out2), impl Operator<(Key, (Out, Out2))>>
     where
         Out2: ExchangeData,
-        OperatorChain2: Operator<KeyValue<Key, Out2>> + 'static,
+        OperatorChain2: Operator<(Key, Out2)> + 'static,
     {
         self.merge_distinct(right)
             .add_operator(Reorder::new)

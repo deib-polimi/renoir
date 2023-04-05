@@ -4,7 +4,7 @@ use std::any::TypeId;
 use std::sync::Arc;
 use std::thread::available_parallelism;
 
-use crate::block::InnerBlock;
+use crate::block::Block;
 use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
@@ -204,15 +204,15 @@ impl StreamEnvironmentInner {
         &mut self,
         source: S,
         batch_mode: BatchMode,
-        iteration_context: Vec<Arc<IterationStateLock>>,
-    ) -> InnerBlock<Out, S> {
+        iteration_ctx: Vec<Arc<IterationStateLock>>,
+    ) -> Block<Out, S> {
         let new_id = self.new_block_id();
-        InnerBlock::new(new_id, source, batch_mode, iteration_context)
+        Block::new(new_id, source, batch_mode, iteration_ctx)
     }
 
     pub(crate) fn close_block<Out: Data, Op: Operator<Out> + 'static>(
         &mut self,
-        block: InnerBlock<Out, Op>,
+        block: Block<Out, Op>,
     ) -> BlockId {
         let id = block.id;
         let scheduler = self.scheduler_mut();

@@ -2,8 +2,8 @@ use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use std::time::Duration;
 
-pub(crate) use multiple::*;
-pub(crate) use single::*;
+pub(crate) use binary::*;
+pub(crate) use simple::*;
 
 #[cfg(feature = "timestamp")]
 use super::Timestamp;
@@ -16,12 +16,12 @@ use crate::operator::start::watermark_frontier::WatermarkFrontier;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
-mod multiple;
-mod single;
+mod binary;
+mod simple;
 mod watermark_frontier;
 
-/// Trait that abstract the receiving part of the `StartBlock`.
-pub(crate) trait StartBlockReceiver<Out>: Clone {
+/// Trait that abstract the receiving part of the `Start`.
+pub(crate) trait StartReceiver<Out>: Clone {
     /// Setup the internal state of the receiver.
     fn setup(&mut self, metadata: &mut ExecutionMetadata);
 
@@ -45,25 +45,24 @@ pub(crate) trait StartBlockReceiver<Out>: Clone {
     fn structure(&self) -> BlockStructure;
 }
 
-pub(crate) type MultipleStartBlockReceiverOperator<OutL, OutR> =
-    StartBlock<TwoSidesItem<OutL, OutR>, MultipleStartBlockReceiver<OutL, OutR>>;
+pub(crate) type BinaryStartOperator<OutL, OutR> =
+    Start<BinaryElement<OutL, OutR>, BinaryStartReceiver<OutL, OutR>>;
 
-pub(crate) type SingleStartBlockReceiverOperator<Out> =
-    StartBlock<Out, SingleStartBlockReceiver<Out>>;
+pub(crate) type SimpleStartOperator<Out> = Start<Out, SimpleStartReceiver<Out>>;
 
-/// Each block should start with a `StartBlock` operator, whose task is to read from the network,
+/// Each block should start with a `Start` operator, whose task is to read from the network,
 /// receive from the previous operators and handle the watermark frontier.
 ///
-/// There are different kinds of `StartBlock`, the main difference is in the number of previous
-/// blocks. With a `SingleStartBlockReceiver` the block is able to receive from the replicas of a
+/// There are different kinds of `Start`, the main difference is in the number of previous
+/// blocks. With a `SimpleStartReceiver` the block is able to receive from the replicas of a
 /// single block of the job graph. If the block needs the data from multiple blocks it should use
-/// `MultipleStartBlockReceiver` which is able to handle 2 previous blocks.
+/// `MultipleStartReceiver` which is able to handle 2 previous blocks.
 ///
 /// Following operators will receive the messages in an unspecified order but the watermark property
 /// is followed. Note that the timestamps of the messages are not sorted, it's only guaranteed that
 /// when a watermark is emitted, all the previous messages are already been emitted (in some order).
 #[derive(Clone, Debug)]
-pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> {
+pub(crate) struct Start<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> {
     /// Execution metadata of this block.
     max_delay: Option<Duration>,
 
@@ -99,37 +98,35 @@ pub(crate) struct StartBlock<Out: ExchangeData, Receiver: StartBlockReceiver<Out
     state_generation: usize,
 }
 
-impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Display
-    for StartBlock<Out, Receiver>
-{
+impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Display for Start<Out, Receiver> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}]", std::any::type_name::<Out>())
     }
 }
 
-impl<Out: ExchangeData> StartBlock<Out, SingleStartBlockReceiver<Out>> {
-    /// Create a `StartBlock` able to receive data only from a single previous block.
+impl<Out: ExchangeData> Start<Out, SimpleStartReceiver<Out>> {
+    /// Create a `Start` able to receive data only from a single previous block.
     pub(crate) fn single(
         previous_block_id: BlockId,
         state_lock: Option<Arc<IterationStateLock>>,
-    ) -> SingleStartBlockReceiverOperator<Out> {
-        StartBlock::new(SingleStartBlockReceiver::new(previous_block_id), state_lock)
+    ) -> SimpleStartOperator<Out> {
+        Start::new(SimpleStartReceiver::new(previous_block_id), state_lock)
     }
 }
 
 impl<OutL: ExchangeData, OutR: ExchangeData>
-    StartBlock<TwoSidesItem<OutL, OutR>, MultipleStartBlockReceiver<OutL, OutR>>
+    Start<BinaryElement<OutL, OutR>, BinaryStartReceiver<OutL, OutR>>
 {
-    /// Create a `StartBlock` able to receive data from 2 previous blocks, setting up the cache.
+    /// Create a `Start` able to receive data from 2 previous blocks, setting up the cache.
     pub(crate) fn multiple(
         previous_block_id1: BlockId,
         previous_block_id2: BlockId,
         left_cache: bool,
         right_cache: bool,
         state_lock: Option<Arc<IterationStateLock>>,
-    ) -> MultipleStartBlockReceiverOperator<OutL, OutR> {
-        StartBlock::new(
-            MultipleStartBlockReceiver::new(
+    ) -> BinaryStartOperator<OutL, OutR> {
+        Start::new(
+            BinaryStartReceiver::new(
                 previous_block_id1,
                 previous_block_id2,
                 left_cache,
@@ -140,7 +137,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData>
     }
 }
 
-impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out, Receiver> {
+impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Start<Out, Receiver> {
     fn new(receiver: Receiver, state_lock: Option<Arc<IterationStateLock>>) -> Self {
         Self {
             coord: Default::default(),
@@ -168,8 +165,8 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> StartBlock<Out
     }
 }
 
-impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
-    for StartBlock<Out, Receiver>
+impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator<Out>
+    for Start<Out, Receiver>
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.receiver.setup(metadata);
@@ -181,7 +178,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
         self.watermark_frontier = WatermarkFrontier::new(prev_replicas);
 
         log::debug!(
-            "StartBlock {} of {} initialized",
+            "Start {} of {} initialized",
             metadata.coord,
             std::any::type_name::<Out>()
         );
@@ -195,11 +192,11 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
         loop {
             // all the previous blocks sent an end: we're done
             if self.missing_terminate == 0 {
-                log::debug!("StartBlock for {} has ended", coord);
+                log::debug!("Start for {} has ended", coord);
                 return StreamElement::Terminate;
             }
             if self.missing_flush_and_restart == 0 {
-                log::debug!("StartBlock for {} is emitting flush and restart", coord);
+                log::debug!("Start for {} is emitting flush and restart", coord);
 
                 self.missing_flush_and_restart = self.num_previous_replicas;
                 self.watermark_frontier.reset();
@@ -294,9 +291,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Operator<Out>
     }
 }
 
-impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Source<Out>
-    for StartBlock<Out, Receiver>
-{
+impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Source<Out> for Start<Out, Receiver> {
     fn get_max_parallelism(&self) -> Option<usize> {
         None
     }
@@ -305,7 +300,7 @@ impl<Out: ExchangeData, Receiver: StartBlockReceiver<Out> + Send> Source<Out>
 #[cfg(test)]
 mod tests {
     use crate::network::NetworkMessage;
-    use crate::operator::{Operator, StartBlock, StreamElement, Timestamp, TwoSidesItem};
+    use crate::operator::{BinaryElement, Operator, Start, StreamElement, Timestamp};
     use crate::test::FakeNetworkTopology;
 
     #[cfg(feature = "timestamp")]
@@ -320,7 +315,7 @@ mod tests {
         let (from2, sender2) = t.senders_mut()[0].pop().unwrap();
 
         let mut start_block =
-            StartBlock::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
+            Start::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
         start_block.setup(&mut t.metadata());
 
         sender1
@@ -360,7 +355,7 @@ mod tests {
         let (from2, sender2) = t.senders_mut()[0].pop().unwrap();
 
         let mut start_block =
-            StartBlock::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
+            Start::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
         start_block.setup(&mut t.metadata());
 
         sender1
@@ -408,7 +403,7 @@ mod tests {
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
         let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
-        let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
+        let mut start_block = Start::<BinaryElement<i32, i32>, _>::multiple(
             from1.block_id,
             from2.block_id,
             false,
@@ -428,7 +423,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            StreamElement::Timestamped(TwoSidesItem::Left(42), ts(10)),
+            StreamElement::Timestamped(BinaryElement::Left(42), ts(10)),
             start_block.next()
         );
         assert_eq!(StreamElement::FlushBatch, start_block.next());
@@ -444,7 +439,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            StreamElement::Timestamped(TwoSidesItem::Right(69), ts(10)),
+            StreamElement::Timestamped(BinaryElement::Right(69), ts(10)),
             start_block.next()
         );
         assert_eq!(StreamElement::Watermark(ts(20)), start_block.next());
@@ -456,7 +451,7 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(
-            StreamElement::Item(TwoSidesItem::LeftEnd),
+            StreamElement::Item(BinaryElement::LeftEnd),
             start_block.next()
         );
         sender2
@@ -466,7 +461,7 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(
-            StreamElement::Item(TwoSidesItem::RightEnd),
+            StreamElement::Item(BinaryElement::RightEnd),
             start_block.next()
         );
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
@@ -478,7 +473,7 @@ mod tests {
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
         let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
-        let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
+        let mut start_block = Start::<BinaryElement<i32, i32>, _>::multiple(
             from1.block_id,
             from2.block_id,
             true,
@@ -499,9 +494,9 @@ mod tests {
 
         let mut recv = [start_block.next(), start_block.next(), start_block.next()];
         recv.sort(); // those messages can arrive unordered
-        assert_eq!(StreamElement::Item(TwoSidesItem::Left(42)), recv[0]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::Left(43)), recv[1]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::Right(69)), recv[2]);
+        assert_eq!(StreamElement::Item(BinaryElement::Left(42)), recv[0]);
+        assert_eq!(StreamElement::Item(BinaryElement::Left(43)), recv[1]);
+        assert_eq!(StreamElement::Item(BinaryElement::Right(69)), recv[2]);
 
         sender1
             .send(NetworkMessage::new_batch(
@@ -518,8 +513,8 @@ mod tests {
 
         let mut recv = [start_block.next(), start_block.next()];
         recv.sort(); // those messages can arrive unordered
-        assert_eq!(StreamElement::Item(TwoSidesItem::LeftEnd), recv[0]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::RightEnd), recv[1]);
+        assert_eq!(StreamElement::Item(BinaryElement::LeftEnd), recv[0]);
+        assert_eq!(StreamElement::Item(BinaryElement::RightEnd), recv[1]);
 
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
 
@@ -538,11 +533,11 @@ mod tests {
             start_block.next(),
         ];
         recv.sort(); // those messages can arrive unordered
-        assert_eq!(StreamElement::Item(TwoSidesItem::Left(42)), recv[0]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::Left(43)), recv[1]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::Right(6969)), recv[2]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::LeftEnd), recv[3]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::RightEnd), recv[4]);
+        assert_eq!(StreamElement::Item(BinaryElement::Left(42)), recv[0]);
+        assert_eq!(StreamElement::Item(BinaryElement::Left(43)), recv[1]);
+        assert_eq!(StreamElement::Item(BinaryElement::Right(6969)), recv[2]);
+        assert_eq!(StreamElement::Item(BinaryElement::LeftEnd), recv[3]);
+        assert_eq!(StreamElement::Item(BinaryElement::RightEnd), recv[4]);
 
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
 
@@ -559,7 +554,7 @@ mod tests {
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
         let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
-        let mut start_block = StartBlock::<TwoSidesItem<i32, i32>, _>::multiple(
+        let mut start_block = Start::<BinaryElement<i32, i32>, _>::multiple(
             from1.block_id,
             from2.block_id,
             false,
@@ -580,9 +575,9 @@ mod tests {
 
         let mut recv = [start_block.next(), start_block.next(), start_block.next()];
         recv.sort(); // those messages can arrive unordered
-        assert_eq!(StreamElement::Item(TwoSidesItem::Left(42)), recv[0]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::Left(43)), recv[1]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::Right(69)), recv[2]);
+        assert_eq!(StreamElement::Item(BinaryElement::Left(42)), recv[0]);
+        assert_eq!(StreamElement::Item(BinaryElement::Left(43)), recv[1]);
+        assert_eq!(StreamElement::Item(BinaryElement::Right(69)), recv[2]);
 
         sender1
             .send(NetworkMessage::new_batch(
@@ -599,8 +594,8 @@ mod tests {
 
         let mut recv = [start_block.next(), start_block.next()];
         recv.sort(); // those messages can arrive unordered
-        assert_eq!(StreamElement::Item(TwoSidesItem::LeftEnd), recv[0]);
-        assert_eq!(StreamElement::Item(TwoSidesItem::RightEnd), recv[1]);
+        assert_eq!(StreamElement::Item(BinaryElement::LeftEnd), recv[0]);
+        assert_eq!(StreamElement::Item(BinaryElement::RightEnd), recv[1]);
 
         assert_eq!(StreamElement::FlushAndRestart, start_block.next());
 

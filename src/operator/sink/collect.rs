@@ -5,7 +5,7 @@ use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Debug)]
 pub struct Collect<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators>
@@ -120,7 +120,7 @@ where
 
 impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Close the stream and store all the resulting items into a collection on a single host.
     ///

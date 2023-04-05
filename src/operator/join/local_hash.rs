@@ -8,10 +8,10 @@ use crate::block::{BlockStructure, OperatorStructure};
 use crate::network::Coord;
 use crate::operator::join::ship::{ShipBroadcastRight, ShipHash, ShipStrategy};
 use crate::operator::join::{InnerJoinTuple, JoinVariant, LeftJoinTuple, OuterJoinTuple};
-use crate::operator::start::{MultipleStartBlockReceiverOperator, TwoSidesItem};
+use crate::operator::start::{BinaryElement, BinaryStartOperator};
 use crate::operator::{DataKey, ExchangeData, KeyerFn, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 /// This type keeps the elements of a side of the join.
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ struct JoinLocalHash<
     Out2: ExchangeData,
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
-    OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
+    OperatorChain: Operator<BinaryElement<Out1, Out2>>,
 > {
     prev: OperatorChain,
     coord: Coord,
@@ -71,7 +71,7 @@ struct JoinLocalHash<
     /// generate useless tuples.
     variant: JoinVariant,
     /// The already generated tuples, but not yet returned.
-    buffer: VecDeque<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>,
+    buffer: VecDeque<(Key, OuterJoinTuple<Out1, Out2>)>,
 }
 
 impl<
@@ -80,7 +80,7 @@ impl<
         Out2: ExchangeData,
         Keyer1: KeyerFn<Key, Out1>,
         Keyer2: KeyerFn<Key, Out2>,
-        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
+        OperatorChain: Operator<BinaryElement<Out1, Out2>>,
     > Display for JoinLocalHash<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -99,7 +99,7 @@ impl<
         Out2: ExchangeData,
         Keyer1: KeyerFn<Key, Out1>,
         Keyer2: KeyerFn<Key, Out2>,
-        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
+        OperatorChain: Operator<BinaryElement<Out1, Out2>>,
     > JoinLocalHash<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
     fn new(prev: OperatorChain, variant: JoinVariant, keyer1: Keyer1, keyer2: Keyer2) -> Self {
@@ -189,8 +189,8 @@ impl<
         Out2: ExchangeData,
         Keyer1: KeyerFn<Key, Out1>,
         Keyer2: KeyerFn<Key, Out2>,
-        OperatorChain: Operator<TwoSidesItem<Out1, Out2>>,
-    > Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>
+        OperatorChain: Operator<BinaryElement<Out1, Out2>>,
+    > Operator<(Key, OuterJoinTuple<Out1, Out2>)>
     for JoinLocalHash<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
@@ -201,7 +201,7 @@ impl<
     fn next(&mut self) -> StreamElement<(Key, OuterJoinTuple<Out1, Out2>)> {
         while self.buffer.is_empty() {
             match self.prev.next() {
-                StreamElement::Item(TwoSidesItem::Left(item)) => Self::add_item(
+                StreamElement::Item(BinaryElement::Left(item)) => Self::add_item(
                     ((self.keyer1)(&item), item),
                     &mut self.left,
                     &mut self.right,
@@ -210,7 +210,7 @@ impl<
                     &mut self.buffer,
                     |x, y| (x, y),
                 ),
-                StreamElement::Item(TwoSidesItem::Right(item)) => Self::add_item(
+                StreamElement::Item(BinaryElement::Right(item)) => Self::add_item(
                     ((self.keyer2)(&item), item),
                     &mut self.right,
                     &mut self.left,
@@ -219,7 +219,7 @@ impl<
                     &mut self.buffer,
                     |x, y| (y, x),
                 ),
-                StreamElement::Item(TwoSidesItem::LeftEnd) => {
+                StreamElement::Item(BinaryElement::LeftEnd) => {
                     log::debug!(
                         "Left side of join ended with {} elements on the left \
                         and {} elements on the right",
@@ -234,7 +234,7 @@ impl<
                         |x, y| (x, y),
                     )
                 }
-                StreamElement::Item(TwoSidesItem::RightEnd) => {
+                StreamElement::Item(BinaryElement::RightEnd) => {
                     log::debug!(
                         "Right side of join ended with {} elements on the left \
                         and {} elements on the right",
@@ -276,10 +276,11 @@ impl<
     }
 
     fn structure(&self) -> BlockStructure {
-        self.prev.structure().add_operator(OperatorStructure::new::<
-            KeyValue<Key, OuterJoinTuple<Out1, Out2>>,
-            _,
-        >("JoinLocalHash"))
+        self.prev
+            .structure()
+            .add_operator(
+                OperatorStructure::new::<(Key, OuterJoinTuple<Out1, Out2>), _>("JoinLocalHash"),
+            )
     }
 }
 
@@ -297,7 +298,7 @@ pub struct JoinStreamLocalHash<
     Keyer2: KeyerFn<Key, Out2>,
     ShipStrat: ShipStrategy,
 > {
-    stream: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+    stream: Stream<BinaryElement<Out1, Out2>, BinaryStartOperator<Out1, Out2>>,
     keyer1: Keyer1,
     keyer2: Keyer2,
     _key: PhantomData<Key>,
@@ -317,7 +318,7 @@ where
     Keyer2: KeyerFn<Key, Out2>,
 {
     pub(crate) fn new(
-        stream: Stream<TwoSidesItem<Out1, Out2>, MultipleStartBlockReceiverOperator<Out1, Out2>>,
+        stream: Stream<BinaryElement<Out1, Out2>, BinaryStartOperator<Out1, Out2>>,
         keyer1: Keyer1,
         keyer2: Keyer2,
     ) -> Self {
@@ -351,7 +352,7 @@ where
     ) -> KeyedStream<
         Key,
         InnerJoinTuple<Out1, Out2>,
-        impl Operator<KeyValue<Key, InnerJoinTuple<Out1, Out2>>>,
+        impl Operator<(Key, InnerJoinTuple<Out1, Out2>)>,
     > {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
@@ -376,11 +377,8 @@ where
     /// **Note**: this operator will split the current block.
     pub fn left(
         self,
-    ) -> KeyedStream<
-        Key,
-        LeftJoinTuple<Out1, Out2>,
-        impl Operator<KeyValue<Key, LeftJoinTuple<Out1, Out2>>>,
-    > {
+    ) -> KeyedStream<Key, LeftJoinTuple<Out1, Out2>, impl Operator<(Key, LeftJoinTuple<Out1, Out2>)>>
+    {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         let inner = self
@@ -408,7 +406,7 @@ where
     ) -> KeyedStream<
         Key,
         OuterJoinTuple<Out1, Out2>,
-        impl Operator<KeyValue<Key, OuterJoinTuple<Out1, Out2>>>,
+        impl Operator<(Key, OuterJoinTuple<Out1, Out2>)>,
     > {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
@@ -436,10 +434,8 @@ where
     /// **Note**: this operator will split the current block.
     pub fn inner(
         self,
-    ) -> Stream<
-        KeyValue<Key, InnerJoinTuple<Out1, Out2>>,
-        impl Operator<KeyValue<Key, InnerJoinTuple<Out1, Out2>>>,
-    > {
+    ) -> Stream<(Key, InnerJoinTuple<Out1, Out2>), impl Operator<(Key, InnerJoinTuple<Out1, Out2>)>>
+    {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         self.stream
@@ -462,10 +458,8 @@ where
     /// **Note**: this operator will split the current block.
     pub fn left(
         self,
-    ) -> Stream<
-        KeyValue<Key, LeftJoinTuple<Out1, Out2>>,
-        impl Operator<KeyValue<Key, LeftJoinTuple<Out1, Out2>>>,
-    > {
+    ) -> Stream<(Key, LeftJoinTuple<Out1, Out2>), impl Operator<(Key, LeftJoinTuple<Out1, Out2>)>>
+    {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         self.stream

@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Clone)]
 struct Filter<Out: Data, PreviousOperator, Predicate>
@@ -105,7 +105,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Remove from the stream all the elements for which the provided predicate returns `false`.
     ///
@@ -129,9 +129,9 @@ where
     pub fn filter<Predicate>(
         self,
         predicate: Predicate,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
-        Predicate: Fn(&KeyValue<Key, Out>) -> bool + Clone + Send + 'static,
+        Predicate: Fn(&(Key, Out)) -> bool + Clone + Send + 'static,
     {
         self.add_operator(|prev| Filter::new(prev, predicate))
     }

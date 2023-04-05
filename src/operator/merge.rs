@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::block::NextStrategy;
-use crate::operator::start::{StartBlock, TwoSidesItem};
+use crate::operator::start::{BinaryElement, Start};
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum MergeElement<A, B> {
@@ -46,13 +46,13 @@ where
     {
         self.add_y_connection(
             oth,
-            StartBlock::multiple,
+            Start::multiple,
             NextStrategy::only_one(),
             NextStrategy::only_one(),
         )
         .filter_map(|e| match e {
-            TwoSidesItem::Left(item) => Some(item),
-            TwoSidesItem::Right(item) => Some(item),
+            BinaryElement::Left(item) => Some(item),
+            BinaryElement::Right(item) => Some(item),
             _ => None,
         })
     }
@@ -76,7 +76,7 @@ where
 
 impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Merge the items of this stream with the items of another stream with the same type.
     ///
@@ -103,9 +103,9 @@ where
     pub fn merge<OperatorChain2>(
         self,
         oth: KeyedStream<Key, Out, OperatorChain2>,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
-        OperatorChain2: Operator<KeyValue<Key, Out>> + 'static,
+        OperatorChain2: Operator<(Key, Out)> + 'static,
     {
         KeyedStream(self.0.merge(oth.0))
     }
@@ -113,14 +113,10 @@ where
     pub(crate) fn merge_distinct<Out2, OperatorChain2>(
         self,
         right: KeyedStream<Key, Out2, OperatorChain2>,
-    ) -> KeyedStream<
-        Key,
-        MergeElement<Out, Out2>,
-        impl Operator<KeyValue<Key, MergeElement<Out, Out2>>>,
-    >
+    ) -> KeyedStream<Key, MergeElement<Out, Out2>, impl Operator<(Key, MergeElement<Out, Out2>)>>
     where
         Out2: ExchangeData,
-        OperatorChain2: Operator<KeyValue<Key, Out2>> + 'static,
+        OperatorChain2: Operator<(Key, Out2)> + 'static,
     {
         // map the left and right streams to the same type
         let left = self.map(|(_, x)| MergeElement::Left(x));

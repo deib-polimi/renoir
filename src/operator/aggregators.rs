@@ -1,7 +1,7 @@
 use std::ops::{AddAssign, Div};
 
 use crate::operator::{ExchangeData, ExchangeDataKey, KeyerFn, Operator};
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -40,7 +40,7 @@ where
         self,
         keyer: Keyer,
         get_value: GetValue,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
         Keyer: KeyerFn<Key, Out> + Fn(&Out) -> Key,
         GetValue: KeyerFn<Value, Out> + Fn(&Out) -> Value,
@@ -90,7 +90,7 @@ where
         self,
         keyer: Keyer,
         get_value: GetValue,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
         Keyer: KeyerFn<Key, Out> + Fn(&Out) -> Key,
         GetValue: KeyerFn<Value, Out> + Fn(&Out) -> Value,
@@ -142,7 +142,7 @@ where
         self,
         keyer: Keyer,
         get_value: GetValue,
-    ) -> KeyedStream<Key, Value, impl Operator<KeyValue<Key, Value>>>
+    ) -> KeyedStream<Key, Value, impl Operator<(Key, Value)>>
     where
         Keyer: KeyerFn<Key, Out> + Fn(&Out) -> Key,
         GetValue: Fn(Out) -> Value + Clone + Send + 'static,
@@ -210,7 +210,7 @@ where
         self,
         keyer: Keyer,
         get_value: GetValue,
-    ) -> KeyedStream<Key, Value, impl Operator<KeyValue<Key, Value>>>
+    ) -> KeyedStream<Key, Value, impl Operator<(Key, Value)>>
     where
         Keyer: KeyerFn<Key, Out> + Fn(&Out) -> Key,
         GetValue: KeyerFn<Value, Out> + Fn(&Out) -> Value,
@@ -276,7 +276,7 @@ where
     pub fn group_by_count<Key: ExchangeDataKey, Keyer>(
         self,
         keyer: Keyer,
-    ) -> KeyedStream<Key, usize, impl Operator<KeyValue<Key, usize>>>
+    ) -> KeyedStream<Key, usize, impl Operator<(Key, usize)>>
     where
         Keyer: KeyerFn<Key, Out> + Fn(&Out) -> Key,
     {

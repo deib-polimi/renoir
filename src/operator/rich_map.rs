@@ -5,13 +5,13 @@ use std::marker::PhantomData;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Debug)]
 struct RichMap<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain>
 where
-    F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
-    OperatorChain: Operator<KeyValue<Key, Out>>,
+    F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
+    OperatorChain: Operator<(Key, Out)>,
 {
     prev: OperatorChain,
     maps_fn: HashMap<Key, F, crate::block::GroupHasherBuilder>,
@@ -23,8 +23,8 @@ where
 impl<Key: DataKey, Out: Data, NewOut: Data, F: Clone, OperatorChain: Clone> Clone
     for RichMap<Key, Out, NewOut, F, OperatorChain>
 where
-    F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
-    OperatorChain: Operator<KeyValue<Key, Out>>,
+    F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
+    OperatorChain: Operator<(Key, Out)>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -40,8 +40,8 @@ where
 impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain> Display
     for RichMap<Key, Out, NewOut, F, OperatorChain>
 where
-    F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
-    OperatorChain: Operator<KeyValue<Key, Out>>,
+    F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
+    OperatorChain: Operator<(Key, Out)>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -57,8 +57,8 @@ where
 impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain>
     RichMap<Key, Out, NewOut, F, OperatorChain>
 where
-    F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
-    OperatorChain: Operator<KeyValue<Key, Out>>,
+    F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
+    OperatorChain: Operator<(Key, Out)>,
 {
     fn new(prev: OperatorChain, f: F) -> Self {
         Self {
@@ -71,11 +71,11 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain> Operator<KeyValue<Key, NewOut>>
+impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain> Operator<(Key, NewOut)>
     for RichMap<Key, Out, NewOut, F, OperatorChain>
 where
-    F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send,
-    OperatorChain: Operator<KeyValue<Key, Out>>,
+    F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
+    OperatorChain: Operator<(Key, Out)>,
 {
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
@@ -179,7 +179,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Map the elements of the stream into new elements. The mapping function can be stateful.
     ///
@@ -188,9 +188,9 @@ where
     pub fn rich_map<NewOut: Data, F>(
         self,
         f: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
     where
-        F: FnMut(KeyValue<&Key, Out>) -> NewOut + Clone + Send + 'static,
+        F: FnMut((&Key, Out)) -> NewOut + Clone + Send + 'static,
     {
         self.add_operator(|prev| RichMap::new(prev, f))
     }

@@ -10,7 +10,7 @@ pub use descr::*;
 
 use crate::block::{GroupHasherBuilder, OperatorStructure};
 use crate::operator::{Data, DataKey, ExchangeData, Operator, StreamElement, Timestamp};
-use crate::stream::{KeyValue, KeyedStream, Stream, WindowedStream};
+use crate::stream::{KeyedStream, Stream, WindowedStream};
 
 mod aggr;
 mod descr;
@@ -112,7 +112,7 @@ where
     /// The manager that will build the windows.
     manager: KeyedWindowManager<Key, In, Out, W>,
     /// A buffer for storing ready items.
-    output_buffer: VecDeque<StreamElement<KeyValue<Key, Out>>>,
+    output_buffer: VecDeque<StreamElement<(Key, Out)>>,
 }
 
 impl<Key, In, Out, Prev, W> Display for WindowOperator<Key, In, Out, Prev, W>
@@ -132,10 +132,10 @@ where
     }
 }
 
-impl<Key, In, Out, Prev, W> Operator<KeyValue<Key, Out>> for WindowOperator<Key, In, Out, Prev, W>
+impl<Key, In, Out, Prev, W> Operator<(Key, Out)> for WindowOperator<Key, In, Out, Prev, W>
 where
     W: WindowManager<In = In, Out = Out> + Send,
-    Prev: Operator<KeyValue<Key, In>>,
+    Prev: Operator<(Key, In)>,
     Key: DataKey,
     In: Data,
     Out: Data,
@@ -144,7 +144,7 @@ where
         self.prev.setup(metadata);
     }
 
-    fn next(&mut self) -> StreamElement<KeyValue<Key, Out>> {
+    fn next(&mut self) -> StreamElement<(Key, Out)> {
         loop {
             if let Some(item) = self.output_buffer.pop_front() {
                 return item;
@@ -197,7 +197,7 @@ where
     fn structure(&self) -> crate::block::BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<KeyValue<Key, Out>, _>(&self.name))
+            .add_operator(OperatorStructure::new::<(Key, Out), _>(&self.name))
     }
 }
 
@@ -222,7 +222,7 @@ where
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowBuilder<Out>,
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
     Key: DataKey,
     Out: Data,
 {
@@ -233,7 +233,7 @@ where
         self,
         name: &str,
         accumulator: A,
-    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
     where
         NewOut: Data,
         A: WindowAccumulator<In = Out, Out = NewOut>,
@@ -256,7 +256,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Apply a window to the stream.
     ///
@@ -285,7 +285,7 @@ where
     pub fn window<WinOut: Data, WinDescr: WindowBuilder<Out>>(
         self,
         descr: WinDescr,
-    ) -> WindowedStream<Key, Out, impl Operator<KeyValue<Key, Out>>, WinOut, WinDescr> {
+    ) -> WindowedStream<Key, Out, impl Operator<(Key, Out)>, WinOut, WinDescr> {
         WindowedStream {
             inner: self,
             descr,
@@ -327,7 +327,7 @@ where
     pub fn window_all<WinOut: Data, WinDescr: WindowBuilder<Out>>(
         self,
         descr: WinDescr,
-    ) -> WindowedStream<(), Out, impl Operator<KeyValue<(), Out>>, WinOut, WinDescr> {
+    ) -> WindowedStream<(), Out, impl Operator<((), Out)>, WinOut, WinDescr> {
         // max_parallelism and key_by are used instead of group_by so that there is exactly one
         // replica, since window_all cannot be parallelized
         self.max_parallelism(1).key_by(|_| ()).window(descr)

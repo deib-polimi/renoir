@@ -1,8 +1,8 @@
 use crate::block::NextStrategy;
-use crate::operator::end::EndBlock;
+use crate::operator::end::End;
 use crate::operator::key_by::KeyBy;
 use crate::operator::{DataKey, ExchangeData, Operator};
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -33,13 +33,13 @@ where
     pub fn group_by<Key: DataKey, Keyer>(
         self,
         keyer: Keyer,
-    ) -> KeyedStream<Key, Out, impl Operator<KeyValue<Key, Out>>>
+    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
     where
         Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
     {
         let next_strategy = NextStrategy::group_by(keyer.clone());
         let new_stream = self
-            .add_block(EndBlock::new, next_strategy)
+            .split_block(End::new, next_strategy)
             .add_operator(|prev| KeyBy::new(prev, keyer));
         KeyedStream(new_stream)
     }

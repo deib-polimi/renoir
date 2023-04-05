@@ -6,7 +6,7 @@ use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::iteration::{IterationResult, StateFeedback};
 use crate::operator::source::Source;
-use crate::operator::start::{SingleStartBlockReceiverOperator, StartBlock, StartBlockReceiver};
+use crate::operator::start::{SimpleStartOperator, Start, StartReceiver};
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::profiler::{get_profiler, Profiler};
 use crate::scheduler::{BlockId, ExecutionMetadata};
@@ -14,7 +14,7 @@ use crate::scheduler::{BlockId, ExecutionMetadata};
 /// The leader block of an iteration.
 ///
 /// This block is the synchronization point for the distributed iterations. At the end of each
-/// iteration the `IterationEndBlock` will send a `DeltaUpdate` each to this block. When all the
+/// iteration the `IterationEnd` will send a `DeltaUpdate` each to this block. When all the
 /// `DeltaUpdate`s are received the new state is computed and the loop condition is evaluated.
 ///
 /// After establishing if a new iteration should start this block will send a message to all the
@@ -46,16 +46,16 @@ where
     /// Will be used for resetting the global state after all the iterations complete.
     initial_state: State,
 
-    /// The receiver from the `IterationEndBlock`s at the end of the loop.
+    /// The receiver from the `IterationEnd`s at the end of the loop.
     ///
     /// This will be set inside `setup` when we will know the id of that block.
-    state_update_receiver: Option<SingleStartBlockReceiverOperator<StateUpdate>>,
-    /// The number of replicas of `IterationEndBlock`.
+    state_update_receiver: Option<SimpleStartOperator<StateUpdate>>,
+    /// The number of replicas of `IterationEnd`.
     num_receivers: usize,
-    /// The id of the block where `IterationEndBlock` is.
+    /// The id of the block where `IterationEnd` is.
     ///
     /// This is a shared reference because when this block is constructed the tail of the iteration
-    /// (i.e. the `IterationEndBlock`) is not constructed yet. Therefore we cannot predict how many
+    /// (i.e. the `IterationEnd`) is not constructed yet. Therefore we cannot predict how many
     /// blocks there will be in between, and therefore we cannot know the block id.
     ///
     /// After constructing the entire iteration this shared variable will be set. This will happen
@@ -189,10 +189,10 @@ where
             .map(|(_, s)| s)
             .collect();
 
-        // at this point the id of the block with IterationEndBlock must be known
+        // at this point the id of the block with IterationEnd must be known
         let feedback_block_id = self.feedback_block_id.load(Ordering::Acquire) as BlockId;
         // get the receiver for the delta updates
-        let mut delta_update_receiver = StartBlock::single(feedback_block_id, None);
+        let mut delta_update_receiver = Start::single(feedback_block_id, None);
         delta_update_receiver.setup(metadata);
         self.num_receivers = delta_update_receiver.receiver().prev_replicas().len();
         self.state_update_receiver = Some(delta_update_receiver);

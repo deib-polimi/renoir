@@ -1,6 +1,6 @@
 use super::super::*;
 use crate::operator::{Data, DataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream, WindowedStream};
+use crate::stream::{KeyedStream, WindowedStream};
 
 #[derive(Clone)]
 pub(crate) struct Last<T>(Option<T>);

@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
@@ -105,7 +105,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Map the elements of the stream into new elements.
     ///
@@ -129,9 +129,9 @@ where
     pub fn map<NewOut: Data, F>(
         self,
         f: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
     where
-        F: Fn(KeyValue<&Key, Out>) -> NewOut + Send + Clone + 'static,
+        F: Fn((&Key, Out)) -> NewOut + Send + Clone + 'static,
     {
         self.add_operator(|prev| {
             Map::new(prev, move |(k, v)| {

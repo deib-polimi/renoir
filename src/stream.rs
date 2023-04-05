@@ -3,20 +3,15 @@ use std::any::TypeId;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::block::{BatchMode, InnerBlock, NextStrategy, SchedulerRequirements};
+use crate::block::{BatchMode, Block, NextStrategy, SchedulerRequirements};
 use crate::environment::StreamEnvironmentInner;
-use crate::operator::end::EndBlock;
+use crate::operator::end::End;
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::window::WindowBuilder;
 use crate::operator::DataKey;
-use crate::operator::StartBlock;
+use crate::operator::Start;
 use crate::operator::{Data, ExchangeData, KeyerFn, Operator};
 use crate::scheduler::BlockId;
-
-/// On keyed streams, this is the type of the items of the stream.
-///
-/// For now it's just a type alias, maybe downstream it can become a richer struct.
-pub type KeyValue<Key, Value> = (Key, Value);
 
 /// A Stream represents a chain of operators that work on a flow of data. The type of the elements
 /// that is leaving the stream is `Out`.
@@ -33,21 +28,19 @@ where
     OperatorChain: Operator<Out>,
 {
     /// The last block inside the stream.
-    pub(crate) block: InnerBlock<Out, OperatorChain>,
+    pub(crate) block: Block<Out, OperatorChain>,
     /// A reference to the environment this stream lives in.
     pub(crate) env: Arc<Mutex<StreamEnvironmentInner>>,
 }
 
 /// A [`KeyedStream`] is like a set of [`Stream`]s, each of which partitioned by some `Key`. Internally
-/// it's just a stream whose elements are `KeyValue` pairs and the operators behave following the
+/// it's just a stream whose elements are `(K, V)` pairs and the operators behave following the
 /// [`KeyedStream`] semantics.
 ///
 /// The type of the `Key` must be a valid key inside an hashmap.
-pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(
-    pub Stream<KeyValue<Key, Out>, OperatorChain>,
-)
+pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(pub Stream<(Key, Out), OperatorChain>)
 where
-    OperatorChain: Operator<KeyValue<Key, Out>>;
+    OperatorChain: Operator<(Key, Out)>;
 
 // /// A [`WindowedStream`] is a data stream where elements are divided in multiple groups called
 // /// windows. Internally, a [`WindowedStream`] is just a [`KeyedWindowedStream`] where each element is
@@ -101,7 +94,7 @@ where
 /// To apply a window to a [`KeyedStream`], see [`KeyedStream::window`].
 pub struct WindowedStream<Key: DataKey, Out: Data, OperatorChain, WinOut: Data, WinDescr>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>>,
+    OperatorChain: Operator<(Key, Out)>,
     WinDescr: WindowBuilder<Out>,
 {
     pub(crate) inner: KeyedStream<Key, Out, OperatorChain>,
@@ -128,15 +121,7 @@ where
         GetOp: FnOnce(OperatorChain) -> Op,
     {
         Stream {
-            block: InnerBlock {
-                id: self.block.id,
-                operators: get_operator(self.block.operators),
-                batch_mode: self.block.batch_mode,
-                iteration_state_lock_stack: self.block.iteration_state_lock_stack,
-                is_only_one_strategy: false,
-                scheduler_requirements: self.block.scheduler_requirements,
-                _out_type: Default::default(),
-            },
+            block: self.block.add_operator(get_operator),
             env: self.env,
         }
     }
@@ -145,11 +130,11 @@ where
     /// connected to the previous one.
     ///
     /// `get_end_operator` is used to extend the operator chain of the old block with the last
-    /// operator (e.g. `operator::EndBlock`, `operator::GroupByEndOperator`). The end operator must
+    /// operator (e.g. `operator::End`, `operator::GroupByEndOperator`). The end operator must
     /// be an `Operator<()>`.
     ///
-    /// The new block is initialized with a `StartBlock`.
-    pub(crate) fn add_block<GetEndOp, Op, IndexFn>(
+    /// The new block is initialized with a `Start`.
+    pub(crate) fn split_block<GetEndOp, Op, IndexFn>(
         self,
         get_end_operator: GetEndOp,
         next_strategy: NextStrategy<Out, IndexFn>,
@@ -160,23 +145,28 @@ where
         Op: Operator<()> + 'static,
         GetEndOp: FnOnce(OperatorChain, NextStrategy<Out, IndexFn>, BatchMode) -> Op,
     {
-        let batch_mode = self.block.batch_mode;
-        let state_lock = self.block.iteration_state_lock_stack.clone();
-        let mut old_stream =
-            self.add_operator(|prev| get_end_operator(prev, next_strategy.clone(), batch_mode));
-        old_stream.block.is_only_one_strategy = matches!(next_strategy, NextStrategy::OnlyOne);
-        let mut env = old_stream.env.lock();
-        let old_id = old_stream.block.id;
-        let new_id = env.new_block_id();
-        let scheduler = env.scheduler_mut();
-        scheduler.add_block(old_stream.block);
-        scheduler.connect_blocks(old_id, new_id, TypeId::of::<Out>());
-        drop(env);
+        let Stream { block, env } = self;
+        // Clone parameters for new block
+        let batch_mode = block.batch_mode;
+        let iteration_ctx = block.iteration_ctx.clone();
+        // Add end operator
+        let mut block =
+            block.add_operator(|prev| get_end_operator(prev, next_strategy.clone(), batch_mode));
+        block.is_only_one_strategy = matches!(next_strategy, NextStrategy::OnlyOne);
 
-        let start_block = StartBlock::single(old_id, state_lock.last().cloned());
+        // Close old block
+        let mut env_lock = env.lock();
+        let prev_id = env_lock.close_block(block);
+        // Create new block
+        let source = Start::single(prev_id, iteration_ctx.last().cloned());
+        let new_block = env_lock.new_block(source, batch_mode, iteration_ctx);
+        // Connect blocks
+        env_lock.connect_blocks::<Out>(prev_id, new_block.id);
+
+        drop(env_lock);
         Stream {
-            block: InnerBlock::new(new_id, start_block, batch_mode, state_lock),
-            env: old_stream.env,
+            block: new_block,
+            env,
         }
     }
 
@@ -239,25 +229,23 @@ where
         let iteration_stack1 = self.block.iteration_stack();
         let iteration_stack2 = oth.block.iteration_stack();
         let (state_lock, left_cache, right_cache) = if iteration_stack1 == iteration_stack2 {
-            (self.block.iteration_state_lock_stack.clone(), false, false)
+            (self.block.iteration_ctx.clone(), false, false)
         } else {
             if !iteration_stack1.is_empty() && !iteration_stack2.is_empty() {
                 panic!("Side inputs are supported only if one of the streams is coming from outside any iteration");
             }
             if iteration_stack1.is_empty() {
                 // self is the side input, cache it
-                (oth.block.iteration_state_lock_stack.clone(), true, false)
+                (oth.block.iteration_ctx.clone(), true, false)
             } else {
                 // oth is the side input, cache it
-                (self.block.iteration_state_lock_stack.clone(), false, true)
+                (self.block.iteration_ctx.clone(), false, true)
             }
         };
 
         // close previous blocks
-        let mut old_stream1 =
-            self.add_operator(|prev| EndBlock::new(prev, next_strategy1, batch_mode));
-        let mut old_stream2 =
-            oth.add_operator(|prev| EndBlock::new(prev, next_strategy2, batch_mode));
+        let mut old_stream1 = self.add_operator(|prev| End::new(prev, next_strategy1, batch_mode));
+        let mut old_stream2 = oth.add_operator(|prev| End::new(prev, next_strategy2, batch_mode));
         old_stream1.block.is_only_one_strategy = is_only_one1;
         old_stream2.block.is_only_one_strategy = is_only_one2;
 
@@ -275,7 +263,7 @@ where
         drop(env);
 
         let mut new_stream = Stream {
-            block: InnerBlock::new(
+            block: Block::new(
                 new_id,
                 get_start_operator(
                     old_id1,
@@ -330,14 +318,14 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
         self,
         get_operator: GetOp,
     ) -> KeyedStream<Key, NewOut, Op>
     where
-        Op: Operator<KeyValue<Key, NewOut>> + 'static,
+        Op: Operator<(Key, NewOut)> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
     {
         KeyedStream(self.0.add_operator(get_operator))

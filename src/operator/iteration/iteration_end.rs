@@ -3,15 +3,15 @@ use crate::network::{Coord, NetworkMessage, NetworkSender, ReceiverEndpoint};
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 
-/// Similar to `EndBlock`, but tied specifically for the iterations.
+/// Similar to `End`, but tied specifically for the iterations.
 ///
 /// This block will receive the data (i.e. the `DeltaUpdate` already reduced) and send back to the
 /// leader.
 ///
-/// `EndBlock` cannot be used here since special care should be taken when the input stream is
+/// `End` cannot be used here since special care should be taken when the input stream is
 /// empty.
 #[derive(Debug, Clone)]
-pub struct IterationEndBlock<DeltaUpdate: ExchangeData, OperatorChain>
+pub struct IterationEnd<DeltaUpdate: ExchangeData, OperatorChain>
 where
     OperatorChain: Operator<DeltaUpdate>,
 {
@@ -33,21 +33,21 @@ where
 }
 
 impl<DeltaUpdate: ExchangeData, OperatorChain> std::fmt::Display
-    for IterationEndBlock<DeltaUpdate, OperatorChain>
+    for IterationEnd<DeltaUpdate, OperatorChain>
 where
     OperatorChain: Operator<DeltaUpdate>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} -> IterationEndBlock<{}>",
+            "{} -> IterationEnd<{}>",
             self.prev,
             std::any::type_name::<DeltaUpdate>()
         )
     }
 }
 
-impl<DeltaUpdate: ExchangeData, OperatorChain> IterationEndBlock<DeltaUpdate, OperatorChain>
+impl<DeltaUpdate: ExchangeData, OperatorChain> IterationEnd<DeltaUpdate, OperatorChain>
 where
     OperatorChain: Operator<DeltaUpdate>,
 {
@@ -63,7 +63,7 @@ where
 }
 
 impl<DeltaUpdate: ExchangeData, OperatorChain> Operator<()>
-    for IterationEndBlock<DeltaUpdate, OperatorChain>
+    for IterationEnd<DeltaUpdate, OperatorChain>
 where
     DeltaUpdate: Default,
     OperatorChain: Operator<DeltaUpdate>,
@@ -73,14 +73,10 @@ where
         assert_eq!(
             replicas.len(),
             1,
-            "The IterationEndBlock block should not be replicated"
+            "The IterationEnd block should not be replicated"
         );
         let leader = replicas.into_iter().next().unwrap();
-        log::debug!(
-            "IterationEndBlock {} has {} as leader",
-            metadata.coord,
-            leader
-        );
+        log::debug!("IterationEnd {} has {} as leader", metadata.coord, leader);
 
         let sender = metadata
             .network
@@ -125,7 +121,7 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<DeltaUpdate, _>("IterationEndBlock");
+        let mut operator = OperatorStructure::new::<DeltaUpdate, _>("IterationEnd");
         operator.connections.push(Connection::new::<DeltaUpdate, _>(
             self.leader_block_id,
             &NextStrategy::only_one(),

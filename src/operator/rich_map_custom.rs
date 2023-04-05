@@ -5,7 +5,7 @@ use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::Stream;
-use crate::{KeyValue, KeyedStream};
+use crate::KeyedStream;
 
 use super::DataKey;
 
@@ -129,7 +129,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Map the elements of the stream into new elements. The mapping function can be stateful.
     ///
@@ -137,7 +137,7 @@ where
     /// means that each key will have a unique mapping function (and therefore a unique state).
     pub fn rich_map_custom<NewOut: Data, F>(self, f: F) -> Stream<NewOut, impl Operator<NewOut>>
     where
-        F: FnMut(ElementGenerator<KeyValue<Key, Out>, OperatorChain>) -> StreamElement<NewOut>
+        F: FnMut(ElementGenerator<(Key, Out), OperatorChain>) -> StreamElement<NewOut>
             + Clone
             + Send
             + 'static,

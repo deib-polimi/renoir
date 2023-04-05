@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::iteration::IterationStateHandle;
 use crate::operator::{
-    ExchangeData, ExchangeDataKey, Operator, SingleStartBlockReceiverOperator, StreamElement,
+    ExchangeData, ExchangeDataKey, Operator, SimpleStartOperator, StreamElement,
 };
 use crate::scheduler::ExecutionMetadata;
 use crate::KeyedStream;
@@ -65,7 +65,7 @@ pub struct DeltaIterate<
     D: ExchangeData,
     O: ExchangeData,
 > {
-    prev: SingleStartBlockReceiverOperator<(Key, Msg<I, U, D, O>)>,
+    prev: SimpleStartOperator<(Key, Msg<I, U, D, O>)>,
 }
 
 impl<Key: ExchangeData, I: ExchangeData, U: ExchangeData, D: ExchangeData, O: ExchangeData>

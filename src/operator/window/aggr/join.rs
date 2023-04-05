@@ -1,7 +1,7 @@
 use super::super::*;
 use crate::operator::merge::MergeElement;
 use crate::operator::{Data, DataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream};
+use crate::stream::KeyedStream;
 
 #[derive(Clone)]
 struct Join<L, R> {
@@ -72,7 +72,7 @@ impl<L: Clone, R: Clone> Iterator for ProductIterator<L, R> {
 
 impl<Key, Out, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
     Key: ExchangeData + DataKey,
     Out: ExchangeData,
 {
@@ -80,7 +80,7 @@ where
         self,
         descr: WindowDescr,
         right: KeyedStream<Key, Out2, OperatorChain2>,
-    ) -> KeyedStream<Key, (Out, Out2), impl Operator<KeyValue<Key, (Out, Out2)>>>
+    ) -> KeyedStream<Key, (Out, Out2), impl Operator<(Key, (Out, Out2))>>
     where
         OperatorChain2: Operator<(Key, Out2)> + 'static,
         Out2: ExchangeData,

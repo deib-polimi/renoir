@@ -5,21 +5,21 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use crate::block::{
-    BlockStructure, Connection, InnerBlock, NextStrategy, OperatorReceiver, OperatorStructure,
+    Block, BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure,
 };
 use crate::channel::RecvError::Disconnected;
 use crate::channel::SelectResult;
 use crate::environment::StreamEnvironmentInner;
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
-use crate::operator::end::EndBlock;
-use crate::operator::iteration::iteration_end::IterationEndBlock;
+use crate::operator::end::End;
+use crate::operator::iteration::iteration_end::IterationEnd;
 use crate::operator::iteration::leader::IterationLeader;
 use crate::operator::iteration::state_handler::IterationStateHandler;
 use crate::operator::iteration::{
     IterationResult, IterationStateHandle, IterationStateLock, StateFeedback,
 };
 use crate::operator::source::Source;
-use crate::operator::start::StartBlock;
+use crate::operator::start::Start;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 use crate::stream::Stream;
@@ -392,7 +392,7 @@ where
         let state_clone = state.clone();
         let env = self.env.clone();
 
-        // the id of the block where IterationEndBlock is. At this moment we cannot know it, so we
+        // the id of the block where IterationEnd is. At this moment we cannot know it, so we
         // store a fake value inside this and as soon as we know it we set it to the right value.
         let shared_delta_update_end_block_id = Arc::new(AtomicUsize::new(0));
         let shared_feedback_end_block_id = Arc::new(AtomicUsize::new(0));
@@ -411,8 +411,7 @@ where
         );
         let leader_block_id = leader_stream.block.id;
         // the output stream is outside this loop, so it doesn't have the lock for this state
-        leader_stream.block.iteration_state_lock_stack =
-            self.block.iteration_state_lock_stack.clone();
+        leader_stream.block.iteration_ctx = self.block.iteration_ctx.clone();
 
         // the lock for synchronizing the access to the state of this iteration
         let state_lock = Arc::new(IterationStateLock::default());
@@ -420,7 +419,7 @@ where
         let input_block_id = self.block.id;
         let batch_mode = self.block.batch_mode;
         let mut input =
-            self.add_operator(|prev| EndBlock::new(prev, NextStrategy::only_one(), batch_mode));
+            self.add_operator(|prev| End::new(prev, NextStrategy::only_one(), batch_mode));
         input.block.is_only_one_strategy = true;
 
         let iterate_block_id = {
@@ -437,28 +436,25 @@ where
         );
 
         let mut iter_start = Stream {
-            block: InnerBlock::new(
+            block: Block::new(
                 iterate_block_id,
                 iter_source,
                 batch_mode,
-                input.block.iteration_state_lock_stack.clone(),
+                input.block.iteration_ctx.clone(),
             ),
             env: env.clone(),
         };
 
-        iter_start
-            .block
-            .iteration_state_lock_stack
-            .push(state_lock.clone());
+        iter_start.block.iteration_ctx.push(state_lock.clone());
         // save the stack of the iteration for checking the stream returned by the body
         let pre_iter_stack = iter_start.block.iteration_stack();
 
         // prepare the stream that will output the content of the loop
         let output = StreamEnvironmentInner::stream(
             env.clone(),
-            StartBlock::single(
+            Start::single(
                 iterate_block_id,
-                iter_start.block.iteration_state_lock_stack.last().cloned(),
+                iter_start.block.iteration_ctx.last().cloned(),
             ),
         );
         let output_block_id = output.block.id;
@@ -468,9 +464,9 @@ where
 
         // Split the body of the loop in 2: the end block of the loop must ignore the output stream
         // since it's manually handled by the Iterate operator.
-        let mut body = body.add_block(
+        let mut body = body.split_block(
             move |prev, next_strategy, batch_mode| {
-                let mut end = EndBlock::new(prev, next_strategy, batch_mode);
+                let mut end = End::new(prev, next_strategy, batch_mode);
                 end.ignore_destination(output_block_id);
                 end
             },
@@ -482,23 +478,23 @@ where
         if pre_iter_stack != post_iter_stack {
             panic!("The body of the iteration should return the stream given as parameter");
         }
-        body.block.iteration_state_lock_stack.pop().unwrap();
+        body.block.iteration_ctx.pop().unwrap();
 
         // First split of the body: the data will be reduced into delta updates
         let state_update_end = StreamEnvironmentInner::stream(
             env.clone(),
-            StartBlock::single(body.block.id, Some(state_lock)),
+            Start::single(body.block.id, Some(state_lock)),
         )
         .key_by(|_| ())
         .fold(StateUpdate::default(), local_fold)
         .drop_key()
-        .add_operator(|prev| IterationEndBlock::new(prev, leader_block_id));
+        .add_operator(|prev| IterationEnd::new(prev, leader_block_id));
         let state_update_end_block_id = state_update_end.block.id;
 
         // Second split of the body: the data will be fed back to the Iterate block
         let batch_mode = body.block.batch_mode;
         let mut feedback_end = body.add_operator(|prev| {
-            let mut end = EndBlock::new(prev, NextStrategy::only_one(), batch_mode);
+            let mut end = End::new(prev, NextStrategy::only_one(), batch_mode);
             end.mark_feedback(iterate_block_id);
             end
         });
@@ -511,13 +507,13 @@ where
         scheduler.add_block(feedback_end.block);
         scheduler.add_block(input.block);
         scheduler.connect_blocks(input_block_id, iterate_block_id, TypeId::of::<Out>());
-        // connect the end of the loop to the IterationEndBlock
+        // connect the end of the loop to the IterationEnd
         scheduler.connect_blocks(
             body_block_id,
             state_update_end_block_id,
             TypeId::of::<Out>(),
         );
-        // connect the IterationEndBlock to the IterationLeader
+        // connect the IterationEnd to the IterationLeader
         scheduler.connect_blocks(
             state_update_end_block_id,
             leader_block_id,
@@ -548,7 +544,7 @@ where
         //        the connections made by the scheduler and if accidentally set to OnlyOne will
         //        break the connections.
         (
-            leader_stream.add_block(EndBlock::new, NextStrategy::random()),
+            leader_stream.split_block(End::new, NextStrategy::random()),
             output,
         )
     }

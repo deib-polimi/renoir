@@ -4,14 +4,14 @@ use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStructure};
 use crate::operator::iteration::IterationStateLock;
-use crate::operator::start::{MultipleStartBlockReceiverOperator, StartBlock, TwoSidesItem};
+use crate::operator::start::{BinaryElement, BinaryStartOperator, Start};
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
 use crate::stream::Stream;
 
 #[derive(Clone)]
 pub struct Zip<Out1: ExchangeData, Out2: ExchangeData> {
-    prev: MultipleStartBlockReceiverOperator<Out1, Out2>,
+    prev: BinaryStartOperator<Out1, Out2>,
     stash1: VecDeque<StreamElement<Out1>>,
     stash2: VecDeque<StreamElement<Out2>>,
     prev_block_id1: BlockId,
@@ -38,7 +38,7 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
         state_lock: Option<Arc<IterationStateLock>>,
     ) -> Self {
         Self {
-            prev: StartBlock::multiple(
+            prev: Start::multiple(
                 prev_block_id1,
                 prev_block_id2,
                 left_cache,
@@ -63,16 +63,16 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1
         while self.stash1.is_empty() || self.stash2.is_empty() {
             let item = self.prev.next();
             match item {
-                StreamElement::Item(TwoSidesItem::Left(left)) => {
+                StreamElement::Item(BinaryElement::Left(left)) => {
                     self.stash1.push_back(StreamElement::Item(left))
                 }
-                StreamElement::Timestamped(TwoSidesItem::Left(left), ts) => {
+                StreamElement::Timestamped(BinaryElement::Left(left), ts) => {
                     self.stash1.push_back(StreamElement::Timestamped(left, ts))
                 }
-                StreamElement::Item(TwoSidesItem::Right(right)) => {
+                StreamElement::Item(BinaryElement::Right(right)) => {
                     self.stash2.push_back(StreamElement::Item(right))
                 }
-                StreamElement::Timestamped(TwoSidesItem::Right(right), ts) => {
+                StreamElement::Timestamped(BinaryElement::Right(right), ts) => {
                     self.stash2.push_back(StreamElement::Timestamped(right, ts))
                 }
                 // ignore LeftEnd | RightEnd

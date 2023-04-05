@@ -1,6 +1,6 @@
 use super::super::*;
 use crate::operator::{Data, DataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream, WindowedStream};
+use crate::stream::{KeyedStream, WindowedStream};
 
 #[derive(Clone)]
 struct CollectVec<I, O, F>
@@ -36,7 +36,7 @@ where
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowBuilder<Out>,
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
     Key: DataKey,
     Out: Data + Ord,
 {
@@ -44,7 +44,7 @@ where
     pub fn map<NewOut: Data, F: Fn(Vec<Out>) -> NewOut + Send + Clone + 'static>(
         self,
         f: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>> {
+    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>> {
         let acc = CollectVec::<Out, NewOut, _> {
             vec: Default::default(),
             f,

@@ -1,5 +1,5 @@
 use crate::operator::{Data, DataKey, Operator};
-use crate::stream::{KeyValue, KeyedStream, Stream};
+use crate::stream::{KeyedStream, Stream};
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
@@ -57,7 +57,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
+    OperatorChain: Operator<(Key, Out)> + 'static,
 {
     /// Apply a mapping operation to each element of the stream, the resulting stream will be the
     /// flattened values of the result of the mapping. The mapping function can be stateful.
@@ -67,11 +67,11 @@ where
     pub fn rich_flat_map<NewOut: Data, MapOut: Data, F>(
         self,
         f: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<KeyValue<Key, NewOut>>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
     where
         MapOut: IntoIterator<Item = NewOut>,
         <MapOut as IntoIterator>::IntoIter: Clone + Send + 'static,
-        F: FnMut(KeyValue<&Key, Out>) -> MapOut + Clone + Send + 'static,
+        F: FnMut((&Key, Out)) -> MapOut + Clone + Send + 'static,
     {
         self.rich_map(f).flatten()
     }
