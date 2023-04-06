@@ -2,12 +2,13 @@ use std::collections::VecDeque;
 use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStructure};
+use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::start::{BinaryElement, BinaryStartOperator, Start};
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::{BlockId, ExecutionMetadata};
-use crate::stream::Stream;
+
+use super::source::Source;
 
 #[derive(Clone)]
 pub struct Zip<Out1: ExchangeData, Out2: ExchangeData> {
@@ -30,7 +31,7 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Display for Zip<Out1, Out2> {
 }
 
 impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
-    fn new(
+    pub(super) fn new(
         prev_block_id1: BlockId,
         prev_block_id2: BlockId,
         left_cache: bool,
@@ -122,49 +123,9 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1
     }
 }
 
-impl<Out1: ExchangeData, OperatorChain1> Stream<Out1, OperatorChain1>
-where
-    OperatorChain1: Operator<Out1> + 'static,
-{
-    /// Given two [`Stream`]s, zip their elements together: the resulting stream will be a stream of
-    /// pairs, each of which is an element from both streams respectively.
-    ///
-    /// **Note**: all the elements after the end of one of the streams are discarded (i.e. the
-    /// resulting stream will have a number of elements that is the minimum between the lengths of
-    /// the two input streams).
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s1 = env.stream(IteratorSource::new(vec!['A', 'B', 'C', 'D'].into_iter()));
-    /// let s2 = env.stream(IteratorSource::new(vec![1, 2, 3].into_iter()));
-    /// let res = s1.zip(s2).collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// assert_eq!(res.get().unwrap(), vec![('A', 1), ('B', 2), ('C', 3)]);
-    /// ```
-    pub fn zip<Out2: ExchangeData, OperatorChain2>(
-        self,
-        oth: Stream<Out2, OperatorChain2>,
-    ) -> Stream<(Out1, Out2), impl Operator<(Out1, Out2)>>
-    where
-        OperatorChain2: Operator<Out2> + 'static,
-    {
-        let mut new_stream = self.add_y_connection(
-            oth,
-            Zip::new,
-            NextStrategy::only_one(),
-            NextStrategy::only_one(),
-        );
-        // if the zip operator is partitioned there could be some loss of data
-        new_stream.block.scheduler_requirements.max_parallelism(1);
-        new_stream
+impl<Out1: ExchangeData, Out2: ExchangeData> Source<(Out1, Out2)> for Zip<Out1, Out2> {
+    fn get_max_parallelism(&self) -> Option<usize> {
+        None
     }
 }
 

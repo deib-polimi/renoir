@@ -2,12 +2,11 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, DataKey, Operator, StreamElement};
+use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyedStream, Stream};
 
 #[derive(Clone)]
-struct Filter<Out: Data, PreviousOperator, Predicate>
+pub struct Filter<Out: Data, PreviousOperator, Predicate>
 where
     Predicate: Fn(&Out) -> bool + Send + Clone + 'static,
     PreviousOperator: Operator<Out> + 'static,
@@ -37,7 +36,7 @@ where
     Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
     PreviousOperator: Operator<Out> + 'static,
 {
-    fn new(prev: PreviousOperator, predicate: Predicate) -> Self {
+    pub(super) fn new(prev: PreviousOperator, predicate: Predicate) -> Self {
         Self {
             prev,
             predicate,
@@ -71,69 +70,6 @@ where
         self.prev
             .structure()
             .add_operator(OperatorStructure::new::<Out, _>("Filter"))
-    }
-}
-
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
-where
-    OperatorChain: Operator<Out> + 'static,
-{
-    /// Remove from the stream all the elements for which the provided predicate returns `false`.
-    ///
-    /// **Note**: this is very similar to [`Iteartor::filter`](std::iter::Iterator::filter)
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
-    /// let res = s.filter(|&n| n % 2 == 0).collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// assert_eq!(res.get().unwrap(), vec![0, 2, 4, 6, 8])
-    /// ```
-    pub fn filter<Predicate>(self, predicate: Predicate) -> Stream<Out, impl Operator<Out>>
-    where
-        Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
-    {
-        self.add_operator(|prev| Filter::new(prev, predicate))
-    }
-}
-
-impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
-where
-    OperatorChain: Operator<(Key, Out)> + 'static,
-{
-    /// Remove from the stream all the elements for which the provided predicate returns `false`.
-    ///
-    /// **Note**: this is very similar to [`Iteartor::filter`](std::iter::Iterator::filter)
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);
-    /// let res = s.filter(|&(_key, n)| n % 3 == 0).collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// let mut res = res.get().unwrap();
-    /// res.sort_unstable();
-    /// assert_eq!(res, vec![(0, 0), (0, 6), (1, 3), (1, 9)]);
-    /// ```
-    pub fn filter<Predicate>(
-        self,
-        predicate: Predicate,
-    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
-    where
-        Predicate: Fn(&(Key, Out)) -> bool + Clone + Send + 'static,
-    {
-        self.add_operator(|prev| Filter::new(prev, predicate))
     }
 }
 

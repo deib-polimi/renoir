@@ -5,7 +5,6 @@ use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, DataKey};
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
@@ -80,41 +79,6 @@ where
         self.prev
             .structure()
             .add_operator(OperatorStructure::new::<(Key, Out), _>("KeyBy"))
-    }
-}
-
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
-where
-    OperatorChain: Operator<Out> + 'static,
-{
-    /// Construct a [`KeyedStream`] from a [`Stream`] without shuffling the data.
-    ///
-    /// **Note**: this violates the semantics of [`KeyedStream`], without sending all the values
-    /// with the same key to the same replica some of the following operators may misbehave. You
-    /// probably need to use [`Stream::group_by`] instead.
-    ///
-    /// ## Example
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
-    /// let res = s.key_by(|&n| n % 2).collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// let mut res = res.get().unwrap();
-    /// res.sort_unstable();
-    /// assert_eq!(res, vec![(0, 0), (0, 2), (0, 4), (1, 1), (1, 3)]);
-    /// ```
-    pub fn key_by<Key: DataKey, Keyer>(
-        self,
-        keyer: Keyer,
-    ) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
-    where
-        Keyer: Fn(&Out) -> Key + Send + Clone + 'static,
-    {
-        KeyedStream(self.add_operator(|prev| KeyBy::new(prev, keyer)))
     }
 }
 

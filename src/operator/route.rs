@@ -36,6 +36,13 @@ pub struct RouterBuilder<T: ExchangeData, O: Operator<T>> {
 }
 
 impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Out, OperatorChain> {
+    pub(super) fn new(stream: Stream<Out, OperatorChain>) -> Self {
+        Self {
+            stream,
+            routes: Vec::new(),
+        }
+    }
+
     pub fn add_route(mut self, filter: fn(&Out) -> bool) -> Self {
         self.routes.push(FilterFn(filter));
         self
@@ -289,45 +296,6 @@ where
     T: Default,
 {
     T::default()
-}
-
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
-where
-    OperatorChain: Operator<Out> + 'static,
-{
-    /// Route each element depending on its content.
-    ///
-    /// + Routes are created with the `add_route` method, a new stream is created for each route.
-    /// + Each element is routed to the first stream for which the routing condition evaluates to true.
-    /// + If no route condition is satisfied, the element is dropped
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::prelude::*;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// # let s = env.stream_iter(0..10);
-    /// let mut routes = s.route()
-    ///     .add_route(|&i| i < 5)
-    ///     .add_route(|&i| i % 2 == 0)
-    ///     .build()
-    ///     .into_iter();
-    /// assert_eq!(routes.len(), 2);
-    /// // 0 1 2 3 4
-    /// routes.next().unwrap().for_each(|i| eprintln!("route1: {i}"));
-    /// // 6 8
-    /// routes.next().unwrap().for_each(|i| eprintln!("route2: {i}"));
-    /// // 5 7 9 ignored
-    /// env.execute();
-    /// ```
-    pub fn route(self) -> RouterBuilder<Out, OperatorChain> {
-        RouterBuilder {
-            stream: self,
-            routes: Vec::new(),
-        }
-    }
 }
 
 #[cfg(test)]

@@ -310,14 +310,14 @@ where
 
         // save the stack of the iteration for checking the stream returned by the body
         iter_start.block.iteration_ctx.push(state_lock);
-        let pre_iter_stack = iter_start.block.iteration_stack();
+        let pre_iter_stack = iter_start.block.iteration_ctx();
 
         let mut iter_end = body(iter_start, state_clone)
             .key_by(|_| ())
             .fold(DeltaUpdate::default(), local_fold)
             .drop_key();
 
-        let post_iter_stack = iter_end.block.iteration_stack();
+        let post_iter_stack = iter_end.block.iteration_ctx();
         if pre_iter_stack != post_iter_stack {
             panic!("The body of the iteration should return the stream given as parameter");
         }

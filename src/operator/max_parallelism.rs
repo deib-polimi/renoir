@@ -1,29 +1,3 @@
-use crate::block::NextStrategy;
-use crate::operator::end::End;
-use crate::operator::{ExchangeData, Operator};
-use crate::stream::Stream;
-use crate::CoordUInt;
-
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
-where
-    OperatorChain: Operator<Out> + 'static,
-{
-    /// Change the maximum parallelism of the following operators.
-    ///
-    /// **Note**: this operator is pretty advanced, some operators may need to be fully replicated
-    /// and will fail otherwise.
-    pub fn max_parallelism(self, max_parallelism: CoordUInt) -> Stream<Out, impl Operator<Out>> {
-        assert!(max_parallelism > 0, "Cannot set the parallelism to zero");
-
-        let mut new_stream = self.split_block(End::new, NextStrategy::only_one());
-        new_stream
-            .block
-            .scheduler_requirements
-            .max_parallelism(max_parallelism);
-        new_stream
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::config::EnvironmentConfig;

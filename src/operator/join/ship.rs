@@ -77,7 +77,7 @@ where
         let next_strategy2 = NextStrategy::group_by(keyer2.clone());
         let inner =
             prev.lhs
-                .add_y_connection(prev.rhs, Start::multiple, next_strategy1, next_strategy2);
+                .binary_connection(prev.rhs, Start::multiple, next_strategy1, next_strategy2);
         JoinStreamShipHash {
             inner,
             keyer1,
@@ -121,7 +121,7 @@ where
     {
         let keyer1 = prev.keyer1;
         let keyer2 = prev.keyer2;
-        let inner = prev.lhs.add_y_connection(
+        let inner = prev.lhs.binary_connection(
             prev.rhs,
             Start::multiple,
             NextStrategy::only_one(),

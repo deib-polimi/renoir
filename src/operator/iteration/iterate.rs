@@ -447,7 +447,7 @@ where
 
         iter_start.block.iteration_ctx.push(state_lock.clone());
         // save the stack of the iteration for checking the stream returned by the body
-        let pre_iter_stack = iter_start.block.iteration_stack();
+        let pre_iter_stack = iter_start.block.iteration_ctx();
 
         // prepare the stream that will output the content of the loop
         let output = StreamEnvironmentInner::stream(
@@ -474,7 +474,7 @@ where
         );
         let body_block_id = body.block.id;
 
-        let post_iter_stack = body.block.iteration_stack();
+        let post_iter_stack = body.block.iteration_ctx();
         if pre_iter_stack != post_iter_stack {
             panic!("The body of the iteration should return the stream given as parameter");
         }

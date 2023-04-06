@@ -105,7 +105,7 @@ where
     ///
     /// An empty vector is returned when the block is outside any iterations, more than one element
     /// if it's inside nested iterations.
-    pub(crate) fn iteration_stack(&self) -> Vec<*const ()> {
+    pub(crate) fn iteration_ctx(&self) -> Vec<*const ()> {
         self.iteration_ctx
             .iter()
             .map(|s| Arc::as_ptr(s) as *const ())

@@ -3,10 +3,9 @@ use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::merge::MergeElement;
-use crate::operator::reorder::Reorder;
+
 use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyedStream, Stream};
 
 type OutputElement<Key, Out, Out2> = (Key, (Out, Out2));
 
@@ -18,7 +17,7 @@ type OutputElement<Key, Out, Out2> = (Key, (Out, Out2));
 ///
 /// This operator assumes elements are received in increasing order of timestamp.
 #[derive(Clone, Debug)]
-struct IntervalJoin<Key, Out, Out2, OperatorChain>
+pub struct IntervalJoin<Key, Out, Out2, OperatorChain>
 where
     Key: ExchangeDataKey,
     Out: ExchangeData,
@@ -68,7 +67,7 @@ where
     Out2: ExchangeData,
     OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
 {
-    fn new(prev: OperatorChain, lower_bound: Timestamp, upper_bound: Timestamp) -> Self {
+    pub(super) fn new(prev: OperatorChain, lower_bound: Timestamp, upper_bound: Timestamp) -> Self {
         Self {
             prev,
             left: Default::default(),
@@ -196,73 +195,5 @@ where
             .add_operator(OperatorStructure::new::<(Key, (Out, Out2)), _>(
                 "IntervalJoin",
             ))
-    }
-}
-
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
-where
-    OperatorChain: Operator<Out> + 'static,
-{
-    /// Given two streams **with timestamps** join them according to an interval centered around the
-    /// timestamp of the left side.
-    ///
-    /// This means that an element on the left side with timestamp T will be joined to all the
-    /// elements on the right with timestamp Q such that `T - lower_bound <= Q <= T + upper_bound`.
-    ///
-    /// **Note**: this operator is not parallelized, all the elements are sent to a single node to
-    /// perform the join.
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    /// TODO: example
-    pub fn interval_join<Out2, OperatorChain2>(
-        self,
-        right: Stream<Out2, OperatorChain2>,
-        lower_bound: Timestamp,
-        upper_bound: Timestamp,
-    ) -> Stream<(Out, Out2), impl Operator<(Out, Out2)>>
-    where
-        Out2: ExchangeData,
-        OperatorChain2: Operator<Out2> + 'static,
-    {
-        let left = self.max_parallelism(1);
-        let right = right.max_parallelism(1);
-        left.merge_distinct(right)
-            .key_by(|_| ())
-            .add_operator(Reorder::new)
-            .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
-            .drop_key()
-    }
-}
-
-impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
-where
-    OperatorChain: Operator<(Key, Out)> + 'static,
-{
-    /// Given two streams **with timestamps** join them according to an interval centered around the
-    /// timestamp of the left side.
-    ///
-    /// This means that an element on the left side with timestamp T will be joined to all the
-    /// elements on the right with timestamp Q such that `T - lower_bound <= Q <= T + upper_bound`.
-    /// Only items with the same key can be joined together.
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    /// TODO: example
-    pub fn interval_join<Out2, OperatorChain2>(
-        self,
-        right: KeyedStream<Key, Out2, OperatorChain2>,
-        lower_bound: Timestamp,
-        upper_bound: Timestamp,
-    ) -> KeyedStream<Key, (Out, Out2), impl Operator<(Key, (Out, Out2))>>
-    where
-        Out2: ExchangeData,
-        OperatorChain2: Operator<(Key, Out2)> + 'static,
-    {
-        self.merge_distinct(right)
-            .add_operator(Reorder::new)
-            .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
     }
 }

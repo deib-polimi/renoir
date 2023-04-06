@@ -404,9 +404,9 @@ where
         let next_strategy1 = NextStrategy::only_one();
         let next_strategy2 = NextStrategy::only_one();
 
-        let inner = self
-            .0
-            .add_y_connection(rhs.0, Start::multiple, next_strategy1, next_strategy2);
+        let inner =
+            self.0
+                .binary_connection(rhs.0, Start::multiple, next_strategy1, next_strategy2);
 
         let s =
             inner.add_operator(move |prev| JoinKeyedOuter::new::<O1, O2>(prev, JoinVariant::Outer));
@@ -423,9 +423,9 @@ where
         let next_strategy1 = NextStrategy::only_one();
         let next_strategy2 = NextStrategy::only_one();
 
-        let inner = self
-            .0
-            .add_y_connection(rhs.0, Start::multiple, next_strategy1, next_strategy2);
+        let inner =
+            self.0
+                .binary_connection(rhs.0, Start::multiple, next_strategy1, next_strategy2);
 
         let s = inner.add_operator(move |prev| JoinKeyedInner::new::<O1, O2>(prev));
         KeyedStream(s)
