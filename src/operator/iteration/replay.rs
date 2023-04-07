@@ -328,7 +328,7 @@ where
 
         let mut env = iter_end.env.lock();
         let scheduler = env.scheduler_mut();
-        scheduler.add_block(iter_end.block);
+        scheduler.schedule_block(iter_end.block);
         // connect the IterationEnd to the IterationLeader
         scheduler.connect_blocks(
             iteration_end_block_id,

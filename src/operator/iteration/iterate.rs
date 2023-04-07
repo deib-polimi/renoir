@@ -503,9 +503,9 @@ where
 
         let mut env = env.lock();
         let scheduler = env.scheduler_mut();
-        scheduler.add_block(state_update_end.block);
-        scheduler.add_block(feedback_end.block);
-        scheduler.add_block(input.block);
+        scheduler.schedule_block(state_update_end.block);
+        scheduler.schedule_block(feedback_end.block);
+        scheduler.schedule_block(input.block);
         scheduler.connect_blocks(input_block_id, iterate_block_id, TypeId::of::<Out>());
         // connect the end of the loop to the IterationEnd
         scheduler.connect_blocks(
@@ -551,7 +551,7 @@ where
 }
 
 impl<Out: ExchangeData, State: ExchangeData + Sync> Source<Out> for Iterate<Out, State> {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         None
     }
 }

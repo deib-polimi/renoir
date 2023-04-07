@@ -21,5 +21,5 @@ mod parallel_iterator;
 /// This trait marks all the operators that can be used as sinks.
 pub trait Source<Out: Data>: Operator<Out> {
     /// The maximum parallelism offered by this operator.
-    fn get_max_parallelism(&self) -> Option<usize>;
+    fn max_parallelism(&self) -> Option<usize>;
 }

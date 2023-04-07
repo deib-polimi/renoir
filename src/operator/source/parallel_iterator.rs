@@ -198,7 +198,7 @@ where
     S::Item: Data,
     S::Iter: Send,
 {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         None
     }
 }

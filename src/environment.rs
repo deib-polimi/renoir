@@ -1,3 +1,4 @@
+use micrometer::Span;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::any::TypeId;
@@ -9,7 +10,6 @@ use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator};
-use crate::profiler::Stopwatch;
 #[cfg(feature = "ssh")]
 use crate::runner::spawn_remote_workers;
 use crate::scheduler::{BlockId, Scheduler};
@@ -48,7 +48,7 @@ pub struct StreamEnvironment {
     /// Reference to the actual content of the environment.
     inner: Arc<Mutex<StreamEnvironmentInner>>,
     /// Measure the time for building the graph.
-    build_time: Stopwatch,
+    build_time: Span<'static>,
 }
 
 impl Default for StreamEnvironment {
@@ -62,13 +62,14 @@ impl Default for StreamEnvironment {
 impl StreamEnvironment {
     /// Construct a new environment from the config.
     pub fn new(config: EnvironmentConfig) -> Self {
-        info!("Constructing environment");
+        debug!("new environment");
         if !config.skip_single_remote_check {
             Self::single_remote_environment_check(&config);
         }
+        micrometer::span!(noir_build_time);
         StreamEnvironment {
             inner: Arc::new(Mutex::new(StreamEnvironmentInner::new(config))),
-            build_time: Stopwatch::new("build"),
+            build_time: noir_build_time,
         }
     }
 
@@ -117,7 +118,7 @@ impl StreamEnvironment {
         drop(self.build_time);
         let _stopwatch = Stopwatch::new("execution");
         let mut env = self.inner.lock();
-        info!("Starting execution of {} blocks", env.block_count);
+        info!("starting execution ({} blocks)", env.block_count);
         let scheduler = env.scheduler.take().unwrap();
         scheduler.start(env.block_count).await;
     }
@@ -126,9 +127,9 @@ impl StreamEnvironment {
     #[cfg(not(feature = "async-tokio"))]
     pub fn execute(self) {
         drop(self.build_time);
-        let _stopwatch = Stopwatch::new("execution");
+        micrometer::span!("noir_execution");
         let mut env = self.inner.lock();
-        info!("Starting execution of {} blocks", env.block_count);
+        info!("starting execution ({} blocks)", env.block_count);
         let scheduler = env.scheduler.take().unwrap();
         scheduler.start(env.block_count);
     }
@@ -184,13 +185,9 @@ impl StreamEnvironmentInner {
             }
         }
 
-        let source_max_parallelism = source.get_max_parallelism();
+        let source_max_parallelism = source.max_parallelism();
         let mut block = env.new_block(source, Default::default(), Default::default());
 
-        info!(
-            "Creating a new stream, block_id={} with max_parallelism {:?}",
-            block.id, source_max_parallelism
-        );
         if let Some(p) = source_max_parallelism {
             block
                 .scheduler_requirements
@@ -207,6 +204,8 @@ impl StreamEnvironmentInner {
         iteration_ctx: Vec<Arc<IterationStateLock>>,
     ) -> Block<Out, S> {
         let new_id = self.new_block_id();
+        let parallelism = source.max_parallelism();
+        info!("new block (b{new_id:02}), max_parallelism {parallelism:?}",);
         Block::new(new_id, source, batch_mode, iteration_ctx)
     }
 
@@ -216,7 +215,7 @@ impl StreamEnvironmentInner {
     ) -> BlockId {
         let id = block.id;
         let scheduler = self.scheduler_mut();
-        scheduler.add_block(block);
+        scheduler.schedule_block(block);
         id
     }
 
@@ -229,7 +228,7 @@ impl StreamEnvironmentInner {
     pub(crate) fn new_block_id(&mut self) -> BlockId {
         let new_id = self.block_count;
         self.block_count += 1;
-        info!("Creating a new block, id={}", new_id);
+        debug!("new block_id (b{new_id:02})");
         new_id
     }
 

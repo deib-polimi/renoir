@@ -259,7 +259,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
 }
 
 impl<Out: Data + for<'a> Deserialize<'a>> Source<Out> for CsvSource<Out> {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         None
     }
 }

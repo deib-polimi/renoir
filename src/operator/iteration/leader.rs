@@ -123,15 +123,15 @@ where
             match rx.next() {
                 StreamElement::Item(state_update) => {
                     missing_state_updates -= 1;
-                    log::debug!(
-                        "IterationLeader at {} received a delta update, {} missing",
+                    log::trace!(
+                        "iter_leader delta_update {}, {} left",
                         self.coord,
                         missing_state_updates
                     );
                     (self.global_fold)(self.state.as_mut().unwrap(), state_update);
                 }
                 StreamElement::Terminate => {
-                    log::debug!("IterationLeader {} received Terminate", self.coord);
+                    log::trace!("iter_leader terminate {}", self.coord);
                     return Some(StreamElement::Terminate);
                 }
                 StreamElement::FlushAndRestart | StreamElement::FlushBatch => {}
@@ -151,16 +151,10 @@ where
         let should_continue = loop_condition && more_iterations;
 
         if !loop_condition {
-            log::debug!(
-                "IterationLeader at {} finished because of loop condition",
-                self.coord,
-            );
+            log::trace!("iter_leader finish_condition {}", self.coord,);
         }
         if !more_iterations {
-            log::debug!(
-                "IterationLeader at {} finished because of iteration limit",
-                self.coord
-            );
+            log::trace!("iter_leader finish_max_iter {}", self.coord);
         }
 
         if should_continue {
@@ -204,8 +198,8 @@ where
             return StreamElement::FlushAndRestart;
         }
         loop {
-            log::debug!(
-                "Leader {} is waiting for {} delta updates",
+            log::trace!(
+                "iter_leader {} {} delta updates left",
                 self.coord,
                 self.num_receivers
             );
@@ -259,7 +253,7 @@ where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
     LoopCond: Fn(&mut State) -> bool + Send + Clone,
 {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         Some(1)
     }
 }

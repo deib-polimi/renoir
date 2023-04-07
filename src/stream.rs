@@ -274,8 +274,7 @@ where
     /// and just add the last block to the scheduler.
     pub(crate) fn finalize_block(self) {
         let mut env = self.env.lock();
-        info!("Finalizing block id={}", self.block.id);
-        env.scheduler_mut().add_block(self.block);
+        env.scheduler_mut().schedule_block(self.block);
     }
 }
 

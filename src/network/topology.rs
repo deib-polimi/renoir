@@ -311,14 +311,12 @@ impl NetworkTopology {
                 self.async_join_handles.push(join_handle);
                 e.insert(demux);
             } else {
-                log::debug!("Demultiplexer of {} is useless since it has no previous remote block, ignoring", demux_coord);
+                log::debug!("demux {} skipping (no remote predecessors)", demux_coord);
             }
         }
         if let Some(demux) = demuxes.get_mut(&demux_coord) {
             demux.register(receiver_endpoint, local_sender)
-        } else {
-            log::debug!("Not registering demux")
-        };
+        }
     }
 
     fn register_mux<T: ExchangeData>(
@@ -353,10 +351,10 @@ impl NetworkTopology {
     /// This will initialize both the sender and the receiver to the receiver. If it's appropriate
     /// also the multiplexer and/or the demultiplexer are initialized and started.
     fn register_channel<T: ExchangeData>(&mut self, receiver_endpoint: ReceiverEndpoint) {
-        log::debug!("Registering {}", receiver_endpoint);
+        log::debug!("new endpoint {}", receiver_endpoint);
         assert!(
             !self.registered_receivers.contains(&receiver_endpoint),
-            "Receiver {receiver_endpoint} has already been registered",
+            "receiver {receiver_endpoint} has already been registered",
         );
         self.registered_receivers.insert(receiver_endpoint);
 
@@ -430,11 +428,11 @@ impl NetworkTopology {
         let from_remote = from.host_id != host_id;
         let to_remote = to.host_id != host_id;
 
-        log::debug!(
-            "New connection: {} (remote={}) -> {} (remote={})",
+        log::trace!(
+            "new connection: {} -> {}, remote: ({}, {})",
             from,
-            from_remote,
             to,
+            from_remote,
             to_remote
         );
         self.next
@@ -520,7 +518,7 @@ impl NetworkTopology {
             let port = host.base_port + *port_offset;
             *port_offset += 1;
             let address = (host.address.clone(), port);
-            log::debug!("Demultiplexer of {} is at {:?}", coord, address);
+            log::debug!("demux {} socket: {:?}", coord, address);
             self.demultiplexer_addresses.insert(coord, address);
         }
     }
@@ -537,7 +535,7 @@ impl NetworkTopology {
     }
 
     pub fn log(&self) {
-        let mut topology = "Execution graph:".to_owned();
+        let mut topology = "execution graph:".to_owned();
         for ((coord, _typ), next) in self.next.iter().sorted() {
             write!(&mut topology, "\n  {coord}:",).unwrap();
             for (next, fragile) in next.iter().sorted() {
@@ -550,7 +548,7 @@ impl NetworkTopology {
                 .unwrap();
             }
         }
-        log::debug!("{}", topology);
+        log::trace!("{}", topology);
     }
 }
 

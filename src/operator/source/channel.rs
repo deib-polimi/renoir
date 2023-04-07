@@ -60,7 +60,7 @@ impl<Out: Data> ChannelSource<Out> {
 }
 // TODO: remove Debug requirement
 impl<Out: Data + core::fmt::Debug> Source<Out> for ChannelSource<Out> {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         Some(1)
     }
 }

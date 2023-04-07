@@ -60,7 +60,7 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out> + 'static>(
 ) -> (JoinHandle<()>, BlockStructure) {
     let coord = metadata.coord;
 
-    info!("Starting worker for {}: {}", coord, block.to_string(),);
+    debug!("starting worker {}: {}", coord, block.to_string(),);
 
     block.operators.setup(metadata);
     let structure = block.operators.structure();
@@ -79,11 +79,11 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out> + 'static>(
 
 fn do_work<Out: Data, Op: Operator<Out> + 'static>(mut block: Block<Out, Op>, coord: Coord) {
     let mut catch_panic = CatchPanic::new(|| {
-        error!("Worker {} has crashed!", coord);
+        error!("worker {} crashed!", coord);
     });
     while !matches!(block.operators.next(), StreamElement::Terminate) {
         // nothing to do
     }
     catch_panic.defuse();
-    info!("Worker {} completed, exiting", coord);
+    info!("worker {} completed", coord);
 }

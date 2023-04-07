@@ -177,8 +177,8 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator<Out>
         self.missing_flush_and_restart = self.num_previous_replicas;
         self.watermark_frontier = WatermarkFrontier::new(prev_replicas);
 
-        log::debug!(
-            "Start {} of {} initialized",
+        log::trace!(
+            "{} initialized <{}>",
             metadata.coord,
             std::any::type_name::<Out>()
         );
@@ -192,11 +192,11 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator<Out>
         loop {
             // all the previous blocks sent an end: we're done
             if self.missing_terminate == 0 {
-                log::debug!("Start for {} has ended", coord);
+                log::trace!("{} ended", coord);
                 return StreamElement::Terminate;
             }
             if self.missing_flush_and_restart == 0 {
-                log::debug!("Start for {} is emitting flush and restart", coord);
+                log::trace!("{} flush_restart", coord);
 
                 self.missing_flush_and_restart = self.num_previous_replicas;
                 self.watermark_frontier.reset();
@@ -233,8 +233,8 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator<Out>
                             }
                             StreamElement::Terminate => {
                                 self.missing_terminate -= 1;
-                                log::debug!(
-                                    "{} received a Terminate, {} more to come",
+                                log::trace!(
+                                    "{} received terminate, {} left",
                                     coord,
                                     self.missing_terminate
                                 );
@@ -292,7 +292,7 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator<Out>
 }
 
 impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Source<Out> for Start<Out, Receiver> {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         None
     }
 }

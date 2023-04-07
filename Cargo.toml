@@ -84,7 +84,7 @@ parking_lot = "0.12.1"
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 glidesort = "0.1.2"
-micrometer = { version = "0.2.0", features = ["enable"] }
+micrometer = "0.2.1"
 
 
 [dev-dependencies]
@@ -96,6 +96,8 @@ criterion = { version = "0.4.0", features = ["html_reports"] }
 fake = "2.5.0"
 mimalloc = { version = "0.1.34", default-features = false }
 tracing-subscriber = "0.3.16"
+
+micrometer = { version = "0.2.1", features = ["enable"]}
 
 # for the examples
 regex = "1.7.1"

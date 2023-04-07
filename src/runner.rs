@@ -18,7 +18,6 @@ use ssh2::Session;
 use crate::config::CONFIG_ENV_VAR;
 use crate::config::HOST_ID_ENV_VAR;
 use crate::config::{RemoteHostConfig, RemoteRuntimeConfig};
-use crate::profiler::Stopwatch;
 use crate::scheduler::HostId;
 use crate::TracingData;
 
@@ -66,11 +65,10 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
         return;
     }
 
-    let stopwatch = Stopwatch::new("wall");
-
     // from now we are sure this is the process that should spawn the remote workers
-    info!("Spawning {} remote workers", config.hosts.len());
+    info!("starting {} remote workers", config.hosts.len());
 
+    let start = Instant::now();
     let exe_hash = executable_hash();
     let mut join_handles = Vec::new();
     let mut host_dup: HashMap<String, usize> = HashMap::new(); // Used to detect deployments with replicated host
@@ -103,8 +101,6 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
             tracing_data += data;
         }
     }
-    Stopwatch::print("max-remote-execution", max_execution_time);
-    Stopwatch::print("max-remote-sync", max_sync_time);
     if let Some(path) = config.tracing_dir {
         std::fs::create_dir_all(&path).expect("Cannot create tracing directory");
         let now = chrono::Local::now();
@@ -115,7 +111,9 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
             .expect("Failed to write tracing json file");
     }
 
-    drop(stopwatch);
+    log::info!("total time: {:?}", start.elapsed());
+    log::info!("max execution time: {max_execution_time:?}");
+    log::info!("max sync time: {max_sync_time:?}");
 
     // all the remote processes have finished, exit to avoid running the environment inside the
     // spawner process
@@ -148,7 +146,7 @@ fn remote_worker(
     if host.ssh.username.is_none() {
         host.ssh.username = Some(whoami::username());
     }
-    info!("Spawning remote worker for host {}: {:#?}", host_id, host);
+    info!("starting remote worker for host {}: {:#?}", host_id, host);
 
     // connect to the ssh server
     let address = (host.address.as_str(), host.ssh.ssh_port);
@@ -162,7 +160,7 @@ fn remote_worker(
     session.set_tcp_stream(stream);
     session.handshake().unwrap();
     log::debug!(
-        "Connected to ssh server for host {}: {:?}",
+        "connected to ssh server for host {}: {:?}",
         host_id,
         address
     );
@@ -192,15 +190,12 @@ fn remote_worker(
         session.authenticated(),
         "Failed to authenticate to remote host {host_id} at {address:?}"
     );
-    log::debug!("Authentication succeeded to host {}", host_id);
+    log::debug!("authentication succeeded to host {}", host_id);
 
     let sync_start = Instant::now();
 
     let current_exe = std::env::current_exe().unwrap();
-    log::debug!(
-        "Locally the executable is located at {}",
-        current_exe.display()
-    );
+    log::debug!("executable located at {}", current_exe.display());
 
     // generate a temporary file on remote host
     let remote_path = Path::new("/tmp/noir/").join(format!(
@@ -209,7 +204,7 @@ fn remote_worker(
         executable_uid
     ));
     log::debug!(
-        "On host {} the executable will be copied at {}",
+        "executable destination for host {}: {}",
         host_id,
         remote_path.display()
     );
@@ -225,39 +220,44 @@ fn remote_worker(
 
     // build the remote command
     let command = build_remote_command(host_id, &config, &remote_path, &host.perf_path);
-    log::debug!("Executing on host {}:\n{}", host_id, command);
+    log::debug!("executing on host {}:\n{}", host_id, command);
 
     let execution_start = Instant::now();
     let mut channel = session.channel_session().unwrap();
     channel.exec(&command).unwrap();
 
-    let reader = BufReader::new(&mut channel);
+    let stderr_reader = BufReader::new(channel.stderr());
+    let stdout_reader = BufReader::new(&mut channel);
 
-    for l in reader.lines() {
-        println!(
-            "{}|{}",
-            host_id,
-            l.unwrap_or_else(|e| format!("ERROR: {e}"))
-        );
-    }
-
-    // copy to stderr the output of the remote process
-    let reader = BufReader::new(channel.stderr());
     let mut tracing_data = None;
-    for line in reader.lines().flatten() {
-        if let Some(pos) = line.find("__noir2_TRACING_DATA__") {
-            let json_data = &line[(pos + "__noir2_TRACING_DATA__ ".len())..];
-            match serde_json::from_str(json_data) {
-                Ok(data) => tracing_data = Some(data),
-                Err(err) => {
-                    error!("Corrupted tracing data from host {}: {:?}", host_id, err);
+
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            for l in stdout_reader.lines() {
+                println!(
+                    "{}|{}",
+                    host_id,
+                    l.unwrap_or_else(|e| format!("ERROR: {e}"))
+                );
+            }
+        });
+        s.spawn(|| {
+            // copy to stderr the output of the remote process
+            for line in stderr_reader.lines().flatten() {
+                if let Some(pos) = line.find("__noir2_TRACING_DATA__") {
+                    let json_data = &line[(pos + "__noir2_TRACING_DATA__ ".len())..];
+                    match serde_json::from_str(json_data) {
+                        Ok(data) => tracing_data = Some(data),
+                        Err(err) => {
+                            error!("Corrupted tracing data from host {}: {:?}", host_id, err);
+                        }
+                    }
+                } else {
+                    eprintln!("{host_id}|{line}");
                 }
             }
-        } else {
-            // prefix each line with the id of the host
-            eprintln!("{host_id}|{line}");
-        }
-    }
+        });
+    });
 
     channel.wait_close().unwrap();
     let exit_code = channel.exit_status().unwrap();
@@ -297,7 +297,7 @@ fn remote_worker(
 
 /// Execute a command remotely and return the standard output and the exit code.
 fn run_remote_command(session: &mut Session, command: &str) -> (String, i32) {
-    log::debug!("Running remote command: {}", command);
+    log::debug!("remote command: {}", command);
     let mut channel = session.channel_session().unwrap();
     channel.exec(command).unwrap();
     let mut stdout = String::new();
@@ -317,8 +317,8 @@ fn send_executable(
 ) {
     let remote_path_str = remote_path.to_str().expect("non UTF-8 executable path");
     let metadata = local_path.metadata().unwrap();
-    log::info!(
-        "Sending executable to host {}: {} -> {}, {} bytes",
+    log::debug!(
+        "sending executable to host {}: {} -> {}, {} bytes",
         host_id,
         local_path.display(),
         remote_path.display(),
@@ -327,8 +327,8 @@ fn send_executable(
 
     let (_, result) = run_remote_command(session, &format!("ls {remote_path_str}",));
     if result == 0 {
-        info!(
-            "Remote file with matching hash `{}` already exists, skipping transfer.",
+        debug!(
+            "remote file with matching hash `{}` already exists, skipping transfer.",
             remote_path_str
         );
         return;
@@ -336,7 +336,7 @@ fn send_executable(
 
     let (msg, result) = run_remote_command(session, "mkdir -p /tmp/noir");
     if result != 0 {
-        warn!("Failed to create /tmp/noir directory [{result}]: {msg}");
+        warn!("failed to create /tmp/noir directory [{result}]: {msg}");
     }
 
     let mut local_file = File::open(local_path).unwrap();
@@ -356,7 +356,7 @@ fn send_executable(
     remote_file.close().unwrap();
     remote_file.wait_close().unwrap();
 
-    log::info!("Sent executable to host {}", host_id,);
+    log::info!("sent executable to host {}", host_id,);
 
     // setting the file mode using scp_send seems unreliable
     let chmod = format!(

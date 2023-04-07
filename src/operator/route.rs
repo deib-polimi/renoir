@@ -248,7 +248,7 @@ where
                 }
 
                 if !sent {
-                    log::debug!("router ignoring message");
+                    log::trace!("router ignoring message");
                 }
             }
             StreamElement::FlushBatch => {}
@@ -262,8 +262,8 @@ where
                 }
             }
             StreamElement::Terminate => {
-                log::debug!(
-                    "RoutingEnd at {} received Terminate, closing {} channels",
+                log::trace!(
+                    "routing_end terminate {}, closing {} channels",
                     self.coord.unwrap(),
                     self.senders.len()
                 );

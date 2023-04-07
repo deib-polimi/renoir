@@ -62,11 +62,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
         receiver_endpoint: ReceiverEndpoint,
         sender: Sender<NetworkMessage<In>>,
     ) {
-        log::debug!(
-            "registering {} to the demultiplexer of {}",
-            receiver_endpoint,
-            self.coord
-        );
+        log::debug!("demux register {} to {}", receiver_endpoint, self.coord);
         self.tx_senders
             .send((receiver_endpoint, sender))
             .unwrap_or_else(|_| panic!("register for {:?} failed", self.coord))
@@ -88,7 +84,7 @@ fn bind_remotes<In: ExchangeData>(
         .unwrap()
         .collect();
 
-    log::debug!("demux binding {}", address[0]);
+    log::debug!("{coord} binding {}", address[0]);
     let listener = TcpListener::bind(&*address)
         .map_err(|e| {
             anyhow!(
@@ -103,9 +99,9 @@ fn bind_remotes<In: ExchangeData>(
         .local_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    info!(
-        "Remote receiver at {} is ready to accept {} connections to {}",
-        coord, num_clients, address
+    debug!(
+        "{} ready at {}, waiting for {} clients",
+        coord, address, num_clients
     );
 
     // the list of JoinHandle of all the spawned threads, including the demultiplexer one
@@ -119,14 +115,14 @@ fn bind_remotes<In: ExchangeData>(
         let stream = match stream {
             Ok(stream) => stream,
             Err(e) => {
-                warn!("Failed to accept incoming connection at {}: {:?}", coord, e);
+                warn!("{} to accept incoming connection: {:?}", coord, e);
                 continue;
             }
         };
         connected_clients += 1;
         let peer_addr = stream.peer_addr().unwrap();
-        info!(
-            "Remote receiver at {} accepted a new connection from {} ({} / {})",
+        debug!(
+            "{} new connection from {} ({} / {})",
             coord, peer_addr, connected_clients, num_clients
         );
 
@@ -141,14 +137,14 @@ fn bind_remotes<In: ExchangeData>(
                 while let Ok((endpoint, sender)) = demux_rx.recv() {
                     senders.insert(endpoint, sender);
                 }
-                log::debug!("demux got senders");
+                log::debug!("{coord} got senders");
                 demux_thread::<In>(coord, senders, stream);
             })
             .unwrap();
         join_handles.push(join_handle);
         tx_broadcast.push(demux_tx);
     }
-    log::debug!("All connection to {} started, waiting for senders", coord);
+    log::debug!("{} all clients connected", coord);
     drop(listener);
 
     // Broadcast senders
@@ -161,7 +157,7 @@ fn bind_remotes<In: ExchangeData>(
     for handle in join_handles {
         handle.join().unwrap();
     }
-    log::debug!("all demuxes for {} finished", coord);
+    log::debug!("{} finished", coord);
 }
 
 /// Handle the connection with a remote sender.
@@ -189,19 +185,19 @@ fn demux_thread<In: ExchangeData>(
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    log::debug!("demultiplexer for {} at {} started", coord, address);
+    log::debug!("{} started", coord);
 
     // let mut r = std::io::BufReader::new(&mut stream);
     let mut r = &mut stream;
 
     while let Some((dest, message)) = remote_recv(coord, &mut r, &address) {
         if let Err(e) = senders[&dest].send(message) {
-            warn!("failed to send message to {}: {:?}", dest, e);
+            warn!("demux failed to send message to {}: {:?}", dest, e);
         }
     }
 
     let _ = stream.shutdown(Shutdown::Both);
-    log::debug!("demultiplexer for {} at {} exited", coord, address);
+    log::debug!("{} finished", coord);
 }
 
 #[cfg(feature = "async-tokio")]
@@ -348,14 +344,14 @@ async fn demux_thread<In: ExchangeData>(
         .peer_addr()
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
-    log::debug!("demultiplexer for {} at {} started", coord, address);
+    log::debug!("{} started", coord);
 
     while let Some((dest, message)) = remote_recv(coord, &mut stream, &address).await {
         if let Err(e) = senders[&dest].send(message) {
-            warn!("failed to send message to {}: {:?}", dest, e);
+            warn!("demux failed to send message to {}: {:?}", dest, e);
         }
     }
 
     stream.shutdown().await.unwrap();
-    log::debug!("demultiplexer for {} at {} exited", coord, address);
+    log::debug!("{} finished", coord);
 }

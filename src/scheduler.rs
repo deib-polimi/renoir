@@ -90,14 +90,16 @@ impl Scheduler {
     /// This spawns a worker for each replica of the block in the execution graph and saves its
     /// start handle. The handle will be later used to actually start the worker when the
     /// computation is asked to begin.
-    pub(crate) fn add_block<Out: Data, OperatorChain>(&mut self, block: Block<Out, OperatorChain>)
-    where
+    pub(crate) fn schedule_block<Out: Data, OperatorChain>(
+        &mut self,
+        block: Block<Out, OperatorChain>,
+    ) where
         OperatorChain: Operator<Out> + 'static,
     {
         let block_id = block.id;
         let info = self.block_info(&block);
-        info!(
-            "Adding new block id={}: {}",
+        debug!(
+            "schedule block (b{:02}): {}",
             block_id,
             block.to_string(),
             // info
@@ -131,7 +133,7 @@ impl Scheduler {
 
     /// Connect a pair of blocks inside the job graph.
     pub(crate) fn connect_blocks(&mut self, from: BlockId, to: BlockId, typ: TypeId) {
-        info!("Connecting blocks: {} -> {}", from, to);
+        debug!("connect block {} -> {}", from, to);
         self.next_blocks
             .entry(from)
             .or_default()
@@ -141,7 +143,7 @@ impl Scheduler {
 
     /// Connect a pair of blocks inside the job graph, marking the connection as fragile.
     pub(crate) fn connect_blocks_fragile(&mut self, from: BlockId, to: BlockId, typ: TypeId) {
-        info!("Connecting blocks: {} -> {} (fragile)", from, to);
+        debug!("connect block {} -> {} (fragile)", from, to);
         self.next_blocks
             .entry(from)
             .or_default()
@@ -152,7 +154,7 @@ impl Scheduler {
     #[cfg(feature = "async-tokio")]
     /// Start the computation returning the list of handles used to join the workers.
     pub(crate) async fn start(mut self, num_blocks: CoordUInt) {
-        info!("Starting scheduler: {:#?}", self.config);
+        debug!("start scheduler: {:?}", self.config);
         self.log_topology();
 
         assert_eq!(
@@ -190,7 +192,7 @@ impl Scheduler {
         }
 
         let job_graph = job_graph_generator.finalize();
-        log::debug!("Job graph in dot format:\n{}", job_graph);
+        log::debug!("job graph:\n{}", job_graph);
 
         self.network.finalize();
 
@@ -213,7 +215,7 @@ impl Scheduler {
     #[cfg(not(feature = "async-tokio"))]
     /// Start the computation returning the list of handles used to join the workers.
     pub(crate) fn start(mut self, num_blocks: CoordUInt) {
-        info!("Starting scheduler: {:#?}", self.config);
+        debug!("start scheduler: {:?}", self.config);
         self.log_topology();
 
         assert_eq!(
@@ -251,7 +253,7 @@ impl Scheduler {
         }
 
         let job_graph = job_graph_generator.finalize();
-        log::debug!("Job graph in dot format:\n{}", job_graph);
+        log::debug!("job graph:\n{}", job_graph);
 
         self.network.finalize();
 
@@ -311,7 +313,7 @@ impl Scheduler {
     }
 
     fn log_topology(&self) {
-        let mut topology = "Job graph:".to_string();
+        let mut topology = "job graph:".to_string();
         for (block_id, block) in self.block_info.iter() {
             write!(&mut topology, "\n  {}: {}", block_id, block.repr).unwrap();
             if let Some(next) = &self.next_blocks.get(block_id) {
@@ -324,15 +326,6 @@ impl Scheduler {
             }
         }
         log::debug!("{}", topology);
-        let mut assignments = "Replicas:".to_string();
-        for (block_id, block) in self.block_info.iter() {
-            write!(&mut assignments, "\n  {block_id}:",).unwrap();
-            let replicas = block.replicas.values().flatten().sorted();
-            for &coord in replicas {
-                write!(&mut assignments, " {coord}").unwrap();
-            }
-        }
-        log::debug!("{}", assignments);
     }
 
     /// Extract the `SchedulerBlockInfo` of a block.
@@ -368,7 +361,7 @@ impl Scheduler {
             .num_cores
             .min(max_parallelism.unwrap_or(CoordUInt::MAX));
         log::debug!(
-            "Block {} will have {} local replicas (max_parallelism={:?}), is_only_one_strategy={}",
+            "local (b{:02}): {{ replicas: {:2}, max_parallelism: {:?}, only_one: {} }}",
             block.id,
             instances,
             max_parallelism,
@@ -399,7 +392,6 @@ impl Scheduler {
         OperatorChain: Operator<Out>,
     {
         let max_parallelism = block.scheduler_requirements.max_parallelism;
-        log::debug!("Allocating block {} on remote runtime", block.id);
         // number of replicas we can assign at most
         let mut remaining_replicas = max_parallelism.unwrap_or(CoordUInt::MAX);
         let mut instances = 0;
@@ -411,10 +403,10 @@ impl Scheduler {
             let host_id: HostId = host_id.try_into().expect("host_id > max id");
             let num_host_replicas = host_info.num_cores.min(remaining_replicas);
             log::debug!(
-                "Block {} will have {} replicas on {} (max_parallelism={:?}, num_cores={})",
+                "remote (b{:02})[{}]: {{ replicas: {:2}, max_parallelism: {:?}, num_cores: {} }}",
                 block.id,
-                num_host_replicas,
                 host_info.to_string(),
+                num_host_replicas,
                 max_parallelism,
                 host_info.num_cores
             );

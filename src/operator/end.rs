@@ -184,7 +184,7 @@ where
             }
             StreamElement::Terminate => {
                 log::debug!(
-                    "End at {} received Terminate, closing {} channels",
+                    "{} received terminate, closing {} channels",
                     self.coord.unwrap(),
                     self.senders.len()
                 );

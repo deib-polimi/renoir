@@ -61,7 +61,7 @@ impl<Out: Data, It> Source<Out> for IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         Some(1)
     }
 }

@@ -1,5 +1,3 @@
-use std::time::{Duration, Instant};
-
 pub use metrics::*;
 #[cfg(feature = "profiler")]
 pub use with_profiler::*;
@@ -27,35 +25,6 @@ pub trait Profiler {
     fn net_bytes_out(&mut self, from: Coord, to: Coord, amount: usize);
     /// Mark the end of an iteration.
     fn iteration_boundary(&mut self, leader_block_id: BlockId);
-}
-
-/// Measure the time from the creating till the drop, and print the elapsed ns to the stderr.
-pub struct Stopwatch {
-    /// The name of the stopwatch.
-    name: String,
-    /// The instant of the start of the stopwatch.
-    start: Instant,
-}
-
-impl Stopwatch {
-    pub fn new<S: Into<String>>(name: S) -> Self {
-        Self {
-            name: name.into(),
-            start: Instant::now(),
-        }
-    }
-
-    /// Print a timing information in a recognizable format.
-    pub fn print(name: &str, elapsed: Duration) {
-        log::info!("timens:{}:{}", name, elapsed.as_nanos())
-    }
-}
-
-impl Drop for Stopwatch {
-    fn drop(&mut self) {
-        let dur = self.start.elapsed();
-        Self::print(&self.name, dur);
-    }
 }
 
 /// The implementation of the profiler when the `profiler` feature is enabled.

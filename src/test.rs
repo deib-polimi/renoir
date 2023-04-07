@@ -62,7 +62,7 @@ impl<Out: Data> Operator<Out> for FakeOperator<Out> {
 }
 
 impl<Out: Data> Source<Out> for FakeOperator<Out> {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         None
     }
 }

@@ -139,7 +139,7 @@ pub struct RemoteHostConfig {
 }
 
 /// The information used to connect to a remote host via SSH.
-#[derive(Debug, Clone, Serialize, Deserialize, Derivative, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct RemoteHostSSHConfig {
@@ -155,6 +155,21 @@ pub struct RemoteHostSSHConfig {
     pub key_file: Option<PathBuf>,
     /// The passphrase for decrypting the private SSH key.
     pub key_passphrase: Option<String>,
+}
+
+impl std::fmt::Debug for RemoteHostSSHConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RemoteHostSSHConfig")
+            .field("ssh_port", &self.ssh_port)
+            .field("username", &self.username)
+            .field("password", &self.password.as_ref().map(|_| "REDACTED"))
+            .field("key_file", &self.key_file)
+            .field(
+                "key_passphrase",
+                &self.key_passphrase.as_ref().map(|_| "REDACTED"),
+            )
+            .finish()
+    }
 }
 
 #[cfg(feature = "clap")]
@@ -216,7 +231,7 @@ impl EnvironmentConfig {
         let config = if let Some(config) = EnvironmentConfig::config_from_env() {
             config
         } else {
-            log::debug!("Reading remote config from: {}", config.as_ref().display());
+            log::info!("reading config from: {}", config.as_ref().display());
             let content = std::fs::read_to_string(config)?;
             serde_yaml::from_str(&content)?
         };
@@ -229,8 +244,7 @@ impl EnvironmentConfig {
         }
 
         let host_id = EnvironmentConfig::host_id(config.hosts.len().try_into().unwrap());
-        log::debug!("Detected host id: {:?}", host_id);
-        log::debug!("Remote runtime configuration: {:#?}", config);
+        log::debug!("host id: {host_id:?}, runtime configuration: {config:#?}");
         Ok(EnvironmentConfig {
             runtime: ExecutionRuntime::Remote(config),
             host_id,
@@ -262,7 +276,7 @@ impl EnvironmentConfig {
     fn config_from_env() -> Option<RemoteRuntimeConfig> {
         match std::env::var(CONFIG_ENV_VAR) {
             Ok(config) => {
-                info!("Reading remote config from env {}", CONFIG_ENV_VAR);
+                info!("reading remote config from env {}", CONFIG_ENV_VAR);
                 let config: RemoteRuntimeConfig =
                     serde_yaml::from_str(&config).expect("Invalid configuration from environment");
                 Some(config)

@@ -67,7 +67,7 @@ impl FileSource {
 }
 
 impl Source<String> for FileSource {
-    fn get_max_parallelism(&self) -> Option<usize> {
+    fn max_parallelism(&self) -> Option<usize> {
         None
     }
 }
@@ -113,7 +113,7 @@ impl Operator<String> for FileSource {
 
     fn next(&mut self) -> StreamElement<String> {
         if self.terminated {
-            log::debug!("{} emitting terminate", self.coord.unwrap());
+            log::trace!("terminate {}", self.coord.unwrap());
             return StreamElement::Terminate;
         }
         let element = if self.current <= self.end {
