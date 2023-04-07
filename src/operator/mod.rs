@@ -8,6 +8,10 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::{AddAssign, Div};
 
+#[cfg(feature = "crossbeam")]
+use crossbeam_channel::{unbounded, Receiver, Sender};
+#[cfg(not(feature = "crossbeam"))]
+use flume::{unbounded, Receiver};
 use serde::{Deserialize, Serialize};
 
 pub(crate) use start::*;
@@ -18,6 +22,12 @@ use crate::block::{group_by_hash, BlockStructure, NextStrategy};
 use crate::scheduler::ExecutionMetadata;
 use crate::{BatchMode, CoordUInt, KeyedStream, Stream};
 
+use self::sink::collect::Collect;
+use self::sink::collect_channel::CollectChannelSink;
+use self::sink::collect_count::CollectCountSink;
+use self::sink::collect_vec::CollectVecSink;
+use self::sink::for_each::ForEach;
+use self::sink::{StreamOutput, StreamOutputRef};
 use self::{
     add_timestamps::{AddTimestamp, DropTimestamp},
     end::End,
@@ -810,6 +820,27 @@ where
     {
         self.add_operator(|prev| FlatMap::new(prev, f))
     }
+
+    /// Apply the given function to all the elements of the stream, consuming the stream.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// s.for_each(|n| println!("Item: {}", n));
+    ///
+    /// env.execute();
+    /// ```
+    pub fn for_each<F>(self, f: F)
+    where
+        F: FnMut(I) + Send + Clone + 'static,
+    {
+        self.add_operator(|prev| ForEach::new(prev, f))
+            .finalize_block();
+    }
 }
 
 impl<I, Op> Stream<I, Op>
@@ -817,142 +848,10 @@ where
     I: ExchangeData,
     Op: Operator<I> + 'static,
 {
-    /// Perform the reduction operation separately for each key.
+    /// Duplicate each element of the stream and forward it to all the replicas of the next block.
     ///
-    /// This is equivalent of partitioning the stream using the `keyer` function, and then applying
-    /// [`Stream::reduce_assoc`] to each partition separately.
-    ///
-    /// Note however that there is a difference between `stream.group_by(keyer).reduce(...)` and
-    /// `stream.group_by_reduce(keyer, ...)`. The first performs the network shuffle of every item in
-    /// the stream, and **later** performs the reduction (i.e. nearly all the elements will be sent to
-    /// the network). The latter avoids sending the items by performing first a local reduction on
-    /// each host, and then send only the locally reduced results (i.e. one message per replica, per
-    /// key); then the global step is performed aggregating the results.
-    ///
-    /// The resulting stream will still be keyed and will contain only a single message per key (the
-    /// final result).
-    ///
-    /// Note that the output type must be the same as the input type, if you need a different type
-    /// consider using [`Stream::group_by_fold`].
-    ///
-    /// **Note**: this operator will retain all the messages of the stream and emit the values only
-    /// when the stream ends. Therefore this is not properly _streaming_.
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
-    /// let res = s
-    ///     .group_by_reduce(|&n| n % 2, |acc, value| *acc += value)
-    ///     .collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// let mut res = res.get().unwrap();
-    /// res.sort_unstable();
-    /// assert_eq!(res, vec![(0, 0 + 2 + 4), (1, 1 + 3)]);
-    /// ```
-    pub fn group_by_reduce<K, Fk, F>(
-        self,
-        keyer: Fk,
-        f: F,
-    ) -> KeyedStream<K, I, impl Operator<(K, I)>>
-    where
-        Fk: Fn(&I) -> K + Send + Clone + 'static,
-        F: Fn(&mut I, I) + Send + Clone + 'static,
-        K: ExchangeDataKey,
-    {
-        let f2 = f.clone();
-
-        self.group_by_fold(
-            keyer,
-            None,
-            move |acc, value| match acc {
-                None => *acc = Some(value),
-                Some(acc) => f(acc, value),
-            },
-            move |acc1, acc2| match acc1 {
-                None => *acc1 = acc2,
-                Some(acc1) => {
-                    if let Some(acc2) = acc2 {
-                        f2(acc1, acc2)
-                    }
-                }
-            },
-        )
-        .map(|(_, value)| value.unwrap())
-    }
-
-    /// Find, for each partition of the stream, the item with the smallest value.
-    ///
-    /// The stream is partitioned using the `keyer` function and the value to compare is obtained
-    /// with `get_value`.
-    ///
-    /// This operation is associative, therefore the computation is done in parallel before sending
-    /// all the elements to the network.
-    ///
-    /// **Note**: the comparison is done using the value returned by `get_value`, but the resulting
-    /// items have the same type as the input.
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
-    /// let res = s
-    ///     .group_by_min_element(|&n| n % 2, |&n| n)
-    ///     .collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// let mut res = res.get().unwrap();
-    /// res.sort_unstable();
-    /// assert_eq!(res, vec![(0, 0), (1, 1)]);
-    /// ```
-    pub fn group_by_min_element<K, V, Fk, Fv>(
-        self,
-        keyer: Fk,
-        get_value: Fv,
-    ) -> KeyedStream<K, I, impl Operator<(K, I)>>
-    where
-        Fk: KeyerFn<K, I> + Fn(&I) -> K,
-        Fv: KeyerFn<V, I> + Fn(&I) -> V,
-        K: ExchangeDataKey,
-        V: Ord,
-    {
-        self.group_by_reduce(keyer, move |out, value| {
-            if get_value(&value) < get_value(out) {
-                *out = value;
-            }
-        })
-    }
-
-    /// Reduce the stream into a stream that emits a single value.
-    ///
-    /// The reducing operator consists in adding to the current accumulation value  the value of the
-    /// current item in the stream.
-    ///
-    /// The reducing function is provided with a mutable reference to the current accumulator and the
-    /// owned item of the stream. The function should modify the accumulator without returning
-    /// anything.
-    ///
-    /// Note that the output type must be the same as the input type, if you need a different type
-    /// consider using [`Stream::fold`].
-    ///
-    /// **Note**: this operator will retain all the messages of the stream and emit the values only
-    /// when the stream ends. Therefore this is not properly _streaming_.
-    ///
-    /// **Note**: this operator is not parallelized, it creates a bottleneck where all the stream
-    /// elements are sent to and the folding is done using a single thread.
-    ///
-    /// **Note**: this is very similar to [`Iteartor::reduce`](std::iter::Iterator::reduce).
+    /// **Note**: this will duplicate the elements of the stream, this is potentially a very
+    /// expensive operation.
     ///
     /// **Note**: this operator will split the current block.
     ///
@@ -962,53 +861,11 @@ where
     /// # use noir::{StreamEnvironment, EnvironmentConfig};
     /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream_iter(0..5);
-    /// let res = s.reduce(|a, b| a + b).collect::<Vec<_>>();
-    ///
-    /// env.execute();
-    ///
-    /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// s.broadcast();
     /// ```
-    pub fn reduce<F>(self, f: F) -> Stream<I, impl Operator<I>>
-    where
-        F: Fn(I, I) -> I + Send + Clone + 'static,
-    {
-        self.fold(None, move |acc, b| {
-            *acc = Some(if let Some(a) = acc.take() { f(a, b) } else { b })
-        })
-        .map(|value| value.unwrap())
-    }
-
-    /// Given two streams **with timestamps** join them according to an interval centered around the
-    /// timestamp of the left side.
-    ///
-    /// This means that an element on the left side with timestamp T will be joined to all the
-    /// elements on the right with timestamp Q such that `T - lower_bound <= Q <= T + upper_bound`.
-    ///
-    /// **Note**: this operator is not parallelized, all the elements are sent to a single node to
-    /// perform the join.
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    /// TODO: example
-    pub fn interval_join<I2, Op2>(
-        self,
-        right: Stream<I2, Op2>,
-        lower_bound: Timestamp,
-        upper_bound: Timestamp,
-    ) -> Stream<(I, I2), impl Operator<(I, I2)>>
-    where
-        I2: ExchangeData,
-        Op2: Operator<I2> + 'static,
-    {
-        let left = self.max_parallelism(1);
-        let right = right.max_parallelism(1);
-        left.merge_distinct(right)
-            .key_by(|_| ())
-            .add_operator(Reorder::new)
-            .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
-            .drop_key()
+    pub fn broadcast(self) -> Stream<I, impl Operator<I>> {
+        self.split_block(End::new, NextStrategy::all())
     }
 
     /// Given a stream, make a [`KeyedStream`] partitioning the values according to a key generated
@@ -1043,76 +900,6 @@ where
             .split_block(End::new, next_strategy)
             .add_operator(|prev| KeyBy::new(prev, keyer));
         KeyedStream(new_stream)
-    }
-
-    /// Reduce the stream into a stream that emits a single value.
-    ///
-    /// The reducing operator consists in adding to the current accumulation value the value of the
-    /// current item in the stream.
-    ///
-    /// This method is very similary to [`Stream::reduce`], but performs the reduction distributely.
-    /// To do so the reducing function must be _associative_, in particular the reducing process is
-    /// performed in 2 steps:
-    ///
-    /// - local: the reducing function is used to reduce the elements present in each replica of
-    ///   the stream independently.
-    /// - global: all the partial results (the elements produced by the local step) have to be
-    ///   aggregated into a single result.
-    ///
-    /// Note that the output type must be the same as the input type, if you need a different type
-    /// consider using [`Stream::fold_assoc`].
-    ///
-    /// **Note**: this operator will retain all the messages of the stream and emit the values only
-    /// when the stream ends. Therefore this is not properly _streaming_.
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
-    /// let res = s.reduce_assoc(|a, b| a + b).collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
-    /// ```
-    pub fn reduce_assoc<F>(self, f: F) -> Stream<I, impl Operator<I>>
-    where
-        F: Fn(I, I) -> I + Send + Clone + 'static,
-    {
-        let f2 = f.clone();
-
-        self.fold_assoc(
-            None,
-            move |acc, b| *acc = Some(if let Some(a) = acc.take() { f(a, b) } else { b }),
-            move |acc1, mut acc2| {
-                *acc1 = match (acc1.take(), acc2.take()) {
-                    (Some(a), Some(b)) => Some(f2(a, b)),
-                    (None, Some(a)) | (Some(a), None) => Some(a),
-                    (None, None) => None,
-                }
-            },
-        )
-        .map(|value| value.unwrap())
-    }
-
-    /// Change the maximum parallelism of the following operators.
-    ///
-    /// **Note**: this operator is pretty advanced, some operators may need to be fully replicated
-    /// and will fail otherwise.
-    pub fn max_parallelism(self, max_parallelism: CoordUInt) -> Stream<I, impl Operator<I>> {
-        assert!(max_parallelism > 0, "Cannot set the parallelism to zero");
-
-        let mut new_stream = self.split_block(End::new, NextStrategy::only_one());
-        new_stream
-            .block
-            .scheduler_requirements
-            .max_parallelism(max_parallelism);
-        new_stream
     }
 
     /// Find, for each partition of the stream, the item with the largest value.
@@ -1336,10 +1123,189 @@ where
         )
     }
 
-    /// Duplicate each element of the stream and forward it to all the replicas of the next block.
+    /// Find, for each partition of the stream, the item with the smallest value.
     ///
-    /// **Note**: this will duplicate the elements of the stream, this is potentially a very
-    /// expensive operation.
+    /// The stream is partitioned using the `keyer` function and the value to compare is obtained
+    /// with `get_value`.
+    ///
+    /// This operation is associative, therefore the computation is done in parallel before sending
+    /// all the elements to the network.
+    ///
+    /// **Note**: the comparison is done using the value returned by `get_value`, but the resulting
+    /// items have the same type as the input.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .group_by_min_element(|&n| n % 2, |&n| n)
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 0), (1, 1)]);
+    /// ```
+    pub fn group_by_min_element<K, V, Fk, Fv>(
+        self,
+        keyer: Fk,
+        get_value: Fv,
+    ) -> KeyedStream<K, I, impl Operator<(K, I)>>
+    where
+        Fk: KeyerFn<K, I> + Fn(&I) -> K,
+        Fv: KeyerFn<V, I> + Fn(&I) -> V,
+        K: ExchangeDataKey,
+        V: Ord,
+    {
+        self.group_by_reduce(keyer, move |out, value| {
+            if get_value(&value) < get_value(out) {
+                *out = value;
+            }
+        })
+    }
+
+    /// Perform the reduction operation separately for each key.
+    ///
+    /// This is equivalent of partitioning the stream using the `keyer` function, and then applying
+    /// [`Stream::reduce_assoc`] to each partition separately.
+    ///
+    /// Note however that there is a difference between `stream.group_by(keyer).reduce(...)` and
+    /// `stream.group_by_reduce(keyer, ...)`. The first performs the network shuffle of every item in
+    /// the stream, and **later** performs the reduction (i.e. nearly all the elements will be sent to
+    /// the network). The latter avoids sending the items by performing first a local reduction on
+    /// each host, and then send only the locally reduced results (i.e. one message per replica, per
+    /// key); then the global step is performed aggregating the results.
+    ///
+    /// The resulting stream will still be keyed and will contain only a single message per key (the
+    /// final result).
+    ///
+    /// Note that the output type must be the same as the input type, if you need a different type
+    /// consider using [`Stream::group_by_fold`].
+    ///
+    /// **Note**: this operator will retain all the messages of the stream and emit the values only
+    /// when the stream ends. Therefore this is not properly _streaming_.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s
+    ///     .group_by_reduce(|&n| n % 2, |acc, value| *acc += value)
+    ///     .collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable();
+    /// assert_eq!(res, vec![(0, 0 + 2 + 4), (1, 1 + 3)]);
+    /// ```
+    pub fn group_by_reduce<K, Fk, F>(
+        self,
+        keyer: Fk,
+        f: F,
+    ) -> KeyedStream<K, I, impl Operator<(K, I)>>
+    where
+        Fk: Fn(&I) -> K + Send + Clone + 'static,
+        F: Fn(&mut I, I) + Send + Clone + 'static,
+        K: ExchangeDataKey,
+    {
+        let f2 = f.clone();
+
+        self.group_by_fold(
+            keyer,
+            None,
+            move |acc, value| match acc {
+                None => *acc = Some(value),
+                Some(acc) => f(acc, value),
+            },
+            move |acc1, acc2| match acc1 {
+                None => *acc1 = acc2,
+                Some(acc1) => {
+                    if let Some(acc2) = acc2 {
+                        f2(acc1, acc2)
+                    }
+                }
+            },
+        )
+        .map(|(_, value)| value.unwrap())
+    }
+
+    /// Given two streams **with timestamps** join them according to an interval centered around the
+    /// timestamp of the left side.
+    ///
+    /// This means that an element on the left side with timestamp T will be joined to all the
+    /// elements on the right with timestamp Q such that `T - lower_bound <= Q <= T + upper_bound`.
+    ///
+    /// **Note**: this operator is not parallelized, all the elements are sent to a single node to
+    /// perform the join.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    /// TODO: example
+    pub fn interval_join<I2, Op2>(
+        self,
+        right: Stream<I2, Op2>,
+        lower_bound: Timestamp,
+        upper_bound: Timestamp,
+    ) -> Stream<(I, I2), impl Operator<(I, I2)>>
+    where
+        I2: ExchangeData,
+        Op2: Operator<I2> + 'static,
+    {
+        let left = self.max_parallelism(1);
+        let right = right.max_parallelism(1);
+        left.merge_distinct(right)
+            .key_by(|_| ())
+            .add_operator(Reorder::new)
+            .add_operator(|prev| IntervalJoin::new(prev, lower_bound, upper_bound))
+            .drop_key()
+    }
+
+    /// Change the maximum parallelism of the following operators.
+    ///
+    /// **Note**: this operator is pretty advanced, some operators may need to be fully replicated
+    /// and will fail otherwise.
+    pub fn max_parallelism(self, max_parallelism: CoordUInt) -> Stream<I, impl Operator<I>> {
+        assert!(max_parallelism > 0, "Cannot set the parallelism to zero");
+
+        let mut new_stream = self.split_block(End::new, NextStrategy::only_one());
+        new_stream
+            .block
+            .scheduler_requirements
+            .max_parallelism(max_parallelism);
+        new_stream
+    }
+
+    /// Reduce the stream into a stream that emits a single value.
+    ///
+    /// The reducing operator consists in adding to the current accumulation value  the value of the
+    /// current item in the stream.
+    ///
+    /// The reducing function is provided with a mutable reference to the current accumulator and the
+    /// owned item of the stream. The function should modify the accumulator without returning
+    /// anything.
+    ///
+    /// Note that the output type must be the same as the input type, if you need a different type
+    /// consider using [`Stream::fold`].
+    ///
+    /// **Note**: this operator will retain all the messages of the stream and emit the values only
+    /// when the stream ends. Therefore this is not properly _streaming_.
+    ///
+    /// **Note**: this operator is not parallelized, it creates a bottleneck where all the stream
+    /// elements are sent to and the folding is done using a single thread.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::reduce`](std::iter::Iterator::reduce).
     ///
     /// **Note**: this operator will split the current block.
     ///
@@ -1349,11 +1315,76 @@ where
     /// # use noir::{StreamEnvironment, EnvironmentConfig};
     /// # use noir::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
-    /// s.broadcast();
+    /// let s = env.stream_iter(0..5);
+    /// let res = s.reduce(|a, b| a + b).collect::<Vec<_>>();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
     /// ```
-    pub fn broadcast(self) -> Stream<I, impl Operator<I>> {
-        self.split_block(End::new, NextStrategy::all())
+    pub fn reduce<F>(self, f: F) -> Stream<I, impl Operator<I>>
+    where
+        F: Fn(I, I) -> I + Send + Clone + 'static,
+    {
+        self.fold(None, move |acc, b| {
+            *acc = Some(if let Some(a) = acc.take() { f(a, b) } else { b })
+        })
+        .map(|value| value.unwrap())
+    }
+
+    /// Reduce the stream into a stream that emits a single value.
+    ///
+    /// The reducing operator consists in adding to the current accumulation value the value of the
+    /// current item in the stream.
+    ///
+    /// This method is very similary to [`Stream::reduce`], but performs the reduction distributely.
+    /// To do so the reducing function must be _associative_, in particular the reducing process is
+    /// performed in 2 steps:
+    ///
+    /// - local: the reducing function is used to reduce the elements present in each replica of
+    ///   the stream independently.
+    /// - global: all the partial results (the elements produced by the local step) have to be
+    ///   aggregated into a single result.
+    ///
+    /// Note that the output type must be the same as the input type, if you need a different type
+    /// consider using [`Stream::fold_assoc`].
+    ///
+    /// **Note**: this operator will retain all the messages of the stream and emit the values only
+    /// when the stream ends. Therefore this is not properly _streaming_.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s.reduce_assoc(|a, b| a + b).collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
+    /// ```
+    pub fn reduce_assoc<F>(self, f: F) -> Stream<I, impl Operator<I>>
+    where
+        F: Fn(I, I) -> I + Send + Clone + 'static,
+    {
+        let f2 = f.clone();
+
+        self.fold_assoc(
+            None,
+            move |acc, b| *acc = Some(if let Some(a) = acc.take() { f(a, b) } else { b }),
+            move |acc1, mut acc2| {
+                *acc1 = match (acc1.take(), acc2.take()) {
+                    (Some(a), Some(b)) => Some(f2(a, b)),
+                    (None, Some(a)) | (Some(a), None) => Some(a),
+                    (None, None) => None,
+                }
+            },
+        )
+        .map(|value| value.unwrap())
     }
 
     /// Route each element depending on its content.
@@ -1477,6 +1508,160 @@ where
         // if the zip operator is partitioned there could be some loss of data
         new_stream.block.scheduler_requirements.max_parallelism(1);
         new_stream
+    }
+
+    /// Close the stream and send resulting items to a channel on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, parallelism will
+    /// be set to 1 to gather all results
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let rx = s.collect_channel();
+    ///
+    /// env.execute();
+    /// let mut v = Vec::new();
+    /// while let Ok(x) = rx.recv() {
+    ///     v.push(x)
+    /// }
+    /// assert_eq!(v, (0..10u32).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_channel(self) -> Receiver<I> {
+        let (tx, rx) = unbounded();
+        self.max_parallelism(1)
+            .add_operator(|prev| CollectChannelSink::new(prev, tx))
+            .finalize_block();
+        rx
+    }
+    /// Close the stream and send resulting items to a channel on each single host.
+    ///
+    /// Each host sends its outputs to the channel without repartitioning.
+    /// Elements will be sent to the channel on the same host that produced
+    /// the output.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let rx = s.collect_channel();
+    ///
+    /// env.execute();
+    /// let mut v = Vec::new();
+    /// while let Ok(x) = rx.recv() {
+    ///     v.push(x)
+    /// }
+    /// assert_eq!(v, (0..10u32).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_channel_parallel(self) -> Receiver<I> {
+        let (tx, rx) = unbounded();
+        self.add_operator(|prev| CollectChannelSink::new(prev, tx))
+            .finalize_block();
+        rx
+    }
+
+    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
+    /// replicas sends the items to.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_count(self) -> StreamOutput<usize> {
+        let output = StreamOutputRef::default();
+        self.add_operator(|prev| Fold::new(prev, 0, |acc, _| *acc += 1))
+            .max_parallelism(1)
+            .add_operator(|prev| CollectCountSink::new(prev, output.clone()))
+            .finalize_block();
+        StreamOutput::from(output)
+    }
+
+    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
+    /// replicas sends the items to.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_vec(self) -> StreamOutput<Vec<I>> {
+        let output = StreamOutputRef::default();
+        self.max_parallelism(1)
+            .add_operator(|prev| CollectVecSink::new(prev, output.clone()))
+            .finalize_block();
+        StreamOutput::from(output)
+    }
+
+    /// Close the stream and store all the resulting items into a collection on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, parallelism will
+    /// be set to 1 to gather all results
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
+    /// ```
+    pub fn collect<C: FromIterator<I> + Send + 'static>(self) -> StreamOutput<C> {
+        let output = StreamOutputRef::default();
+        self.max_parallelism(1)
+            .add_operator(|prev| Collect::new(prev, output.clone()))
+            .finalize_block();
+        StreamOutput::from(output)
     }
 }
 
@@ -1921,6 +2106,28 @@ where
     pub fn drop_key(self) -> Stream<I, impl Operator<I>> {
         self.0.map(|(_k, v)| v)
     }
+
+    /// Apply the given function to all the elements of the stream, consuming the stream.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
+    /// s.for_each(|(key, n)| println!("Item: {} has key {}", n, key));
+    ///
+    /// env.execute();
+    /// ```
+    pub fn for_each<F>(self, f: F)
+    where
+        F: FnMut((K, I)) + Send + Clone + 'static,
+    {
+        self.0
+            .add_operator(|prev| ForEach::new(prev, f))
+            .finalize_block();
+    }
 }
 
 impl<K, I, Op> KeyedStream<K, I, Op>
@@ -1997,6 +2204,121 @@ where
         let right = right.map(|(_, x)| MergeElement::Right(x));
 
         left.merge(right)
+    }
+
+    /// Close the stream and send resulting items to a channel on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, parallelism will
+    /// be set to 1 to gather all results
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let rx = s.collect_channel();
+    ///
+    /// env.execute();
+    /// let mut v = Vec::new();
+    /// while let Ok(x) = rx.recv() {
+    ///     v.push(x)
+    /// }
+    /// assert_eq!(v, (0..10u32).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_channel(self) -> Receiver<(K, I)> {
+        self.unkey().collect_channel()
+    }
+    /// Close the stream and send resulting items to a channel on each single host.
+    ///
+    /// Each host sends its outputs to the channel without repartitioning.
+    /// Elements will be sent to the channel on the same host that produced
+    /// the output.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let rx = s.collect_channel();
+    ///
+    /// env.execute();
+    /// let mut v = Vec::new();
+    /// while let Ok(x) = rx.recv() {
+    ///     v.push(x)
+    /// }
+    /// assert_eq!(v, (0..10u32).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_channel_parallel(self) -> Receiver<(K, I)> {
+        self.unkey().collect_channel_parallel()
+    }
+
+    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
+    /// replicas sends the items to.
+    ///
+    /// **Note**: the collected items are the pairs `(key, value)`.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable(); // the output order is nondeterministic
+    /// assert_eq!(res, vec![(0, 0), (0, 2), (1, 1)]);
+    /// ```
+    pub fn collect_vec(self) -> StreamOutput<Vec<(K, I)>> {
+        self.unkey().collect_vec()
+    }
+
+    /// Close the stream and store all the resulting items into a collection on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, parallelism will
+    /// be set to 1 to gather all results
+    ///
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable(); // the output order is nondeterministic
+    /// assert_eq!(res, vec![(0, 0), (0, 2), (1, 1)]);
+    /// ```
+    pub fn collect<C: FromIterator<(K, I)> + Send + 'static>(self) -> StreamOutput<C> {
+        self.unkey().collect()
     }
 }
 

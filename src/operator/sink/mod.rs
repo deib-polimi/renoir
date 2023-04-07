@@ -7,11 +7,11 @@ use std::sync::{Arc, Mutex};
 
 use crate::operator::Operator;
 
-mod collect;
-mod collect_channel;
-mod collect_count;
-mod collect_vec;
-mod for_each;
+pub(super) mod collect;
+pub(super) mod collect_channel;
+pub(super) mod collect_count;
+pub(super) mod collect_vec;
+pub(super) mod for_each;
 
 /// This trait marks all the operators that can be used as sinks.
 pub(crate) trait Sink: Operator<()> {}
@@ -24,6 +24,12 @@ pub(crate) type StreamOutputRef<Out> = Arc<Mutex<Option<Out>>>;
 /// the content of the output you have to call [`StreamOutput::get`].
 pub struct StreamOutput<Out> {
     result: StreamOutputRef<Out>,
+}
+
+impl<Out> From<StreamOutputRef<Out>> for StreamOutput<Out> {
+    fn from(value: StreamOutputRef<Out>) -> Self {
+        Self { result: value }
+    }
 }
 
 impl<Out> StreamOutput<Out> {

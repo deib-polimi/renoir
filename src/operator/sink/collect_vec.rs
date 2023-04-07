@@ -1,10 +1,9 @@
 use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::operator::sink::{Sink, StreamOutput, StreamOutputRef};
-use crate::operator::{ExchangeData, ExchangeDataKey, Operator, StreamElement};
+use crate::operator::sink::{Sink, StreamOutputRef};
+use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyedStream, Stream};
 
 #[derive(Debug)]
 pub struct CollectVecSink<Out: ExchangeData, PreviousOperators>
@@ -14,6 +13,19 @@ where
     prev: PreviousOperators,
     result: Option<Vec<Out>>,
     output: StreamOutputRef<Vec<Out>>,
+}
+
+impl<Out: ExchangeData, PreviousOperators> CollectVecSink<Out, PreviousOperators>
+where
+    PreviousOperators: Operator<Out>,
+{
+    pub(crate) fn new(prev: PreviousOperators, output: StreamOutputRef<Vec<Out>>) -> Self {
+        Self {
+            prev,
+            result: Some(Vec::new()),
+            output,
+        }
+    }
 }
 
 impl<Out: ExchangeData, PreviousOperators> Display for CollectVecSink<Out, PreviousOperators>
@@ -72,80 +84,6 @@ where
 {
     fn clone(&self) -> Self {
         panic!("CollectVecSink cannot be cloned, max_parallelism should be 1");
-    }
-}
-
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
-where
-    OperatorChain: Operator<Out> + 'static,
-{
-    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
-    ///
-    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
-    /// replicas sends the items to.
-    ///
-    /// **Note**: the order of items and keys is unspecified.
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
-    /// let res = s.collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
-    /// ```
-    pub fn collect_vec(self) -> StreamOutput<Vec<Out>> {
-        let output = StreamOutputRef::default();
-        self.max_parallelism(1)
-            .add_operator(|prev| CollectVecSink {
-                prev,
-                result: Some(Vec::new()),
-                output: output.clone(),
-            })
-            .finalize_block();
-        StreamOutput { result: output }
-    }
-}
-
-impl<Key: ExchangeDataKey, Out: ExchangeData, OperatorChain> KeyedStream<Key, Out, OperatorChain>
-where
-    OperatorChain: Operator<(Key, Out)> + 'static,
-{
-    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
-    ///
-    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
-    /// replicas sends the items to.
-    ///
-    /// **Note**: the collected items are the pairs `(key, value)`.
-    ///
-    /// **Note**: the order of items and keys is unspecified.
-    ///
-    /// **Note**: this operator will split the current block.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
-    /// let res = s.collect_vec();
-    ///
-    /// env.execute();
-    ///
-    /// let mut res = res.get().unwrap();
-    /// res.sort_unstable(); // the output order is nondeterministic
-    /// assert_eq!(res, vec![(0, 0), (0, 2), (1, 1)]);
-    /// ```
-    pub fn collect_vec(self) -> StreamOutput<Vec<(Key, Out)>> {
-        self.unkey().collect_vec()
     }
 }
 
