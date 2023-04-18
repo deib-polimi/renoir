@@ -47,6 +47,7 @@ where
             prev: self.prev.clone(),
             f: self.f.clone(),
             frontiter: None,
+            #[cfg(feature = "timestamp")]
             timestamp: self.timestamp,
             _out: self._out,
             _iter_out: self._iter_out,
@@ -127,7 +128,7 @@ where
             match self.prev.next() {
                 #[cfg(not(feature = "timestamp"))]
                 StreamElement::Item(inner) | StreamElement::Timestamped(inner, _) => {
-                    self.frontiter = Some(inner.into_iter());
+                    self.frontiter = Some((self.f)(inner).into_iter());
                 }
 
                 #[cfg(feature = "timestamp")]
@@ -285,7 +286,8 @@ where
             match self.prev.next() {
                 #[cfg(not(feature = "timestamp"))]
                 StreamElement::Item((key, inner)) | StreamElement::Timestamped((key, inner), _) => {
-                    self.frontiter = Some((key, inner.into_iter()));
+                    let iter = (self.f)((&key, inner)).into_iter();
+                    self.frontiter = Some((key, iter));
                 }
                 #[cfg(feature = "timestamp")]
                 StreamElement::Item((key, inner)) => {

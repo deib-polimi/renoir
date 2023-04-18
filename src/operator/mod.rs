@@ -28,8 +28,12 @@ use self::sink::collect_count::CollectCountSink;
 use self::sink::collect_vec::CollectVecSink;
 use self::sink::for_each::ForEach;
 use self::sink::{StreamOutput, StreamOutputRef};
+#[cfg(feature = "timestamp")]
 use self::{
     add_timestamps::{AddTimestamp, DropTimestamp},
+    interval_join::IntervalJoin,
+};
+use self::{
     end::End,
     filter::Filter,
     filter_map::FilterMap,
@@ -37,7 +41,6 @@ use self::{
     flatten::{Flatten, KeyedFlatten},
     fold::Fold,
     inspect::Inspect,
-    interval_join::IntervalJoin,
     key_by::KeyBy,
     keyed_fold::KeyedFold,
     map::Map,
@@ -280,6 +283,7 @@ where
     ///     |&n, &ts| if n % 2 == 0 { Some(ts) } else { None }
     /// );
     /// ```
+    #[cfg(feature = "timestamp")]
     pub fn add_timestamps<F, G>(
         self,
         timestamp_gen: F,
@@ -292,6 +296,7 @@ where
         self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
     }
 
+    #[cfg(feature = "timestamp")]
     pub fn drop_timestamps(self) -> Stream<I, DropTimestamp<I, Op>> {
         self.add_operator(|prev| DropTimestamp::new(prev))
     }
@@ -1253,6 +1258,7 @@ where
     ///
     /// ## Example
     /// TODO: example
+    #[cfg(feature = "timestamp")]
     pub fn interval_join<I2, Op2>(
         self,
         right: Stream<I2, Op2>,
@@ -1734,6 +1740,7 @@ where
     ///     |&(_k, n), &ts| if n % 2 == 0 { Some(ts) } else { None }
     /// );
     /// ```
+    #[cfg(feature = "timestamp")]
     pub fn add_timestamps<F, G>(
         self,
         timestamp_gen: F,
@@ -1746,6 +1753,7 @@ where
         self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
     }
 
+    #[cfg(feature = "timestamp")]
     pub fn drop_timestamps(self) -> KeyedStream<K, I, impl Operator<(K, I)>> {
         self.add_operator(|prev| DropTimestamp::new(prev))
     }
@@ -2147,6 +2155,7 @@ where
     ///
     /// ## Example
     /// TODO: example
+    #[cfg(feature = "timestamp")]
     pub fn interval_join<I2, Op2>(
         self,
         right: KeyedStream<K, I2, Op2>,
