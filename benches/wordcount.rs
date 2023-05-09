@@ -1,44 +1,54 @@
+use std::collections::HashMap;
+use std::hash::BuildHasherDefault;
 use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use fake::Fake;
-use itertools::Itertools;
+use once_cell::sync::Lazy;
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
 use noir::operator::source::FileSource;
 use noir::BatchMode;
-use noir::EnvironmentConfig;
 use noir::StreamEnvironment;
+use regex::Regex;
 
 mod common;
 
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[a-zA-Z]+").unwrap());
+
 fn wordcount_fold(path: &Path) {
-    let config = EnvironmentConfig::local(4);
-    let mut env = StreamEnvironment::new(config);
+    let mut env = StreamEnvironment::default();
 
     let source = FileSource::new(path);
     let _result = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
-        .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
+        .flat_map(move |line| {
+            RE.find_iter(&line)
+                .map(|s| s.as_str().to_lowercase())
+                .collect::<Vec<_>>()
+        })
         .group_by(|word| word.clone())
         .fold(0, |count, _word| *count += 1)
-        .collect_vec();
+        .collect::<Vec<_>>();
     env.execute();
 }
 
 fn wordcount_fold_assoc(path: &Path) {
-    let config = EnvironmentConfig::local(4);
-    let mut env = StreamEnvironment::new(config);
+    let mut env = StreamEnvironment::default();
 
     let source = FileSource::new(path);
     let stream = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
-        .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
+        .flat_map(move |line| {
+            RE.find_iter(&line)
+                .map(|s| s.as_str().to_lowercase())
+                .collect::<Vec<_>>()
+        })
         .group_by_fold(
             |w| w.clone(),
             0,
@@ -51,17 +61,17 @@ fn wordcount_fold_assoc(path: &Path) {
 }
 
 fn wordcount_fold_assoc_kstring(path: &Path) {
-    let config = EnvironmentConfig::local(4);
-    let mut env = StreamEnvironment::new(config);
+    let mut env = StreamEnvironment::default();
 
     let source = FileSource::new(path);
     let stream = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
         .flat_map(move |line| {
-            line.split(' ')
+            RE.find_iter(&line)
+                .map(|m| m.as_str())
                 .map(kstring::KString::from_ref)
-                .collect_vec()
+                .collect::<Vec<_>>()
         })
         .group_by_fold(
             |w| w.clone(),
@@ -75,33 +85,98 @@ fn wordcount_fold_assoc_kstring(path: &Path) {
 }
 
 fn wordcount_reduce(path: &Path) {
-    let config = EnvironmentConfig::local(4);
-    let mut env = StreamEnvironment::new(config);
+    let mut env = StreamEnvironment::default();
 
     let source = FileSource::new(path);
     let _result = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
-        .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
+        .flat_map(move |line| {
+            RE.find_iter(&line)
+                .map(|s| s.as_str().to_lowercase())
+                .collect::<Vec<_>>()
+        })
         .group_by(|word| word.clone())
         .map(|(_, word)| (word, 1))
         .reduce(|(_w1, c1), (_w2, c2)| *c1 += c2)
-        .collect_vec();
+        .collect::<Vec<_>>();
     env.execute();
 }
 
 fn wordcount_reduce_assoc(path: &Path) {
-    let config = EnvironmentConfig::local(4);
-    let mut env = StreamEnvironment::new(config);
+    let mut env = StreamEnvironment::default();
 
     let source = FileSource::new(path);
     let stream = env
         .stream(source)
         .batch_mode(BatchMode::fixed(1024))
-        .flat_map(move |line| line.split(' ').map(|s| s.to_owned()).collect_vec())
+        .flat_map(move |line| {
+            RE.find_iter(&line)
+                .map(|s| s.as_str().to_lowercase())
+                .collect::<Vec<_>>()
+        })
         .map(|word| (word, 1))
         .group_by_reduce(|w| w.clone(), |(_w1, c1), (_w, c2)| *c1 += c2)
         .unkey();
+    let _result = stream.collect_vec();
+    env.execute();
+}
+
+fn wordcount_fast(path: &Path) {
+    let mut env = StreamEnvironment::default();
+
+    let stream = env
+        .stream_file(path)
+        .batch_mode(BatchMode::fixed(1024))
+        .fold_assoc(
+            HashMap::<String, u64, BuildHasherDefault<wyhash::WyHash>>::default(),
+            |acc, line| {
+                let mut word = String::with_capacity(8);
+                for c in line.chars() {
+                    if c.is_ascii_alphabetic() {
+                        word.push(c.to_ascii_lowercase());
+                    } else if !word.is_empty() {
+                        let key = std::mem::replace(&mut word, String::with_capacity(8));
+                        *acc.entry(key).or_default() += 1;
+                    }
+                }
+            },
+            |a, mut b| {
+                for (k, v) in b.drain() {
+                    *a.entry(k).or_default() += v;
+                }
+            },
+        );
+    let _result = stream.collect_vec();
+    env.execute();
+}
+
+fn wordcount_fast_kstring(path: &Path) {
+    let mut env = StreamEnvironment::default();
+
+    let stream = env
+        .stream_file(path)
+        .batch_mode(BatchMode::fixed(1024))
+        .fold_assoc(
+            HashMap::<kstring::KString, u64, BuildHasherDefault<wyhash::WyHash>>::default(),
+            |acc, line| {
+                let mut word = String::with_capacity(8);
+                for c in line.chars() {
+                    if c.is_ascii_alphabetic() {
+                        word.push(c.to_ascii_lowercase());
+                    } else if !word.is_empty() {
+                        let key = kstring::KString::from_ref(word.as_str());
+                        *acc.entry(key).or_default() += 1;
+                        word.truncate(0);
+                    }
+                }
+            },
+            |a, mut b| {
+                for (k, v) in b.drain() {
+                    *a.entry(k).or_default() += v;
+                }
+            },
+        );
     let _result = stream.collect_vec();
     env.execute();
 }
@@ -140,6 +215,12 @@ fn wordcount_benchmark(c: &mut Criterion) {
     });
     group.bench_function("wordcount-reduce-assoc", |b| {
         b.iter(|| wordcount_reduce_assoc(black_box(path)))
+    });
+    group.bench_function("wordcount-fast", |b| {
+        b.iter(|| wordcount_fast(black_box(path)))
+    });
+    group.bench_function("wordcount-fast-kstring", |b| {
+        b.iter(|| wordcount_fast_kstring(black_box(path)))
     });
     group.finish();
 }

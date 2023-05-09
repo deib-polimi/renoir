@@ -41,18 +41,10 @@ where
 }
 
 pub fn noir_max_parallism_env() -> StreamEnvironment {
-    noir_local_env(max_cpu_parallelism())
+    StreamEnvironment::default()
 }
 
 pub fn noir_local_env(parallelism: CoordUInt) -> StreamEnvironment {
     let config = EnvironmentConfig::local(parallelism);
     StreamEnvironment::new(config)
-}
-
-pub fn max_cpu_parallelism() -> CoordUInt {
-    std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4)
-        .try_into()
-        .unwrap()
 }
