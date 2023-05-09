@@ -64,14 +64,7 @@ struct JoinKeyedOuter<K: DataKey + ExchangeData, V1: ExchangeData, V2: ExchangeD
 }
 
 impl<K: DataKey + ExchangeData, V1: ExchangeData, V2: ExchangeData> JoinKeyedOuter<K, V1, V2> {
-    pub(crate) fn new<O1, O2>(
-        prev: BinaryStartOperator<(K, V1), (K, V2)>,
-        variant: JoinVariant,
-    ) -> Self
-    where
-        O1: Operator<(K, V1)> + 'static,
-        O2: Operator<(K, V2)> + 'static,
-    {
+    pub(crate) fn new(prev: BinaryStartOperator<(K, V1), (K, V2)>, variant: JoinVariant) -> Self {
         JoinKeyedOuter {
             prev,
             variant,
@@ -287,11 +280,7 @@ impl<K: DataKey + ExchangeData, V1: ExchangeData, V2: ExchangeData> Display
 impl<K: DataKey + ExchangeData + Debug, V1: ExchangeData + Debug, V2: ExchangeData + Debug>
     JoinKeyedInner<K, V1, V2>
 {
-    pub(crate) fn new<O1, O2>(prev: BinaryStartOperator<(K, V1), (K, V2)>) -> Self
-    where
-        O1: Operator<(K, V1)> + 'static,
-        O2: Operator<(K, V2)> + 'static,
-    {
+    pub(crate) fn new(prev: BinaryStartOperator<(K, V1), (K, V2)>) -> Self {
         JoinKeyedInner {
             prev,
             _k: PhantomData,
@@ -408,8 +397,7 @@ where
             self.0
                 .binary_connection(rhs.0, Start::multiple, next_strategy1, next_strategy2);
 
-        let s =
-            inner.add_operator(move |prev| JoinKeyedOuter::new::<O1, O2>(prev, JoinVariant::Outer));
+        let s = inner.add_operator(move |prev| JoinKeyedOuter::new(prev, JoinVariant::Outer));
         KeyedStream(s)
     }
 
@@ -427,7 +415,7 @@ where
             self.0
                 .binary_connection(rhs.0, Start::multiple, next_strategy1, next_strategy2);
 
-        let s = inner.add_operator(move |prev| JoinKeyedInner::new::<O1, O2>(prev));
+        let s = inner.add_operator(move |prev| JoinKeyedInner::new(prev));
         KeyedStream(s)
     }
 }

@@ -2215,6 +2215,27 @@ where
         left.merge(right)
     }
 
+    /// Perform a network shuffle sending the messages to a random replica.
+    ///
+    /// This operator returns a `Stream` instead of a `KeyedStream` as after
+    /// shuffling the messages between replicas, the keyed semantics are lost.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let res = s.shuffle();
+    /// ```
+
+    pub fn shuffle(self) -> Stream<(K, I), impl Operator<(K, I)>> {
+        self.0.split_block(End::new, NextStrategy::random())
+    }
+
     /// Close the stream and send resulting items to a channel on a single host.
     ///
     /// If the stream is distributed among multiple replicas, parallelism will
