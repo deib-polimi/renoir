@@ -15,4 +15,4 @@ pub use session::SessionWindow;
 #[cfg(feature = "timestamp")]
 mod transaction;
 #[cfg(feature = "timestamp")]
-pub use transaction::{TransactionWindow, TxCommand as TransactionCommand};
+pub use transaction::{TransactionOp, TransactionWindow};

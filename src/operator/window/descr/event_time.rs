@@ -107,6 +107,7 @@ where
     }
 }
 
+/// Window based on event timestamps
 #[derive(Clone)]
 pub struct EventTimeWindow {
     size: Timestamp,
@@ -128,7 +129,7 @@ impl EventTimeWindow {
     }
 }
 
-impl<T: Data> WindowBuilder<T> for EventTimeWindow {
+impl<T: Data> WindowDescription<T> for EventTimeWindow {
     type Manager<A: WindowAccumulator<In = T>> = EventTimeWindowManager<A>;
 
     #[inline]

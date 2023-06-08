@@ -87,6 +87,7 @@ where
     }
 }
 
+/// Window based on wall clock at time of processing
 #[derive(Clone)]
 pub struct ProcessingTimeWindow {
     size: Duration,
@@ -108,7 +109,7 @@ impl ProcessingTimeWindow {
     }
 }
 
-impl<T: Data> WindowBuilder<T> for ProcessingTimeWindow {
+impl<T: Data> WindowDescription<T> for ProcessingTimeWindow {
     type Manager<A: WindowAccumulator<In = T>> = ProcessingTimeWindowManager<A>;
 
     #[inline]

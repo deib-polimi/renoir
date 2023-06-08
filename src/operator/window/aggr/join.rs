@@ -84,7 +84,7 @@ where
     where
         OperatorChain2: Operator<(Key, Out2)> + 'static,
         Out2: ExchangeData,
-        WindowDescr: WindowBuilder<MergeElement<Out, Out2>> + 'static,
+        WindowDescr: WindowDescription<MergeElement<Out, Out2>> + 'static,
     {
         let acc = Join::<Out, Out2> {
             left: Default::default(),

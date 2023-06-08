@@ -8,7 +8,7 @@ use crate::environment::StreamEnvironmentInner;
 use crate::operator::end::End;
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
-use crate::operator::window::WindowBuilder;
+use crate::operator::window::WindowDescription;
 use crate::operator::DataKey;
 use crate::operator::Start;
 use crate::operator::{Data, ExchangeData, KeyerFn, Operator};
@@ -43,34 +43,33 @@ pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(pub Stream<(Key, Out
 where
     OperatorChain: Operator<(Key, Out)>;
 
-/// A [`KeyedWindowedStream`] is a data stream partitioned by `Key`, where elements of each partition
+/// A [`WindowedStream`] is a data stream partitioned by `Key`, where elements of each partition
 /// are divided in groups called windows.
 /// Each element can be assigned to one or multiple windows.
 ///
 /// Windows are handled independently for each partition of the stream.
 /// Each partition may be processed in parallel.
 ///
-/// The trait [`WindowDescription`] is used to specify how windows behave, that is how elements are
-/// grouped into windows.
+/// The windowing logic is implemented through 3 traits:
+/// - A [`WindowDescription`] contains the parameters and logic that characterize the windowing strategy,
+///   when given a `WindowAccumulator` it instantiates a `WindowManager`.
+/// - A [`WindowManger`](crate::operator::window::WindowManager) is the struct responsible for creating
+///   the windows and forwarding the input elements to the correct window which will should pass it to
+///   its `WindowAccumulator`.
+/// - A [`WindowAccumulator`](crate::operator::window::WindowAccumulator) contains the logic that should
+///   be applied to the elements of each window.
 ///
-/// These are the windows supported out-of-the-box:
+/// There are a set of provided window descriptions with their respective managers:
 ///  - [`EventTimeWindow`][crate::operator::window::EventTimeWindow]
-///     - [`EventTimeWindow::sliding`][crate::operator::window::EventTimeWindow::sliding]
-///     - [`EventTimeWindow::tumbling`][crate::operator::window::EventTimeWindow::tumbling]
-///     - [`EventTimeWindow::session`][crate::operator::window::EventTimeWindow::session]
 ///  - [`ProcessingTimeWindow`][crate::operator::window::ProcessingTimeWindow]
-///     - [`ProcessingTimeWindow::sliding`][crate::operator::window::ProcessingTimeWindow::sliding]
-///     - [`ProcessingTimeWindow::tumbling`][crate::operator::window::ProcessingTimeWindow::tumbling]
-///     - [`ProcessingTimeWindow::session`][crate::operator::window::ProcessingTimeWindow::session]
 ///  - [`CountWindow`][crate::operator::window::CountWindow]
-///     - [`CountWindow::sliding`][crate::operator::window::CountWindow::sliding]
-///     - [`CountWindow::tumbling`][crate::operator::window::CountWindow::tumbling]
+///  - [`SessionWindow`][crate::operator::window::SessionWindow]
+///  - [`TransactionWindow`][crate::operator::window::TransactionWindow]
 ///
-/// To apply a window to a [`KeyedStream`], see [`KeyedStream::window`].
 pub struct WindowedStream<K: DataKey, I: Data, Op, O: Data, WinDescr>
 where
     Op: Operator<(K, I)>,
-    WinDescr: WindowBuilder<I>,
+    WinDescr: WindowDescription<I>,
 {
     pub(crate) inner: KeyedStream<K, I, Op>,
     pub(crate) descr: WinDescr,

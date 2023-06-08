@@ -1,4 +1,4 @@
-//! Some utility structures for building the join operators.
+//! Structures for building the join operators.
 //!
 //! The actual operators are [`Stream::join`], [`Stream::left_join`], [`Stream::outer_join`] and
 //! [`Stream::join_with`].

@@ -2,7 +2,7 @@
 //!
 //! The actual operator list can be found from the implemented methods of [`Stream`](crate::Stream),
 //! [`KeyedStream`](crate::KeyedStream), [`WindowedStream`](crate::WindowedStream) and
-//! [`KeyedWindowedStream`](crate::KeyedWindowedStream).
+//! [`WindowedStream`](crate::WindowedStream).
 
 use std::fmt::Display;
 use std::hash::Hash;

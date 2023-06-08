@@ -38,7 +38,7 @@ where
 
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
-    WindowDescr: WindowBuilder,
+    WindowDescr: WindowDescription,
     OperatorChain: Operator<KeyValue<Key, Out>> + 'static,
     Key: DataKey,
     Out: Data + Ord,

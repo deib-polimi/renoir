@@ -1,6 +1,6 @@
 use fxhash::FxHashMap;
 use nexmark::config::NexmarkConfig;
-use noir::operator::window::TransactionCommand;
+use noir::operator::window::TransactionOp;
 use noir::operator::window::TransactionWindow;
 use noir::operator::ElementGenerator;
 use noir::operator::Operator;
@@ -47,8 +47,8 @@ fn winning_bids(
             _ => unreachable!(),
         })
         .window(TransactionWindow::new(|e| match e {
-            Event::Auction(a) => TransactionCommand::CommitAfter(a.expires as i64),
-            _ => TransactionCommand::None,
+            Event::Auction(a) => TransactionOp::CommitAfter(a.expires as i64),
+            _ => TransactionOp::Continue,
         }))
         // find the bid with the maximum price
         .fold(

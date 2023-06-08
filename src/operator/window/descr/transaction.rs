@@ -1,22 +1,25 @@
 use super::super::*;
 use crate::operator::{Data, StreamElement};
 
-pub enum TxCommand {
-    /// Output the result of the accumulator for this window
+/// Controls the status of a transaction window after the current element has been accumulated.
+#[derive(Default)]
+pub enum TransactionOp {
+    /// Keep the window open and continue accumulating elements in this window.
+    #[default]
+    Continue,
+    /// Output the result of the accumulator for this window.
     Commit,
-    /// Output the result of the accumulator when the watermark is greater than a timestamp
+    /// Output the result of the accumulator when the watermark is greater than a timestamp.
     CommitAfter(Timestamp),
-    /// Discard the result of the accumulator for this window
+    /// Discard the result of the accumulator for this window.
     Discard,
-    /// No action
-    None,
 }
 
 #[derive(Clone)]
 pub struct TransactionWindowManager<A, F>
 where
     A: WindowAccumulator,
-    F: Fn(&A::In) -> TxCommand,
+    F: Fn(&A::In) -> TransactionOp,
 {
     init: A,
     f: F,
@@ -36,7 +39,7 @@ impl<A> Slot<A> {
     }
 }
 
-impl<A: WindowAccumulator, F: Fn(&A::In) -> TxCommand + Clone + Send + 'static> WindowManager
+impl<A: WindowAccumulator, F: Fn(&A::In) -> TransactionOp + Clone + Send + 'static> WindowManager
     for TransactionWindowManager<A, F>
 where
     A::In: Data,
@@ -62,10 +65,10 @@ where
                 slot.acc.process(item);
 
                 match command {
-                    TxCommand::Commit => return_current!(),
-                    TxCommand::CommitAfter(t) => slot.close = Some(t),
-                    TxCommand::Discard => self.w = None,
-                    TxCommand::None => {}
+                    TransactionOp::Commit => return_current!(),
+                    TransactionOp::CommitAfter(t) => slot.close = Some(t),
+                    TransactionOp::Discard => self.w = None,
+                    TransactionOp::Continue => {}
                 }
             }
             StreamElement::Watermark(ts) => {
@@ -93,27 +96,44 @@ where
     }
 }
 
+/// Window that closes according to user supplied logic
+///
+/// + Windows are implicitly created when the first element for the partition is received.
+/// + Only one window per partition can be active at the same time.
+/// + The `logic` function determines when (and if) the window should be committed producing an output.
+/// + The `logic` function is called on each element before it is passed to the accumulator.
+/// + Returning [`TransactionOp::Continue`] will keep the window open and continue processing.
+/// + Returing [`TransactionOp::Commit`] will close the current window and generate an output.
+///   (The element triggering the commit will be included in the window)
+/// + Returning [`TransactionOp::Discard`] will close the window dropping the accumulator without producing
+///   an output
+/// + Returning [`TransactionOp::CommitAfter`] will register the window to be commited after a watermark
+///   with event time greater than the specified time has been received. The commit time can be overwritten
+///   by another message or cancelled by returning [`TransactionOp::Discard`].
 #[derive(Clone)]
-pub struct TransactionWindow<T, F: Fn(&T) -> TxCommand> {
-    f: F,
+pub struct TransactionWindow<T, F: Fn(&T) -> TransactionOp> {
+    logic: F,
     _t: PhantomData<T>,
 }
 
-impl<T, F: Fn(&T) -> TxCommand> TransactionWindow<T, F> {
+impl<T, F: Fn(&T) -> TransactionOp> TransactionWindow<T, F> {
     #[inline]
-    pub fn new(f: F) -> Self {
-        Self { f, _t: PhantomData }
+    pub fn new(logic: F) -> Self {
+        Self {
+            logic,
+            _t: PhantomData,
+        }
     }
 }
 
-impl<T: Data, F: Fn(&T) -> TxCommand + Data> WindowBuilder<T> for TransactionWindow<T, F> {
+impl<T: Data, F: Fn(&T) -> TransactionOp + Data> WindowDescription<T> for TransactionWindow<T, F> {
     type Manager<A: WindowAccumulator<In = T>> = TransactionWindowManager<A, F>;
 
     #[inline]
     fn build<A: WindowAccumulator<In = T>>(&self, accumulator: A) -> Self::Manager<A> {
         TransactionWindowManager {
             init: accumulator,
-            f: self.f.clone(),
+            f: self.logic.clone(),
             w: None,
         }
     }

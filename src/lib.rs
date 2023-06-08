@@ -39,7 +39,7 @@ fn main() {
         .fold(0, |count, _word| *count += 1)
         // Collect result
         .collect_vec();
-        
+
     env.execute(); // Start execution (blocking)
     if let Some(result) = result.get() {
         // Print word counts

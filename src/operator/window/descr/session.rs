@@ -64,6 +64,7 @@ where
     }
 }
 
+/// Window that splits after if no element is received for a fixed wall clock duration
 #[derive(Clone)]
 pub struct SessionWindow {
     gap: Duration,
@@ -77,7 +78,7 @@ impl SessionWindow {
     }
 }
 
-impl<T: Data> WindowBuilder<T> for SessionWindow {
+impl<T: Data> WindowDescription<T> for SessionWindow {
     type Manager<A: WindowAccumulator<In = T>> = SessionWindowManager<A>;
 
     #[inline]
