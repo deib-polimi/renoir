@@ -18,9 +18,9 @@ pub(crate) use start::*;
 
 pub use rich_map_custom::ElementGenerator;
 
-use crate::block::{group_by_hash, BlockStructure, NextStrategy};
+use crate::block::{group_by_hash, BlockStructure, NextStrategy, Replication};
 use crate::scheduler::ExecutionMetadata;
-use crate::{BatchMode, CoordUInt, KeyedStream, Stream};
+use crate::{BatchMode, KeyedStream, Stream};
 
 use self::sink::collect::Collect;
 use self::sink::collect_channel::CollectChannelSink;
@@ -69,9 +69,9 @@ pub mod join;
 pub(crate) mod key_by;
 pub(crate) mod keyed_fold;
 pub(crate) mod map;
-pub(crate) mod max_parallelism;
 pub(crate) mod merge;
 pub(crate) mod reorder;
+pub(crate) mod replication;
 pub(crate) mod rich_map;
 pub(crate) mod rich_map_custom;
 pub(crate) mod route;
@@ -387,7 +387,7 @@ where
     ///
     /// The mapping function is _cloned_ inside each replica, and they will not share state between
     /// each other. If you want that only a single replica handles all the items you may want to
-    /// change the parallelism of this operator with [`Stream::max_parallelism`].
+    /// change the parallelism of this operator with [`Stream::replication`].
     ///
     /// ## Examples
     ///
@@ -431,7 +431,7 @@ where
     ///
     /// The mapping function is _cloned_ inside each replica, and they will not share state between
     /// each other. If you want that only a single replica handles all the items you may want to
-    /// change the parallelism of this operator with [`Stream::max_parallelism`].
+    /// change the parallelism of this operator with [`Stream::replication`].
     ///
     /// ## Examples
     ///
@@ -551,7 +551,7 @@ where
         F: Fn(&mut O, I) + Send + Clone + 'static,
         O: Data,
     {
-        self.max_parallelism(1)
+        self.replication(Replication::One)
             .add_operator(|prev| Fold::new(prev, init, f))
     }
 
@@ -598,7 +598,7 @@ where
         O: ExchangeData,
     {
         self.add_operator(|prev| Fold::new(prev, init.clone(), local))
-            .max_parallelism(1)
+            .replication(Replication::One)
             .add_operator(|prev| Fold::new(prev, init, global))
     }
 
@@ -733,7 +733,7 @@ where
     ///
     /// The mapping function is _cloned_ inside each replica, and they will not share state between
     /// each other. If you want that only a single replica handles all the items you may want to
-    /// change the parallelism of this operator with [`Stream::max_parallelism`].
+    /// change the parallelism of this operator with [`Stream::replication`].
     ///
     /// ## Examples
     ///
@@ -784,7 +784,7 @@ where
     ///
     /// The mapping function is _cloned_ inside each replica, and they will not share state between
     /// each other. If you want that only a single replica handles all the items you may want to
-    /// change the parallelism of this operator with [`Stream::max_parallelism`].
+    /// change the parallelism of this operator with [`Stream::replication`].
     ///
     /// ## Examples
     ///
@@ -1269,8 +1269,8 @@ where
         I2: ExchangeData,
         Op2: Operator<I2> + 'static,
     {
-        let left = self.max_parallelism(1);
-        let right = right.max_parallelism(1);
+        let left = self.replication(Replication::One);
+        let right = right.replication(Replication::One);
         left.merge_distinct(right)
             .key_by(|_| ())
             .add_operator(Reorder::new)
@@ -1282,14 +1282,12 @@ where
     ///
     /// **Note**: this operator is pretty advanced, some operators may need to be fully replicated
     /// and will fail otherwise.
-    pub fn max_parallelism(self, max_parallelism: CoordUInt) -> Stream<I, impl Operator<I>> {
-        assert!(max_parallelism > 0, "Cannot set the parallelism to zero");
-
+    pub fn replication(self, replication: Replication) -> Stream<I, impl Operator<I>> {
         let mut new_stream = self.split_block(End::new, NextStrategy::only_one());
         new_stream
             .block
             .scheduler_requirements
-            .max_parallelism(max_parallelism);
+            .replication(replication);
         new_stream
     }
 
@@ -1512,7 +1510,10 @@ where
             NextStrategy::only_one(),
         );
         // if the zip operator is partitioned there could be some loss of data
-        new_stream.block.scheduler_requirements.max_parallelism(1);
+        new_stream
+            .block
+            .scheduler_requirements
+            .replication(Replication::One);
         new_stream
     }
 
@@ -1543,7 +1544,7 @@ where
     /// ```
     pub fn collect_channel(self) -> Receiver<I> {
         let (tx, rx) = unbounded();
-        self.max_parallelism(1)
+        self.replication(Replication::One)
             .add_operator(|prev| CollectChannelSink::new(prev, tx))
             .finalize_block();
         rx
@@ -1604,7 +1605,7 @@ where
     pub fn collect_count(self) -> StreamOutput<usize> {
         let output = StreamOutputRef::default();
         self.add_operator(|prev| Fold::new(prev, 0, |acc, _| *acc += 1))
-            .max_parallelism(1)
+            .replication(Replication::One)
             .add_operator(|prev| CollectCountSink::new(prev, output.clone()))
             .finalize_block();
         StreamOutput::from(output)
@@ -1634,7 +1635,7 @@ where
     /// ```
     pub fn collect_vec(self) -> StreamOutput<Vec<I>> {
         let output = StreamOutputRef::default();
-        self.max_parallelism(1)
+        self.replication(Replication::One)
             .add_operator(|prev| CollectVecSink::new(prev, output.clone()))
             .finalize_block();
         StreamOutput::from(output)
@@ -1664,7 +1665,7 @@ where
     /// ```
     pub fn collect<C: FromIterator<I> + Send + 'static>(self) -> StreamOutput<C> {
         let output = StreamOutputRef::default();
-        self.max_parallelism(1)
+        self.replication(Replication::One)
             .add_operator(|prev| Collect::new(prev, output.clone()))
             .finalize_block();
         StreamOutput::from(output)

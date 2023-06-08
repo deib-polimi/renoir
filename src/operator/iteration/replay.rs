@@ -275,7 +275,7 @@ where
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.
         assert!(
-            self.block.scheduler_requirements.max_parallelism.is_none(),
+            self.block.scheduler_requirements.replication.is_unlimited(),
             "Cannot have an iteration block with limited parallelism"
         );
 

@@ -83,7 +83,7 @@ where
     PreviousOperators: Operator<Out>,
 {
     fn clone(&self) -> Self {
-        panic!("CollectVecSink cannot be cloned, max_parallelism should be 1");
+        panic!("CollectVecSink cannot be cloned, replication should be 1");
     }
 }
 

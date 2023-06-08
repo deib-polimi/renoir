@@ -8,7 +8,7 @@ pub use descr::*;
 // pub use aggregator::*;
 // pub use description::*;
 
-use crate::block::{GroupHasherBuilder, OperatorStructure};
+use crate::block::{GroupHasherBuilder, OperatorStructure, Replication};
 use crate::operator::{Data, DataKey, ExchangeData, Operator, StreamElement, Timestamp};
 use crate::stream::{KeyedStream, Stream, WindowedStream};
 
@@ -328,8 +328,10 @@ where
         self,
         descr: WinDescr,
     ) -> WindowedStream<(), Out, impl Operator<((), Out)>, WinOut, WinDescr> {
-        // max_parallelism and key_by are used instead of group_by so that there is exactly one
+        // replication and key_by are used instead of group_by so that there is exactly one
         // replica, since window_all cannot be parallelized
-        self.max_parallelism(1).key_by(|_| ()).window(descr)
+        self.replication(Replication::new_one())
+            .key_by(|_| ())
+            .window(descr)
     }
 }

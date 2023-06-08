@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::fmt::Display;
 use std::time::Duration;
 
-use crate::block::{BlockStructure, OperatorStructure};
+use crate::block::{BlockStructure, OperatorStructure, Replication};
 use crate::network::{Coord, NetworkSender, NetworkTopology, ReceiverEndpoint};
 use crate::operator::source::Source;
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
@@ -62,8 +62,8 @@ impl<Out: Data> Operator<Out> for FakeOperator<Out> {
 }
 
 impl<Out: Data> Source<Out> for FakeOperator<Out> {
-    fn max_parallelism(&self) -> Option<usize> {
-        None
+    fn replication(&self) -> Replication {
+        Replication::Unlimited
     }
 }
 

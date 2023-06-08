@@ -3,6 +3,7 @@ use nexmark::config::NexmarkConfig;
 use noir::operator::Operator;
 use noir::operator::Timestamp;
 use noir::prelude::*;
+use noir::Replication;
 use noir::Stream;
 use std::time::Instant;
 use std::time::SystemTime;
@@ -45,7 +46,7 @@ fn query2(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)>
         // .shuffle()
         .filter(|(_, b)| b.auction % 123 == 0)
         .map(|(t, _)| t)
-        // .max_parallelism(1)
+        // .replication(Replication::One)
         .for_each(|t| TRACK_POINT.get_or_init("q2").record(t.elapsed().unwrap()));
 }
 
@@ -82,7 +83,7 @@ fn query3(events: Stream<(SystemTime, Event), impl Operator<(SystemTime, Event)>
         // SELECT person, auction.id
         .map(|((t0, p), (t1, a))| (t0.max(t1), p.name, p.city, p.state, a.id))
         .map(|(t, ..)| t)
-        .max_parallelism(1)
+        .replication(Replication::One)
         .for_each(|t| TRACK_POINT.get_or_init("q3").record(t.elapsed().unwrap()))
 }
 

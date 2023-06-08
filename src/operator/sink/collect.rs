@@ -88,7 +88,7 @@ where
     PreviousOperators: Operator<Out>,
 {
     fn clone(&self) -> Self {
-        panic!("Collect cannot be cloned, max_parallelism should be 1");
+        panic!("Collect cannot be cloned, replication should be 1");
     }
 }
 

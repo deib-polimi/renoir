@@ -116,7 +116,7 @@ impl StreamEnvironment {
     #[cfg(feature = "async-tokio")]
     pub async fn execute(self) {
         drop(self.build_time);
-        let _stopwatch = Stopwatch::new("execution");
+        micrometer::span!("noir_execution");
         let mut env = self.inner.lock();
         info!("starting execution ({} blocks)", env.block_count);
         let scheduler = env.scheduler.take().unwrap();
@@ -185,14 +185,10 @@ impl StreamEnvironmentInner {
             }
         }
 
-        let source_max_parallelism = source.max_parallelism();
+        let source_replication = source.replication();
         let mut block = env.new_block(source, Default::default(), Default::default());
 
-        if let Some(p) = source_max_parallelism {
-            block
-                .scheduler_requirements
-                .max_parallelism(p.try_into().expect("Parallelism level > max id"));
-        }
+        block.scheduler_requirements.replication(source_replication);
         drop(env);
         Stream { block, env: env_rc }
     }
@@ -204,8 +200,8 @@ impl StreamEnvironmentInner {
         iteration_ctx: Vec<Arc<IterationStateLock>>,
     ) -> Block<Out, S> {
         let new_id = self.new_block_id();
-        let parallelism = source.max_parallelism();
-        info!("new block (b{new_id:02}), max_parallelism {parallelism:?}",);
+        let parallelism = source.replication();
+        info!("new block (b{new_id:02}), replication {parallelism:?}",);
         Block::new(new_id, source, batch_mode, iteration_ctx)
     }
 

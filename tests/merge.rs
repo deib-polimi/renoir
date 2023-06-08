@@ -4,6 +4,7 @@ use std::sync::Arc;
 use itertools::Itertools;
 
 use noir::operator::source::IteratorSource;
+use noir::Replication;
 use utils::{TestHelper, WatermarkChecker};
 
 mod utils;
@@ -107,7 +108,7 @@ fn merge_with_timestamps() {
         let stream = stream1
             .merge(stream2)
             .shuffle()
-            .max_parallelism(1)
+            .replication(Replication::One)
             .add_operator(|prev| WatermarkChecker::new(prev, num_watermarks.clone()));
         let res = stream.collect_vec();
 

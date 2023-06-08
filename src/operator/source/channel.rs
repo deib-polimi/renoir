@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::channel::{bounded, Receiver, RecvError, Sender, TryRecvError};
 
-use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -60,8 +60,8 @@ impl<Out: Data> ChannelSource<Out> {
 }
 // TODO: remove Debug requirement
 impl<Out: Data + core::fmt::Debug> Source<Out> for ChannelSource<Out> {
-    fn max_parallelism(&self) -> Option<usize> {
-        Some(1)
+    fn replication(&self) -> Replication {
+        Replication::One
     }
 }
 
@@ -122,6 +122,6 @@ impl<Out: Data + core::fmt::Debug> Operator<Out> for ChannelSource<Out> {
 impl<Out: Data> Clone for ChannelSource<Out> {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
-        panic!("ChannelSource cannot be cloned, max_parallelism should be 1");
+        panic!("ChannelSource cannot be cloned, replication should be 1");
     }
 }

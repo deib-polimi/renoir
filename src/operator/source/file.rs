@@ -5,6 +5,7 @@ use std::io::Seek;
 use std::io::{BufReader, SeekFrom};
 use std::path::PathBuf;
 
+use crate::block::Replication;
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 use crate::network::Coord;
 use crate::operator::source::Source;
@@ -67,8 +68,8 @@ impl FileSource {
 }
 
 impl Source<String> for FileSource {
-    fn max_parallelism(&self) -> Option<usize> {
-        None
+    fn replication(&self) -> Replication {
+        Replication::Unlimited
     }
 }
 

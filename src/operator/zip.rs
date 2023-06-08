@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure};
+use crate::block::{BlockStructure, OperatorReceiver, OperatorStructure, Replication};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::start::{BinaryElement, BinaryStartOperator, Start};
 use crate::operator::{ExchangeData, Operator, StreamElement};
@@ -124,8 +124,8 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1
 }
 
 impl<Out1: ExchangeData, Out2: ExchangeData> Source<(Out1, Out2)> for Zip<Out1, Out2> {
-    fn max_parallelism(&self) -> Option<usize> {
-        None
+    fn replication(&self) -> Replication {
+        Replication::Unlimited
     }
 }
 

@@ -181,11 +181,11 @@ where
         let is_one_2 = matches!(next_strategy2, NextStrategy::OnlyOne);
         let sched_1 = b1.scheduler_requirements.clone();
         let sched_2 = b2.scheduler_requirements.clone();
-        if is_one_1 && is_one_2 && sched_1.max_parallelism != sched_2.max_parallelism {
+        if is_one_1 && is_one_2 && sched_1.replication != sched_2.replication {
             panic!(
                 "The parallelism of the 2 blocks coming inside a Y connection must be equal. \
                 On the left ({}) is {:?}, on the right ({}) is {:?}",
-                b1, sched_1.max_parallelism, b2, sched_2.max_parallelism
+                b1, sched_1.replication, b2, sched_2.replication
             );
         }
 

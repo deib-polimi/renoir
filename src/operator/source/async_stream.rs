@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use futures::{Stream, StreamExt};
 
-use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -64,8 +64,8 @@ impl<Out: Data, S> Source<Out> for AsyncStreamSource<Out, S>
 where
     S: Stream<Item = Out> + Send + Unpin + 'static,
 {
-    fn get_max_parallelism(&self) -> Option<usize> {
-        Some(1)
+    fn replication(&self) -> Replication {
+        Replication::One
     }
 }
 
@@ -103,6 +103,6 @@ where
 {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
-        panic!("AsyncStreamSource cannot be cloned, max_parallelism should be 1");
+        panic!("AsyncStreamSource cannot be cloned, replication should be 1");
     }
 }

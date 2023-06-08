@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -61,8 +61,8 @@ impl<Out: Data, It> Source<Out> for IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
-    fn max_parallelism(&self) -> Option<usize> {
-        Some(1)
+    fn replication(&self) -> Replication {
+        Replication::One
     }
 }
 
@@ -99,7 +99,7 @@ where
 {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
-        panic!("IteratorSource cannot be cloned, max_parallelism should be 1");
+        panic!("IteratorSource cannot be cloned, replication should be 1");
     }
 }
 

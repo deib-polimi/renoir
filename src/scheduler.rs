@@ -5,7 +5,7 @@ use std::thread::JoinHandle;
 
 use itertools::Itertools;
 
-use crate::block::{BatchMode, Block, BlockStructure, JobGraphGenerator};
+use crate::block::{BatchMode, Block, BlockStructure, JobGraphGenerator, Replication};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
@@ -347,7 +347,7 @@ impl Scheduler {
     /// The number of replicas will be the minimum between:
     ///
     ///  - the number of logical cores.
-    ///  - the `max_parallelism` of the block.
+    ///  - the `replication` of the block.
     fn local_block_info<Out: Data, OperatorChain>(
         &self,
         block: &Block<Out, OperatorChain>,
@@ -356,15 +356,13 @@ impl Scheduler {
     where
         OperatorChain: Operator<Out>,
     {
-        let max_parallelism = block.scheduler_requirements.max_parallelism;
-        let instances = local
-            .num_cores
-            .min(max_parallelism.unwrap_or(CoordUInt::MAX));
+        let replication = block.scheduler_requirements.replication;
+        let instances = replication.clamp(local.num_cores);
         log::debug!(
-            "local (b{:02}): {{ replicas: {:2}, max_parallelism: {:?}, only_one: {} }}",
+            "local (b{:02}): {{ replicas: {:2}, replication: {:?}, only_one: {} }}",
             block.id,
             instances,
-            max_parallelism,
+            replication,
             block.is_only_one_strategy
         );
         let host_id = self.config.host_id.unwrap();
@@ -381,7 +379,7 @@ impl Scheduler {
 
     /// Extract the `SchedulerBlockInfo` of a block that runs remotely.
     ///
-    /// The block can be replicated at most `max_parallelism` times (if specified). Assign the
+    /// The block can be replicated at most `replication` times (if specified). Assign the
     /// replicas starting from the first host giving as much replicas as possible..
     fn remote_block_info<Out: Data, OperatorChain>(
         &self,
@@ -391,34 +389,55 @@ impl Scheduler {
     where
         OperatorChain: Operator<Out>,
     {
-        let max_parallelism = block.scheduler_requirements.max_parallelism;
+        let replication = block.scheduler_requirements.replication;
         // number of replicas we can assign at most
-        let mut remaining_replicas = max_parallelism.unwrap_or(CoordUInt::MAX);
-        let mut instances = 0;
+        let mut global_counter = 0;
         let mut replicas: HashMap<_, Vec<_>, crate::block::CoordHasherBuilder> = HashMap::default();
         let mut global_ids = HashMap::default();
-        // FIXME: if the next_strategy of the previous blocks are OnlyOne the replicas of this block
-        //        must be in the same hosts are the previous blocks.
-        for (host_id, host_info) in remote.hosts.iter().enumerate() {
-            let host_id: HostId = host_id.try_into().expect("host_id > max id");
-            let num_host_replicas = host_info.num_cores.min(remaining_replicas);
-            log::debug!(
-                "remote (b{:02})[{}]: {{ replicas: {:2}, max_parallelism: {:?}, num_cores: {} }}",
-                block.id,
-                host_info.to_string(),
-                num_host_replicas,
-                max_parallelism,
-                host_info.num_cores
-            );
-            remaining_replicas -= num_host_replicas;
-            let host_replicas = replicas.entry(host_id).or_default();
-            for replica_id in 0..num_host_replicas {
-                let coord = Coord::new(block.id, host_id, replica_id);
-                host_replicas.push(coord);
-                global_ids.insert(coord, instances + replica_id);
-            }
-            instances += num_host_replicas;
+
+        macro_rules! add_replicas {
+            ($id:expr, $h:expr, $n:expr) => {{
+                log::debug!(
+                    "remote (b{:02})[{}]: {{ replicas: {:2}, replication: {:?}, num_cores: {} }}",
+                    block.id,
+                    $h.to_string(),
+                    $n,
+                    replication,
+                    $h.num_cores
+                );
+                let host_replicas = replicas.entry($id).or_default();
+                for replica_id in 0..$n {
+                    let coord = Coord::new(block.id, $id, replica_id);
+                    host_replicas.push(coord);
+                    global_ids.insert(coord, global_counter);
+                    global_counter += 1;
+                }
+            }};
         }
+
+        match replication {
+            Replication::Unlimited => {
+                for (host_id, host_info) in remote.hosts.iter().enumerate() {
+                    add_replicas!(host_id.try_into().unwrap(), host_info, host_info.num_cores);
+                }
+            }
+            Replication::Limited(mut remaining) => {
+                for (host_id, host_info) in remote.hosts.iter().enumerate() {
+                    let n = remaining.min(host_info.num_cores);
+                    add_replicas!(host_id.try_into().unwrap(), host_info, n);
+                    remaining -= n;
+                }
+            }
+            Replication::Host => {
+                for (host_id, host_info) in remote.hosts.iter().enumerate() {
+                    add_replicas!(host_id.try_into().unwrap(), host_info, 1);
+                }
+            }
+            Replication::One => {
+                add_replicas!(0, remote.hosts[0], 1);
+            }
+        }
+
         SchedulerBlockInfo {
             repr: block.to_string(),
             replicas,

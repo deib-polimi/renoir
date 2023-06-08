@@ -77,7 +77,61 @@ pub(crate) struct SchedulerRequirements {
     /// this block as it likes.
     ///
     /// The value specified is only an upper bound, the scheduler is allowed to spawn less blocks,
-    pub(crate) max_parallelism: Option<CoordUInt>,
+    pub(crate) replication: Replication,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+pub enum Replication {
+    // The number of replicas is unlimited and will be determined by the launch configuration.
+    #[default]
+    Unlimited,
+    // The number of replicas is limited to a fixed number.
+    Limited(CoordUInt),
+    // The number of replicas is limited to one per host.
+    Host,
+    // The number of replicas is limited to one across all the hosts.
+    One,
+}
+
+impl Replication {
+    pub fn new_unlimited() -> Self {
+        Self::Unlimited
+    }
+
+    pub fn new_limited(size: CoordUInt) -> Self {
+        assert!(size > 0, "Replication limit must be greater than zero!");
+        Self::Limited(size)
+    }
+
+    pub fn new_host() -> Self {
+        Self::Host
+    }
+
+    pub fn new_one() -> Self {
+        Self::One
+    }
+
+    pub fn is_unlimited(&self) -> bool {
+        matches!(self, Replication::Unlimited)
+    }
+    pub fn intersect(&self, rhs: Self) -> Self {
+        match (*self, rhs) {
+            (Replication::One, _) | (_, Replication::One) => Replication::One,
+            (Replication::Host, _) | (_, Replication::Host) => Replication::Host,
+            (Replication::Limited(n), Replication::Limited(m)) => Replication::Limited(n.min(m)),
+            (Replication::Limited(n), _) | (_, Replication::Limited(n)) => Replication::Limited(n),
+            (Replication::Unlimited, Replication::Unlimited) => Replication::Unlimited,
+        }
+    }
+
+    pub(crate) fn clamp(&self, n: CoordUInt) -> CoordUInt {
+        match self {
+            Replication::Unlimited => n,
+            Replication::Limited(q) => n.min(*q),
+            Replication::Host => 1,
+            Replication::One => 1,
+        }
+    }
 }
 
 impl<Out: Data, OperatorChain> Block<Out, OperatorChain>
@@ -124,12 +178,8 @@ where
 
 impl SchedulerRequirements {
     /// Limit the maximum parallelism of this block.
-    pub(crate) fn max_parallelism(&mut self, max_parallelism: CoordUInt) {
-        if let Some(old) = self.max_parallelism {
-            self.max_parallelism = Some(old.min(max_parallelism));
-        } else {
-            self.max_parallelism = Some(max_parallelism);
-        }
+    pub(crate) fn replication(&mut self, replication: Replication) {
+        self.replication = self.replication.intersect(replication);
     }
 }
 

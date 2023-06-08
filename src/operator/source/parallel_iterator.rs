@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::ops::Range;
 
-use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
@@ -198,8 +198,8 @@ where
     S::Item: Data,
     S::Iter: Send,
 {
-    fn max_parallelism(&self) -> Option<usize> {
-        None
+    fn replication(&self) -> Replication {
+        Replication::Unlimited
     }
 }
 

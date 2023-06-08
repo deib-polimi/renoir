@@ -7,7 +7,7 @@ pub(crate) use simple::*;
 
 #[cfg(feature = "timestamp")]
 use super::Timestamp;
-use crate::block::BlockStructure;
+use crate::block::{BlockStructure, Replication};
 use crate::channel::RecvTimeoutError;
 use crate::network::{Coord, NetworkDataIterator, NetworkMessage};
 use crate::operator::iteration::IterationStateLock;
@@ -292,8 +292,8 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator<Out>
 }
 
 impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Source<Out> for Start<Out, Receiver> {
-    fn max_parallelism(&self) -> Option<usize> {
-        None
+    fn replication(&self) -> Replication {
+        Replication::Unlimited
     }
 }
 

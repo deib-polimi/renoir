@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure};
+use crate::block::{BlockStructure, Connection, NextStrategy, OperatorStructure, Replication};
 use crate::network::{Coord, NetworkMessage, NetworkSender};
 use crate::operator::iteration::{IterationResult, StateFeedback};
 use crate::operator::source::Source;
@@ -253,7 +253,7 @@ where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
     LoopCond: Fn(&mut State) -> bool + Send + Clone,
 {
-    fn max_parallelism(&self) -> Option<usize> {
-        Some(1)
+    fn replication(&self) -> Replication {
+        Replication::One
     }
 }
