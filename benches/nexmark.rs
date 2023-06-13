@@ -1,5 +1,4 @@
-use common::NoirBenchBuilder;
-use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use nexmark::config::NexmarkConfig;
 use noir::operator::window::TransactionOp;
 use noir::operator::window::TransactionWindow;
@@ -7,11 +6,11 @@ use noir::operator::Operator;
 use noir::operator::Timestamp;
 use noir::prelude::*;
 use noir::Stream;
-use std::time::Duration;
 
 use nexmark::event::*;
 
 mod common;
+use common::*;
 
 const WATERMARK_INTERVAL: usize = 1 << 20;
 const BATCH_SIZE: usize = 16 << 10;
@@ -358,34 +357,34 @@ fn run_query(env: &mut StreamEnvironment, q: &str, n: usize) {
 
 fn bench_main(c: &mut Criterion) {
     let mut g = c.benchmark_group("nexmark");
-    g.sample_size(30);
-    g.warm_up_time(Duration::from_secs(3));
-    g.measurement_time(Duration::from_secs(12));
-    g.throughput(Throughput::Elements(1));
+    g.sample_size(SAMPLES);
+    g.warm_up_time(WARM_UP);
+    g.measurement_time(DURATION);
 
     macro_rules! bench_query {
-        ($q:expr) => {{
-            g.bench_function($q, |b| {
-                let builder = NoirBenchBuilder::new(
-                    StreamEnvironment::default,
-                    |n: u64, env: &mut StreamEnvironment| {
-                        run_query(env, $q, n as usize);
-                    },
-                );
-                b.iter_custom(|n| builder.bench(n))
-            })
+        ($q:expr, $n:expr) => {{
+            g.bench_with_input(BenchmarkId::new($q, $n), &$n, |b, size| {
+                b.iter(|| {
+                    let mut env = StreamEnvironment::default();
+                    run_query(&mut env, $q, *size);
+                    env.execute();
+                })
+            });
         }};
     }
 
-    bench_query!("0");
-    bench_query!("1");
-    bench_query!("2");
-    bench_query!("3");
-    bench_query!("4");
-    bench_query!("5");
-    bench_query!("6");
-    bench_query!("7");
-    bench_query!("8");
+    for size in [1_000, 100_000, 1_000_000] {
+        g.throughput(Throughput::Elements(size as u64));
+        bench_query!("0", size);
+        bench_query!("1", size);
+        bench_query!("2", size);
+        bench_query!("3", size);
+        bench_query!("4", size);
+        bench_query!("5", size);
+        bench_query!("6", size);
+        bench_query!("7", size);
+        bench_query!("8", size);
+    }
 
     g.finish();
 }

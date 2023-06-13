@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use common::NoirBenchBuilder;
+use criterion::BenchmarkId;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use fxhash::FxHashMap;
 use noir::operator::Operator;
@@ -12,6 +10,7 @@ use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
 
 mod common;
+use common::*;
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 struct State {
@@ -102,24 +101,28 @@ fn connected(input: Stream<(u64, u64), impl Operator<(u64, u64)> + 'static>) {
 
 fn bench_main(c: &mut Criterion) {
     let mut g = c.benchmark_group("connected");
-    g.sample_size(30);
-    g.warm_up_time(Duration::from_secs(3));
-    g.measurement_time(Duration::from_secs(12));
-    g.throughput(Throughput::Elements(1));
-    g.bench_function("connected", |b| {
-        let builder = NoirBenchBuilder::new(
-            || StreamEnvironment::new(EnvironmentConfig::local(4)),
-            |n: u64, env: &mut StreamEnvironment| {
+    g.sample_size(SAMPLES);
+    g.warm_up_time(WARM_UP);
+    g.measurement_time(DURATION);
+
+    for size in [0, 1_000, 1_000_000, 2_000_000] {
+        g.throughput(Throughput::Elements(size));
+        g.bench_with_input(BenchmarkId::new("connected", size), &size, |b, size| {
+            b.iter(|| {
+                let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+                let n = *size;
+
                 let source = env.stream_par_iter(move |id, peers| {
                     let mut rng: SmallRng = SeedableRng::seed_from_u64(id ^ 0xdeadbeef);
                     (0..n / peers).map(move |_| rng.gen())
                 });
 
                 connected(source);
-            },
-        );
-        b.iter_custom(|n| builder.bench(n))
-    });
+                env.execute();
+            })
+        });
+    }
+
     g.finish();
 }
 

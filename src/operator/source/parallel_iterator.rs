@@ -36,7 +36,9 @@ impl IntoParallelSource for Range<u64> {
         let n = self.end - self.start;
         let chunk_size = (n.saturating_add(peers - 1)) / peers;
         let start = self.start.saturating_add(index * chunk_size);
-        let end = (start.saturating_add(chunk_size)).min(self.end - 1);
+        let end = (start.saturating_add(chunk_size))
+            .min(self.end.saturating_sub(1))
+            .max(self.start);
 
         start..end
     }
@@ -55,7 +57,9 @@ macro_rules! impl_into_parallel_source {
                 let n = self.end as i64 - self.start as i64;
                 let chunk_size = (n.saturating_add(peers - 1)) / peers;
                 let start = (self.start as i64).saturating_add(index * chunk_size);
-                let end = (start.saturating_add(chunk_size)).min(self.end as i64 - 1);
+                let end = (start.saturating_add(chunk_size))
+                    .min(self.end as i64 - 1)
+                    .max(self.start as i64);
 
                 let (start, end) = (start.try_into().unwrap(), end.try_into().unwrap());
                 start..end

@@ -1,23 +1,23 @@
-use std::time::Duration;
-
-use common::NoirBenchBuilder;
+use criterion::BenchmarkId;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use noir::BatchMode;
 use noir::StreamEnvironment;
 
 mod common;
+use common::*;
 
 fn bench_main(c: &mut Criterion) {
     let mut g = c.benchmark_group("wordcount-line");
-    g.sample_size(30);
-    g.warm_up_time(Duration::from_secs(3));
-    g.measurement_time(Duration::from_secs(12));
-    g.throughput(Throughput::Elements(1));
-    g.bench_function("collatz", |b| {
-        let builder = NoirBenchBuilder::new(
-            StreamEnvironment::default,
-            |n: u64, env: &mut StreamEnvironment| {
-                env.stream_par_iter(0..n)
+    g.sample_size(SAMPLES);
+    g.warm_up_time(WARM_UP);
+    g.measurement_time(DURATION);
+
+    for size in [0u32, 1_000, 1_000_000, 100_000_000] {
+        g.throughput(Throughput::Elements(size as u64));
+        g.bench_with_input(BenchmarkId::new("collatz", size), &size, |b, n| {
+            b.iter(|| {
+                let mut env = StreamEnvironment::default();
+                env.stream_par_iter(0..*n)
                     .batch_mode(BatchMode::fixed(1024))
                     .map(move |n| {
                         let mut c = 0;
@@ -36,11 +36,12 @@ fn bench_main(c: &mut Criterion) {
                         (c, n)
                     })
                     .reduce_assoc(|a, b| a.max(b))
-                    .collect::<Vec<_>>()
-            },
-        );
-        b.iter_custom(|n| builder.bench(n))
-    });
+                    .collect::<Vec<_>>();
+                env.execute();
+            });
+        });
+    }
+
     g.finish();
 }
 
