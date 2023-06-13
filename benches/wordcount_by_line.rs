@@ -46,7 +46,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
 
     group.bench_function("wordcount-fold", |b| {
         let builder = NoirBenchBuilder::new(
-            noir_max_parallism_env,
+            StreamEnvironment::default,
             |n: u64, env: &mut StreamEnvironment| {
                 let file = make_file(n as usize);
                 let path = file.path();
@@ -70,7 +70,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
 
     group.bench_function("wordcount-fold-assoc", |b| {
         let builder = NoirBenchBuilder::new(
-            noir_max_parallism_env,
+            StreamEnvironment::default,
             |n: u64, env: &mut StreamEnvironment| {
                 let file = make_file(n as usize);
                 let path = file.path();
@@ -99,7 +99,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
 
     group.bench_function("wordcount-count-assoc", |b| {
         let builder = NoirBenchBuilder::new(
-            noir_max_parallism_env,
+            StreamEnvironment::default,
             |n: u64, env: &mut StreamEnvironment| {
                 let file = make_file(n as usize);
                 let path = file.path();
@@ -123,7 +123,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
 
     group.bench_function("wordcount-reduce-assoc", |b| {
         let builder = NoirBenchBuilder::new(
-            noir_max_parallism_env,
+            StreamEnvironment::default,
             |n: u64, env: &mut StreamEnvironment| {
                 let file = make_file(n as usize);
                 let path = file.path();
@@ -148,7 +148,7 @@ fn wordcount_by_line_benchmark(c: &mut Criterion) {
 
     group.bench_function("wordcount-fast", |b| {
         let builder = NoirBenchBuilder::new(
-            noir_max_parallism_env,
+            StreamEnvironment::default,
             |n: u64, env: &mut StreamEnvironment| {
                 let file = make_file(n as usize);
                 let path = file.path();

@@ -126,6 +126,12 @@ required-features = ["timestamp"]
 # work with criterion.rs. Cannot set `[lib] harness = false` because the tests
 # require the harness.
 [[bench]]
+name = "collatz"
+harness = false
+[[bench]]
+name = "connected"
+harness = false
+[[bench]]
 name = "wordcount"
 harness = false
 [[bench]]
@@ -141,10 +147,7 @@ harness = false
 name = "batch_mode"
 harness = false
 [[bench]]
-name = "recv_vs_select"
-harness = false
-[[bench]]
-name = "coarse_time"
+name = "nexmark"
 harness = false
 
 [profile.release]

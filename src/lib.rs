@@ -19,7 +19,7 @@ The common layout of a Noir program starts with the creation of a `StreamEnviron
 
 #### Wordcount
 
-```
+```no_run
 use noir::prelude::*;
 
 fn main() {
@@ -58,7 +58,7 @@ fn tokenize(s: &str) -> Vec<String> {
 #### Wordcount associative (faster)
 
 
-```
+```no_run
 use noir::prelude::*;
 
 fn main() {
@@ -77,7 +77,7 @@ fn main() {
         // Associative operators split the operation in a local and a
         // global step for faster execution
         .group_by_reduce(|w| w.clone(), |(_w1, c1), (_w2, c2)| *c1 += c2)
-        .unkey()
+        .drop_key()
         .collect_vec();
 
     env.execute(); // Start execution (blocking)
@@ -96,7 +96,7 @@ fn tokenize(s: &str) -> Vec<String> {
 
 ### Remote deployment
 
-```
+```yaml
 # config.yaml
 hosts:
   - address: host1.lan

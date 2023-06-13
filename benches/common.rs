@@ -39,12 +39,3 @@ where
         duration
     }
 }
-
-pub fn noir_max_parallism_env() -> StreamEnvironment {
-    StreamEnvironment::default()
-}
-
-pub fn noir_local_env(parallelism: CoordUInt) -> StreamEnvironment {
-    let config = EnvironmentConfig::local(parallelism);
-    StreamEnvironment::new(config)
-}

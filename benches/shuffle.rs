@@ -1,15 +1,14 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use rand::prelude::StdRng;
+
+use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
 use noir::operator::source::IteratorSource;
 use noir::BatchMode;
-use noir::EnvironmentConfig;
 use noir::StreamEnvironment;
 
 fn shuffle(dataset: &'static [u32]) {
-    let config = EnvironmentConfig::local(4);
-    let mut env = StreamEnvironment::new(config);
+    let mut env = StreamEnvironment::default();
 
     let source = IteratorSource::new(dataset.iter().cloned());
     let stream = env
@@ -23,13 +22,13 @@ fn shuffle(dataset: &'static [u32]) {
         .map(|n| n.wrapping_mul(2))
         .shuffle()
         .map(|n| n.wrapping_sub(42));
-    let _result = stream.collect_vec();
+    stream.for_each(std::mem::drop);
     env.execute();
 }
 
 fn shuffle_benchmark(c: &mut Criterion) {
     let seed = b"rstream2 by edomora97 and mark03".to_owned();
-    let r = &mut StdRng::from_seed(seed);
+    let r = &mut SmallRng::from_seed(seed);
 
     const DATASET_SIZE: usize = 100_000;
     let mut dataset: [u32; DATASET_SIZE] = [0; DATASET_SIZE];
