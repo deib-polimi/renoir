@@ -110,11 +110,14 @@ fn bench_main(c: &mut Criterion) {
         g.bench_with_input(BenchmarkId::new("connected", size), &size, |b, size| {
             b.iter(|| {
                 let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
-                let n = *size;
+                let edges = *size;
+                let nodes = ((edges as f32).sqrt() * 25.) as u64 + 1;
+                eprintln!("n:{nodes}, e:{edges}");
 
                 let source = env.stream_par_iter(move |id, peers| {
                     let mut rng: SmallRng = SeedableRng::seed_from_u64(id ^ 0xdeadbeef);
-                    (0..n / peers).map(move |_| rng.gen())
+                    (0..edges / peers)
+                        .map(move |_| (rng.gen_range(0..nodes), rng.gen_range(0..nodes)))
                 });
 
                 connected(source);
