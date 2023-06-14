@@ -22,6 +22,7 @@ use crate::block::{group_by_hash, BlockStructure, NextStrategy, Replication};
 use crate::scheduler::ExecutionMetadata;
 use crate::{BatchMode, KeyedStream, Stream};
 
+use self::map_memo::MemoMap;
 use self::sink::collect::Collect;
 use self::sink::collect_channel::CollectChannelSink;
 use self::sink::collect_count::CollectCountSink;
@@ -69,6 +70,7 @@ pub mod join;
 pub(crate) mod key_by;
 pub(crate) mod keyed_fold;
 pub(crate) mod map;
+pub(crate) mod map_memo;
 pub(crate) mod merge;
 pub(crate) mod reorder;
 pub(crate) mod replication;
@@ -220,6 +222,17 @@ impl<Out> StreamElement<Out> {
             StreamElement::Terminate => StreamElement::Terminate,
             StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
             StreamElement::FlushBatch => StreamElement::FlushBatch,
+        }
+    }
+
+    pub fn value(&self) -> Option<&Out> {
+        match self {
+            StreamElement::Item(v) => Some(v),
+            StreamElement::Timestamped(v, _) => Some(v),
+            StreamElement::Watermark(_) => None,
+            StreamElement::FlushBatch => None,
+            StreamElement::Terminate => None,
+            StreamElement::FlushAndRestart => None,
         }
     }
 }
@@ -510,6 +523,20 @@ where
     {
         self.add_operator(|prev| Map::new(prev, f))
     }
+
+    /// # TODO
+    pub fn map_memo_by<K: DataKey + Sync, O: Data + Sync, F, Fk>(
+        self,
+        f: F,
+        fk: Fk,
+    ) -> Stream<O, impl Operator<O>>
+    where
+        F: Fn(I) -> O + Send + Clone + 'static,
+        Fk: Fn(&I) -> K + Send + Clone + 'static,
+    {
+        self.add_operator(|prev| MemoMap::new(prev, f, fk))
+    }
+
     /// Fold the stream into a stream that emits a single value.
     ///
     /// The folding operator consists in adding to the current accumulation value (initially the
@@ -1702,6 +1729,21 @@ where
     /// ```
     pub fn flatten(self) -> Stream<O, impl Operator<O>> {
         self.add_operator(|prev| Flatten::new(prev))
+    }
+}
+
+impl<I, Op> Stream<I, Op>
+where
+    I: Data + Hash + Eq + Sync,
+    Op: Operator<I> + 'static,
+{
+    /// # TODO
+    ///
+    pub fn map_memo<O: Data + Sync, F>(self, f: F) -> Stream<O, impl Operator<O>>
+    where
+        F: Fn(I) -> O + Send + Clone + 'static,
+    {
+        self.add_operator(|prev| MemoMap::new(prev, f, |x| x.clone()))
     }
 }
 
