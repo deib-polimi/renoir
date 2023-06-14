@@ -80,16 +80,17 @@ pub(crate) struct SchedulerRequirements {
     pub(crate) replication: Replication,
 }
 
+/// Replication factor for a block
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
 pub enum Replication {
-    // The number of replicas is unlimited and will be determined by the launch configuration.
+    /// The number of replicas is unlimited and will be determined by the launch configuration.
     #[default]
     Unlimited,
-    // The number of replicas is limited to a fixed number.
+    /// The number of replicas is limited to a fixed number.
     Limited(CoordUInt),
-    // The number of replicas is limited to one per host.
+    /// The number of replicas is limited to one per host.
     Host,
-    // The number of replicas is limited to one across all the hosts.
+    /// The number of replicas is limited to one across all the hosts.
     One,
 }
 
