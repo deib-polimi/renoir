@@ -124,7 +124,7 @@ impl StreamEnvironment {
     }
 
     /// Start the computation. Blocks until the computation is complete.
-    /// 
+    ///
     /// Execute on a thread or use the async version [`execute`]
     /// for non-blocking alternatives
     pub fn execute_blocking(self) {

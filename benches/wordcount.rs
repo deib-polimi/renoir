@@ -3,6 +3,7 @@ use std::hash::BuildHasherDefault;
 use std::io::{BufWriter, Write};
 use std::os::unix::prelude::MetadataExt;
 use std::path::Path;
+use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use criterion::{BenchmarkId, Throughput};
@@ -132,6 +133,42 @@ fn wordcount_bench(c: &mut Criterion) {
                     let mut env = StreamEnvironment::default();
                     wc_fast_kstring(&mut env, path);
                     env.execute_blocking();
+                })
+            },
+        );
+
+        g.bench_with_input(
+            BenchmarkId::new("wordcount-fold-remote", lines),
+            file.path(),
+            |b, path| {
+                let pathb = Arc::new(path.to_path_buf());
+                b.iter(|| {
+                    let p = pathb.clone();
+                    remote_loopback_deploy(4, 4, move |env| wc_fold(env, &p));
+                })
+            },
+        );
+
+        g.bench_with_input(
+            BenchmarkId::new("wordcount-fold-assoc-remote", lines),
+            file.path(),
+            |b, path| {
+                let pathb = Arc::new(path.to_path_buf());
+                b.iter(|| {
+                    let p = pathb.clone();
+                    remote_loopback_deploy(4, 4, move |env| wc_fold_assoc(env, &p));
+                })
+            },
+        );
+
+        g.bench_with_input(
+            BenchmarkId::new("wordcount-fast-remote", lines),
+            file.path(),
+            |b, path| {
+                let pathb = Arc::new(path.to_path_buf());
+                b.iter(|| {
+                    let p = pathb.clone();
+                    remote_loopback_deploy(4, 4, move |env| wc_fast(env, &p));
                 })
             },
         );

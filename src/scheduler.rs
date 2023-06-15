@@ -217,7 +217,7 @@ impl Scheduler {
     }
 
     /// Start the computation returning the list of handles used to join the workers.
-    /// 
+    ///
     /// NOTE: If running with the `async-tokio` feature enable, this will create a new
     /// tokio runtime.
     pub(crate) fn start_blocking(mut self, num_blocks: CoordUInt) {
@@ -261,7 +261,7 @@ impl Scheduler {
             for handle in join {
                 handle.join().unwrap();
             }
-    
+
             self.network.stop_and_wait();
             let profiler_results = wait_profiler();
             Self::log_tracing_data(block_structures, profiler_results);

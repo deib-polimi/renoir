@@ -123,6 +123,27 @@ fn bench_main(c: &mut Criterion) {
                 env.execute_blocking();
             })
         });
+
+        g.bench_with_input(
+            BenchmarkId::new("connected-remote", size),
+            &size,
+            |b, size| {
+                let edges = *size;
+                b.iter(|| {
+                    remote_loopback_deploy(4, 4, move |env| {
+                        let nodes = ((edges as f32).sqrt() * 25.) as u64 + 1;
+
+                        let source = env.stream_par_iter(move |id, peers| {
+                            let mut rng: SmallRng = SeedableRng::seed_from_u64(id ^ 0xdeadbeef);
+                            (0..edges / peers)
+                                .map(move |_| (rng.gen_range(0..nodes), rng.gen_range(0..nodes)))
+                        });
+
+                        connected(source);
+                    })
+                });
+            },
+        );
     }
 
     g.finish();
