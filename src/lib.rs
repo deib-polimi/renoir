@@ -40,7 +40,7 @@ fn main() {
         // Collect result
         .collect_vec();
 
-    env.execute(); // Start execution (blocking)
+    env.execute_blocking(); // Start execution (blocking)
     if let Some(result) = result.get() {
         // Print word counts
         result.into_iter().for_each(|(word, count)| println!("{word}: {count}"));
@@ -80,7 +80,7 @@ fn main() {
         .drop_key()
         .collect_vec();
 
-    env.execute(); // Start execution (blocking)
+    env.execute_blocking(); // Start execution (blocking)
     if let Some(result) = result.get() {
         // Print word counts
         result.into_iter().for_each(|(word, count)| println!("{word}: {count}"));

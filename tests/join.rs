@@ -21,7 +21,7 @@ macro_rules! run_test {
         let local = run_test!(@local, $local, ship);
         let variant = run_test!(@variant, $variant, local);
         let res = run_test!(@ship_post, $ship, variant).collect_vec();
-        $env.execute();
+        $env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = run_test!(@get_expected, $variant, $n1, $n2, $m);
@@ -60,7 +60,7 @@ macro_rules! run_test_shortcut {
             .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)));
         let res = run_test_shortcut!(@variant, $variant, join, s2, |x: &u16| *x as u8 % $m, |x: &u32| *x as u8 % $m);
         let res = res.unkey().collect_vec();
-        $env.execute();
+        $env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = run_test!(@get_expected, $variant, $n1, $n2, $m);
@@ -249,7 +249,7 @@ fn self_join() {
         let s1 = splits.next().unwrap();
         let s2 = splits.next().unwrap().shuffle().map(|n| n * 2);
         let res = s1.join(s2, |n| *n % 2, |n| *n % 2).unkey().collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             let mut expected = vec![];
@@ -294,7 +294,7 @@ fn join_in_loop() {
                 |_| true,
             )
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(state) = state.get() {
             let state = state[0];
             let mut expected = 0;

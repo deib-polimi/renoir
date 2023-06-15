@@ -16,7 +16,7 @@ fn group_by_fold_stream() {
                 |s1, s2| *s1 += &s2,
             )
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(res.len(), 2);
@@ -35,7 +35,7 @@ fn fold_keyed_stream() {
             .group_by(|n| n % 2)
             .fold("".to_string(), |s, n| *s += &n.to_string())
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(res.len(), 2);
@@ -59,7 +59,7 @@ fn group_by_fold_shuffled_stream() {
                 |v1, mut v2| v1.append(&mut v2),
             )
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             res[0].1.sort_unstable();
@@ -81,7 +81,7 @@ fn fold_shuffled_keyed_stream() {
             .group_by(|n| n % 2)
             .fold(Vec::new(), |v, n| v.push(n))
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             res[0].1.sort_unstable();

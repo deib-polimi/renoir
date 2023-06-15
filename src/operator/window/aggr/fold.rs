@@ -117,7 +117,7 @@ where
     ///     .fold(1, |acc, n| *acc *= n)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();

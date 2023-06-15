@@ -59,7 +59,7 @@ fn main() {
     state.for_each(|(_, _, iter)| eprintln!("Iterations: {iter}"));
 
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
 
     if let Some(mut res) = result.get() {

@@ -247,7 +247,7 @@ where
     ///     |_state| true,
     /// );
     /// let state = state.collect_vec();
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(state.get().unwrap(), vec![3 * (10 + 11 + 12)]);
     /// ```

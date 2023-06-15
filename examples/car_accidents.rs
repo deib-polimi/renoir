@@ -336,7 +336,7 @@ fn main() {
     };
 
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
     eprintln!("Elapsed: {elapsed:?}");
 

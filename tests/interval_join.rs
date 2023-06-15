@@ -20,7 +20,7 @@ fn interval_join_keyed_stream() {
             .interval_join(right, 1, 2)
             .collect_vec();
 
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             let mut expected = Vec::new();
@@ -54,7 +54,7 @@ fn interval_join_stream() {
             .interval_join(right, 1, 2)
             .collect_vec();
 
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             let mut expected = Vec::new();

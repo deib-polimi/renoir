@@ -207,5 +207,5 @@ fn main() {
                 tester.add();
             }
         });
-    env.execute();
+    env.execute_blocking();
 }

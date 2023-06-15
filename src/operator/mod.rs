@@ -348,7 +348,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10)));
     /// let res = s.filter_map(|n| if n % 2 == 0 { Some(n * 3) } else { None }).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![0, 6, 12, 18, 24])
     /// ```
@@ -373,7 +373,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10)));
     /// let res = s.filter(|&n| n % 2 == 0).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![0, 2, 4, 6, 8])
     /// ```
@@ -423,7 +423,7 @@ where
     ///     }
     /// }).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![1, 1 + 2, /* 1 + 2 - 5, */ 1 + 2 - 5 + 3, 1 + 2 - 5 + 3 + 1]);
     /// ```
@@ -465,7 +465,7 @@ where
     ///     }
     /// }).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![1, 1 + 2, 1 + 2 + 3, 1 + 2 + 3 + 4, 1 + 2 + 3 + 4 + 5]);
     /// ```    
@@ -486,7 +486,7 @@ where
     ///     }
     /// }).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)]);
     /// ```
@@ -513,7 +513,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s.map(|n| n * 10).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![0, 10, 20, 30, 40]);
     /// ```
@@ -568,7 +568,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s.fold(0, |acc, value| *acc += value).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
     /// ```
@@ -614,7 +614,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s.fold_assoc(0, |acc, value| *acc += value, |acc, value| *acc += value).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
     /// ```
@@ -663,7 +663,7 @@ where
     ///     .group_by_fold(|&n| n % 2, 0, |acc, value| *acc += value, |acc, value| *acc += value)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -716,7 +716,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s.key_by(|&n| n % 2).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -741,7 +741,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// s.inspect(|n| println!("Item: {}", n)).for_each(std::mem::drop);
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// ```
     pub fn inspect<F>(self, f: F) -> Stream<I, impl Operator<I>>
     where
@@ -783,7 +783,7 @@ where
     ///     }
     /// }).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)]);
     /// ```
@@ -838,7 +838,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..3)));
     /// let res = s.flat_map(|n| vec![n, n]).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![0, 0, 1, 1, 2, 2]);
     /// ```
@@ -864,7 +864,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// s.for_each(|n| println!("Item: {}", n));
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// ```
     pub fn for_each<F>(self, f: F)
     where
@@ -957,7 +957,7 @@ where
     ///     .group_by_max_element(|&n| n % 2, |&n| n)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -1006,7 +1006,7 @@ where
     ///     .group_by_sum(|&n| n % 2, |n| n)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -1070,7 +1070,7 @@ where
     ///     .group_by_avg(|&n| n % 2, |&n| n as f64)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_by_key(|(k, _)| *k);
@@ -1133,7 +1133,7 @@ where
     ///     .group_by_count(|&n| n % 2)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_by_key(|(k, _)| *k);
@@ -1178,7 +1178,7 @@ where
     ///     .group_by_min_element(|&n| n % 2, |&n| n)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -1235,7 +1235,7 @@ where
     ///     .group_by_reduce(|&n| n % 2, |acc, value| *acc += value)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -1349,7 +1349,7 @@ where
     /// let s = env.stream_iter(0..5);
     /// let res = s.reduce(|a, b| a + b).collect::<Vec<_>>();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
     /// ```
@@ -1394,7 +1394,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s.reduce_assoc(|a, b| a + b).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![0 + 1 + 2 + 3 + 4]);
     /// ```
@@ -1443,7 +1443,7 @@ where
     /// // 6 8
     /// routes.next().unwrap().for_each(|i| eprintln!("route2: {i}"));
     /// // 5 7 9 ignored
-    /// env.execute();
+    /// env.execute_blocking();
     /// ```
     pub fn route(self) -> RouterBuilder<I, Op> {
         RouterBuilder::new(self)
@@ -1521,7 +1521,7 @@ where
     /// let s2 = env.stream(IteratorSource::new(vec![1, 2, 3].into_iter()));
     /// let res = s1.zip(s2).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![('A', 1), ('B', 2), ('C', 3)]);
     /// ```
@@ -1562,7 +1562,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10u32)));
     /// let rx = s.collect_channel();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// let mut v = Vec::new();
     /// while let Ok(x) = rx.recv() {
     ///     v.push(x)
@@ -1593,7 +1593,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10u32)));
     /// let rx = s.collect_channel();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// let mut v = Vec::new();
     /// while let Ok(x) = rx.recv() {
     ///     v.push(x)
@@ -1625,7 +1625,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10)));
     /// let res = s.collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
     /// ```
@@ -1656,7 +1656,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10)));
     /// let res = s.collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
     /// ```
@@ -1686,7 +1686,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10)));
     /// let res = s.collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
     /// ```
@@ -1723,7 +1723,7 @@ where
     /// ].into_iter()));
     /// let res = s.flatten().collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(res.get().unwrap(), vec![1, 2, 3, 4, 5]);
     /// ```
@@ -1836,7 +1836,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);
     /// let res = s.filter_map(|(_key, n)| if n % 3 == 0 { Some(n * 4) } else { None }).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -1865,7 +1865,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);
     /// let res = s.filter(|&(_key, n)| n % 3 == 0).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -1892,7 +1892,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
     /// let res = s.flat_map(|(_key, n)| vec![n, n]).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -1920,7 +1920,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
     /// s.inspect(|(key, n)| println!("Item: {} has key {}", n, key)).for_each(std::mem::drop);
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// ```
     pub fn inspect<F>(self, f: F) -> KeyedStream<K, I, impl Operator<(K, I)>>
     where
@@ -1960,7 +1960,7 @@ where
     ///     .fold(0, |acc, value| *acc += value)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -2005,7 +2005,7 @@ where
     ///     .reduce(|acc, value| *acc += value)
     ///     .collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -2035,7 +2035,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
     /// let res = s.map(|(_key, n)| 10 * n).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -2126,7 +2126,7 @@ where
     /// let stream = env.stream(IteratorSource::new((0..4))).group_by(|&n| n % 2);
     /// let res = stream.unkey().collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable(); // the output order is nondeterministic
@@ -2148,7 +2148,7 @@ where
     /// let stream = env.stream(IteratorSource::new((0..4))).group_by(|&n| n % 2);
     /// let res = stream.drop_key().collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable(); // the output order is nondeterministic
@@ -2169,7 +2169,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
     /// s.for_each(|(key, n)| println!("Item: {} has key {}", n, key));
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// ```
     pub fn for_each<F>(self, f: F)
     where
@@ -2230,7 +2230,7 @@ where
     /// let s2 = env.stream(IteratorSource::new((3..5))).group_by(|&n| n % 2);
     /// let res = s1.merge(s2).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable(); // the output order is nondeterministic
@@ -2297,7 +2297,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10u32)));
     /// let rx = s.collect_channel();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// let mut v = Vec::new();
     /// while let Ok(x) = rx.recv() {
     ///     v.push(x)
@@ -2324,7 +2324,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..10u32)));
     /// let rx = s.collect_channel();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// let mut v = Vec::new();
     /// while let Ok(x) = rx.recv() {
     ///     v.push(x)
@@ -2355,7 +2355,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
     /// let res = s.collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable(); // the output order is nondeterministic
@@ -2384,7 +2384,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
     /// let res = s.collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable(); // the output order is nondeterministic
@@ -2423,7 +2423,7 @@ where
     ///     .group_by(|v| v[0] % 2);
     /// let res = s.flatten().collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();

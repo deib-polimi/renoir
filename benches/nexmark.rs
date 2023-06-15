@@ -367,9 +367,19 @@ fn bench_main(c: &mut Criterion) {
                 b.iter(|| {
                     let mut env = StreamEnvironment::default();
                     run_query(&mut env, $q, *size);
-                    env.execute();
+                    env.execute_blocking();
                 })
             });
+            g.bench_with_input(
+                BenchmarkId::new(format!("{}-remote", $q), $n),
+                &$n,
+                |b, size| {
+                    let size = *size;
+                    b.iter(|| {
+                        remote_loopback_deploy(4, 4, move |env| run_query(env, $q, size));
+                    })
+                },
+            );
         }};
     }
 

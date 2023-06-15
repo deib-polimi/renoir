@@ -20,7 +20,7 @@ fn flatten_stream() {
             .into_iter(),
         );
         let res = env.stream(source).flatten().collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             assert_eq!(res, (1..=8).collect_vec());
         }
@@ -37,7 +37,7 @@ fn flatten_keyed_stream() {
             .map(|(_k, v)| vec![v, v, v])
             .flatten()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..10u8)
@@ -57,7 +57,7 @@ fn flat_map_stream() {
             .stream(source)
             .flat_map(|x| vec![x, 10 * x, 20 * x])
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..10u8)
@@ -78,7 +78,7 @@ fn flat_map_keyed_stream() {
             .group_by(|v| v % 2)
             .flat_map(|(_k, v)| vec![v, v, v])
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..10u8)
@@ -109,7 +109,7 @@ fn flatten_not_serializable_stream() {
             .map(|x| x.into_iter())
             .flatten()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             assert_eq!(res, (1..=8).collect_vec());
         }
@@ -124,7 +124,7 @@ fn flat_map_not_serializable_stream() {
             .stream(source)
             .flat_map(|x| vec![x, 10 * x, 20 * x].into_iter())
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..10u8)

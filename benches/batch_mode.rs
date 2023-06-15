@@ -19,7 +19,7 @@ fn batch_mode(batch_mode: BatchMode, dataset: &'static [u32]) {
         .batch_mode(batch_mode)
         .fold(0u32, |a, b| *a = a.wrapping_add(b));
     let _result = stream.collect_vec();
-    env.execute();
+    env.execute_blocking();
 }
 
 fn batch_mode_benchmark(c: &mut Criterion) {

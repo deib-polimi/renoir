@@ -10,7 +10,7 @@ fn key_by_stream() {
     TestHelper::local_remote_env(|mut env| {
         let source = IteratorSource::new(0..10u8);
         let res = env.stream(source).shuffle().key_by(|&n| n).collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..10u8).map(|n| (n, n)).collect_vec();
@@ -28,7 +28,7 @@ fn key_by_stream2() {
             .shuffle()
             .key_by(|&n| n.to_string().chars().next().unwrap())
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..100u8)

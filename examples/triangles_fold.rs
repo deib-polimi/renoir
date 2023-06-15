@@ -59,7 +59,7 @@ fn main() {
     let result = triangles.collect_vec();
 
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
 
     if let Some(res) = result.get() {

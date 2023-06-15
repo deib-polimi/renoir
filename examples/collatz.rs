@@ -39,7 +39,7 @@ fn main() {
         .collect::<Vec<_>>();
 
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
     if let Some(state) = output.get() {
         eprintln!("Best: {state:?}");

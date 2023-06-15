@@ -328,6 +328,6 @@ mod tests {
             .for_each(|i| eprintln!("route2: {i}"));
         // 5 7 9 ignored
 
-        env.execute();
+        env.execute_blocking();
     }
 }

@@ -106,7 +106,7 @@ where
     /// let s2 = env.stream(IteratorSource::new(0..5i32));
     /// let res = s1.join(s2, |n| (n % 5) as i32, |n| n % 2).drop_key().collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -154,7 +154,7 @@ where
     /// let s2 = env.stream(IteratorSource::new(0..5i32));
     /// let res = s1.left_join(s2, |n| (n % 5) as i32, |n| n % 2).drop_key().collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();
@@ -203,7 +203,7 @@ where
     /// let s2 = env.stream(IteratorSource::new(0..5i32));
     /// let res = s1.outer_join(s2, |n| (n % 5) as i32, |n| n % 2).drop_key().collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();

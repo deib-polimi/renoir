@@ -18,7 +18,7 @@ fn shuffle_stream() {
             .shuffle()
             .shuffle()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res_sorted = res.clone().into_iter().sorted().collect_vec();
             let expected = (0..1000u16).collect_vec();

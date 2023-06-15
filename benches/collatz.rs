@@ -37,7 +37,7 @@ fn bench_main(c: &mut Criterion) {
                     })
                     .reduce_assoc(|a, b| a.max(b))
                     .collect::<Vec<_>>();
-                env.execute();
+                env.execute_blocking();
             });
         });
     }

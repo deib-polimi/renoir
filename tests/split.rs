@@ -12,7 +12,7 @@ fn split_stream() {
         let mut splits = env.stream(source).shuffle().map(|n| n.to_string()).split(2);
         let v1 = splits.pop().unwrap().map(|x| x.clone() + &x).collect_vec();
         let v2 = splits.pop().unwrap().map(|x| x + "a").collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(v1) = v1.get() {
             assert_eq!(
@@ -43,7 +43,7 @@ fn double_split_stream() {
             v34.pop().unwrap().collect_vec(),
         ];
 
-        env.execute();
+        env.execute_blocking();
 
         for res in res {
             if let Some(mut res) = res.get() {

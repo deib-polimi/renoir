@@ -20,7 +20,7 @@ fn rich_map_stream() {
                 }
             })
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let expected = (1..=10u32).collect_vec();
             assert_eq!(res, expected);
@@ -44,7 +44,7 @@ fn rich_map_keyed_stream() {
                 }
             })
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..=1)

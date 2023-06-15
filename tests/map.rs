@@ -17,7 +17,7 @@ fn map_stream() {
             .map(|n| n + "000")
             .map(|n| u32::from_str(&n).unwrap())
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let expected = (0..10u32).map(|n| 1000 * n).collect_vec();
             assert_eq!(res, expected);
@@ -35,7 +35,7 @@ fn map_keyed_stream() {
             .map(|(k, v)| 100 * k + v)
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..10u8).map(|n| (n % 2) * 100 + n).sorted().collect_vec();

@@ -158,7 +158,7 @@ fn main() {
         .collect_vec();
 
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
     if let Some(res) = res.get() {
         let state = &res[0];

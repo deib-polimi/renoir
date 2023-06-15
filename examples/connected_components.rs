@@ -102,7 +102,7 @@ fn main() {
     dropme.for_each(|_| {});
 
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
 
     if let Some(res) = result.get() {

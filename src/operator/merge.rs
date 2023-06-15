@@ -31,7 +31,7 @@ where
     /// let s2 = env.stream(IteratorSource::new((10..20)));
     /// let res = s1.merge(s2).collect_vec();
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// let mut res = res.get().unwrap();
     /// res.sort_unstable();

@@ -16,7 +16,7 @@ fn test_zip_no_shuffle() {
         let stream1 = env.stream(source1);
         let stream2 = env.stream(source2);
         let res = stream1.zip(stream2).collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let expected = items1.into_iter().zip(items2.into_iter()).collect_vec();
             assert_eq!(res, expected);
@@ -35,7 +35,7 @@ fn test_zip_balanced() {
         let stream1 = env.stream(source1).shuffle();
         let stream2 = env.stream(source2).shuffle();
         let res = stream1.zip(stream2).collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let (n, s): (Vec<_>, Vec<_>) = res.into_iter().unzip();
             let n = n.into_iter().sorted().collect_vec();
@@ -58,7 +58,7 @@ fn test_zip_unbalanced() {
         let stream1 = env.stream(source1).shuffle();
         let stream2 = env.stream(source2).shuffle();
         let res = stream1.zip(stream2).collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let (_n, s): (Vec<_>, Vec<_>) = res.into_iter().unzip();
             let s = s.into_iter().sorted().collect_vec();

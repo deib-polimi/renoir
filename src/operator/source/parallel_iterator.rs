@@ -282,7 +282,7 @@ impl crate::StreamEnvironment {
     ///     })
     ///    .for_each(|q| println!("b: {q}"));
     ///
-    /// env.execute();
+    /// env.execute_blocking();
     /// ```
     pub fn stream_par_iter<Source>(
         &mut self,

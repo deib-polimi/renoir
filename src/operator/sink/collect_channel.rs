@@ -87,7 +87,7 @@ mod tests {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::IteratorSource::new(0..10u8);
         let rx = env.stream(source).collect_channel();
-        env.execute();
+        env.execute_blocking();
         let mut v = Vec::new();
         while let Ok(x) = rx.recv() {
             v.push(x)

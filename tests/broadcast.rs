@@ -16,7 +16,7 @@ fn broadcast_test() {
             .reduce(|x, y| x + y)
             .collect_vec();
 
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             assert_eq!(res.len(), 1);
             assert_eq!(res[0], (0..100).sum::<u32>() * parallelism);

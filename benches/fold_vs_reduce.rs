@@ -17,7 +17,7 @@ fn fold(dataset: &'static [u32]) {
         .batch_mode(BatchMode::fixed(1024))
         .fold(0u32, |a, b| *a = a.wrapping_add(b));
     let _result = stream.collect_vec();
-    env.execute();
+    env.execute_blocking();
 }
 
 fn reduce(dataset: &'static [u32]) {
@@ -30,7 +30,7 @@ fn reduce(dataset: &'static [u32]) {
         .batch_mode(BatchMode::fixed(1024))
         .reduce(|a, b| a.wrapping_add(b));
     let _result = stream.collect_vec();
-    env.execute();
+    env.execute_blocking();
 }
 
 fn fold_assoc(dataset: &'static [u32]) {
@@ -47,7 +47,7 @@ fn fold_assoc(dataset: &'static [u32]) {
             |a, b| *a = a.wrapping_add(b),
         );
     let _result = stream.collect_vec();
-    env.execute();
+    env.execute_blocking();
 }
 
 fn reduce_assoc(dataset: &'static [u32]) {
@@ -60,7 +60,7 @@ fn reduce_assoc(dataset: &'static [u32]) {
         .batch_mode(BatchMode::fixed(1024))
         .reduce_assoc(|a, b| a.wrapping_add(b));
     let _result = stream.collect_vec();
-    env.execute();
+    env.execute_blocking();
 }
 
 fn fold_vs_reduce_benchmark(c: &mut Criterion) {

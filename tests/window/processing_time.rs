@@ -20,7 +20,7 @@ fn tumbling_processing_time() {
             .fold(0, |acc, x| *acc += x)
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(res) = res.get() {
             eprintln!("{res:?}");

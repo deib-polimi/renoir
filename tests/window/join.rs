@@ -25,7 +25,7 @@ fn window_join() {
             .window(EventTimeWindow::tumbling(3))
             .join(stream2)
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             res.sort_unstable();
@@ -77,7 +77,7 @@ fn window_all_join() {
             .window_all(EventTimeWindow::tumbling(3))
             .join(stream2)
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             res.sort_unstable();
@@ -120,7 +120,7 @@ fn session_window_join() {
             .window(EventTimeWindow::session(3))
             .join(stream2)
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             let mut expected = vec![

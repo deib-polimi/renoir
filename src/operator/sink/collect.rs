@@ -105,7 +105,7 @@ mod qtests {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).collect::<Vec<_>>();
-        env.execute();
+        env.execute_blocking();
         assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
     }
 
@@ -114,7 +114,7 @@ mod qtests {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).collect::<HashSet<_>>();
-        env.execute();
+        env.execute_blocking();
         assert_eq!(res.get().unwrap(), (0..10).collect::<HashSet<_>>());
     }
 }
