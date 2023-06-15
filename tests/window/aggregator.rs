@@ -15,7 +15,7 @@ fn test_first_window() {
             .first()
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(
@@ -42,7 +42,7 @@ fn test_fold_window() {
             .fold(0, |acc, x| *acc += x)
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(
@@ -72,7 +72,7 @@ fn test_sum_window() {
             .sum::<u8>()
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(
@@ -102,7 +102,7 @@ fn test_min_window() {
             .min()
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(
@@ -129,7 +129,7 @@ fn test_max_window() {
             .max()
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(
@@ -162,7 +162,7 @@ fn test_map_window() {
             })
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(

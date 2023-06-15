@@ -19,7 +19,7 @@ fn merge_stream() {
         let stream2 = env.stream(source2);
 
         let res = stream1.merge(stream2).collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res_sorted = res.into_iter().sorted().collect_vec();
             let expected = (0..20000u16).collect_vec();
@@ -38,7 +38,7 @@ fn merge_stream_with_empty() {
         let stream2 = env.stream(source2);
 
         let res = stream1.merge(stream2).collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res_sorted = res.into_iter().sorted().collect_vec();
             let expected = (0..10000u16).collect_vec();
@@ -57,7 +57,7 @@ fn merge_stream_with_empty_other_way() {
         let stream2 = env.stream(source2);
 
         let res = stream1.merge(stream2).collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res_sorted = res.into_iter().sorted().collect_vec();
             let expected = (0..10000u16).collect_vec();
@@ -76,7 +76,7 @@ fn merge_empty_with_empty() {
         let stream2 = env.stream(source2);
 
         let res = stream1.merge(stream2).collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             assert!(res.is_empty());
         }
@@ -112,7 +112,7 @@ fn merge_with_timestamps() {
             .add_operator(|prev| WatermarkChecker::new(prev, num_watermarks.clone()));
         let res = stream.collect_vec();
 
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             assert_eq!(res.len(), 20);
             assert_eq!(num_watermarks.load(Ordering::Acquire), 5);
@@ -130,7 +130,7 @@ fn merge_keyed_stream() {
         let stream2 = env.stream(source2).group_by(|x| x % 3);
 
         let res = stream1.merge(stream2).reduce(|x, y| *x += y).collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             res.sort_unstable();

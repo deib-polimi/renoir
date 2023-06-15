@@ -353,7 +353,7 @@ where
     /// );
     /// let state = state.collect_vec();
     /// let items = items.collect_vec();
-    /// env.execute();
+    /// env.execute_blocking();
     ///
     /// assert_eq!(state.get().unwrap(), vec![10 + 11 + 12 + 20 + 21 + 22 + 30 + 31 + 32]);
     /// assert_eq!(items.get().unwrap(), vec![30, 31, 32]);

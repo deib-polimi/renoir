@@ -35,7 +35,7 @@ fn main() {
         .fold(0, |count, _word| *count += 1)
         .collect_vec();
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
     if let Some(_res) = result.get() {
         eprintln!("Output: {:?}", _res.len());

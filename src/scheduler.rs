@@ -151,6 +151,41 @@ impl Scheduler {
         self.prev_blocks.entry(to).or_default().push((from, typ));
     }
 
+    fn build_all(&mut self) -> (Vec<JoinHandle<()>>, Vec<(Coord, BlockStructure)>) {
+        self.build_execution_graph();
+        self.network.build();
+        self.network.log();
+
+        let mut join = vec![];
+        let mut block_structures = vec![];
+        let mut job_graph_generator = JobGraphGenerator::new();
+
+        for (coord, init_fn) in self.block_init.drain(..) {
+            let block_info = &self.block_info[&coord.block_id];
+            let replicas = block_info.replicas.values().flatten().cloned().collect();
+            let global_id = block_info.global_ids[&coord];
+            let mut metadata = ExecutionMetadata {
+                coord,
+                replicas,
+                global_id,
+                prev: self.network.prev(coord),
+                network: &mut self.network,
+                batch_mode: block_info.batch_mode,
+            };
+            let (handle, structure) = init_fn(&mut metadata);
+            join.push(handle);
+            block_structures.push((coord, structure.clone()));
+            job_graph_generator.add_block(coord.block_id, structure);
+        }
+
+        let job_graph = job_graph_generator.finalize();
+        log::debug!("job graph:\n{}", job_graph);
+
+        self.network.finalize();
+
+        (join, block_structures)
+    }
+
     #[cfg(feature = "async-tokio")]
     /// Start the computation returning the list of handles used to join the workers.
     pub(crate) async fn start(mut self, num_blocks: CoordUInt) {
@@ -165,36 +200,7 @@ impl Scheduler {
             self.block_info.len(),
         );
 
-        self.build_execution_graph();
-        self.network.build();
-        self.network.log();
-
-        let mut join = vec![];
-        let mut block_structures = vec![];
-        let mut job_graph_generator = JobGraphGenerator::new();
-
-        for (coord, init_fn) in self.block_init {
-            let block_info = &self.block_info[&coord.block_id];
-            let replicas = block_info.replicas.values().flatten().cloned().collect();
-            let global_id = block_info.global_ids[&coord];
-            let mut metadata = ExecutionMetadata {
-                coord,
-                replicas,
-                global_id,
-                prev: self.network.prev(coord),
-                network: &mut self.network,
-                batch_mode: block_info.batch_mode,
-            };
-            let (handle, structure) = init_fn(&mut metadata);
-            join.push(handle);
-            block_structures.push((coord, structure.clone()));
-            job_graph_generator.add_block(coord.block_id, structure);
-        }
-
-        let job_graph = job_graph_generator.finalize();
-        log::debug!("job graph:\n{}", job_graph);
-
-        self.network.finalize();
+        let (join, block_structures) = self.build_all();
 
         let (_, join_result) = tokio::join!(
             self.network.stop_and_wait(),
@@ -207,14 +213,14 @@ impl Scheduler {
 
         join_result.expect("Could not join worker threads");
 
-        let profiler_results = wait_profiler();
-
-        Self::log_tracing_data(block_structures, profiler_results);
+        Self::log_tracing_data(block_structures, wait_profiler());
     }
 
-    #[cfg(not(feature = "async-tokio"))]
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) fn start(mut self, num_blocks: CoordUInt) {
+    /// 
+    /// NOTE: If running with the `async-tokio` feature enable, this will create a new
+    /// tokio runtime.
+    pub(crate) fn start_blocking(mut self, num_blocks: CoordUInt) {
         debug!("start scheduler: {:?}", self.config);
         self.log_topology();
 
@@ -226,46 +232,40 @@ impl Scheduler {
             self.block_info.len(),
         );
 
-        self.build_execution_graph();
-        self.network.build();
-        self.network.log();
+        #[cfg(feature = "async-tokio")]
+        {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_io()
+                .enable_time()
+                .build()
+                .unwrap()
+                .block_on(async move {
+                    let (join, block_structures) = self.build_all();
 
-        let mut join = vec![];
-        let mut block_structures = vec![];
-        let mut job_graph_generator = JobGraphGenerator::new();
-
-        for (coord, init_fn) in self.block_init {
-            let block_info = &self.block_info[&coord.block_id];
-            let replicas = block_info.replicas.values().flatten().cloned().collect();
-            let global_id = block_info.global_ids[&coord];
-            let mut metadata = ExecutionMetadata {
-                coord,
-                replicas,
-                global_id,
-                prev: self.network.prev(coord),
-                network: &mut self.network,
-                batch_mode: block_info.batch_mode,
-            };
-            let (handle, structure) = init_fn(&mut metadata);
-            join.push(handle);
-            block_structures.push((coord, structure.clone()));
-            job_graph_generator.add_block(coord.block_id, structure);
+                    let (_, join_result) = tokio::join!(
+                        self.network.stop_and_wait(),
+                        tokio::task::spawn_blocking(move || {
+                            for handle in join {
+                                handle.join().unwrap();
+                            }
+                        })
+                    );
+                    join_result.expect("Could not join worker threads");
+                    Self::log_tracing_data(block_structures, wait_profiler());
+                });
         }
+        #[cfg(not(feature = "async-tokio"))]
+        {
+            let (join, block_structures) = self.build_all();
 
-        let job_graph = job_graph_generator.finalize();
-        log::debug!("job graph:\n{}", job_graph);
-
-        self.network.finalize();
-
-        for handle in join {
-            handle.join().unwrap();
+            for handle in join {
+                handle.join().unwrap();
+            }
+    
+            self.network.stop_and_wait();
+            let profiler_results = wait_profiler();
+            Self::log_tracing_data(block_structures, profiler_results);
         }
-
-        self.network.stop_and_wait();
-
-        let profiler_results = wait_profiler();
-
-        Self::log_tracing_data(block_structures, profiler_results);
     }
 
     /// Get the ids of the previous blocks of a given block in the job graph
@@ -468,7 +468,7 @@ mod tests {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = IteratorSource::new(vec![1, 2, 3].into_iter());
         let _stream = env.stream(source);
-        env.execute();
+        env.execute_blocking();
     }
 
     #[test]
@@ -477,6 +477,6 @@ mod tests {
         let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
         let source = IteratorSource::new(vec![1, 2, 3].into_iter());
         let _stream = env.stream(source).shuffle();
-        env.execute();
+        env.execute_blocking();
     }
 }

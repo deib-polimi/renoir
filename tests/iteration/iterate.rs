@@ -54,7 +54,7 @@ fn test_iterate_no_blocks_in_between() {
             );
         let state = state.collect_vec();
         let res = res.collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         check_result(n, n_iter, state.get(), res.get());
     });
@@ -82,7 +82,7 @@ fn test_iterate_side_input() {
         );
         let state = state.collect_vec();
         let res = res.map(|(_, y)| y).collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         check_result(n, n_iter, state.get(), res.get());
     });
@@ -117,7 +117,7 @@ fn test_iterate_with_shuffle() {
             );
         let state = state.collect_vec();
         let res = res.collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         check_result(n, n_iter, state.get(), res.get());
     });
@@ -143,7 +143,7 @@ fn test_iterate_primes() {
         );
         let state = state.collect_vec();
         let primes = primes.collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(state) = state.get() {
             assert_eq!(state.len(), 1);

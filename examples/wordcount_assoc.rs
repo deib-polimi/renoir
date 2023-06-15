@@ -30,7 +30,7 @@ fn main() {
         .group_by_count(|word: &String| word.clone())
         .collect_vec();
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
 
     if let Some(_res) = result.get() {

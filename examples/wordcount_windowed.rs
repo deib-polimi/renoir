@@ -28,7 +28,7 @@ fn main() {
         .fold(0, |count, _word| *count += 1)
         .for_each(|_| {});
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     let elapsed = start.elapsed();
     eprintln!("Elapsed: {elapsed:?}");
 }

@@ -13,7 +13,7 @@ fn main() {
         .group_by(|i| i % 5)
         .fold(Vec::new(), Vec::push)
         .collect_vec();
-    env.execute();
+    env.execute_blocking();
     if let Some(result) = result.get() {
         println!("{result:?}");
     }

@@ -27,7 +27,7 @@ fn test_replay_no_blocks_in_between() {
                 },
             )
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(res) = res.get() {
             assert_eq!(res.len(), 1);
@@ -68,7 +68,7 @@ fn test_replay_with_shuffle() {
                 },
             )
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(res) = res.get() {
             assert_eq!(res.len(), 1);
@@ -127,7 +127,7 @@ fn test_replay_nested_no_shuffle() {
             |&mut _state| true,
         );
         let res = stream.collect_vec();
-        env.execute();
+        env.execute_blocking();
         check_nested_result(res);
     });
 }
@@ -154,7 +154,7 @@ fn test_replay_nested_shuffle_inner() {
             |&mut _state| true,
         );
         let res = stream.collect_vec();
-        env.execute();
+        env.execute_blocking();
         check_nested_result(res);
     });
 }
@@ -181,7 +181,7 @@ fn test_replay_nested_shuffle_outer() {
             |&mut _state| true,
         );
         let res = stream.collect_vec();
-        env.execute();
+        env.execute_blocking();
         check_nested_result(res);
     });
 }
@@ -208,7 +208,7 @@ fn test_replay_nested_shuffle_both() {
             |&mut _state| true,
         );
         let res = stream.collect_vec();
-        env.execute();
+        env.execute_blocking();
         check_nested_result(res);
     });
 }

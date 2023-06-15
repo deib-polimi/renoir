@@ -19,7 +19,7 @@ fn rich_flat_map_stream() {
                 }
             })
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             let expected = (0..10u8)
@@ -50,7 +50,7 @@ fn rich_flat_map_keyed_stream() {
                 }
             })
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..10i32)

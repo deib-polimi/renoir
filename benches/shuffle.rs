@@ -23,7 +23,7 @@ fn shuffle(dataset: &'static [u32]) {
         .shuffle()
         .map(|n| n.wrapping_sub(42));
     stream.for_each(std::mem::drop);
-    env.execute();
+    env.execute_blocking();
 }
 
 fn shuffle_benchmark(c: &mut Criterion) {

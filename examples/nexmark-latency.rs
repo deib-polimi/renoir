@@ -215,7 +215,7 @@ fn main() {
     }
 
     let start = Instant::now();
-    env.execute();
+    env.execute_blocking();
     println!("q{q}:elapsed:{:?}", start.elapsed());
 
     eprintln!("==================================================");

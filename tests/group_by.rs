@@ -13,7 +13,7 @@ fn group_by_stream() {
             .stream(source)
             .group_by(|&n| n.to_string().chars().next().unwrap())
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             let expected = (0..100u8)

@@ -19,7 +19,7 @@ fn sliding_event_time() {
             .first()
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             // Windows and elements
@@ -46,7 +46,7 @@ fn tumbling_event_time() {
             .first()
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
 
         if let Some(mut res) = res.get() {
             // Windows and elements

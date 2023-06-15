@@ -59,7 +59,7 @@ fn wordcount_bench(c: &mut Criterion) {
                 b.iter(move || {
                     let mut env = StreamEnvironment::default();
                     wc_fold(&mut env, path);
-                    env.execute();
+                    env.execute_blocking();
                 })
             },
         );
@@ -71,7 +71,7 @@ fn wordcount_bench(c: &mut Criterion) {
                 b.iter(move || {
                     let mut env = StreamEnvironment::default();
                     wc_fold_assoc(&mut env, path);
-                    env.execute();
+                    env.execute_blocking();
                 })
             },
         );
@@ -83,7 +83,7 @@ fn wordcount_bench(c: &mut Criterion) {
                 b.iter(move || {
                     let mut env = StreamEnvironment::default();
                     wc_count_assoc(&mut env, path);
-                    env.execute();
+                    env.execute_blocking();
                 })
             },
         );
@@ -95,7 +95,7 @@ fn wordcount_bench(c: &mut Criterion) {
                 b.iter(move || {
                     let mut env = StreamEnvironment::default();
                     wc_reduce(&mut env, path);
-                    env.execute();
+                    env.execute_blocking();
                 })
             },
         );
@@ -107,7 +107,7 @@ fn wordcount_bench(c: &mut Criterion) {
                 b.iter(move || {
                     let mut env = StreamEnvironment::default();
                     wc_reduce_assoc(&mut env, path);
-                    env.execute();
+                    env.execute_blocking();
                 })
             },
         );
@@ -119,7 +119,7 @@ fn wordcount_bench(c: &mut Criterion) {
                 b.iter(move || {
                     let mut env = StreamEnvironment::default();
                     wc_fast(&mut env, path);
-                    env.execute();
+                    env.execute_blocking();
                 })
             },
         );
@@ -131,7 +131,7 @@ fn wordcount_bench(c: &mut Criterion) {
                 b.iter(move || {
                     let mut env = StreamEnvironment::default();
                     wc_fast_kstring(&mut env, path);
-                    env.execute();
+                    env.execute_blocking();
                 })
             },
         );

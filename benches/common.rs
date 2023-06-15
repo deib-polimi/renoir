@@ -39,7 +39,7 @@ pub const DURATION: Duration = Duration::from_secs(10);
 //             let mut env = (self.make_env)();
 //             let _result = (self.make_network)(&mut env);
 //             let start = Instant::now();
-//             env.execute();
+//             env.execute_blocking();
 //             time += start.elapsed();
 //             black_box(_result);
 //         }

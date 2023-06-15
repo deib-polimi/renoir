@@ -123,15 +123,17 @@ impl StreamEnvironment {
         scheduler.start(env.block_count).await;
     }
 
-    /// Start the computation. Await on the returned future to actually start the computation.
-    #[cfg(not(feature = "async-tokio"))]
-    pub fn execute(self) {
+    /// Start the computation. Blocks until the computation is complete.
+    /// 
+    /// Execute on a thread or use the async version [`execute`]
+    /// for non-blocking alternatives
+    pub fn execute_blocking(self) {
         drop(self.build_time);
         micrometer::span!("noir_execution");
         let mut env = self.inner.lock();
         info!("starting execution ({} blocks)", env.block_count);
         let scheduler = env.scheduler.take().unwrap();
-        scheduler.start(env.block_count);
+        scheduler.start_blocking(env.block_count);
     }
 
     /// Get the total number of processing cores in the cluster.

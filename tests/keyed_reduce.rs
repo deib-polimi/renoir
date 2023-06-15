@@ -14,7 +14,7 @@ fn group_by_reduce_stream() {
             .map(|x| x.to_string())
             .group_by_reduce(|n| n.parse::<u32>().unwrap() % 2, |acc, y| *acc += &y)
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             assert_eq!(res.len(), 2);
@@ -34,7 +34,7 @@ fn reduce_keyed_stream() {
             .map(|(_, x)| x.to_string())
             .reduce(|acc, y| *acc += &y)
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             let res = res.into_iter().sorted().collect_vec();
             assert_eq!(res.len(), 2);

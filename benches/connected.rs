@@ -112,7 +112,6 @@ fn bench_main(c: &mut Criterion) {
                 let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
                 let edges = *size;
                 let nodes = ((edges as f32).sqrt() * 25.) as u64 + 1;
-                eprintln!("n:{nodes}, e:{edges}");
 
                 let source = env.stream_par_iter(move |id, peers| {
                     let mut rng: SmallRng = SeedableRng::seed_from_u64(id ^ 0xdeadbeef);
@@ -121,7 +120,7 @@ fn bench_main(c: &mut Criterion) {
                 });
 
                 connected(source);
-                env.execute();
+                env.execute_blocking();
             })
         });
     }

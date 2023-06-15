@@ -137,7 +137,7 @@ fn main() {}
 //         .collect_vec();
 //
 //     let start = Instant::now();
-//     env.execute();
+//     env.execute_blocking();
 //     let state = &res[0];
 //     env = StreamEnvironment::new();
 //     env.spawn_remote_workers();
@@ -146,7 +146,7 @@ fn main() {}
 //         .filter(|x| x[0] == x[1])
 //         .collect_vec();
 //
-//     env.execute();
+//     env.execute_blocking();
 //
 //     let accuracy: f64 = accuracy_vector.iter().count() as f64 / state.count as f64;
 //     println!("Accuracy: {}", accuracy);

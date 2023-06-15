@@ -18,7 +18,7 @@ fn parallel_iterator() {
             start..stop
         });
         let res = env.stream(source).shuffle().collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             let expected = (0..n).collect_vec();

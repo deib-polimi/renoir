@@ -21,7 +21,7 @@ fn rich_filter_map_stream() {
                 }
             })
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(res) = res.get() {
             assert_eq!(res, &["aaaa", "aaaaa", "aaaaaa"]);
         }
@@ -48,7 +48,7 @@ fn rich_filter_map_keyed_stream() {
             })
             .drop_key()
             .collect_vec();
-        env.execute();
+        env.execute_blocking();
         if let Some(mut res) = res.get() {
             res.sort_unstable();
             assert_eq!(res, &["aaaa", "aaaaa", "bbbb", "bbbbb"]);
