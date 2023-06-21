@@ -12,6 +12,7 @@ use std::ops::{AddAssign, Div};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 #[cfg(not(feature = "crossbeam"))]
 use flume::{unbounded, Receiver};
+use futures::Future;
 use serde::{Deserialize, Serialize};
 
 pub(crate) use start::*;
@@ -22,7 +23,9 @@ use crate::block::{group_by_hash, BlockStructure, NextStrategy, Replication};
 use crate::scheduler::ExecutionMetadata;
 use crate::{BatchMode, KeyedStream, Stream};
 
-use self::map_memo::MemoMap;
+use self::map_async::MapAsync;
+// use self::map_async_memo::MapAsyncMemo;
+use self::map_memo::MapMemo;
 use self::sink::collect::Collect;
 use self::sink::collect_channel::CollectChannelSink;
 use self::sink::collect_count::CollectCountSink;
@@ -70,6 +73,8 @@ pub mod join;
 pub(crate) mod key_by;
 pub(crate) mod keyed_fold;
 pub(crate) mod map;
+mod map_async;
+mod map_async_memo;
 pub(crate) mod map_memo;
 pub(crate) mod merge;
 pub(crate) mod reorder;
@@ -187,6 +192,23 @@ impl<Out> StreamElement<Out> {
         match self {
             StreamElement::Item(item) => StreamElement::Item(f(item)),
             StreamElement::Timestamped(item, ts) => StreamElement::Timestamped(f(item), ts),
+            StreamElement::Watermark(w) => StreamElement::Watermark(w),
+            StreamElement::Terminate => StreamElement::Terminate,
+            StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
+            StreamElement::FlushBatch => StreamElement::FlushBatch,
+        }
+    }
+
+    /// Change the type of the element inside the `StreamElement`.
+    #[cfg(feature = "async-tokio")]
+    pub async fn map_async<NewOut, F, Fut>(self, f: F) -> StreamElement<NewOut>
+    where
+        F: FnOnce(Out) -> Fut,
+        Fut: Future<Output=NewOut>,
+    {
+        match self {
+            StreamElement::Item(item) => StreamElement::Item(f(item).await),
+            StreamElement::Timestamped(item, ts) => StreamElement::Timestamped(f(item).await, ts),
             StreamElement::Watermark(w) => StreamElement::Watermark(w),
             StreamElement::Terminate => StreamElement::Terminate,
             StreamElement::FlushAndRestart => StreamElement::FlushAndRestart,
@@ -524,17 +546,42 @@ where
         self.add_operator(|prev| Map::new(prev, f))
     }
 
+    // pub fn map_async_memo_by<O, K, F, Fk, Fut>(
+    //     self,
+    //     f: F,
+    //     fk: Fk,
+    //     capacity: usize,
+    // ) -> Stream<O, impl Operator<O>>
+    // where
+    //     F: Fn(I) -> Fut + Send + Sync + 'static,
+    //     Fk: Fn(&I) -> K + Send + Clone + 'static,
+    //     Fut: futures::Future<Output = O> + Send,
+    //     O: Data + Sync,
+    //     K: DataKey + Sync,
+    // {
+    //     self.add_operator(|prev| MapAsyncMemo::new(prev, f, fk, capacity))
+    // }
+
+    pub fn map_async<O: Data, F, Fut>(self, f: F) -> Stream<O, impl Operator<O>>
+    where
+        F: Fn(I) -> Fut + Send + Sync + 'static + Clone,
+        Fut: futures::Future<Output = O> + Send + 'static,
+    {
+        self.add_operator(|prev| MapAsync::new(prev, f, 0))
+    }
+
     /// # TODO
     pub fn map_memo_by<K: DataKey + Sync, O: Data + Sync, F, Fk>(
         self,
         f: F,
         fk: Fk,
+        capacity: usize,
     ) -> Stream<O, impl Operator<O>>
     where
         F: Fn(I) -> O + Send + Clone + 'static,
         Fk: Fn(&I) -> K + Send + Clone + 'static,
     {
-        self.add_operator(|prev| MemoMap::new(prev, f, fk))
+        self.add_operator(|prev| MapMemo::new(prev, f, fk, capacity))
     }
 
     /// Fold the stream into a stream that emits a single value.
@@ -1732,6 +1779,26 @@ where
     }
 }
 
+// impl<I, Op> Stream<I, Op>
+// where
+//     I: Data + Hash + Eq + Sync,
+//     Op: Operator<I> + 'static,
+// {
+//     /// # TODO
+//     ///
+//     pub fn map_async_memo<O: Data + Sync, F, Fut>(
+//         self,
+//         f: F,
+//         capacity: usize,
+//     ) -> Stream<O, impl Operator<O>>
+//     where
+//         F: Fn(I) -> Fut + Send + Sync + 'static,
+//         Fut: Future<Output = O> + Send,
+//     {
+//         self.add_operator(|prev| MapAsyncMemo::new(prev, f, |x: &I| x.clone(), capacity))
+//     }
+// }
+
 impl<I, Op> Stream<I, Op>
 where
     I: Data + Hash + Eq + Sync,
@@ -1739,11 +1806,11 @@ where
 {
     /// # TODO
     ///
-    pub fn map_memo<O: Data + Sync, F>(self, f: F) -> Stream<O, impl Operator<O>>
+    pub fn map_memo<O: Data + Sync, F>(self, f: F, capacity: usize) -> Stream<O, impl Operator<O>>
     where
         F: Fn(I) -> O + Send + Clone + 'static,
     {
-        self.add_operator(|prev| MemoMap::new(prev, f, |x| x.clone()))
+        self.add_operator(|prev| MapMemo::new(prev, f, |x| x.clone(), capacity))
     }
 }
 

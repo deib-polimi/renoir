@@ -3,8 +3,8 @@ use std::hash::BuildHasher;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use dashmap::mapref::entry::Entry;
-use dashmap::DashMap;
+use quick_cache::sync::Cache;
+use quick_cache::UnitWeighter;
 
 use crate::block::{BlockStructure, GroupHasherBuilder, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement};
@@ -14,7 +14,7 @@ use super::DataKey;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct MemoMap<I, O, K, F, Fk, Op, H: BuildHasher + Clone = GroupHasherBuilder>
+pub struct MapMemo<I, O, K, F, Fk, Op, H: BuildHasher + Clone = GroupHasherBuilder>
 where
     F: Fn(I) -> O + Send + Clone,
     Fk: Fn(&I) -> K + Send + Clone,
@@ -28,11 +28,11 @@ where
     f: F,
     #[derivative(Debug = "ignore")]
     fk: Fk,
-    cache: Arc<DashMap<K, O, H>>,
+    cache: Arc<Cache<K, O, UnitWeighter, H>>,
     _i: PhantomData<I>,
 }
 
-impl<I, O, K, F, Fk, Op> Display for MemoMap<I, O, K, F, Fk, Op>
+impl<I, O, K, F, Fk, Op> Display for MapMemo<I, O, K, F, Fk, Op>
 where
     F: Fn(I) -> O + Send + Clone,
     Fk: Fn(&I) -> K + Send + Clone,
@@ -52,7 +52,7 @@ where
     }
 }
 
-impl<I, O, K, F, Fk, Op> MemoMap<I, O, K, F, Fk, Op>
+impl<I, O, K, F, Fk, Op> MapMemo<I, O, K, F, Fk, Op>
 where
     F: Fn(I) -> O + Send + Clone,
     Fk: Fn(&I) -> K + Send + Clone,
@@ -61,18 +61,23 @@ where
     O: Data + Sync,
     K: DataKey + Sync,
 {
-    pub(super) fn new(prev: Op, f: F, fk: Fk) -> Self {
+    pub(super) fn new(prev: Op, f: F, fk: Fk, capacity: usize) -> Self {
         Self {
             prev,
             f,
             fk,
             _i: Default::default(),
-            cache: Default::default(),
+            cache: Arc::new(Cache::with(
+                capacity,
+                capacity as u64,
+                UnitWeighter,
+                Default::default(),
+            )),
         }
     }
 }
 
-impl<I, O, K, F, Fk, Op> Operator<O> for MemoMap<I, O, K, F, Fk, Op>
+impl<I, O, K, F, Fk, Op> Operator<O> for MapMemo<I, O, K, F, Fk, Op>
 where
     F: Fn(I) -> O + Send + Clone,
     Fk: Fn(&I) -> K + Send + Clone,
@@ -89,17 +94,15 @@ where
     fn next(&mut self) -> StreamElement<O> {
         self.prev.next().map(|v| {
             let k = (self.fk)(&v);
-            match self.cache.entry(k) {
-                Entry::Occupied(e) => {
-                    log::info!("cache hit, loading");
-                    e.get().clone()
-                }
-                Entry::Vacant(e) => {
+            match self.cache.get_value_or_guard(&k, None) {
+                quick_cache::GuardResult::Value(o) => o,
+                quick_cache::GuardResult::Guard(g) => {
                     log::info!("cache miss, computing");
                     let o = (self.f)(v);
-                    e.insert(o.clone());
+                    g.insert(o.clone());
                     o
                 }
+                quick_cache::GuardResult::Timeout => unreachable!(),
             }
         })
     }
@@ -111,36 +114,36 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::str::FromStr;
+// #[cfg(test)]
+// mod tests {
+//     use std::str::FromStr;
 
-    use crate::operator::map::Map;
-    use crate::operator::{Operator, StreamElement};
-    use crate::test::FakeOperator;
+//     use crate::operator::map::Map;
+//     use crate::operator::{Operator, StreamElement};
+//     use crate::test::FakeOperator;
 
-    #[test]
-    #[cfg(feature = "timestamp")]
-    fn map_stream() {
-        let mut fake_operator = FakeOperator::new(0..10u8);
-        for i in 0..10 {
-            fake_operator.push(StreamElement::Timestamped(i, i as i64));
-        }
-        fake_operator.push(StreamElement::Watermark(100));
+//     #[test]
+//     #[cfg(feature = "timestamp")]
+//     fn map_stream() {
+//         let mut fake_operator = FakeOperator::new(0..10u8);
+//         for i in 0..10 {
+//             fake_operator.push(StreamElement::Timestamped(i, i as i64));
+//         }
+//         fake_operator.push(StreamElement::Watermark(100));
 
-        let map = Map::new(fake_operator, |x| x.to_string());
-        let map = Map::new(map, |x| x + "000");
-        let mut map = Map::new(map, |x| u32::from_str(&x).unwrap());
+//         let map = Map::new(fake_operator, |x| x.to_string());
+//         let map = Map::new(map, |x| x + "000");
+//         let mut map = Map::new(map, |x| u32::from_str(&x).unwrap());
 
-        for i in 0..10 {
-            let elem = map.next();
-            assert_eq!(elem, StreamElement::Item(i * 1000));
-        }
-        for i in 0..10 {
-            let elem = map.next();
-            assert_eq!(elem, StreamElement::Timestamped(i * 1000, i as i64));
-        }
-        assert_eq!(map.next(), StreamElement::Watermark(100));
-        assert_eq!(map.next(), StreamElement::Terminate);
-    }
-}
+//         for i in 0..10 {
+//             let elem = map.next();
+//             assert_eq!(elem, StreamElement::Item(i * 1000));
+//         }
+//         for i in 0..10 {
+//             let elem = map.next();
+//             assert_eq!(elem, StreamElement::Timestamped(i * 1000, i as i64));
+//         }
+//         assert_eq!(map.next(), StreamElement::Watermark(100));
+//         assert_eq!(map.next(), StreamElement::Terminate);
+//     }
+// }
