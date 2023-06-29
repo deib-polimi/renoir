@@ -29,6 +29,13 @@ jobs:
         run: cargo doc --color=always --no-deps --all
       - name: Setup Pages
         uses: actions/configure-pages@v3
+      - name: Fix file permissions
+        shell: sh
+        run: |
+          chmod -c -R +rX "target/doc" |
+          while read line; do
+              echo "::warning title=Invalid file permissions automatically fixed::$line"
+          done
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
