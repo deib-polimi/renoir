@@ -1,8 +1,8 @@
 use std::fmt::Display;
-use std::marker::PhantomData;
 use std::vec::IntoIter as VecIter;
 
 use coarsetime::Instant;
+use flume::{Receiver, Sender};
 use futures::{Future, StreamExt};
 
 use crate::block::{BlockStructure, OperatorStructure};
@@ -11,7 +11,7 @@ use crate::scheduler::ExecutionMetadata;
 use crate::BatchMode;
 
 #[derive(Debug, Clone)]
-struct Batcher<T> {
+pub(super) struct Batcher<T> {
     mode: BatchMode,
     buffer: Vec<StreamElement<T>>,
     last_send: Instant,
@@ -28,14 +28,6 @@ impl<T> Default for Batcher<T> {
 }
 
 impl<T> Batcher<T> {
-    pub(crate) fn new(mode: BatchMode) -> Self {
-        Self {
-            mode,
-            buffer: Default::default(),
-            last_send: Instant::default(),
-        }
-    }
-
     /// Put a message in the batch queue, it won't be sent immediately.
     pub(crate) fn enqueue(&mut self, message: StreamElement<T>) -> Option<Vec<StreamElement<T>>> {
         match self.mode {
@@ -91,30 +83,27 @@ where
     prev: PreviousOperators,
     batcher: Batcher<I>,
     buffer: Option<VecIter<StreamElement<O>>>,
+    flushing: bool,
+    pending: usize,
     f: F,
-    _o: PhantomData<O>,
-    // #[derivative(Debug = "ignore")]
-    // i_tx: Sender<I>,
-    // #[derivative(Debug = "ignore")]
-    // o_rx: Receiver<O>,
+    #[derivative(Debug = "ignore")]
+    i_tx: Sender<Vec<StreamElement<I>>>,
+    #[derivative(Debug = "ignore")]
+    o_rx: Receiver<Vec<StreamElement<O>>>,
 }
 
-impl<I: Clone, O: Clone, F: Clone, Fut, PreviousOperators: Clone> Clone
-    for MapAsync<I, O, F, Fut, PreviousOperators>
+impl<I, O, F, Fut, PreviousOperators> Clone for MapAsync<I, O, F, Fut, PreviousOperators>
 where
     F: Fn(I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send,
     PreviousOperators: Operator<I>,
     I: Data,
+    O: Data,
+    F: Clone,
+    PreviousOperators: Clone,
 {
     fn clone(&self) -> Self {
-        Self {
-            prev: self.prev.clone(),
-            batcher: self.batcher.clone(),
-            f: self.f.clone(),
-            _o: self._o.clone(),
-            buffer: Default::default(),
-        }
+        Self::new(self.prev.clone(), self.f.clone(), 0)
     }
 }
 
@@ -143,27 +132,52 @@ where
     PreviousOperators: Operator<I>,
 {
     pub(super) fn new(prev: PreviousOperators, f: F, _queue: usize) -> Self {
+        const CH: usize = 4;
+        let (i_tx, i_rx) = flume::bounded::<Vec<StreamElement<I>>>(CH);
+        let (o_tx, o_rx) = flume::bounded::<Vec<StreamElement<O>>>(CH);
+
+        let ff = f.clone();
+        tokio::spawn(async move {
+            while let Ok(b) = i_rx.recv_async().await {
+                let v: Vec<_> = futures::stream::iter(b.into_iter())
+                    .then(|el| el.map_async(&ff))
+                    .collect()
+                    .await;
+
+                o_tx.send_async(v).await.unwrap();
+            }
+        });
+
         Self {
             prev,
             batcher: Default::default(),
             f,
-            _o: PhantomData,
+            flushing: false,
+            pending: 0,
             buffer: Default::default(),
+            i_tx,
+            o_rx,
         }
     }
 
     fn schedule_batch(&mut self, b: Vec<StreamElement<I>>) {
-        let (tx, rx) = flume::bounded(1);
-        let f = self.f.clone();
-        tokio::spawn(async move {
-            let v: Vec<_> = futures::stream::iter(b.into_iter())
-                .then(|el| el.map_async(f))
-                .collect()
-                .await;
+        micrometer::span!(map_async_sched);
+        match self.i_tx.try_send(b) {
+            Ok(()) => self. pending += 1,
+            Err(flume::TrySendError::Full(b)) => {
+                self.recv_output_batch();
+                self.i_tx.send(b).unwrap();
+                self. pending += 1
+            }
+            Err(e) => panic!("{e}"),
+        }
+    }
 
-            tx.send_async(v).await;
-        });
-        self.buffer = Some(rx.recv().unwrap().into_iter());
+    fn recv_output_batch(&mut self) {
+        assert!(self.pending > 0, "map_async trier receiving batches, but pending is equal to 0");
+        micrometer::span!(map_async_recv);
+        self.buffer = Some(self.o_rx.recv().unwrap().into_iter());
+        self.pending -= 1;
     }
 }
 
@@ -188,7 +202,15 @@ where
                 self.buffer = None;
             }
 
+            if self.flushing && self.pending > 0 {
+                self.recv_output_batch();
+                continue;
+            } if self.flushing && self.pending == 0 {
+                self.flushing = false;
+            }
+
             let el = self.prev.next();
+            micrometer::span!(map_async_enqueue);
             let kind = el.take();
 
             if let Some(b) = self.batcher.enqueue(el) {
@@ -204,6 +226,9 @@ where
                 if let Some(b) = self.batcher.flush() {
                     self.schedule_batch(b);
                 }
+            }
+            if matches!(kind, StreamElement::FlushAndRestart | StreamElement::Terminate) {
+                self.flushing = true;
             }
         }
     }

@@ -19,7 +19,15 @@ where
         });
         self.add_window_operator("WindowMax", acc)
     }
+}
 
+impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
+where
+    WindowDescr: WindowDescription<Out>,
+    OperatorChain: Operator<(Key, Out)> + 'static,
+    Key: DataKey,
+    Out: Data,
+{
     pub fn max_by_key<K: Ord, F: Fn(&Out) -> K + Clone + Send + 'static>(
         self,
         get_key: F,

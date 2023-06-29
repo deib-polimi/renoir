@@ -97,7 +97,7 @@ where
             match self.cache.get_value_or_guard(&k, None) {
                 quick_cache::GuardResult::Value(o) => o,
                 quick_cache::GuardResult::Guard(g) => {
-                    log::info!("cache miss, computing");
+                    log::debug!("cache miss, computing");
                     let o = (self.f)(v);
                     g.insert(o.clone());
                     o

@@ -1,4 +1,3 @@
-use micrometer::Span;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::any::TypeId;
@@ -47,8 +46,6 @@ pub(crate) struct StreamEnvironmentInner {
 pub struct StreamEnvironment {
     /// Reference to the actual content of the environment.
     inner: Arc<Mutex<StreamEnvironmentInner>>,
-    /// Measure the time for building the graph.
-    build_time: Span<'static>,
 }
 
 impl Default for StreamEnvironment {
@@ -66,10 +63,8 @@ impl StreamEnvironment {
         if !config.skip_single_remote_check {
             Self::single_remote_environment_check(&config);
         }
-        micrometer::span!(noir_build_time);
         StreamEnvironment {
             inner: Arc::new(Mutex::new(StreamEnvironmentInner::new(config))),
-            build_time: noir_build_time,
         }
     }
 
@@ -115,12 +110,13 @@ impl StreamEnvironment {
     /// Start the computation. Await on the returned future to actually start the computation.
     #[cfg(feature = "async-tokio")]
     pub async fn execute(self) {
-        drop(self.build_time);
-        micrometer::span!("noir_execution");
         let mut env = self.inner.lock();
         info!("starting execution ({} blocks)", env.block_count);
         let scheduler = env.scheduler.take().unwrap();
-        scheduler.start(env.block_count).await;
+        let block_count = env.block_count;
+        drop(env);
+        scheduler.start(block_count).await;
+        info!("finished execution");
     }
 
     /// Start the computation. Blocks until the computation is complete.
@@ -128,12 +124,11 @@ impl StreamEnvironment {
     /// Execute on a thread or use the async version [`execute`]
     /// for non-blocking alternatives
     pub fn execute_blocking(self) {
-        drop(self.build_time);
-        micrometer::span!("noir_execution");
         let mut env = self.inner.lock();
         info!("starting execution ({} blocks)", env.block_count);
         let scheduler = env.scheduler.take().unwrap();
         scheduler.start_blocking(env.block_count);
+        info!("finished execution");
     }
 
     /// Get the total number of processing cores in the cluster.

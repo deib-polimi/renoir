@@ -84,7 +84,6 @@ parking_lot = "0.12.1"
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 glidesort = "0.1.2"
-micrometer = "0.2.3"
 indexmap = "1.9.3"
 tracing = { version = "0.1.37", features = ["log"] }
 quick_cache = "0.3.0"

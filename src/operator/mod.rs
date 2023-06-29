@@ -12,6 +12,7 @@ use std::ops::{AddAssign, Div};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 #[cfg(not(feature = "crossbeam"))]
 use flume::{unbounded, Receiver};
+#[cfg(feature = "async-tokio")]
 use futures::Future;
 use serde::{Deserialize, Serialize};
 
@@ -23,8 +24,8 @@ use crate::block::{group_by_hash, BlockStructure, NextStrategy, Replication};
 use crate::scheduler::ExecutionMetadata;
 use crate::{BatchMode, KeyedStream, Stream};
 
+#[cfg(feature = "async-tokio")]
 use self::map_async::MapAsync;
-// use self::map_async_memo::MapAsyncMemo;
 use self::map_memo::MapMemo;
 use self::sink::collect::Collect;
 use self::sink::collect_channel::CollectChannelSink;
@@ -57,36 +58,36 @@ use self::{
 };
 
 #[cfg(feature = "timestamp")]
-pub(crate) mod add_timestamps;
-pub(crate) mod batch_mode;
+mod add_timestamps;
+mod batch_mode;
 pub(crate) mod end;
-pub(crate) mod filter;
-pub(crate) mod filter_map;
-pub(crate) mod flat_map;
-pub(crate) mod flatten;
-pub(crate) mod fold;
-pub(crate) mod inspect;
+mod filter;
+mod filter_map;
+mod flat_map;
+mod flatten;
+mod fold;
+mod inspect;
 #[cfg(feature = "timestamp")]
-pub(crate) mod interval_join;
+mod interval_join;
 pub(crate) mod iteration;
 pub mod join;
-pub(crate) mod key_by;
-pub(crate) mod keyed_fold;
-pub(crate) mod map;
+mod key_by;
+mod keyed_fold;
+mod map;
+#[cfg(feature = "async-tokio")]
 mod map_async;
-mod map_async_memo;
-pub(crate) mod map_memo;
-pub(crate) mod merge;
-pub(crate) mod reorder;
-pub(crate) mod replication;
-pub(crate) mod rich_map;
-pub(crate) mod rich_map_custom;
-pub(crate) mod route;
+mod map_memo;
+mod merge;
+mod reorder;
+mod replication;
+mod rich_map;
+mod rich_map_custom;
+mod route;
 pub mod sink;
 pub mod source;
-pub(crate) mod start;
+mod start;
 pub mod window;
-pub(crate) mod zip;
+mod zip;
 
 /// Marker trait that all the types inside a stream should implement.
 pub trait Data: Clone + Send + 'static {}
@@ -204,7 +205,7 @@ impl<Out> StreamElement<Out> {
     pub async fn map_async<NewOut, F, Fut>(self, f: F) -> StreamElement<NewOut>
     where
         F: FnOnce(Out) -> Fut,
-        Fut: Future<Output=NewOut>,
+        Fut: Future<Output = NewOut>,
     {
         match self {
             StreamElement::Item(item) => StreamElement::Item(f(item).await),
@@ -546,22 +547,56 @@ where
         self.add_operator(|prev| Map::new(prev, f))
     }
 
-    // pub fn map_async_memo_by<O, K, F, Fk, Fut>(
-    //     self,
-    //     f: F,
-    //     fk: Fk,
-    //     capacity: usize,
-    // ) -> Stream<O, impl Operator<O>>
-    // where
-    //     F: Fn(I) -> Fut + Send + Sync + 'static,
-    //     Fk: Fn(&I) -> K + Send + Clone + 'static,
-    //     Fut: futures::Future<Output = O> + Send,
-    //     O: Data + Sync,
-    //     K: DataKey + Sync,
-    // {
-    //     self.add_operator(|prev| MapAsyncMemo::new(prev, f, fk, capacity))
-    // }
+    #[cfg(feature = "async-tokio")]
+    pub fn map_async_memo_by<O, K, F, Fk, Fut>(
+        self,
+        f: F,
+        fk: Fk,
+        capacity: usize,
+    ) -> Stream<O, impl Operator<O>>
+    where
+        F: Fn(I) -> Fut + Send + Sync + 'static + Clone,
+        Fk: Fn(&I) -> K + Send + Sync + Clone + 'static,
+        Fut: futures::Future<Output = O> + Send,
+        O: Data + Sync,
+        K: DataKey + Sync,
+    {
+        use crate::block::GroupHasherBuilder;
+        use quick_cache::{sync::Cache, UnitWeighter};
+        use std::sync::Arc;
 
+        let cache: Arc<Cache<K, O, _, GroupHasherBuilder>> = Arc::new(Cache::with(
+            capacity,
+            capacity as u64,
+            UnitWeighter,
+            Default::default(),
+        ));
+        self.add_operator(|prev| {
+            MapAsync::new(
+                prev,
+                move |el| {
+                    let fk = fk.clone();
+                    let f = f.clone();
+                    let cache = cache.clone();
+                    let k = fk(&el);
+                    async move {
+                        match cache.get_value_or_guard_async(&k).await {
+                            Ok(o) => o,
+                            Err(g) => {
+                                log::debug!("cache miss, computing");
+                                let o = (f)(el).await;
+                                g.insert(o.clone());
+                                o
+                            }
+                        }
+                    }
+                },
+                capacity,
+            )
+        })
+    }
+
+    #[cfg(feature = "async-tokio")]
     pub fn map_async<O: Data, F, Fut>(self, f: F) -> Stream<O, impl Operator<O>>
     where
         F: Fn(I) -> Fut + Send + Sync + 'static + Clone,
@@ -1779,25 +1814,26 @@ where
     }
 }
 
-// impl<I, Op> Stream<I, Op>
-// where
-//     I: Data + Hash + Eq + Sync,
-//     Op: Operator<I> + 'static,
-// {
-//     /// # TODO
-//     ///
-//     pub fn map_async_memo<O: Data + Sync, F, Fut>(
-//         self,
-//         f: F,
-//         capacity: usize,
-//     ) -> Stream<O, impl Operator<O>>
-//     where
-//         F: Fn(I) -> Fut + Send + Sync + 'static,
-//         Fut: Future<Output = O> + Send,
-//     {
-//         self.add_operator(|prev| MapAsyncMemo::new(prev, f, |x: &I| x.clone(), capacity))
-//     }
-// }
+impl<I, Op> Stream<I, Op>
+where
+    I: Data + Hash + Eq + Sync,
+    Op: Operator<I> + 'static,
+{
+    /// # TODO
+    ///
+    #[cfg(feature = "async-tokio")]
+    pub fn map_async_memo<O: Data + Sync, F, Fut>(
+        self,
+        f: F,
+        capacity: usize,
+    ) -> Stream<O, impl Operator<O>>
+    where
+        F: Fn(I) -> Fut + Send + Sync + Clone + 'static,
+        Fut: Future<Output = O> + Send,
+    {
+        self.map_async_memo_by(f, |x: &I| x.clone(), capacity)
+    }
+}
 
 impl<I, Op> Stream<I, Op>
 where

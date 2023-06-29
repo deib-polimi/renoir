@@ -179,10 +179,10 @@ impl std::fmt::Debug for RemoteHostSSHConfig {
     about = "Network of Operators In Rust",
     trailing_var_arg = true
 )]
-struct CommandLineOptions {
+pub struct CommandLineOptions {
     /// Path to the configuration file for remote execution.
     ///
-    /// When this is specified the execution will be remote. This conflicts with `--threads`.
+    /// When this is specified the execution will be remote. This conflicts with `--local`.
     #[clap(short, long)]
     remote: Option<PathBuf>,
 

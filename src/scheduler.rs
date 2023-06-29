@@ -188,15 +188,15 @@ impl Scheduler {
 
     #[cfg(feature = "async-tokio")]
     /// Start the computation returning the list of handles used to join the workers.
-    pub(crate) async fn start(mut self, num_blocks: CoordUInt) {
+    pub(crate) async fn start(mut self, block_count: CoordUInt) {
         debug!("start scheduler: {:?}", self.config);
         self.log_topology();
 
         assert_eq!(
             self.block_info.len(),
-            num_blocks as usize,
+            block_count as usize,
             "Some streams do not have a sink attached: {} streams created, but only {} registered",
-            num_blocks as usize,
+            block_count as usize,
             self.block_info.len(),
         );
 

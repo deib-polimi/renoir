@@ -160,8 +160,11 @@ impl NetworkTopology {
     pub(crate) async fn stop_and_wait(&mut self) {
         self.async_join_handles
             .drain(..)
-            .collect::<futures::stream::FuturesOrdered<_>>()
-            .for_each(|h| futures::future::ready(h.unwrap()))
+            .collect::<futures::stream::FuturesUnordered<_>>()
+            .for_each(|h| {
+                h.unwrap();
+                futures::future::ready(())
+            })
             .await;
     }
 

@@ -108,7 +108,7 @@ where
             match self.cache.get_value_or_guard(&k, None) {
                 quick_cache::GuardResult::Value(o) => o,
                 quick_cache::GuardResult::Guard(g) => {
-                    log::info!("cache miss, computing");
+                    log::debug!("cache miss, computing");
 
                     self.i_tx.send(v).unwrap();
                     let o = self.o_rx.recv().unwrap();

@@ -105,10 +105,17 @@ fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
                         log::debug!("{coord} timeout connecting to {address:?}");
                     }
                     ErrorKind::ConnectionRefused => {
-                        warn!("{coord} connection refused connecting to {address:?}");
+                        log::log!(
+                            if attempt > 4 {
+                                log::Level::Warn
+                            } else {
+                                log::Level::Debug
+                            },
+                            "{coord} connection refused connecting to {address:?} ({attempt})"
+                        );
                     }
                     _ => {
-                        warn!("{coord} failed to connect to {address:?}: {err:?}");
+                        log::warn!("{coord} failed to connect to {address:?}: {err:?}");
                     }
                 },
             }
@@ -161,7 +168,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
         let join_handle = tokio::spawn(async move {
             log::debug!(
                 "mux connecting to {}",
-                address.to_socket_addrs().unwrap().nth(0).unwrap()
+                address.to_socket_addrs().unwrap().next().unwrap()
             );
             let stream = connect_remote(coord, address).await;
             mux_thread::<Out>(coord, rx, stream).await;
@@ -218,10 +225,17 @@ async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream 
                         log::debug!("{coord} timeout connecting to {address:?}");
                     }
                     ErrorKind::ConnectionRefused => {
-                        warn!("{coord} connection refused connecting to {address:?}");
+                        log::log!(
+                            if attempt > 4 {
+                                log::Level::Warn
+                            } else {
+                                log::Level::Debug
+                            },
+                            "{coord} connection refused connecting to {address:?} ({attempt})"
+                        );
                     }
                     _ => {
-                        warn!("{coord} failed to connect to {address:?}: {err:?}");
+                        log::warn!("{coord} failed to connect to {address:?}: {err:?}");
                     }
                 },
             }
