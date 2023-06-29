@@ -161,21 +161,22 @@ where
     }
 
     fn schedule_batch(&mut self, b: Vec<StreamElement<I>>) {
-        micrometer::span!(map_async_sched);
         match self.i_tx.try_send(b) {
-            Ok(()) => self. pending += 1,
+            Ok(()) => self.pending += 1,
             Err(flume::TrySendError::Full(b)) => {
                 self.recv_output_batch();
                 self.i_tx.send(b).unwrap();
-                self. pending += 1
+                self.pending += 1
             }
             Err(e) => panic!("{e}"),
         }
     }
 
     fn recv_output_batch(&mut self) {
-        assert!(self.pending > 0, "map_async trier receiving batches, but pending is equal to 0");
-        micrometer::span!(map_async_recv);
+        assert!(
+            self.pending > 0,
+            "map_async trier receiving batches, but pending is equal to 0"
+        );
         self.buffer = Some(self.o_rx.recv().unwrap().into_iter());
         self.pending -= 1;
     }
@@ -205,12 +206,12 @@ where
             if self.flushing && self.pending > 0 {
                 self.recv_output_batch();
                 continue;
-            } if self.flushing && self.pending == 0 {
+            }
+            if self.flushing && self.pending == 0 {
                 self.flushing = false;
             }
 
             let el = self.prev.next();
-            micrometer::span!(map_async_enqueue);
             let kind = el.take();
 
             if let Some(b) = self.batcher.enqueue(el) {
@@ -227,7 +228,10 @@ where
                     self.schedule_batch(b);
                 }
             }
-            if matches!(kind, StreamElement::FlushAndRestart | StreamElement::Terminate) {
+            if matches!(
+                kind,
+                StreamElement::FlushAndRestart | StreamElement::Terminate
+            ) {
                 self.flushing = true;
             }
         }
