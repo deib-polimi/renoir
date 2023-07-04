@@ -103,8 +103,10 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
     }
     if let Some(path) = config.tracing_dir {
         std::fs::create_dir_all(&path).expect("Cannot create tracing directory");
-        let now = chrono::Local::now();
-        let file_name = format!("{}.json", now.format("%Y-%m-%d-%H%M%S"));
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+        let file_name = format!("noir-trace-{}.json", now.as_secs());
         let target = path.join(file_name);
         let mut target = std::fs::File::create(target).expect("Cannot create tracing json file");
         serde_json::to_writer(&mut target, &tracing_data)
