@@ -1,8 +1,7 @@
 //! Operators that can be applied to a stream.
 //!
 //! The actual operator list can be found from the implemented methods of [`Stream`](crate::Stream),
-//! [`KeyedStream`](crate::KeyedStream), [`WindowedStream`](crate::WindowedStream) and
-//! [`WindowedStream`](crate::WindowedStream).
+//! [`KeyedStream`](crate::KeyedStream), [`WindowedStream`](crate::WindowedStream)
 
 use std::fmt::Display;
 use std::hash::Hash;
@@ -69,7 +68,7 @@ mod fold;
 mod inspect;
 #[cfg(feature = "timestamp")]
 mod interval_join;
-pub(crate) mod iteration;
+pub mod iteration;
 pub mod join;
 mod key_by;
 mod keyed_fold;
@@ -407,8 +406,10 @@ where
         self.add_operator(|prev| Filter::new(prev, predicate))
     }
 
-    /// # TODO
     /// Reorder timestamped items
+    /// 
+    /// # Example
+    /// ### TODO
     pub fn reorder(self) -> Stream<I, impl Operator<I>> {
         self.add_operator(|prev| Reorder::new(prev))
     }
@@ -547,6 +548,32 @@ where
         self.add_operator(|prev| Map::new(prev, f))
     }
 
+    /// Map the elements of the stream into new elements by evaluating a future for each one.
+    /// Use memoization to cache outputs for previously seen inputs.
+    ///
+    /// The cache is implemented through a *per-process* [`quick_cache::sync::Cache`].
+    /// The maximum number of elements to be cached is passed as the `capacity` parameter.
+    ///
+    /// The outputs are cached according to the key produced by the `fk` function.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # tokio::runtime::Runtime::new()
+    /// #    .unwrap()
+    /// #    .block_on(base());
+    /// # async fn base() {
+    /// #    let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream_iter(5..15);
+    /// let res = s.map_async_memo_by(
+    ///     |n| async move {(n * n) % 7}, |n| n % 7, 5
+    /// ).collect_vec();
+    /// env.execute().await;
+    /// assert_eq!(res.get().unwrap(), vec![4, 1, 0, 1, 4, 2, 2, 4, 1, 0]);
+    /// # }
+    /// ```
     #[cfg(feature = "async-tokio")]
     pub fn map_async_memo_by<O, K, F, Fk, Fut>(
         self,
@@ -596,6 +623,24 @@ where
         })
     }
 
+    /// Map the elements of the stream into new elements by evaluating a future for each one.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # tokio::runtime::Runtime::new()
+    /// #    .unwrap()
+    /// #    .block_on(base());
+    /// # async fn base() {
+    /// #    let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream_iter(5..15);
+    /// let res = s.map_async(|n| async move {(n * n) % 7}).collect_vec();
+    /// env.execute().await;
+    /// assert_eq!(res.get().unwrap(), vec![4, 1, 0, 1, 4, 2, 2, 4, 1, 0]);
+    /// # }
+    /// ```
     #[cfg(feature = "async-tokio")]
     pub fn map_async<O: Data, F, Fut>(self, f: F) -> Stream<O, impl Operator<O>>
     where
@@ -605,7 +650,27 @@ where
         self.add_operator(|prev| MapAsync::new(prev, f, 0))
     }
 
-    /// # TODO
+    /// Map the elements of the stream into new elements. Use memoization
+    /// to cache outputs for previously seen inputs.
+    ///
+    /// The cache is implemented through a *per-process* [`quick_cache::sync::Cache`].
+    /// The maximum number of elements to be cached is passed as the `capacity` parameter.
+    ///
+    /// The outputs are cached according to the key produced by the `fk` function.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((5..15)));
+    /// let res = s.map_memo_by(|n| (n * n) % 7, |n| n % 7, 5).collect_vec();
+    ///
+    /// env.execute_blocking();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![4, 1, 0, 1, 4, 2, 2, 4, 1, 0]);
+    /// ```
     pub fn map_memo_by<K: DataKey + Sync, O: Data + Sync, F, Fk>(
         self,
         f: F,
@@ -1819,8 +1884,28 @@ where
     I: Data + Hash + Eq + Sync,
     Op: Operator<I> + 'static,
 {
-    /// # TODO
+    /// Map the elements of the stream into new elements by evaluating a future for each one.
+    /// Use memoization to cache outputs for previously seen inputs.
     ///
+    /// The cache is implemented through a *per-process* [`quick_cache::sync::Cache`].
+    /// The maximum number of elements to be cached is passed as the `capacity` parameter.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # tokio::runtime::Runtime::new()
+    /// #    .unwrap()
+    /// #    .block_on(base());
+    /// # async fn base() {
+    /// #    let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream_iter((0..4).cycle().take(10));
+    /// let res = s.map_async_memo(|n| async move {n * n}, 100).collect_vec();
+    /// env.execute().await;
+    /// assert_eq!(res.get().unwrap(), vec![0, 1, 4, 9, 0, 1, 4, 9, 0, 1]);
+    /// # }
+    /// ```
     #[cfg(feature = "async-tokio")]
     pub fn map_async_memo<O: Data + Sync, F, Fut>(
         self,
@@ -1840,8 +1925,26 @@ where
     I: Data + Hash + Eq + Sync,
     Op: Operator<I> + 'static,
 {
-    /// # TODO
+    /// Map the elements of the stream into new elements. Use memoization
+    /// to cache outputs for previously seen inputs.
     ///
+    /// The cache is implemented through a *per-process* [`quick_cache::sync::Cache`].
+    /// The maximum number of elements to be cached is passed as the `capacity` parameter.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream_iter((0..4).cycle().take(10));
+    /// let res = s.map_memo(|n| n * n, 5).collect_vec();
+    ///
+    /// env.execute_blocking();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![0, 1, 4, 9, 0, 1, 4, 9, 0, 1]);
+    /// ```
+
     pub fn map_memo<O: Data + Sync, F>(self, f: F, capacity: usize) -> Stream<O, impl Operator<O>>
     where
         F: Fn(I) -> O + Send + Clone + 'static,

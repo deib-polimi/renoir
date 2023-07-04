@@ -1,5 +1,4 @@
-//! This `mod` contains the types and function that model the structure of the blocks and operators
-//! for debugging purposes only.
+//! Types that describe the structure of an execution graph. For debugging purposes
 
 use std::fmt::{Display, Formatter};
 

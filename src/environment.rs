@@ -39,7 +39,7 @@ pub(crate) struct StreamEnvironmentInner {
 /// If you want to use a distributed environment (i.e. using remote workers) you have to spawn them
 /// using [`spawn_remote_workers`](StreamEnvironment::spawn_remote_workers) before asking for some stream.
 ///
-/// When all the stream have been registered you have to call [`execute`](StreamEnvironment::execute) that will consume the
+/// When all the stream have been registered you have to call [`execute`](StreamEnvironment::execute_blocking) that will consume the
 /// environment and start the computation. This function will return when the computation ends.
 ///
 /// TODO: example usage

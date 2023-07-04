@@ -140,7 +140,9 @@ where
         tokio::spawn(async move {
             while let Ok(b) = i_rx.recv_async().await {
                 let v: Vec<_> = futures::stream::iter(b.into_iter())
-                    .then(|el| el.map_async(&ff))
+                    .then(|el| async {
+                        micrometer::span!(el.map_async(&ff).await, "map_async_call")
+                    })
                     .collect()
                     .await;
 
@@ -196,6 +198,7 @@ where
 
     #[inline]
     fn next(&mut self) -> StreamElement<O> {
+        micrometer::span!(map_async_next);
         loop {
             if let Some(el) = self.buffer.as_mut().and_then(Iterator::next) {
                 return el;

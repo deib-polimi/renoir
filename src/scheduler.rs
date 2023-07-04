@@ -24,10 +24,10 @@ pub type ReplicaId = CoordUInt;
 type BlockInitFn =
     Box<dyn FnOnce(&mut ExecutionMetadata) -> (JoinHandle<()>, BlockStructure) + Send>;
 
-/// Metadata associated to a block in the execution graph.
+/// Metadata used to initialize a block at the start of an execution
 #[derive(Debug)]
 pub struct ExecutionMetadata<'a> {
-    /// The coordinate of the block (it's id, replica id, ...).
+    /// The coordinate of the block
     pub coord: Coord,
     /// The list of replicas of this block.
     pub replicas: Vec<Coord>,

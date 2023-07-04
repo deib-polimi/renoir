@@ -1,3 +1,5 @@
+//! Utilities for iteration operators
+
 use std::cell::UnsafeCell;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, Condvar, Mutex};

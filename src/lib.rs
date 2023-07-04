@@ -151,6 +151,7 @@ pub(crate) mod worker;
 
 pub type CoordUInt = u64;
 
+/// Re-export of commonly used structs and traits
 pub mod prelude {
     pub use super::operator::sink::StreamOutput;
     pub use super::operator::source::*;

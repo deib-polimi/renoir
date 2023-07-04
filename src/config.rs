@@ -1,4 +1,4 @@
-//! The types for constructing the configuration of the environment.
+//! Configuration types used to initialize the [`StreamEnvironment`](crate::StreamEnvironment).
 //!
 //! See the documentation of [`EnvironmentConfig`] for more details.
 
