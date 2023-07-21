@@ -407,7 +407,7 @@ where
     }
 
     /// Reorder timestamped items
-    /// 
+    ///
     /// # Example
     /// ### TODO
     pub fn reorder(self) -> Stream<I, impl Operator<I>> {
@@ -618,7 +618,7 @@ where
                         }
                     }
                 },
-                capacity,
+                4,
             )
         })
     }
@@ -647,7 +647,7 @@ where
         F: Fn(I) -> Fut + Send + Sync + 'static + Clone,
         Fut: futures::Future<Output = O> + Send + 'static,
     {
-        self.add_operator(|prev| MapAsync::new(prev, f, 0))
+        self.add_operator(|prev| MapAsync::new(prev, f, 4))
     }
 
     /// Map the elements of the stream into new elements. Use memoization

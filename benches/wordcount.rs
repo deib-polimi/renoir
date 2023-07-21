@@ -45,8 +45,8 @@ fn make_file(lines: usize) -> tempfile::NamedTempFile {
 fn wordcount_bench(c: &mut Criterion) {
     let mut g = c.benchmark_group("wordcount-line");
     g.sample_size(SAMPLES);
-    g.warm_up_time(WARM_UP);
-    g.measurement_time(DURATION);
+    // g.warm_up_time(WARM_UP);
+    // g.measurement_time(DURATION);
 
     for lines in [0, 100, 10_000, 1_000_000] {
         let file = make_file(lines as usize);

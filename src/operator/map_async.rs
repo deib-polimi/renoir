@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::sync::Arc;
 use std::vec::IntoIter as VecIter;
 
 use coarsetime::Instant;
@@ -103,7 +104,7 @@ where
     PreviousOperators: Clone,
 {
     fn clone(&self) -> Self {
-        Self::new(self.prev.clone(), self.f.clone(), 0)
+        Self::new(self.prev.clone(), self.f.clone(), 4)
     }
 }
 
@@ -131,18 +132,23 @@ where
     Fut: Future<Output = O> + Send,
     PreviousOperators: Operator<I>,
 {
-    pub(super) fn new(prev: PreviousOperators, f: F, _queue: usize) -> Self {
-        const CH: usize = 4;
+    pub(super) fn new(prev: PreviousOperators, f: F, buffer: usize) -> Self {
+        const CH: usize = 2;
         let (i_tx, i_rx) = flume::bounded::<Vec<StreamElement<I>>>(CH);
         let (o_tx, o_rx) = flume::bounded::<Vec<StreamElement<O>>>(CH);
 
-        let ff = f.clone();
+        let ff = Arc::new(f.clone());
         tokio::spawn(async move {
             while let Ok(b) = i_rx.recv_async().await {
                 let v: Vec<_> = futures::stream::iter(b.into_iter())
-                    .then(|el| async {
-                        micrometer::span!(el.map_async(&ff).await, "map_async_call")
+                    .map(|el| {
+                        let ff = ff.clone();
+                        tokio::spawn(async move {
+                            micrometer::span!(el.map_async(ff.as_ref()).await, "map_async_call")
+                        })
                     })
+                    .buffered(buffer)
+                    .map(Result::unwrap)
                     .collect()
                     .await;
 

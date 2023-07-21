@@ -280,7 +280,7 @@ where
             rhs,
             keyer1,
             keyer2,
-            _key: PhantomData::default(),
+            _key: PhantomData,
         }
     }
 }

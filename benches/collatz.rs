@@ -9,8 +9,8 @@ use common::*;
 fn bench_main(c: &mut Criterion) {
     let mut g = c.benchmark_group("wordcount-line");
     g.sample_size(SAMPLES);
-    g.warm_up_time(WARM_UP);
-    g.measurement_time(DURATION);
+    // g.warm_up_time(WARM_UP);
+    // g.measurement_time(DURATION);
 
     for size in [0u32, 1_000, 1_000_000, 100_000_000] {
         g.throughput(Throughput::Elements(size as u64));

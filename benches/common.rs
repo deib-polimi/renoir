@@ -9,9 +9,7 @@ use std::time::{Duration, Instant};
 
 use noir::*;
 
-pub const SAMPLES: usize = 20;
-pub const WARM_UP: Duration = Duration::from_secs(3);
-pub const DURATION: Duration = Duration::from_secs(10);
+pub const SAMPLES: usize = 50;
 
 static NONCE: AtomicU16 = AtomicU16::new(1);
 const PORT_BASE: u16 = 9090;

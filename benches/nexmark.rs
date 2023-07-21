@@ -358,8 +358,8 @@ fn run_query(env: &mut StreamEnvironment, q: &str, n: usize) {
 fn bench_main(c: &mut Criterion) {
     let mut g = c.benchmark_group("nexmark");
     g.sample_size(SAMPLES);
-    g.warm_up_time(WARM_UP);
-    g.measurement_time(DURATION);
+    // g.warm_up_time(WARM_UP);
+    // g.measurement_time(DURATION);
 
     macro_rules! bench_query {
         ($q:expr, $n:expr) => {{

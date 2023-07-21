@@ -102,8 +102,8 @@ fn connected(input: Stream<(u64, u64), impl Operator<(u64, u64)> + 'static>) {
 fn bench_main(c: &mut Criterion) {
     let mut g = c.benchmark_group("connected");
     g.sample_size(SAMPLES);
-    g.warm_up_time(WARM_UP);
-    g.measurement_time(DURATION);
+    // g.warm_up_time(WARM_UP);
+    // g.measurement_time(DURATION);
 
     for size in [0, 1_000, 1_000_000, 2_000_000] {
         g.throughput(Throughput::Elements(size));
