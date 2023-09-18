@@ -48,7 +48,7 @@ fn wordcount_bench(c: &mut Criterion) {
     // g.warm_up_time(WARM_UP);
     // g.measurement_time(DURATION);
 
-    for lines in [0, 100, 10_000, 1_000_000] {
+    for lines in [0, 10_000, 1_000_000] {
         let file = make_file(lines as usize);
         let file_size = file.as_file().metadata().unwrap().size();
         g.throughput(Throughput::Bytes(file_size));
@@ -263,16 +263,15 @@ fn wc_fast(env: &mut StreamEnvironment, path: &Path) {
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))
         .fold_assoc(
-            HashMap::<KString, u64, BuildHasherDefault<WyHash>>::default(),
+            HashMap::<String, u64, BuildHasherDefault<WyHash>>::default(),
             |acc, line| {
                 let mut word = String::with_capacity(4);
                 for c in line.chars() {
                     if !c.is_whitespace() {
                         word.push(c.to_ascii_lowercase());
                     } else if !word.is_empty() {
-                        let key = KString::from_ref(word.as_str());
+                        let key = std::mem::replace(&mut word, String::with_capacity(4));
                         *acc.entry(key).or_default() += 1;
-                        word.truncate(0);
                     }
                 }
             },
@@ -291,15 +290,16 @@ fn wc_fast_kstring(env: &mut StreamEnvironment, path: &Path) {
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))
         .fold_assoc(
-            HashMap::<String, u64, BuildHasherDefault<WyHash>>::default(),
+            HashMap::<KString, u64, BuildHasherDefault<WyHash>>::default(),
             |acc, line| {
                 let mut word = String::with_capacity(4);
                 for c in line.chars() {
                     if !c.is_whitespace() {
                         word.push(c.to_ascii_lowercase());
                     } else if !word.is_empty() {
-                        let key = std::mem::replace(&mut word, String::with_capacity(4));
+                        let key = KString::from_ref(word.as_str());
                         *acc.entry(key).or_default() += 1;
+                        word.truncate(0);
                     }
                 }
             },
