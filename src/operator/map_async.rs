@@ -144,7 +144,7 @@ where
                     .map(|el| {
                         let ff = ff.clone();
                         tokio::spawn(async move {
-                            micrometer::span!(el.map_async(ff.as_ref()).await, "map_async_call")
+                            el.map_async(ff.as_ref()).await
                         })
                     })
                     .buffered(buffer)
@@ -204,7 +204,6 @@ where
 
     #[inline]
     fn next(&mut self) -> StreamElement<O> {
-        micrometer::span!(map_async_next);
         loop {
             if let Some(el) = self.buffer.as_mut().and_then(Iterator::next) {
                 return el;

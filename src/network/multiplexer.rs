@@ -1,4 +1,5 @@
 use std::io::ErrorKind;
+use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg(not(feature = "async-tokio"))]
@@ -10,13 +11,17 @@ use std::thread::{sleep, JoinHandle};
 use std::net::ToSocketAddrs;
 #[cfg(feature = "async-tokio")]
 use tokio::net::TcpStream;
+use tokio::sync::OnceCell;
 #[cfg(feature = "async-tokio")]
 use tokio::task::JoinHandle;
 #[cfg(feature = "async-tokio")]
 use tokio::time::sleep;
 
+use quinn::{Connection, SendStream};
+use std::net::SocketAddr;
+
 use crate::channel::{self, Receiver, Sender};
-use crate::network::remote::remote_send;
+use crate::network::remote::{remote_send, write_stream_header};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
 
@@ -24,6 +29,7 @@ use crate::operator::ExchangeData;
 // use crate::channel::Selector;
 
 use super::NetworkSender;
+use super::quic::client_config;
 
 /// Maximum number of attempts to make for connecting to a remote host.
 const CONNECT_ATTEMPTS: usize = 32;
@@ -60,9 +66,16 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
                     "mux {coord} connecting to {}",
                     address.to_socket_addrs().unwrap().next().unwrap()
                 );
-                let stream = connect_remote(coord, address);
 
-                mux_thread::<Out>(coord, rx, stream);
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async move {
+                        let stream = connect_remote(coord, address).await;
+
+                        mux_thread::<Out>(coord, rx, stream).await;
+                    });
             })
             .unwrap();
         (Self { tx: Some(tx) }, join_handle)
@@ -80,7 +93,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
 ///   of errors.
 /// - If the connection cannot be established this function will panic.
 #[cfg(not(feature = "async-tokio"))]
-fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
+async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
     let socket_addrs: Vec<_> = address
         .to_socket_addrs()
         .map_err(|e| format!("Failed to get the address for {coord}: {e:?}",))
@@ -133,7 +146,7 @@ fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
 }
 
 #[cfg(not(feature = "async-tokio"))]
-fn mux_thread<Out: ExchangeData>(
+async fn mux_thread<Out: ExchangeData>(
     coord: DemuxCoord,
     rx: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
     mut stream: TcpStream,
@@ -163,15 +176,18 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     /// Construct a new `MultiplexingSender` for a block.
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).
-    pub fn new(coord: DemuxCoord, address: (String, u16)) -> (Self, JoinHandle<()>) {
+    pub fn new(coord: DemuxCoord, conn: Arc<OnceCell<Connection>>, address: SocketAddr) -> (Self, JoinHandle<()>) {
         let (tx, rx) = channel::bounded(MUX_CHANNEL_CAPACITY);
         let join_handle = tokio::spawn(async move {
+            let conn = conn.get_or_init(move || connect_remote(coord, address)).await;
+            let address = conn.remote_address();
             log::debug!(
                 "mux connecting to {}",
-                address.to_socket_addrs().unwrap().next().unwrap()
+                address
             );
-            let stream = connect_remote(coord, address).await;
-            mux_thread::<Out>(coord, rx, stream).await;
+            let mut stream = conn.open_uni().await.unwrap();
+            write_stream_header(&mut stream, coord.into()).await;
+            mux_thread::<Out>(coord, rx, stream, address).await
         });
         (Self { tx: Some(tx) }, join_handle)
     }
@@ -200,49 +216,48 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
 ///   of errors.
 /// - If the connection cannot be established this function will panic.
 #[cfg(feature = "async-tokio")]
-async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
-    let socket_addrs: Vec<_> = address
-        .to_socket_addrs()
-        .map_err(|e| format!("Failed to get the address for {}: {:?}", coord, e))
-        .unwrap()
-        .collect();
+async fn connect_remote(coord: DemuxCoord, address: SocketAddr) -> Connection {
+    use quinn::ConnectionError;
+
+    use crate::network::quic::SERVER_NAME;
+
     let mut retry_delay = RETRY_INITIAL_TIMEOUT;
+    let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
+    endpoint.set_default_client_config(client_config());
+
     for attempt in 1..=CONNECT_ATTEMPTS {
         log::debug!(
             "{} connecting to {:?} ({} attempt)",
             coord,
-            socket_addrs,
+            address,
             attempt,
         );
 
-        for address in socket_addrs.iter() {
-            match TcpStream::connect(address).await {
-                Ok(stream) => {
-                    return stream;
-                }
-                Err(err) => match err.kind() {
-                    ErrorKind::TimedOut => {
-                        log::debug!("{coord} timeout connecting to {address:?}");
-                    }
-                    ErrorKind::ConnectionRefused => {
-                        log::log!(
-                            if attempt > 4 {
-                                log::Level::Warn
-                            } else {
-                                log::Level::Debug
-                            },
-                            "{coord} connection refused connecting to {address:?} ({attempt})"
-                        );
-                    }
-                    _ => {
-                        log::warn!("{coord} failed to connect to {address:?}: {err:?}");
-                    }
-                },
+        match endpoint.connect(address, SERVER_NAME).unwrap().await {
+            Ok(stream) => {
+                return stream;
+            }
+            Err(ConnectionError::TimedOut) => {
+                log::debug!("{coord} timeout connecting to {address:?}");
+            }
+            Err(ConnectionError::ConnectionClosed(_)) => {
+                log::log!(
+                    if attempt > 4 {
+                        log::Level::Warn
+                    } else {
+                        log::Level::Debug
+                    },
+                    "{coord} connection refused connecting to {address:?} ({attempt})"
+                );
+            }
+            Err(err) => {
+                log::warn!("{coord} failed to connect to {address:?}: {err:?}");
             }
         }
+    
 
         log::debug!(
-            "{coord} retrying connection to {socket_addrs:?} in {}s",
+            "{coord} retrying connection to {address:?} in {}s",
             retry_delay.as_secs_f32(),
         );
 
@@ -259,20 +274,15 @@ async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream 
 async fn mux_thread<Out: ExchangeData>(
     coord: DemuxCoord,
     rx: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,
-    mut stream: TcpStream,
+    mut stream: SendStream,
+    address: SocketAddr,
 ) {
-    use tokio::io::AsyncWriteExt;
-
-    let address = stream
-        .peer_addr()
-        .map(|a| a.to_string())
-        .unwrap_or_else(|_| "unknown".to_string());
     log::debug!("{} connected to {:?}", coord, address);
 
     while let Ok((dest, message)) = rx.recv_async().await {
         remote_send(message, dest, &mut stream, &address).await;
     }
-
-    stream.shutdown().await.unwrap();
+    
+    stream.finish().await.unwrap();
     log::debug!("{} finished", coord);
 }

@@ -100,9 +100,10 @@ pub struct TestHelper;
 
 impl TestHelper {
     fn setup() {
-        let _ = env_logger::Builder::new()
+        let _ = env_logger::builder()
             .is_test(true)
             .parse_default_env()
+            .default_format()
             .try_init();
     }
 
@@ -154,10 +155,10 @@ impl TestHelper {
             let test_id = TEST_INDEX.fetch_add(1, Ordering::SeqCst) + 1;
             let high_part = (test_id & 0xff00) >> 8;
             let low_part = test_id & 0xff;
-            let address = format!("127.{high_part}.{low_part}.{host_id}");
+            let address = format!("127.{high_part}.{low_part}.{host_id}:{TEST_BASE_PORT}");
             hosts.push(RemoteHostConfig {
                 address,
-                base_port: TEST_BASE_PORT,
+                // base_port: TEST_BASE_PORT,
                 num_cores: cores_per_host,
                 ssh: Default::default(),
                 perf_path: None,

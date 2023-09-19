@@ -23,10 +23,9 @@ pub fn remote_loopback_deploy(
     for host_id in 0..num_hosts {
         let test_id = NONCE.fetch_add(1, Ordering::SeqCst);
         let [hi, lo] = test_id.to_be_bytes();
-        let address = format!("127.{hi}.{lo}.{host_id}");
+        let address = format!("127.{hi}.{lo}.{host_id}:{}", PORT_BASE + host_id as u16);
         hosts.push(RemoteHostConfig {
             address,
-            base_port: PORT_BASE,
             num_cores: cores_per_host,
             ssh: Default::default(),
             perf_path: None,

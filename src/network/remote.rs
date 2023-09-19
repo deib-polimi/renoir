@@ -1,10 +1,12 @@
 use once_cell::sync::Lazy;
+use std::any::TypeId;
 #[cfg(not(feature = "async-tokio"))]
 use std::io::Read;
 #[cfg(not(feature = "async-tokio"))]
 use std::io::Write;
 #[cfg(feature = "async-tokio")]
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use std::net::SocketAddr;
 
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
 use bincode::{DefaultOptions, Options};
@@ -28,6 +30,7 @@ static BINCODE_HEADER_CONFIG: Lazy<
 static BINCODE_MSG_CONFIG: Lazy<DefaultOptions> = Lazy::new(bincode::DefaultOptions::new);
 
 pub(crate) const HEADER_SIZE: usize = 20; // std::mem::size_of::<MessageHeader>();
+pub(crate) const LINK_ID_SIZE: usize = 16; // std::mem::size_of::<MessageHeader>();
 
 /// Header of a message sent before the actual message.
 #[derive(Serialize, Deserialize, Default)]
@@ -38,6 +41,45 @@ struct MessageHeader {
     replica_id: ReplicaId,
     /// The id of the block that is sending the message.
     sender_block_id: BlockId,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub(super) struct LinkId {
+    block_id: BlockId,
+    prev_id: BlockId,
+}
+
+impl From<DemuxCoord> for LinkId {
+    fn from(value: DemuxCoord) -> Self {
+        Self {
+            block_id: value.coord.block_id,
+            prev_id: value.prev_block_id,
+        }
+    }
+}
+
+pub(super) async fn read_stream_header<R: AsyncRead + Unpin>(r: &mut R) -> LinkId {
+    let mut buf = [0u8; LINK_ID_SIZE];
+    r.read_exact(&mut buf).await.unwrap_or_else(|e| {
+        panic!(
+            "Failed to receive {} bytes of header: {:?}",
+            HEADER_SIZE, e
+        )
+    });
+    let header: LinkId = BINCODE_HEADER_CONFIG
+        .deserialize(&buf)
+        .expect("Malformed stream header");
+    header
+}
+
+pub(super) async fn write_stream_header<W: AsyncWrite + Unpin>(w: &mut W, link_id: LinkId) {
+    let mut buf = Vec::with_capacity(LINK_ID_SIZE);
+    // assert_eq!(BINCODE_HEADER_CONFIG.serialized_size(&link_id).unwrap(), LINK_ID_SIZE as u64);
+    BINCODE_HEADER_CONFIG
+        .serialize_into(&mut buf, &link_id)
+        .expect("Malformed stream header");
+    debug!("serialized link_id {:?} as {:?}", link_id, buf);
+    w.write_all(&buf).await.unwrap();
 }
 
 /// Serialize and send a message to a remote socket.
@@ -105,7 +147,7 @@ pub(crate) async fn remote_send<T: ExchangeData, W: AsyncWrite + Unpin>(
     msg: NetworkMessage<T>,
     dest: ReceiverEndpoint,
     writer: &mut W,
-    address: &str,
+    address: &SocketAddr,
 ) {
     let serialized_len = BINCODE_MSG_CONFIG
         .serialized_size(&msg)
@@ -207,7 +249,7 @@ pub(crate) fn remote_recv<T: ExchangeData, R: Read>(
 pub(crate) async fn remote_recv<T: ExchangeData, R: AsyncRead + Unpin>(
     coord: DemuxCoord,
     reader: &mut R,
-    address: &str,
+    address: &SocketAddr,
 ) -> Option<(ReceiverEndpoint, NetworkMessage<T>)> {
     let mut header = [0u8; HEADER_SIZE];
     match reader.read_exact(&mut header).await {
@@ -249,7 +291,7 @@ pub(crate) async fn remote_recv<T: ExchangeData, R: AsyncRead + Unpin>(
 mod tests {
     use bincode::Options;
 
-    use crate::network::remote::HEADER_SIZE;
+    use crate::network::remote::{HEADER_SIZE, LinkId, LINK_ID_SIZE};
 
     use super::{MessageHeader, BINCODE_HEADER_CONFIG};
 
@@ -260,5 +302,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(HEADER_SIZE as u64, computed_size);
+
+        let computed_size = BINCODE_HEADER_CONFIG
+            .serialized_size(&LinkId{block_id: 0, prev_id: 0})
+            .unwrap();
+
+        assert_eq!(LINK_ID_SIZE as u64, computed_size);
     }
 }

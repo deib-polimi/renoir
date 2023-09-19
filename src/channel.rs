@@ -224,6 +224,12 @@ impl<T: ChannelItem> UnboundedReceiver<T> {
         self.0.recv_timeout(timeout).map_err(RecvTimeoutError::from)
     }
 
+    #[inline]
+    #[cfg(feature = "flume")]
+    pub async fn recv_async(&self) -> Result<T, RecvError> {
+        self.0.recv_async().await.map_err(RecvError::from)
+    }
+
     /// Receive a message from any sender of this receiver of the other provided receiver.
     ///
     /// The first message of the two is returned. If both receivers are ready one of them is chosen

@@ -3,15 +3,20 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::marker::PhantomData;
+use std::net::{SocketAddr, ToSocketAddrs};
+use std::sync::Arc;
 #[cfg(not(feature = "async-tokio"))]
 use std::thread::JoinHandle;
 
 #[cfg(feature = "async-tokio")]
 use futures::StreamExt;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
+use quinn::{Connection, RecvStream};
+use tokio::sync::OnceCell;
 use typemap_rev::{TypeMap, TypeMapKey};
 
-use crate::channel::Sender;
+use crate::channel::{Sender, UnboundedSender};
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::demultiplexer::DemuxHandle;
 use crate::network::multiplexer::MultiplexingSender;
@@ -22,6 +27,8 @@ use crate::operator::ExchangeData;
 use crate::scheduler::{BlockId, HostId};
 
 use super::NetworkMessage;
+use super::demultiplexer::DemuxGate;
+use super::quic::server_config;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In: ExchangeData>(PhantomData<In>);
@@ -101,6 +108,12 @@ pub(crate) struct NetworkTopology {
     #[derivative(Debug = "ignore")]
     multiplexers: Option<TypeMap>,
 
+    #[derivative(Debug = "ignore")]
+    connections: HashMap<SocketAddr, Arc<OnceCell<Connection>>>,
+
+    #[derivative(Debug = "ignore")]
+    demux_gate: Option<DemuxGate>,
+
     /// The adjacency list of the execution graph.
     next: HashMap<(Coord, TypeId), Vec<(Coord, bool)>, crate::block::CoordHasherBuilder>,
     /// The inverse adjacency list of the execution graph.
@@ -122,13 +135,15 @@ pub(crate) struct NetworkTopology {
 
     /// The mapping between the coordinate of a demultiplexer of a block to the actual address/port
     /// of that demultiplexer in the network.
-    demultiplexer_addresses: HashMap<DemuxCoord, (String, u16), crate::block::CoordHasherBuilder>,
+    demultiplexer_addresses: HashMap<DemuxCoord, SocketAddr, crate::block::CoordHasherBuilder>,
 
     /// The set of join handles of the various threads spawned by the topology.
     #[cfg(not(feature = "async-tokio"))]
+    #[derivative(Debug = "ignore")]
     join_handles: Vec<JoinHandle<()>>,
 
     #[cfg(feature = "async-tokio")]
+    #[derivative(Debug = "ignore")]
     async_join_handles: Vec<tokio::task::JoinHandle<()>>,
 }
 
@@ -140,6 +155,8 @@ impl NetworkTopology {
             senders: Some(TypeMap::new()),
             demultiplexers: Some(TypeMap::new()),
             multiplexers: Some(TypeMap::new()),
+            connections: Default::default(),
+            demux_gate: Default::default(),
             next: Default::default(),
             prev: Default::default(),
             senders_metadata: Default::default(),
@@ -307,7 +324,9 @@ impl NetworkTopology {
             }
             if !prev.is_empty() {
                 let address = self.demultiplexer_addresses[&demux_coord].clone();
-                let (demux, join_handle) = DemuxHandle::new(demux_coord, address, prev.len());
+                let connection = self.connections.entry(address.clone()).or_default();
+                let (demux, join_handle, tx_stream) = DemuxHandle::new(demux_coord, connection.clone(), address, prev.len());
+                self.demux_gate.get_or_insert_with(|| DemuxGate::new(address)).register(demux_coord, tx_stream, prev.len());
                 #[cfg(not(feature = "async-tokio"))]
                 self.join_handles.push(join_handle);
                 #[cfg(feature = "async-tokio")]
@@ -336,7 +355,8 @@ impl NetworkTopology {
 
         if let Entry::Vacant(e) = muxers.entry(demux_coord) {
             let address = self.demultiplexer_addresses[&demux_coord].clone();
-            let (mux, join_handle) = MultiplexingSender::new(demux_coord, address);
+            let connection = self.connections.entry(address.clone()).or_default();
+            let (mux, join_handle) = MultiplexingSender::new(demux_coord, connection.clone(), address);
             #[cfg(not(feature = "async-tokio"))]
             self.join_handles.push(join_handle);
             #[cfg(feature = "async-tokio")]
@@ -512,22 +532,21 @@ impl NetworkTopology {
                 coords.insert(coord);
             }
         }
-        let mut used_ports: HashMap<HostId, u16> = HashMap::new();
         // sort the coords in order to have a deterministic assignment between all the hosts
         for coord in coords.into_iter().sorted() {
             let host_id = coord.coord.host_id;
-            let port_offset = used_ports.entry(host_id).or_default();
             let host = &config.hosts[host_id as usize];
-            let port = host.base_port + *port_offset;
-            *port_offset += 1;
-            let address = (host.address.clone(), port);
-            log::debug!("demux {} socket: {:?}", coord, address);
+            let address = host.address.to_socket_addrs().expect("invalid host address").next().unwrap();
+            log::debug!("demux {} hostname: {:?} socket: {:?}", coord, host.address, address);
             self.demultiplexer_addresses.insert(coord, address);
         }
     }
 
     /// Finalize the topology and start mutliplexers and demultiplexers
     pub fn finalize(&mut self) {
+        if let Some(gate) = self.demux_gate.take() {
+            self.async_join_handles.push(gate.start());
+        }
         // drop all the senders/receivers making sure no dangling sender keep alive their network
         // receivers.
         self.receivers.take();

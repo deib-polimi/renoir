@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::TcpStream;
+use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -151,7 +152,7 @@ fn remote_worker(
     info!("starting remote worker for host {}: {:#?}", host_id, host);
 
     // connect to the ssh server
-    let address = (host.address.as_str(), host.ssh.ssh_port);
+    let address = (host.address.to_socket_addrs().unwrap().next().unwrap().ip(), host.ssh.ssh_port);
     let stream = TcpStream::connect(address).unwrap_or_else(|e| {
         panic!(
             "Failed to connect to remote SSH for host {} at {} port {}: {:?}",

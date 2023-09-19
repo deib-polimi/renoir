@@ -3,6 +3,7 @@
 //! See the documentation of [`EnvironmentConfig`] for more details.
 
 use std::fmt::{Display, Formatter};
+use std::net::SocketAddr;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -125,7 +126,7 @@ pub struct RemoteHostConfig {
     ///
     /// This port and the following ones will be bound by the host, one for each connection between
     /// blocks of the job graph..
-    pub base_port: u16,
+    // pub base_port: u16,
     /// The number of cores of the remote host.
     ///
     /// This is the same as `LocalRuntimeConfig::num_cores`.
@@ -288,7 +289,7 @@ impl EnvironmentConfig {
 
 impl Display for RemoteHostConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}:{}-]", self.address, self.base_port)
+        write!(f, "[{}]", self.address)
     }
 }
 

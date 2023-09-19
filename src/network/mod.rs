@@ -13,6 +13,7 @@ mod multiplexer;
 mod network_channel;
 mod remote;
 mod topology;
+mod quic;
 
 #[derive(Debug, Clone)]
 pub enum NetworkDataIterator<T> {
