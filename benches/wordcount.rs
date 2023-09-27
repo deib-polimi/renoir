@@ -18,6 +18,7 @@ use noir::StreamEnvironment;
 
 mod common;
 use common::*;
+use rand::rngs::SmallRng;
 use regex::Regex;
 use wyhash::WyHash;
 
@@ -29,7 +30,7 @@ static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[a-zA-Z]+").unwrap());
 fn make_file(lines: usize) -> tempfile::NamedTempFile {
     let mut file = tempfile::NamedTempFile::new().unwrap();
     let seed = b"By imDema, edomora97 and mark03.".to_owned();
-    let r = &mut StdRng::from_seed(seed);
+    let r = &mut SmallRng::from_seed(seed);
     let mut w = BufWriter::new(&mut file);
 
     for _ in 0..lines {
