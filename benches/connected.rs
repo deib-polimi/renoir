@@ -100,6 +100,7 @@ fn connected(input: Stream<(u64, u64), impl Operator<(u64, u64)> + 'static>) {
 }
 
 fn bench_main(c: &mut Criterion) {
+    tracing_subscriber::fmt::init();
     let mut g = c.benchmark_group("connected");
     g.sample_size(SAMPLES);
     // g.warm_up_time(WARM_UP);

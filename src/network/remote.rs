@@ -1,12 +1,12 @@
 use once_cell::sync::Lazy;
-use std::any::TypeId;
+
 #[cfg(not(feature = "async-tokio"))]
 use std::io::Read;
 #[cfg(not(feature = "async-tokio"))]
 use std::io::Write;
+use std::net::SocketAddr;
 #[cfg(feature = "async-tokio")]
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use std::net::SocketAddr;
 
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
 use bincode::{DefaultOptions, Options};
@@ -60,12 +60,9 @@ impl From<DemuxCoord> for LinkId {
 
 pub(super) async fn read_stream_header<R: AsyncRead + Unpin>(r: &mut R) -> LinkId {
     let mut buf = [0u8; LINK_ID_SIZE];
-    r.read_exact(&mut buf).await.unwrap_or_else(|e| {
-        panic!(
-            "Failed to receive {} bytes of header: {:?}",
-            HEADER_SIZE, e
-        )
-    });
+    r.read_exact(&mut buf)
+        .await
+        .unwrap_or_else(|e| panic!("Failed to receive {} bytes of header: {:?}", HEADER_SIZE, e));
     let header: LinkId = BINCODE_HEADER_CONFIG
         .deserialize(&buf)
         .expect("Malformed stream header");
@@ -291,7 +288,7 @@ pub(crate) async fn remote_recv<T: ExchangeData, R: AsyncRead + Unpin>(
 mod tests {
     use bincode::Options;
 
-    use crate::network::remote::{HEADER_SIZE, LinkId, LINK_ID_SIZE};
+    use crate::network::remote::{LinkId, HEADER_SIZE, LINK_ID_SIZE};
 
     use super::{MessageHeader, BINCODE_HEADER_CONFIG};
 
@@ -304,7 +301,10 @@ mod tests {
         assert_eq!(HEADER_SIZE as u64, computed_size);
 
         let computed_size = BINCODE_HEADER_CONFIG
-            .serialized_size(&LinkId{block_id: 0, prev_id: 0})
+            .serialized_size(&LinkId {
+                block_id: 0,
+                prev_id: 0,
+            })
             .unwrap();
 
         assert_eq!(LINK_ID_SIZE as u64, computed_size);

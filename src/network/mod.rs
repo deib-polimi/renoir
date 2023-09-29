@@ -11,9 +11,9 @@ use crate::scheduler::{BlockId, HostId, ReplicaId};
 mod demultiplexer;
 mod multiplexer;
 mod network_channel;
+mod quic;
 mod remote;
 mod topology;
-mod quic;
 
 #[derive(Debug, Clone)]
 pub enum NetworkDataIterator<T> {

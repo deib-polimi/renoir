@@ -18,10 +18,11 @@ timestamp = []
 ssh = ["ssh2", "whoami", "shell-escape", "sha2", "base64"]
 async-tokio = ["tokio", "flume", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 profiler = []
+plot = []
 
 [dependencies]
 # for logging to the console
-log = { version = "0.4.20", features = ["release_max_level_info"] }
+log = { version = "0.4.20" } # , features = ["release_max_level_info"] }
 
 # used by the network for storing type-generic structures
 typemap_rev = "0.3.0"
@@ -84,6 +85,7 @@ quick_cache = "0.3.0"
 quinn = "0.10.2"
 rustls = { version = "0.21.7", features = ["dangerous_configuration", "quic"] }
 rcgen = "0.11.1"
+rustls-pemfile = "1.0.3"
 
 [dev-dependencies]
 # for the tests
@@ -106,6 +108,7 @@ flume = "0.10.14"
 
 kstring = { version = "2.0.0", features = ["serde"] }
 nexmark = { version = "0.2.0", features = ["serde"] }
+pprof = { version = "0.13.0", features = ["flamegraph", "criterion"] }
 
 [[example]]
 name = "nexmark"
@@ -132,19 +135,28 @@ harness = false
 name = "wordcount"
 harness = false
 [[bench]]
-name = "shuffle"
-harness = false
-[[bench]]
-name = "fold_vs_reduce"
-harness = false
-[[bench]]
-name = "batch_mode"
-harness = false
-[[bench]]
 name = "nexmark"
 harness = false
 
+### Old benches
+[[bench]]
+name = "shuffle"
+harness = false
+bench = false
+[[bench]]
+name = "fold_vs_reduce"
+harness = false
+bench = false
+[[bench]]
+name = "batch_mode"
+harness = false
+bench = false
+
+
 [profile.release]
-lto = true
+# lto = true
 strip = "symbols"
 # debug = 1
+
+[profile.bench]
+debug = 1

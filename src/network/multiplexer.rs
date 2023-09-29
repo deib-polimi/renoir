@@ -1,4 +1,3 @@
-use std::io::ErrorKind;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -7,10 +6,6 @@ use std::net::{Shutdown, TcpStream, ToSocketAddrs};
 #[cfg(not(feature = "async-tokio"))]
 use std::thread::{sleep, JoinHandle};
 
-#[cfg(feature = "async-tokio")]
-use std::net::ToSocketAddrs;
-#[cfg(feature = "async-tokio")]
-use tokio::net::TcpStream;
 use tokio::sync::OnceCell;
 #[cfg(feature = "async-tokio")]
 use tokio::task::JoinHandle;
@@ -28,8 +23,8 @@ use crate::operator::ExchangeData;
 // #[cfg(not(feature = "async-tokio"))]
 // use crate::channel::Selector;
 
-use super::NetworkSender;
 use super::quic::client_config;
+use super::NetworkSender;
 
 /// Maximum number of attempts to make for connecting to a remote host.
 const CONNECT_ATTEMPTS: usize = 32;
@@ -40,7 +35,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// fails again this timeout will be doubled up to `RETRY_MAX_TIMEOUT`.
 const RETRY_INITIAL_TIMEOUT: Duration = Duration::from_millis(8);
 /// Maximum timeout between connection attempts.
-const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(1);
+const RETRY_MAX_TIMEOUT: Duration = Duration::from_secs(2);
 
 const MUX_CHANNEL_CAPACITY: usize = 10;
 /// Like `NetworkSender`, but this should be used in a multiplexed channel (i.e. a remote one).
@@ -176,16 +171,20 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     /// Construct a new `MultiplexingSender` for a block.
     ///
     /// All the replicas of this block should point to this multiplexer (or one of its clones).
-    pub fn new(coord: DemuxCoord, conn: Arc<OnceCell<Connection>>, address: SocketAddr) -> (Self, JoinHandle<()>) {
+    pub fn new(
+        coord: DemuxCoord,
+        conn: Arc<OnceCell<Connection>>,
+        address: SocketAddr,
+    ) -> (Self, JoinHandle<()>) {
         let (tx, rx) = channel::bounded(MUX_CHANNEL_CAPACITY);
         let join_handle = tokio::spawn(async move {
-            let conn = conn.get_or_init(move || connect_remote(coord, address)).await;
+            let conn = conn
+                .get_or_init(move || connect_remote(coord, address))
+                .await;
             let address = conn.remote_address();
-            log::debug!(
-                "mux connecting to {}",
-                address
-            );
+            log::debug!("mux opening stream to {address}");
             let mut stream = conn.open_uni().await.unwrap();
+            log::debug!("mux opened stream to {address}");
             write_stream_header(&mut stream, coord.into()).await;
             mux_thread::<Out>(coord, rx, stream, address).await
         });
@@ -233,14 +232,19 @@ async fn connect_remote(coord: DemuxCoord, address: SocketAddr) -> Connection {
             attempt,
         );
 
-        match endpoint.connect(address, SERVER_NAME).unwrap().await {
+        match endpoint
+            .connect_with(client_config(), address, SERVER_NAME)
+            .unwrap()
+            .await
+        {
             Ok(stream) => {
+                log::debug!("{} connected to {:?}", coord, address);
                 return stream;
             }
             Err(ConnectionError::TimedOut) => {
                 log::debug!("{coord} timeout connecting to {address:?}");
             }
-            Err(ConnectionError::ConnectionClosed(_)) => {
+            Err(ConnectionError::ConnectionClosed(_) | ConnectionError::ApplicationClosed(_)) => {
                 log::log!(
                     if attempt > 4 {
                         log::Level::Warn
@@ -254,7 +258,6 @@ async fn connect_remote(coord: DemuxCoord, address: SocketAddr) -> Connection {
                 log::warn!("{coord} failed to connect to {address:?}: {err:?}");
             }
         }
-    
 
         log::debug!(
             "{coord} retrying connection to {address:?} in {}s",
@@ -282,7 +285,7 @@ async fn mux_thread<Out: ExchangeData>(
     while let Ok((dest, message)) = rx.recv_async().await {
         remote_send(message, dest, &mut stream, &address).await;
     }
-    
+
     stream.finish().await.unwrap();
     log::debug!("{} finished", coord);
 }

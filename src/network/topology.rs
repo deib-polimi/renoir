@@ -11,12 +11,12 @@ use std::thread::JoinHandle;
 #[cfg(feature = "async-tokio")]
 use futures::StreamExt;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
-use quinn::{Connection, RecvStream};
+
+use quinn::Connection;
 use tokio::sync::OnceCell;
 use typemap_rev::{TypeMap, TypeMapKey};
 
-use crate::channel::{Sender, UnboundedSender};
+use crate::channel::Sender;
 use crate::config::{EnvironmentConfig, ExecutionRuntime};
 use crate::network::demultiplexer::DemuxHandle;
 use crate::network::multiplexer::MultiplexingSender;
@@ -24,11 +24,11 @@ use crate::network::{
     local_channel, BlockCoord, Coord, DemuxCoord, NetworkReceiver, NetworkSender, ReceiverEndpoint,
 };
 use crate::operator::ExchangeData;
-use crate::scheduler::{BlockId, HostId};
+use crate::scheduler::BlockId;
+
+use super::demultiplexer::DemuxGate;
 
 use super::NetworkMessage;
-use super::demultiplexer::DemuxGate;
-use super::quic::server_config;
 
 /// This struct is used to index inside the `typemap` with the `NetworkReceiver`s.
 struct ReceiverKey<In: ExchangeData>(PhantomData<In>);
@@ -323,10 +323,12 @@ impl NetworkTopology {
                 }
             }
             if !prev.is_empty() {
-                let address = self.demultiplexer_addresses[&demux_coord].clone();
-                let connection = self.connections.entry(address.clone()).or_default();
-                let (demux, join_handle, tx_stream) = DemuxHandle::new(demux_coord, connection.clone(), address, prev.len());
-                self.demux_gate.get_or_insert_with(|| DemuxGate::new(address)).register(demux_coord, tx_stream, prev.len());
+                let address = self.demultiplexer_addresses[&demux_coord];
+                let (demux, join_handle, tx_stream) =
+                    DemuxHandle::new(demux_coord, address, prev.len());
+                self.demux_gate
+                    .get_or_insert_with(|| DemuxGate::new(address))
+                    .register(demux_coord, tx_stream, prev.len());
                 #[cfg(not(feature = "async-tokio"))]
                 self.join_handles.push(join_handle);
                 #[cfg(feature = "async-tokio")]
@@ -354,9 +356,10 @@ impl NetworkTopology {
         let demux_coord = DemuxCoord::from(receiver_endpoint);
 
         if let Entry::Vacant(e) = muxers.entry(demux_coord) {
-            let address = self.demultiplexer_addresses[&demux_coord].clone();
-            let connection = self.connections.entry(address.clone()).or_default();
-            let (mux, join_handle) = MultiplexingSender::new(demux_coord, connection.clone(), address);
+            let address = self.demultiplexer_addresses[&demux_coord];
+            let connection = self.connections.entry(address).or_default();
+            let (mux, join_handle) =
+                MultiplexingSender::new(demux_coord, connection.clone(), address);
             #[cfg(not(feature = "async-tokio"))]
             self.join_handles.push(join_handle);
             #[cfg(feature = "async-tokio")]
@@ -536,8 +539,18 @@ impl NetworkTopology {
         for coord in coords.into_iter().sorted() {
             let host_id = coord.coord.host_id;
             let host = &config.hosts[host_id as usize];
-            let address = host.address.to_socket_addrs().expect("invalid host address").next().unwrap();
-            log::debug!("demux {} hostname: {:?} socket: {:?}", coord, host.address, address);
+            let address = host
+                .address
+                .to_socket_addrs()
+                .expect("invalid host address")
+                .next()
+                .unwrap();
+            log::debug!(
+                "demux {} hostname: {:?} socket: {:?}",
+                coord,
+                host.address,
+                address
+            );
             self.demultiplexer_addresses.insert(coord, address);
         }
     }
@@ -576,12 +589,9 @@ impl NetworkTopology {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
-    use std::io::Write;
 
     use crate::network::NetworkMessage;
     use crate::operator::StreamElement;
-    use crate::scheduler::HostId;
 
     use super::*;
 

@@ -143,9 +143,7 @@ where
                 let v: Vec<_> = futures::stream::iter(b.into_iter())
                     .map(|el| {
                         let ff = ff.clone();
-                        tokio::spawn(async move {
-                            el.map_async(ff.as_ref()).await
-                        })
+                        tokio::spawn(async move { el.map_async(ff.as_ref()).await })
                     })
                     .buffered(buffer)
                     .map(Result::unwrap)

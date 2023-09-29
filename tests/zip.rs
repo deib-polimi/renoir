@@ -18,7 +18,7 @@ fn test_zip_no_shuffle() {
         let res = stream1.zip(stream2).collect_vec();
         env.execute_blocking();
         if let Some(res) = res.get() {
-            let expected = items1.into_iter().zip(items2.into_iter()).collect_vec();
+            let expected = items1.into_iter().zip(items2).collect_vec();
             assert_eq!(res, expected);
         }
     });

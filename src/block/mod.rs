@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 pub use batcher::BatchMode;
 pub(crate) use batcher::*;
+#[cfg(feature = "plot")]
 pub(crate) use graph_generator::*;
 pub(crate) use next_strategy::*;
 pub(crate) use structure::*;
@@ -15,6 +16,7 @@ use crate::scheduler::BlockId;
 use crate::CoordUInt;
 
 mod batcher;
+#[cfg(feature = "plot")]
 mod graph_generator;
 mod next_strategy;
 pub mod structure;

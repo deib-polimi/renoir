@@ -1,33 +1,24 @@
 #[cfg(not(feature = "async-tokio"))]
 use std::net::{Shutdown, TcpListener, TcpStream};
-use std::sync::Arc;
+
 #[cfg(not(feature = "async-tokio"))]
 use std::thread::JoinHandle;
 
-use parking_lot::Mutex;
-use quinn::{Connection, SendStream};
-#[cfg(feature = "async-tokio")]
-use tokio::io::AsyncWriteExt;
-#[cfg(feature = "async-tokio")]
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::oneshot::{Receiver as OnceReceiver, Sender as OnceSender};
-use tokio::sync::OnceCell;
+use quinn::Connection;
+
 #[cfg(feature = "async-tokio")]
 use tokio::task::JoinHandle;
 
-use anyhow::anyhow;
 use std::collections::HashMap;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::SocketAddr;
 use tokio::task::JoinSet;
 
 use quinn::RecvStream;
 
 use crate::channel::{self, Sender, UnboundedReceiver, UnboundedSender};
-use crate::network::remote::{remote_recv, read_stream_header};
+use crate::network::remote::{read_stream_header, remote_recv};
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
-use crate::scheduler::BlockId;
-use crate::CoordUInt;
 
 use super::quic::server_config;
 use super::remote::LinkId;
@@ -44,13 +35,6 @@ struct ChannelRegistry {
 }
 
 impl ChannelRegistry {
-    pub fn new() -> Self {
-        Self {
-            registry: Default::default(),
-            total: 0,
-        }
-    }
-
     pub fn register(
         &mut self,
         link_id: LinkId,
@@ -95,46 +79,45 @@ impl DemuxGate {
     }
 
     pub fn start(mut self) -> JoinHandle<()> {
-        async fn accept_stream(
-            conn: Connection,
-            registry: Arc<Mutex<ChannelRegistry>>,
-        ) -> Option<(Connection, Arc<Mutex<ChannelRegistry>>)> {
+        async fn accept_stream(conn: Connection) -> Option<(Connection, LinkId, RecvStream)> {
             if let Ok(mut stream) = conn.accept_uni().await {
                 let link_id = read_stream_header(&mut stream).await;
                 log::info!(
                     "new stream for block {link_id:?} from {}",
                     conn.remote_address()
                 );
-                registry
-                    .lock()
-                    .send(link_id, stream, conn.remote_address());
-                Some((conn, registry))
+                Some((conn, link_id, stream))
             } else {
                 None
             }
         }
 
-        log::debug!("demux gate started");
         tokio::spawn(async move {
             let endpoint = quinn::Endpoint::server(server_config(), self.bind_socket).unwrap();
             let mut join = JoinSet::new();
-            let registry = Arc::new(Mutex::new(std::mem::take(&mut self.registry)));
 
-            while !registry.lock().is_empty() {
+            let mut delay = Some(std::time::Instant::now());
+
+            log::debug!("demux gate started");
+            while !self.registry.is_empty() {
                 tokio::select! {
                     connecting = endpoint.accept() => {
+                        log::debug!("demux gate accepting connection");
                         if let Some(conn) = connecting {
                             let conn = conn.await.unwrap();
-                            info!("connection accepted {}", conn.remote_address());
-                            let registry = registry.clone();
-                            join.spawn(accept_stream(conn, registry));
+                            info!("demux gate accepted connection {}", conn.remote_address());
+                            if let Some(d) = delay.take() {log::info!("demux gate connection delay {:?}", d.elapsed())};
+                            join.spawn(accept_stream(conn));
                         } else {
                             break;
                         }
                     }
                     Some(result) = join.join_next() => {
                         match result {
-                            Ok(Some((conn, registry))) => { join.spawn(accept_stream(conn, registry)); }
+                            Ok(Some((conn, link_id, stream))) => {
+                                self.registry.send(link_id, stream, conn.remote_address());
+                                join.spawn(accept_stream(conn));
+                            }
                             Ok(None) => {}
                             Err(e) => {
                                 log::error!("demux gate join failed: {:?}", e);
@@ -144,10 +127,6 @@ impl DemuxGate {
                     }
                 }
             }
-            assert!(
-                registry.lock().is_empty(),
-                "demux gate did not dispatch all connections!!"
-            );
             join.abort_all();
             log::debug!("demux gate completed");
         })
@@ -187,7 +166,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
                 "reg-{}:{}-{}",
                 coord.coord.host_id, coord.prev_block_id, coord.coord.block_id
             ))
-            .spawn(move || bind_remotes(coord, address, num_clients, rx_senders))
+            .spawn(move || spawn_handlers(coord, address, num_clients, rx_senders))
             .unwrap();
         (Self { coord, tx_senders }, join_handle)
     }
@@ -346,7 +325,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
     /// the previous block (relative to the block this demultiplexer refers to).
     pub fn new(
         coord: DemuxCoord,
-        connection: Arc<OnceCell<Connection>>,
+        // connection: Arc<OnceCell<Connection>>,
         address: SocketAddr,
         num_clients: usize,
     ) -> (
@@ -358,7 +337,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
         let (tx_stream, rx_stream) = channel::unbounded();
 
         let join_handle = tokio::spawn(async move {
-            bind_remotes(coord, address, num_clients, rx_stream, rx_senders).await
+            spawn_handlers(coord, address, num_clients, rx_stream, rx_senders).await
         });
         (Self { coord, tx_senders }, join_handle, tx_stream)
     }
@@ -382,7 +361,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
 
 /// Bind the socket of this demultiplexer.
 #[cfg(feature = "async-tokio")]
-async fn bind_remotes<In: ExchangeData>(
+async fn spawn_handlers<In: ExchangeData>(
     coord: DemuxCoord,
     address: SocketAddr,
     num_clients: usize,
@@ -395,8 +374,7 @@ async fn bind_remotes<In: ExchangeData>(
 
     let mut connected_clients = 0;
     while connected_clients < num_clients {
-        let stream = rx_stream.recv_async().await;
-        let (stream, peer_addr) = match stream {
+        let (stream, peer_addr) = match rx_stream.recv_async().await {
             Ok(s) => s,
             Err(e) => {
                 warn!("Failed to accept incoming connection at {}: {:?}", coord, e);
@@ -409,27 +387,27 @@ async fn bind_remotes<In: ExchangeData>(
             coord, peer_addr, connected_clients, num_clients
         );
 
-        let (demux_tx, demux_rx) = flume::unbounded();
+        let (thread_sender_tx, thread_sender_rx) = tokio::sync::oneshot::channel();
         let join_handle = tokio::spawn(async move {
-            let mut senders = HashMap::new();
-            while let Ok((endpoint, sender)) = demux_rx.recv_async().await {
-                senders.insert(endpoint, sender);
-            }
+            let senders = thread_sender_rx.await.expect("couldn't receive senders");
             log::debug!("demux got senders");
             demux_thread::<In>(coord, senders, stream, address).await;
         });
         join_handles.push(join_handle);
-        tx_broadcast.push(demux_tx);
+        tx_broadcast.push(thread_sender_tx);
     }
     log::debug!("All connection to {} started, waiting for senders", coord);
 
     // Broadcast senders
-    while let Ok(t) = rx_senders.recv() {
-        for tx in tx_broadcast.iter() {
-            tx.send(t.clone()).unwrap();
-        }
+    let mut senders = HashMap::default();
+    while let Ok((endpoint, sender)) = rx_senders.recv() {
+        senders.insert(endpoint, sender);
     }
-    drop(tx_broadcast); // Start all demuxes
+    for tx in tx_broadcast.drain(..) {
+        tx.send(senders.clone())
+            .map_err(|_| ())
+            .expect("couldn't send senders");
+    }
     for handle in join_handles {
         handle.await.unwrap();
     }

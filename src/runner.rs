@@ -153,7 +153,10 @@ fn remote_worker(
     info!("starting remote worker for host {}: {:#?}", host_id, host);
 
     // connect to the ssh server
-    let address = (host.address.to_socket_addrs().unwrap().next().unwrap().ip(), host.ssh.ssh_port);
+    let address = (
+        host.address.to_socket_addrs().unwrap().next().unwrap().ip(),
+        host.ssh.ssh_port,
+    );
     let stream = TcpStream::connect(address).unwrap_or_else(|e| {
         panic!(
             "Failed to connect to remote SSH for host {} at {} port {}: {:?}",

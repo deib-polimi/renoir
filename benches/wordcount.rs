@@ -10,7 +10,7 @@ use criterion::{BenchmarkId, Throughput};
 use fake::Fake;
 use kstring::KString;
 use once_cell::sync::Lazy;
-use rand::prelude::StdRng;
+
 use rand::SeedableRng;
 
 use noir::BatchMode;

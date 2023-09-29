@@ -3,7 +3,7 @@
 //! See the documentation of [`EnvironmentConfig`] for more details.
 
 use std::fmt::{Display, Formatter};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -83,6 +83,19 @@ pub struct EnvironmentConfig {
     /// Skip the check that prevents two remote environments with different environments to be
     /// constructed.
     pub skip_single_remote_check: bool,
+}
+
+impl EnvironmentConfig {
+    /// Return this host's address if it's a remote environment.
+    pub fn host_address(&self) -> Option<SocketAddr> {
+        if let ExecutionRuntime::Remote(rt) = &self.runtime {
+            self.host_id
+                .and_then(|id| rt.hosts.get(id as usize))
+                .map(|h| h.address.to_socket_addrs().unwrap().next().unwrap())
+        } else {
+            None
+        }
+    }
 }
 
 /// Which kind of environment to use for the execution.

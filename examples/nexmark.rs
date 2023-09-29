@@ -215,7 +215,9 @@ impl Q4Unary {
             {
                 let (_, a) = self.open.pop().unwrap();
                 let s = self.state.remove(&a).unwrap();
-                let Some(winner) = s.bids.into_iter().next() else { continue; };
+                let Some(winner) = s.bids.into_iter().next() else {
+                    continue;
+                };
                 return StreamElement::Item((s.auction.unwrap(), winner));
             }
 
@@ -460,7 +462,7 @@ fn filter_bid(e: Event) -> Option<Bid> {
 }
 
 fn main() {
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 2 {

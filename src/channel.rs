@@ -198,7 +198,7 @@ impl<T: ChannelItem> Receiver<T> {
 #[derive(Debug, Clone)]
 pub struct UnboundedSender<T: ChannelItem>(SenderExt<T>);
 /// A wrapper on an unbounded channel receiver.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnboundedReceiver<T: ChannelItem>(pub(crate) ReceiverExt<T>);
 
 impl<T: ChannelItem> UnboundedSender<T> {

@@ -5,7 +5,9 @@ use std::thread::JoinHandle;
 
 use itertools::Itertools;
 
-use crate::block::{BatchMode, Block, BlockStructure, JobGraphGenerator, Replication};
+#[cfg(feature = "plot")]
+use crate::block::JobGraphGenerator;
+use crate::block::{BatchMode, Block, BlockStructure, Replication};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::{Data, Operator};
@@ -158,6 +160,7 @@ impl Scheduler {
 
         let mut join = vec![];
         let mut block_structures = vec![];
+        #[cfg(feature = "plot")]
         let mut job_graph_generator = JobGraphGenerator::new();
 
         for (coord, init_fn) in self.block_init.drain(..) {
@@ -175,11 +178,15 @@ impl Scheduler {
             let (handle, structure) = init_fn(&mut metadata);
             join.push(handle);
             block_structures.push((coord, structure.clone()));
+            #[cfg(feature = "plot")]
             job_graph_generator.add_block(coord.block_id, structure);
         }
 
-        let job_graph = job_graph_generator.finalize();
-        log::debug!("job graph:\n{}", job_graph);
+        #[cfg(feature = "plot")]
+        {
+            let job_graph = job_graph_generator.finalize();
+            log::debug!("job graph:\n{}", job_graph);
+        }
 
         self.network.finalize();
 
@@ -235,6 +242,7 @@ impl Scheduler {
         #[cfg(feature = "async-tokio")]
         {
             tokio::runtime::Builder::new_multi_thread()
+                .thread_name(format!("ntk-{:02}", self.config.host_id.unwrap()))
                 .enable_io()
                 .enable_time()
                 .build()
