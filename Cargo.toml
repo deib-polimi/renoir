@@ -21,7 +21,7 @@ profiler = []
 
 [dependencies]
 # for logging to the console
-log = { version = "0.4.19", features = ["release_max_level_info"] }
+log = { version = "0.4.20", features = ["release_max_level_info"] }
 
 # used by the network for storing type-generic structures
 typemap_rev = "0.3.0"
@@ -34,14 +34,14 @@ derivative = "2.2.0"
 
 # serialization library used for reading the config file (yaml) and serializing
 # the messages on the network
-serde = { version = "1.0.174", features = ["derive"] }
+serde = { version = "1.0.188", features = ["derive"] }
 serde_yaml = "0.9.25"
-serde_json = "1.0.103"
+serde_json = "1.0.107"
 bincode = "1.3.3"
 
 # handy Result type
-anyhow = "1.0.72"
-thiserror = "1.0.44"
+anyhow = "1.0.75"
+thiserror = "1.0.49"
 
 # handy iterators functions
 itertools = "0.11.0"
@@ -53,13 +53,13 @@ once_cell = "1.18.0"
 ssh2 = { version = "0.9.4", optional = true }
 whoami = { version = "1.4.1", optional = true }
 shell-escape = { version = "0.1.5", optional = true }
-clap = { version = "4.3.17", features = ["derive"], optional = true }
-sha2 = { version = "0.10.7", optional = true }
-base64 = { version = "0.21.2", optional = true }
+clap = { version = "4.4.6", features = ["derive"], optional = true }
+sha2 = { version = "0.10.8", optional = true }
+base64 = { version = "0.21.4", optional = true }
 
 # channel implementation
 crossbeam-channel = { version = "0.5.8", optional = true }
-flume = { version = "0.10.14", optional = true }
+flume = { version = "0.11.0", optional = true }
 
 # used for csv file source
 csv = "1.2.2"
@@ -68,9 +68,9 @@ csv = "1.2.2"
 lazy-init = "0.5.1"
 
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
-coarsetime = "0.1.23"
+coarsetime = "0.1.28"
 
-tokio = { version = "1.29.1", features = ["rt"], default-features = false, optional = true }
+tokio = { version = "1.32.0", features = ["rt"], default-features = false, optional = true }
 futures = { version = "0.3.28", optional = true }
 
 parking_lot = "0.12.1"
@@ -78,7 +78,7 @@ parking_lot = "0.12.1"
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 glidesort = "0.1.2"
-indexmap = "2.0.0"
+indexmap = "2.0.2"
 tracing = { version = "0.1.37", features = ["log"] }
 quick_cache = "0.3.0"
 
@@ -86,20 +86,20 @@ quick_cache = "0.3.0"
 # for the tests
 env_logger = "0.10.0"
 rand = { version = "0.8.5", features = ["small_rng"] }
-tempfile = "3.7.0"
+tempfile = "3.8.0"
 criterion = { version = "0.5.1", features = ["html_reports"] }
-fake = "2.6.1"
-mimalloc = { version = "0.1.37", default-features = false }
+fake = "2.8.0"
+mimalloc = { version = "0.1.39", default-features = false }
 tracing-subscriber = "0.3.17"
 
 micrometer = { version = "0.2.6", features = ["enable"]}
 
 # for the examples
-regex = "1.9.1"
+regex = "1.9.6"
 
 # used in the benchmarks
 crossbeam-channel = "0.5.8"
-flume = "0.10.14"
+flume = "0.11.0"
 
 kstring = { version = "2.0.0", features = ["serde"] }
 nexmark = { version = "0.2.0", features = ["serde"] }

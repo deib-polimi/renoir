@@ -142,10 +142,10 @@ impl<Out: ExchangeData, State: ExchangeData> Iterate<Out, State> {
         if let Some(rx_input) = self.input_receiver.as_ref() {
             match rx_input.select(rx_feedback) {
                 SelectResult::A(Ok(msg)) => {
-                    self.input_stash.extend(msg.into_iter());
+                    self.input_stash.extend(msg);
                 }
                 SelectResult::B(Ok(msg)) => {
-                    self.feedback_content.extend(msg.into_iter());
+                    self.feedback_content.extend(msg);
                 }
                 SelectResult::A(Err(Disconnected)) => {
                     self.input_receiver = None;
@@ -157,8 +157,7 @@ impl<Out: ExchangeData, State: ExchangeData> Iterate<Out, State> {
                 }
             }
         } else {
-            self.feedback_content
-                .extend(rx_feedback.recv().unwrap().into_iter());
+            self.feedback_content.extend(rx_feedback.recv().unwrap());
         }
     }
 
@@ -175,7 +174,7 @@ impl<Out: ExchangeData, State: ExchangeData> Iterate<Out, State> {
                         panic!("state_receiver disconnected!");
                     }
                     SelectResult::B(Ok(msg)) => {
-                        self.input_stash.extend(msg.into_iter());
+                        self.input_stash.extend(msg);
                         continue;
                     }
                     SelectResult::B(Err(Disconnected)) => {

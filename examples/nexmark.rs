@@ -215,7 +215,9 @@ impl Q4Unary {
             {
                 let (_, a) = self.open.pop().unwrap();
                 let s = self.state.remove(&a).unwrap();
-                let Some(winner) = s.bids.into_iter().next() else { continue; };
+                let Some(winner) = s.bids.into_iter().next() else {
+                    continue;
+                };
                 return StreamElement::Item((s.auction.unwrap(), winner));
             }
 

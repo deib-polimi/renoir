@@ -143,9 +143,7 @@ where
                 let v: Vec<_> = futures::stream::iter(b.into_iter())
                     .map(|el| {
                         let ff = ff.clone();
-                        tokio::spawn(async move {
-                            micrometer::span!(el.map_async(ff.as_ref()).await, "map_async_call")
-                        })
+                        tokio::spawn(async move { el.map_async(ff.as_ref()).await })
                     })
                     .buffered(buffer)
                     .map(Result::unwrap)
@@ -204,7 +202,6 @@ where
 
     #[inline]
     fn next(&mut self) -> StreamElement<O> {
-        micrometer::span!(map_async_next);
         loop {
             if let Some(el) = self.buffer.as_mut().and_then(Iterator::next) {
                 return el;

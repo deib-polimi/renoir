@@ -225,7 +225,7 @@ impl TestHelper {
             return Some(Vec::new());
         }
         let values = content.split(',').map(CoordUInt::from_str).collect_vec();
-        process_results(values.into_iter(), |values| values.collect_vec()).ok()
+        process_results(values, |values| values.collect_vec()).ok()
     }
 
     fn parse_int_from_env(var_name: &str) -> Option<u64> {
