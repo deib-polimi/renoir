@@ -440,10 +440,10 @@ async fn demux_thread<In: ExchangeData>(
 
     while let Some((dest, message)) = remote_recv(coord, &mut stream, &address).await {
         if let Err(e) = senders[&dest].send(message) {
-            warn!("demux failed to send message to {}: {:?}", dest, e);
+            panic!("demux failed to send message to {}: {:?}", dest, e);
         }
     }
-
+    
     drop(stream);
     log::debug!("{} finished", coord);
 }

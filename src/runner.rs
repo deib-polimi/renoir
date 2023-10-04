@@ -75,7 +75,7 @@ pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
     let mut host_dup: HashMap<std::net::IpAddr, usize> = HashMap::new(); // Used to detect deployments with replicated host
     for (host_id, host) in config.hosts.iter().enumerate() {
         let mut exe_uid = exe_hash.clone();
-        let sock: std::net::SocketAddr = host.address.parse().unwrap();
+        let sock: std::net::SocketAddr = host.address.to_socket_addrs().unwrap().next().unwrap();
         let ctr = host_dup.entry(sock.ip()).or_default();
         if *ctr > 0 {
             write!(&mut exe_uid, "-{:02}", *ctr).unwrap();

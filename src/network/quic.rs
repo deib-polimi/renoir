@@ -27,6 +27,16 @@ impl rustls::client::ServerCertVerifier for SkipServerVerification {
     }
 }
 
+fn transport_config() -> TransportConfig {
+    let mut transport_config = TransportConfig::default();
+    transport_config.max_concurrent_uni_streams(VarInt::from_u64(1024).unwrap());
+    transport_config.initial_rtt(std::time::Duration::from_millis(50));
+    transport_config.receive_window(VarInt::from_u64(10_000_000).unwrap());
+    transport_config.stream_receive_window(VarInt::from_u64(5_000_000).unwrap());
+    transport_config.max_idle_timeout(None);
+    transport_config
+}
+
 pub fn client_config() -> ClientConfig {
     let mut crypto = rustls::ClientConfig::builder()
         .with_safe_defaults()
@@ -35,20 +45,17 @@ pub fn client_config() -> ClientConfig {
 
     crypto.enable_early_data = true;
 
-    let mut transport_config = TransportConfig::default();
-    transport_config.max_concurrent_uni_streams(VarInt::from_u64(1024).unwrap());
-    transport_config.initial_rtt(std::time::Duration::from_millis(50));
-    transport_config.receive_window(VarInt::from_u64(10_000_000).unwrap());
-    transport_config.stream_receive_window(VarInt::from_u64(5_000_000).unwrap());
 
     let mut c = ClientConfig::new(Arc::new(crypto));
-    c.transport_config(Arc::new(transport_config));
+    c.transport_config(Arc::new(transport_config()));
     c
 }
 
 pub fn server_config() -> ServerConfig {
     let (cert, key) = generate_self_signed_cert().expect("certificate");
-    ServerConfig::with_single_cert(vec![cert], key).unwrap()
+    let mut s = ServerConfig::with_single_cert(vec![cert], key).unwrap();
+    s.transport_config(Arc::new(transport_config()));
+    s
 }
 
 fn generate_self_signed_cert(

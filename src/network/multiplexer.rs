@@ -286,6 +286,6 @@ async fn mux_thread<Out: ExchangeData>(
         remote_send(message, dest, &mut stream, &address).await;
     }
 
-    stream.finish().await.unwrap();
+    let _ = stream.finish().await;
     log::debug!("{} finished", coord);
 }

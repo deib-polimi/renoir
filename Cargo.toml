@@ -86,6 +86,7 @@ quinn = "0.10.2"
 rustls = { version = "0.21.7", features = ["dangerous_configuration", "quic"] }
 rcgen = "0.11.1"
 rustls-pemfile = "1.0.3"
+num_cpus = "1.16.0"
 
 [dev-dependencies]
 # for the tests
@@ -154,7 +155,7 @@ bench = false
 
 
 [profile.release]
-# lto = true
+lto = true
 strip = "symbols"
 # debug = 1
 

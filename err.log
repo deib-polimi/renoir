@@ -1,0 +1,79 @@
+warning: unused import: `std::sync::Arc`
+  --> src/network/demultiplexer.rs:14:5
+   |
+14 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `tokio_native_tls::TlsAcceptor`
+  --> src/network/demultiplexer.rs:15:5
+   |
+15 | use tokio_native_tls::TlsAcceptor;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/network/multiplexer.rs:11:5
+   |
+11 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `TlsConnector`
+  --> src/network/multiplexer.rs:13:35
+   |
+13 | use tokio_native_tls::{TlsStream, TlsConnector};
+   |                                   ^^^^^^^^^^^^
+
+warning: unused import: `std::io`
+ --> src/network/tls.rs:1:5
+  |
+1 | use std::io;
+  |     ^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src/network/tls.rs:2:5
+  |
+2 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `TlsStream`
+ --> src/network/tls.rs:4:38
+  |
+4 | use tokio_native_tls::{TlsConnector, TlsStream, native_tls::{self, Identity}, TlsAcceptor};
+  |                                      ^^^^^^^^^
+
+warning: unused import: `tokio::net::TcpStream`
+ --> src/network/tls.rs:5:5
+  |
+5 | use tokio::net::TcpStream;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `ReceiverEndpoint`
+ --> src/operator/start/binary.rs:7:45
+  |
+7 | use crate::network::{Coord, NetworkMessage, ReceiverEndpoint};
+  |                                             ^^^^^^^^^^^^^^^^
+
+warning: unused import: `tokio::task::JoinSet`
+ --> src/scheduler.rs:7:5
+  |
+7 | use tokio::task::JoinSet;
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `futures::StreamExt`
+  --> src/network/topology.rs:10:5
+   |
+10 | use futures::StreamExt;
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: function `generate_self_signed_cert` is never used
+  --> src/network/tls.rs:30:4
+   |
+30 | fn generate_self_signed_cert() -> Result<Identity, Box<dyn std::error::Error>> {
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: `noir` (lib) generated 12 warnings (run `cargo fix --lib -p noir` to apply 10 suggestions)
+    Finished release [optimized + debuginfo] target(s) in 0.09s
+     Running `target/release/examples/nexmark -r /home/dema/dev/thesis/noir-config-localhost.yml 1000000 3`

@@ -111,6 +111,8 @@ impl State {
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
+    
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 3 {
         panic!("Pass the number of centroid, the number of iterations and the dataset path as arguments");

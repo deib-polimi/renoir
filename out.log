@@ -1,0 +1,253 @@
+[2m2023-10-03T15:50:29.246860Z[0m [32m INFO[0m [2mnoir::config[0m[2m:[0m reading config from: /home/dema/dev/thesis/noir-config-localhost.yml    
+[2m2023-10-03T15:50:29.247019Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m starting 4 remote workers    
+[2m2023-10-03T15:50:29.303470Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m starting remote worker for host 0: RemoteHostConfig {
+    address: "127.0.0.1",
+    base_port: 9500,
+    num_cores: 2,
+    ssh: RemoteHostSSHConfig {
+        ssh_port: 22,
+        username: Some(
+            "dema",
+        ),
+        password: None,
+        key_file: Some(
+            "/home/dema/.ssh/id_ed25519",
+        ),
+        key_passphrase: None,
+    },
+    perf_path: None,
+}    
+[2m2023-10-03T15:50:29.303531Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m starting remote worker for host 1: RemoteHostConfig {
+    address: "127.0.0.1",
+    base_port: 9520,
+    num_cores: 2,
+    ssh: RemoteHostSSHConfig {
+        ssh_port: 22,
+        username: Some(
+            "dema",
+        ),
+        password: None,
+        key_file: Some(
+            "/home/dema/.ssh/id_ed25519",
+        ),
+        key_passphrase: None,
+    },
+    perf_path: None,
+}    
+[2m2023-10-03T15:50:29.303635Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m starting remote worker for host 2: RemoteHostConfig {
+    address: "127.0.0.1",
+    base_port: 9540,
+    num_cores: 2,
+    ssh: RemoteHostSSHConfig {
+        ssh_port: 22,
+        username: Some(
+            "dema",
+        ),
+        password: None,
+        key_file: Some(
+            "/home/dema/.ssh/id_ed25519",
+        ),
+        key_passphrase: None,
+    },
+    perf_path: None,
+}    
+[2m2023-10-03T15:50:29.303635Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m starting remote worker for host 3: RemoteHostConfig {
+    address: "127.0.0.1",
+    base_port: 9560,
+    num_cores: 2,
+    ssh: RemoteHostSSHConfig {
+        ssh_port: 22,
+        username: Some(
+            "dema",
+        ),
+        password: None,
+        key_file: Some(
+            "/home/dema/.ssh/id_ed25519",
+        ),
+        key_passphrase: None,
+    },
+    perf_path: None,
+}    
+0|[2m2023-10-03T15:50:29.616951Z[0m [32m INFO[0m [2mnoir::config[0m[2m:[0m reading remote config from env NOIR_CONFIG    
+0|[2m2023-10-03T15:50:29.617073Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b00), replication Unlimited    
+0|[2m2023-10-03T15:50:29.617081Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b01), replication Unlimited    
+0|[2m2023-10-03T15:50:29.617083Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b02), replication Unlimited    
+2|[2m2023-10-03T15:50:29.616918Z[0m [32m INFO[0m [2mnoir::config[0m[2m:[0m reading remote config from env NOIR_CONFIG    
+2|[2m2023-10-03T15:50:29.617027Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b00), replication Unlimited    
+2|[2m2023-10-03T15:50:29.617037Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b01), replication Unlimited    
+2|[2m2023-10-03T15:50:29.617039Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b02), replication Unlimited    
+2|[2m2023-10-03T15:50:29.617102Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b03), replication Unlimited    
+2|[2m2023-10-03T15:50:29.617124Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m starting execution (4 blocks)    
+1|[2m2023-10-03T15:50:29.631582Z[0m [32m INFO[0m [2mnoir::config[0m[2m:[0m reading remote config from env NOIR_CONFIG    
+1|[2m2023-10-03T15:50:29.631720Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b00), replication Unlimited    
+1|[2m2023-10-03T15:50:29.631728Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b01), replication Unlimited    
+1|[2m2023-10-03T15:50:29.631731Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b02), replication Unlimited    
+1|[2m2023-10-03T15:50:29.631793Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b03), replication Unlimited    
+1|[2m2023-10-03T15:50:29.631816Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m starting execution (4 blocks)    
+3|[2m2023-10-03T15:50:29.617079Z[0m [32m INFO[0m [2mnoir::config[0m[2m:[0m reading remote config from env NOIR_CONFIG    
+3|[2m2023-10-03T15:50:29.617215Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b00), replication Unlimited    
+3|[2m2023-10-03T15:50:29.617225Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b01), replication Unlimited    
+3|[2m2023-10-03T15:50:29.617229Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b02), replication Unlimited    
+3|[2m2023-10-03T15:50:29.617302Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b03), replication Unlimited    
+3|[2m2023-10-03T15:50:29.617329Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m starting execution (4 blocks)    
+3|[2m2023-10-03T15:50:29.618552Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h03)} is ready to accept 3 connections to 127.0.0.1:9561    
+3|[2m2023-10-03T15:50:29.618553Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h00)} from 127.0.0.1:40410 to 127.0.0.1:9500    
+3|[2m2023-10-03T15:50:29.618565Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h03)} is ready to accept 3 connections to 127.0.0.1:9560    
+3|[2m2023-10-03T15:50:29.618575Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h00)} from 127.0.0.1:35714 to 127.0.0.1:9501    
+3|[2m2023-10-03T15:50:29.618706Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h03)} is ready to accept 3 connections to 127.0.0.1:9562    
+3|[2m2023-10-03T15:50:29.619038Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h03)} accepted a new connection from 127.0.0.1:38754 (1 / 3)    
+3|[2m2023-10-03T15:50:29.619077Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h00)} from 127.0.0.1:38884 to 127.0.0.1:9502    
+3|[2m2023-10-03T15:50:29.619092Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h03)} accepted a new connection from 127.0.0.1:49286 (1 / 3)    
+3|[2m2023-10-03T15:50:29.619143Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h03)} is ready to accept 3 connections to 127.0.0.1:9563    
+3|[2m2023-10-03T15:50:29.619151Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h00)} from 127.0.0.1:42286 to 127.0.0.1:9503    
+3|[2m2023-10-03T15:50:29.620013Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h03)} accepted a new connection from 127.0.0.1:46042 (1 / 3)    
+3|[2m2023-10-03T15:50:29.620014Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h03)} accepted a new connection from 127.0.0.1:47428 (1 / 3)    
+3|[2m2023-10-03T15:50:29.628591Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h02)} from 127.0.0.1:50932 to 127.0.0.1:9543    
+3|[2m2023-10-03T15:50:29.629673Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h02)} from 127.0.0.1:39596 to 127.0.0.1:9540    
+3|[2m2023-10-03T15:50:29.631185Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h02)} from 127.0.0.1:57110 to 127.0.0.1:9541    
+3|[2m2023-10-03T15:50:29.634993Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h02)} from 127.0.0.1:33626 to 127.0.0.1:9542    
+3|[2m2023-10-03T15:50:29.651036Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h01)} from 127.0.0.1:37944 to 127.0.0.1:9522    
+3|[2m2023-10-03T15:50:29.655040Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h01)} from 127.0.0.1:59848 to 127.0.0.1:9520    
+3|[2m2023-10-03T15:50:29.672267Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h01)} from 127.0.0.1:52046 to 127.0.0.1:9521    
+3|[2m2023-10-03T15:50:29.711046Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h01)} from 127.0.0.1:56660 to 127.0.0.1:9523    
+3|[2m2023-10-03T15:50:29.814926Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b00.h03.r00) completed    
+3|[2m2023-10-03T15:50:29.828252Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h03)} accepted a new connection from 127.0.0.1:38764 (2 / 3)    
+3|[2m2023-10-03T15:50:29.831152Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h03)} accepted a new connection from 127.0.0.1:47434 (2 / 3)    
+3|[2m2023-10-03T15:50:29.831155Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h03)} accepted a new connection from 127.0.0.1:46044 (2 / 3)    
+3|[2m2023-10-03T15:50:29.849129Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h03)} accepted a new connection from 127.0.0.1:46046 (3 / 3)    
+3|[2m2023-10-03T15:50:29.861261Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h03)} accepted a new connection from 127.0.0.1:49290 (2 / 3)    
+3|[2m2023-10-03T15:50:29.871138Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h03)} accepted a new connection from 127.0.0.1:38780 (3 / 3)    
+3|[2m2023-10-03T15:50:29.872178Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h03)} accepted a new connection from 127.0.0.1:47444 (3 / 3)    
+3|[2m2023-10-03T15:50:29.871141Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h03)} accepted a new connection from 127.0.0.1:49294 (3 / 3)    
+3|[2m2023-10-03T15:50:29.877686Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b00.h03.r01) completed    
+3|[2m2023-10-03T15:50:29.899375Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b02.h03.r00) completed    
+3|[2m2023-10-03T15:50:29.899662Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b02.h03.r01) completed    
+3|[2m2023-10-03T15:50:29.907775Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b01.h03.r01) completed    
+3|[2m2023-10-03T15:50:29.908986Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b01.h03.r00) completed    
+3|[2m2023-10-03T15:50:29.950664Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b03.h03.r00) completed    
+3|[2m2023-10-03T15:50:29.951538Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b03.h03.r01) completed    
+3|[2m2023-10-03T15:50:29.953001Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m finished execution    
+3|q3:elapsed:335.686424ms
+1|[2m2023-10-03T15:50:29.650691Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h01)} is ready to accept 3 connections to 127.0.0.1:9520    
+1|[2m2023-10-03T15:50:29.650823Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h01)} is ready to accept 3 connections to 127.0.0.1:9521    
+1|[2m2023-10-03T15:50:29.650953Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h01)} is ready to accept 3 connections to 127.0.0.1:9522    
+1|[2m2023-10-03T15:50:29.651008Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h03)} from 127.0.0.1:47444 to 127.0.0.1:9562    
+[2m2023-10-03T15:50:29.957645Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m 3|Exit status: 0    
+1|[2m2023-10-03T15:50:29.651027Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h01)} is ready to accept 3 connections to 127.0.0.1:9523    
+1|[2m2023-10-03T15:50:29.651065Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h00)} from 127.0.0.1:35744 to 127.0.0.1:9501    
+1|[2m2023-10-03T15:50:29.651086Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h03)} from 127.0.0.1:49294 to 127.0.0.1:9561    
+1|[2m2023-10-03T15:50:29.651414Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h02)} from 127.0.0.1:57138 to 127.0.0.1:9541    
+2|[2m2023-10-03T15:50:29.618782Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h02)} is ready to accept 3 connections to 127.0.0.1:9540    
+2|[2m2023-10-03T15:50:29.618802Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h00)} from 127.0.0.1:40414 to 127.0.0.1:9500    
+2|[2m2023-10-03T15:50:29.618783Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h02)} is ready to accept 3 connections to 127.0.0.1:9541    
+2|[2m2023-10-03T15:50:29.618821Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h00)} from 127.0.0.1:35730 to 127.0.0.1:9501    
+2|[2m2023-10-03T15:50:29.618854Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h03)} from 127.0.0.1:49286 to 127.0.0.1:9561    
+2|[2m2023-10-03T15:50:29.618916Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h03)} from 127.0.0.1:38754 to 127.0.0.1:9560    
+2|[2m2023-10-03T15:50:29.619608Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h02)} is ready to accept 3 connections to 127.0.0.1:9542    
+2|[2m2023-10-03T15:50:29.619612Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h00)} from 127.0.0.1:38894 to 127.0.0.1:9502    
+2|[2m2023-10-03T15:50:29.619754Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h02)} is ready to accept 3 connections to 127.0.0.1:9543    
+2|[2m2023-10-03T15:50:29.619844Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h00)} from 127.0.0.1:42296 to 127.0.0.1:9503    
+2|[2m2023-10-03T15:50:29.619903Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h03)} from 127.0.0.1:47428 to 127.0.0.1:9562    
+1|[2m2023-10-03T15:50:29.651446Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h00)} from 127.0.0.1:38896 to 127.0.0.1:9502    
+1|[2m2023-10-03T15:50:29.651461Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h02)} from 127.0.0.1:33630 to 127.0.0.1:9542    
+1|[2m2023-10-03T15:50:29.651467Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h02)} from 127.0.0.1:39608 to 127.0.0.1:9540    
+1|[2m2023-10-03T15:50:29.651483Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h00)} from 127.0.0.1:40428 to 127.0.0.1:9500    
+1|[2m2023-10-03T15:50:29.651504Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h03)} from 127.0.0.1:38780 to 127.0.0.1:9560    
+1|[2m2023-10-03T15:50:29.652893Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h03)} from 127.0.0.1:46046 to 127.0.0.1:9563    
+1|[2m2023-10-03T15:50:29.652968Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h00)} from 127.0.0.1:42306 to 127.0.0.1:9503    
+1|[2m2023-10-03T15:50:29.654797Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h01)} accepted a new connection from 127.0.0.1:37944 (1 / 3)    
+1|[2m2023-10-03T15:50:29.654925Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h02)} from 127.0.0.1:50952 to 127.0.0.1:9543    
+1|[2m2023-10-03T15:50:29.659213Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h01)} accepted a new connection from 127.0.0.1:59832 (1 / 3)    
+2|[2m2023-10-03T15:50:29.619972Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h03)} from 127.0.0.1:46042 to 127.0.0.1:9563    
+2|[2m2023-10-03T15:50:29.628525Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h02)} accepted a new connection from 127.0.0.1:39596 (1 / 3)    
+2|[2m2023-10-03T15:50:29.631716Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h02)} accepted a new connection from 127.0.0.1:50932 (1 / 3)    
+2|[2m2023-10-03T15:50:29.637492Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h02)} accepted a new connection from 127.0.0.1:57110 (1 / 3)    
+2|[2m2023-10-03T15:50:29.639004Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h02)} accepted a new connection from 127.0.0.1:33626 (1 / 3)    
+2|[2m2023-10-03T15:50:29.655052Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h01)} from 127.0.0.1:59832 to 127.0.0.1:9520    
+2|[2m2023-10-03T15:50:29.666952Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h01)} from 127.0.0.1:37950 to 127.0.0.1:9522    
+2|[2m2023-10-03T15:50:29.667097Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h01)} from 127.0.0.1:52030 to 127.0.0.1:9521    
+2|[2m2023-10-03T15:50:29.667155Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h01)} from 127.0.0.1:56652 to 127.0.0.1:9523    
+2|[2m2023-10-03T15:50:29.812781Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b00.h02.r00) completed    
+2|[2m2023-10-03T15:50:29.831575Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h02)} accepted a new connection from 127.0.0.1:39602 (2 / 3)    
+2|[2m2023-10-03T15:50:29.833329Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b00.h02.r01) completed    
+2|[2m2023-10-03T15:50:29.843245Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h02)} accepted a new connection from 127.0.0.1:50940 (2 / 3)    
+2|[2m2023-10-03T15:50:29.844823Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h02)} accepted a new connection from 127.0.0.1:33628 (2 / 3)    
+1|[2m2023-10-03T15:50:29.676628Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h01)} accepted a new connection from 127.0.0.1:52014 (1 / 3)    
+1|[2m2023-10-03T15:50:29.678015Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h01)} accepted a new connection from 127.0.0.1:56646 (1 / 3)    
+1|[2m2023-10-03T15:50:29.807161Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h01)} accepted a new connection from 127.0.0.1:52030 (2 / 3)    
+1|[2m2023-10-03T15:50:29.816505Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h01)} accepted a new connection from 127.0.0.1:56652 (2 / 3)    
+1|[2m2023-10-03T15:50:29.817819Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h01)} accepted a new connection from 127.0.0.1:52046 (3 / 3)    
+1|[2m2023-10-03T15:50:29.818068Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h01)} accepted a new connection from 127.0.0.1:59848 (2 / 3)    
+1|[2m2023-10-03T15:50:29.839491Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h01)} accepted a new connection from 127.0.0.1:56660 (3 / 3)    
+1|[2m2023-10-03T15:50:29.842573Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h01)} accepted a new connection from 127.0.0.1:37950 (2 / 3)    
+2|[2m2023-10-03T15:50:29.846423Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h02)} accepted a new connection from 127.0.0.1:57126 (2 / 3)    
+2|[2m2023-10-03T15:50:29.847251Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h02)} accepted a new connection from 127.0.0.1:39608 (3 / 3)    
+2|[2m2023-10-03T15:50:29.857585Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h02)} accepted a new connection from 127.0.0.1:57138 (3 / 3)    
+2|[2m2023-10-03T15:50:29.875145Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h02)} accepted a new connection from 127.0.0.1:33630 (3 / 3)    
+2|[2m2023-10-03T15:50:29.876635Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h02)} accepted a new connection from 127.0.0.1:50952 (3 / 3)    
+2|[2m2023-10-03T15:50:29.903125Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b01.h02.r00) completed    
+2|[2m2023-10-03T15:50:29.903373Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b01.h02.r01) completed    
+2|[2m2023-10-03T15:50:29.921591Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b02.h02.r00) completed    
+2|[2m2023-10-03T15:50:29.921755Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b02.h02.r01) completed    
+2|[2m2023-10-03T15:50:29.951939Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b03.h02.r00) completed    
+2|[2m2023-10-03T15:50:29.952954Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b03.h02.r01) completed    
+2|[2m2023-10-03T15:50:29.954371Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m finished execution    
+2|q3:elapsed:337.257238ms
+1|[2m2023-10-03T15:50:29.857622Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h01)} accepted a new connection from 127.0.0.1:37954 (3 / 3)    
+1|[2m2023-10-03T15:50:29.863613Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h01)} accepted a new connection from 127.0.0.1:59864 (3 / 3)    
+1|[2m2023-10-03T15:50:29.896072Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b00.h01.r00) completed    
+1|[2m2023-10-03T15:50:29.898527Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b00.h01.r01) completed    
+1|[2m2023-10-03T15:50:29.898682Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b01.h01.r00) completed    
+[2m2023-10-03T15:50:29.958243Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m 2|Exit status: 0    
+1|[2m2023-10-03T15:50:29.898762Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b01.h01.r01) completed    
+1|[2m2023-10-03T15:50:29.898876Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b02.h01.r00) completed    
+1|[2m2023-10-03T15:50:29.898990Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b02.h01.r01) completed    
+1|[2m2023-10-03T15:50:29.950596Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b03.h01.r00) completed    
+1|[2m2023-10-03T15:50:29.951325Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b03.h01.r01) completed    
+1|[2m2023-10-03T15:50:29.953133Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m finished execution    
+1|q3:elapsed:321.331563ms
+[2m2023-10-03T15:50:29.958339Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m 1|Exit status: 0    
+0|[2m2023-10-03T15:50:29.617150Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m new block (b03), replication Unlimited    
+0|[2m2023-10-03T15:50:29.617177Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m starting execution (4 blocks)    
+0|[2m2023-10-03T15:50:29.618391Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h00)} is ready to accept 3 connections to 127.0.0.1:9500    
+0|[2m2023-10-03T15:50:29.618400Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h00)} is ready to accept 3 connections to 127.0.0.1:9501    
+0|[2m2023-10-03T15:50:29.618548Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h00)} accepted a new connection from 127.0.0.1:40410 (1 / 3)    
+0|[2m2023-10-03T15:50:29.618592Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h00)} is ready to accept 3 connections to 127.0.0.1:9502    
+0|[2m2023-10-03T15:50:29.618569Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h00)} accepted a new connection from 127.0.0.1:35714 (1 / 3)    
+0|[2m2023-10-03T15:50:29.618849Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h00)} is ready to accept 3 connections to 127.0.0.1:9503    
+0|[2m2023-10-03T15:50:29.618912Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h00)} accepted a new connection from 127.0.0.1:38884 (1 / 3)    
+0|[2m2023-10-03T15:50:29.619121Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h00)} accepted a new connection from 127.0.0.1:42286 (1 / 3)    
+0|[2m2023-10-03T15:50:29.631447Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h02)} from 127.0.0.1:50940 to 127.0.0.1:9543    
+0|[2m2023-10-03T15:50:29.632369Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h02)} from 127.0.0.1:57126 to 127.0.0.1:9541    
+0|[2m2023-10-03T15:50:29.644133Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h02)} from 127.0.0.1:33628 to 127.0.0.1:9542    
+0|[2m2023-10-03T15:50:29.647603Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h03)} from 127.0.0.1:38764 to 127.0.0.1:9560    
+0|[2m2023-10-03T15:50:29.647713Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h03)} from 127.0.0.1:49290 to 127.0.0.1:9561    
+0|[2m2023-10-03T15:50:29.647735Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h03)} from 127.0.0.1:47434 to 127.0.0.1:9562    
+0|[2m2023-10-03T15:50:29.647788Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h02)} from 127.0.0.1:39602 to 127.0.0.1:9540    
+0|[2m2023-10-03T15:50:29.647826Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h03)} from 127.0.0.1:46044 to 127.0.0.1:9563    
+0|[2m2023-10-03T15:50:29.665473Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b01) -> (b03.h01)} from 127.0.0.1:37954 to 127.0.0.1:9522    
+0|[2m2023-10-03T15:50:29.671205Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b02) -> (b03.h01)} from 127.0.0.1:56646 to 127.0.0.1:9523    
+0|[2m2023-10-03T15:50:29.665335Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b02.h01)} from 127.0.0.1:52014 to 127.0.0.1:9521    
+0|[2m2023-10-03T15:50:29.691421Z[0m [32m INFO[0m [2mnoir::network::multiplexer[0m[2m:[0m Mux connected Demux{(b00) -> (b01.h01)} from 127.0.0.1:59864 to 127.0.0.1:9520    
+0|[2m2023-10-03T15:50:29.713201Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b00.h00.r00) completed    
+0|[2m2023-10-03T15:50:29.754312Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b00.h00.r01) completed    
+0|[2m2023-10-03T15:50:29.839159Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h00)} accepted a new connection from 127.0.0.1:40414 (2 / 3)    
+0|[2m2023-10-03T15:50:29.867128Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b01.h00)} accepted a new connection from 127.0.0.1:40428 (3 / 3)    
+0|[2m2023-10-03T15:50:29.873156Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h00)} accepted a new connection from 127.0.0.1:38894 (2 / 3)    
+0|[2m2023-10-03T15:50:29.883896Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h00)} accepted a new connection from 127.0.0.1:42296 (2 / 3)    
+0|[2m2023-10-03T15:50:29.884149Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h00)} accepted a new connection from 127.0.0.1:35730 (2 / 3)    
+0|[2m2023-10-03T15:50:29.896655Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b00) -> (b02.h00)} accepted a new connection from 127.0.0.1:35744 (3 / 3)    
+0|[2m2023-10-03T15:50:29.896655Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b02) -> (b03.h00)} accepted a new connection from 127.0.0.1:42306 (3 / 3)    
+0|[2m2023-10-03T15:50:29.896783Z[0m [32m INFO[0m [2mnoir::network::demultiplexer[0m[2m:[0m Remote receiver at Demux{(b01) -> (b03.h00)} accepted a new connection from 127.0.0.1:38896 (3 / 3)    
+0|[2m2023-10-03T15:50:29.905445Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b01.h00.r01) completed    
+0|[2m2023-10-03T15:50:29.907465Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b01.h00.r00) completed    
+0|[2m2023-10-03T15:50:29.938277Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b02.h00.r01) completed    
+0|[2m2023-10-03T15:50:29.945121Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b02.h00.r00) completed    
+0|[2m2023-10-03T15:50:29.949719Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b03.h00.r01) completed    
+0|[2m2023-10-03T15:50:29.950574Z[0m [32m INFO[0m [2mnoir::worker[0m[2m:[0m worker (b03.h00.r00) completed    
+0|[2m2023-10-03T15:50:29.953186Z[0m [32m INFO[0m [2mnoir::environment[0m[2m:[0m finished execution    
+0|q3:elapsed:336.024638ms
+[2m2023-10-03T15:50:29.960668Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m 0|Exit status: 0    
+[2m2023-10-03T15:50:29.960856Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m total time: 713.821361ms    
+[2m2023-10-03T15:50:29.960881Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m max execution time: 407.59281ms    
+[2m2023-10-03T15:50:29.960893Z[0m [32m INFO[0m [2mnoir::runner[0m[2m:[0m max sync time: 188.136093ms    

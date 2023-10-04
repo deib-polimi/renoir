@@ -245,6 +245,7 @@ impl Scheduler {
                 .thread_name(format!("ntk-{:02}", self.config.host_id.unwrap()))
                 .enable_io()
                 .enable_time()
+                .worker_threads(num_cpus::get().div_euclid(2).max(1))
                 .build()
                 .unwrap()
                 .block_on(async move {
