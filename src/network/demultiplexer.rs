@@ -10,7 +10,7 @@ use quinn::Connection;
 use tokio::task::JoinHandle;
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::task::JoinSet;
 
 use quinn::RecvStream;
@@ -93,7 +93,14 @@ impl DemuxGate {
         }
 
         tokio::spawn(async move {
-            let endpoint = quinn::Endpoint::server(server_config(), self.bind_socket).unwrap();
+            let endpoint = quinn::Endpoint::server(
+                server_config(),
+                SocketAddr::new(
+                    IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+                    self.bind_socket.port(),
+                ),
+            )
+            .unwrap();
             let mut join = JoinSet::new();
 
             let mut delay = Some(std::time::Instant::now());
@@ -443,7 +450,7 @@ async fn demux_thread<In: ExchangeData>(
             panic!("demux failed to send message to {}: {:?}", dest, e);
         }
     }
-    
+
     drop(stream);
     log::debug!("{} finished", coord);
 }
