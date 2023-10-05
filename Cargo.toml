@@ -145,3 +145,9 @@ harness = false
 lto = true
 strip = "symbols"
 # debug = 1
+
+[profile.release-fast]
+inherits = "release"
+lto = true
+codegen-units = 1
+panic = "abort"

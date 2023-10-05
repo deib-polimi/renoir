@@ -8,10 +8,17 @@ pub(crate) use topology::*;
 use crate::operator::StreamElement;
 use crate::scheduler::{BlockId, HostId, ReplicaId};
 
-mod demultiplexer;
-mod multiplexer;
+#[cfg(feature = "async-tokio")]
+mod tokio;
+#[cfg(feature = "async-tokio")]
+use tokio::*;
+
+#[cfg(not(feature = "async-tokio"))]
+mod sync;
+#[cfg(not(feature = "async-tokio"))]
+use sync::*;
+
 mod network_channel;
-mod remote;
 mod topology;
 
 #[derive(Debug, Clone)]

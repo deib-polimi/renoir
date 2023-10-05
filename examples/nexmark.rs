@@ -462,7 +462,7 @@ fn filter_bid(e: Event) -> Option<Bid> {
 }
 
 fn main() {
-    env_logger::init();
+    tracing_subscriber::fmt::init();
 
     let (config, args) = EnvironmentConfig::from_args();
     if args.len() != 2 {
