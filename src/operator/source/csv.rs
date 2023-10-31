@@ -5,7 +5,7 @@ use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
-use csv::{Reader, ReaderBuilder, Terminator, Trim};
+use csv::{ByteRecord, Reader, ReaderBuilder, Terminator, Trim};
 use serde::Deserialize;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
@@ -96,6 +96,7 @@ pub struct CsvSource<Out: Data + for<'a> Deserialize<'a>> {
     /// Whether the reader has terminated its job.
     terminated: bool,
     _out: PhantomData<Out>,
+    buf: ByteRecord,
 }
 
 impl<Out: Data + for<'a> Deserialize<'a>> Display for CsvSource<Out> {
@@ -144,6 +145,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
             options: Default::default(),
             terminated: false,
             _out: PhantomData,
+            buf: ByteRecord::new(),
         }
     }
 
@@ -380,12 +382,19 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
             .as_mut()
             .expect("CsvSource was not initialized");
 
-        match csv_reader.deserialize::<Out>().next() {
-            Some(item) => StreamElement::Item(item.unwrap()),
-            None => {
+        match csv_reader.read_byte_record(&mut self.buf) {
+            Ok(true) => {
+                let item = self
+                    .buf
+                    .deserialize::<Out>(None)
+                    .expect("csv does not match type");
+                StreamElement::Item(item)
+            }
+            Ok(false) => {
                 self.terminated = true;
                 StreamElement::FlushAndRestart
             }
+            Err(e) => panic!("Error while reading CSV file: {:?}", e),
         }
     }
 
@@ -408,6 +417,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Clone for CsvSource<Out> {
             options: self.options.clone(),
             terminated: false,
             _out: PhantomData,
+            buf: ByteRecord::new(),
         }
     }
 }

@@ -258,7 +258,7 @@ impl NetworkTopology {
             .as_mut()
             .unwrap()
             .entry::<ReceiverKey<T>>()
-            .or_insert_with(Default::default);
+            .or_default();
         // if the channel has not been registered yet, register it
         if !entry.contains_key(&receiver_endpoint) {
             self.register_channel::<T>(receiver_endpoint);
@@ -283,7 +283,7 @@ impl NetworkTopology {
             .as_mut()
             .unwrap()
             .entry::<DemultiplexingReceiverKey<T>>()
-            .or_insert_with(Default::default);
+            .or_default();
 
         if let Entry::Vacant(e) = demuxes.entry(demux_coord) {
             // find the set of all the previous blocks that have a MultiplexingSender that
@@ -331,7 +331,7 @@ impl NetworkTopology {
             .as_mut()
             .unwrap()
             .entry::<MultiplexingSenderKey<T>>()
-            .or_insert_with(Default::default);
+            .or_default();
         let demux_coord = DemuxCoord::from(receiver_endpoint);
 
         if let Entry::Vacant(e) = muxers.entry(demux_coord) {
@@ -375,7 +375,7 @@ impl NetworkTopology {
                         .as_mut()
                         .unwrap()
                         .entry::<SenderKey<T>>()
-                        .or_insert_with(Default::default)
+                        .or_default()
                         .insert(receiver_endpoint, sender);
                 } else {
                     let (sender, receiver) = local_channel(receiver_endpoint);
@@ -388,13 +388,13 @@ impl NetworkTopology {
                         .as_mut()
                         .unwrap()
                         .entry::<ReceiverKey<T>>()
-                        .or_insert_with(Default::default)
+                        .or_default()
                         .insert(receiver_endpoint, receiver);
                     self.senders
                         .as_mut()
                         .unwrap()
                         .entry::<SenderKey<T>>()
-                        .or_insert_with(Default::default)
+                        .or_default()
                         .insert(receiver_endpoint, sender);
                 };
             }
@@ -405,13 +405,13 @@ impl NetworkTopology {
                     .as_mut()
                     .unwrap()
                     .entry::<ReceiverKey<T>>()
-                    .or_insert_with(Default::default)
+                    .or_default()
                     .insert(receiver_endpoint, receiver);
                 self.senders
                     .as_mut()
                     .unwrap()
                     .entry::<SenderKey<T>>()
-                    .or_insert_with(Default::default)
+                    .or_default()
                     .insert(receiver_endpoint, sender);
             }
         }
@@ -461,9 +461,7 @@ impl NetworkTopology {
         }
 
         let receiver_endpoint = ReceiverEndpoint::new(to, from.block_id);
-        self.senders_metadata
-            .entry(receiver_endpoint)
-            .or_insert_with(Default::default);
+        self.senders_metadata.entry(receiver_endpoint).or_default();
 
         // we want to connect to a remote: this sender should be remote
         if to_remote {

@@ -41,17 +41,13 @@ impl Eq for Point {}
 
 impl PartialOrd for Point {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.x.partial_cmp(&other.x) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.y.partial_cmp(&other.y)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Point {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        self.x.total_cmp(&other.x).then(other.y.total_cmp(&self.y))
     }
 }
 
