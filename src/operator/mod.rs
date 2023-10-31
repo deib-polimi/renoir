@@ -589,13 +589,15 @@ where
         K: DataKey + Sync,
     {
         use crate::block::GroupHasherBuilder;
+        use futures::FutureExt;
         use quick_cache::{sync::Cache, UnitWeighter};
-        use std::sync::Arc;
+        use std::{convert::Infallible, sync::Arc};
 
         let cache: Arc<Cache<K, O, _, GroupHasherBuilder>> = Arc::new(Cache::with(
             capacity,
             capacity as u64,
             UnitWeighter,
+            Default::default(),
             Default::default(),
         ));
         self.add_operator(|prev| {
@@ -607,15 +609,10 @@ where
                     let cache = cache.clone();
                     let k = fk(&el);
                     async move {
-                        match cache.get_value_or_guard_async(&k).await {
-                            Ok(o) => o,
-                            Err(g) => {
-                                log::debug!("cache miss, computing");
-                                let o = (f)(el).await;
-                                g.insert(o.clone());
-                                o
-                            }
-                        }
+                        cache
+                            .get_or_insert_async(&k, (f)(el).map(Result::Ok::<_, Infallible>))
+                            .await
+                            .unwrap()
                     }
                 },
                 4,

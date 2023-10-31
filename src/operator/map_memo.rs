@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::fmt::Display;
 use std::hash::BuildHasher;
 use std::marker::PhantomData;
@@ -72,6 +73,7 @@ where
                 capacity as u64,
                 UnitWeighter,
                 Default::default(),
+                Default::default(),
             )),
         }
     }
@@ -94,16 +96,9 @@ where
     fn next(&mut self) -> StreamElement<O> {
         self.prev.next().map(|v| {
             let k = (self.fk)(&v);
-            match self.cache.get_value_or_guard(&k, None) {
-                quick_cache::GuardResult::Value(o) => o,
-                quick_cache::GuardResult::Guard(g) => {
-                    log::debug!("cache miss, computing");
-                    let o = (self.f)(v);
-                    g.insert(o.clone());
-                    o
-                }
-                quick_cache::GuardResult::Timeout => unreachable!(),
-            }
+            self.cache
+                .get_or_insert_with(&k, || Ok::<O, Infallible>((self.f)(v)))
+                .unwrap()
         })
     }
 

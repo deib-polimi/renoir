@@ -555,12 +555,8 @@ impl NetworkTopology {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
-    use std::io::Write;
-
     use crate::network::NetworkMessage;
     use crate::operator::StreamElement;
-    use crate::scheduler::HostId;
 
     use super::*;
 
