@@ -83,7 +83,7 @@ where
 {
 }
 
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain> where
+impl<Out: Data, OperatorChain> Stream<OperatorChain> where
     OperatorChain: Operator<Out = Out> + 'static
 {
 }

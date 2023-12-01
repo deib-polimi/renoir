@@ -71,9 +71,9 @@ pub struct JoinStream<
     Keyer2: KeyerFn<Key, Out2>,
 {
     /// The stream of the left side.
-    pub(crate) lhs: Stream<Out1, OperatorChain1>,
+    pub(crate) lhs: Stream<OperatorChain1>,
     /// The stream of the right side.
-    pub(crate) rhs: Stream<Out2, OperatorChain2>,
+    pub(crate) rhs: Stream<OperatorChain2>,
     /// The function for extracting the join key from the left stream.
     pub(crate) keyer1: Keyer1,
     /// The function for extracting the join key from the right stream.
@@ -82,7 +82,7 @@ pub struct JoinStream<
     _key: PhantomData<Key>,
 }
 
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<OperatorChain>
 where
     OperatorChain: Operator<Out = Out> + 'static,
 {
@@ -114,7 +114,7 @@ where
     /// ```
     pub fn join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
-        rhs: Stream<Out2, OperatorChain2>,
+        rhs: Stream<OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
     ) -> KeyedStream<
@@ -166,7 +166,7 @@ where
     /// ```
     pub fn left_join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
-        rhs: Stream<Out2, OperatorChain2>,
+        rhs: Stream<OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
     ) -> KeyedStream<
@@ -219,7 +219,7 @@ where
     /// ```
     pub fn outer_join<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
-        rhs: Stream<Out2, OperatorChain2>,
+        rhs: Stream<OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
     ) -> KeyedStream<
@@ -278,7 +278,7 @@ where
     /// ```
     pub fn join_with<Out2: ExchangeData, OperatorChain2, Key, Keyer1, Keyer2>(
         self,
-        rhs: Stream<Out2, OperatorChain2>,
+        rhs: Stream<OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
     ) -> JoinStream<Key, Out, Out2, OperatorChain, OperatorChain2, Keyer1, Keyer2>

@@ -32,7 +32,7 @@ impl State {
     }
 }
 
-fn connected(input: Stream<(u64, u64), impl Operator<Out = (u64, u64)> + 'static>) {
+fn connected(input: Stream<impl Operator<Out = (u64, u64)> + 'static>) {
     let mut s = input.split(2);
 
     let nodes = s

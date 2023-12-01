@@ -289,7 +289,7 @@ impl crate::StreamEnvironment {
     pub fn stream_par_iter<Source>(
         &mut self,
         generator: Source,
-    ) -> Stream<Source::Item, ParallelIteratorSource<Source>>
+    ) -> Stream<ParallelIteratorSource<Source>>
     where
         Source: IntoParallelSource + 'static,
         Source::Iter: Send,

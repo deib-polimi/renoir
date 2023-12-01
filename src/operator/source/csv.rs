@@ -429,7 +429,7 @@ impl crate::StreamEnvironment {
     pub fn stream_csv<T: Data + for<'a> Deserialize<'a>>(
         &mut self,
         path: impl Into<PathBuf>,
-    ) -> Stream<T, CsvSource<T>> {
+    ) -> Stream<CsvSource<T>> {
         let source = CsvSource::new(path);
         self.stream(source)
     }

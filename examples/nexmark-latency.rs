@@ -34,7 +34,7 @@ fn watermark_gen(ts: &Timestamp, count: &mut usize, interval: usize) -> Option<T
 /// FROM Bid [NOW]
 /// WHERE auction = 1007 OR auction = 1020 OR auction = 2001 OR auction = 2019 OR auction = 2087;
 /// ```
-fn query2(events: Stream<(SystemTime, Event), impl Operator<Out = (SystemTime, Event)> + 'static>) {
+fn query2(events: Stream<impl Operator<Out = (SystemTime, Event)> + 'static>) {
     events
         .filter_map(|(s, e)| {
             if let Event::Bid(b) = e {
@@ -57,7 +57,7 @@ fn query2(events: Stream<(SystemTime, Event), impl Operator<Out = (SystemTime, E
 /// FROM Auction A [ROWS UNBOUNDED], Person P [ROWS UNBOUNDED]
 /// WHERE A.seller = P.id AND (P.state = `OR' OR P.state = `ID' OR P.state = `CA') AND A.category = 10;
 /// ```
-fn query3(events: Stream<(SystemTime, Event), impl Operator<Out = (SystemTime, Event)> + 'static>) {
+fn query3(events: Stream<impl Operator<Out = (SystemTime, Event)> + 'static>) {
     let mut routes = events
         .route()
         .add_route(|(_, e)| matches!(e, Event::Person(_)))
@@ -98,7 +98,7 @@ fn query3(events: Stream<(SystemTime, Event), impl Operator<Out = (SystemTime, E
 ///                   FROM Bid [RANGE 60 MINUTE SLIDE 1 MINUTE] B2
 ///                   GROUP BY B2.auction);
 /// ```
-fn query5(events: Stream<(SystemTime, Event), impl Operator<Out = (SystemTime, Event)> + 'static>) {
+fn query5(events: Stream<impl Operator<Out = (SystemTime, Event)> + 'static>) {
     let window_descr = EventTimeWindow::sliding(1_000, 100);
     let bid = events
         .filter_map(filter_bid)
@@ -137,7 +137,7 @@ static TRACK_POINT: micrometer::TrackPoint = micrometer::TrackPoint::new_thread_
 fn events(
     env: &mut StreamEnvironment,
     args: &Args,
-) -> Stream<(SystemTime, Event), impl Operator<Out = (SystemTime, Event)>> {
+) -> Stream<impl Operator<Out = (SystemTime, Event)>> {
     env.stream_iter({
         let conf = NexmarkConfig {
             num_event_generators: 1,

@@ -6,7 +6,7 @@ use crate::block::NextStrategy;
 use crate::operator::join::local_hash::JoinStreamLocalHash;
 use crate::operator::join::local_sort_merge::JoinStreamLocalSortMerge;
 use crate::operator::join::JoinStream;
-use crate::operator::start::{BinaryElement, BinaryStartOperator, Start};
+use crate::operator::start::{BinaryStartOperator, Start};
 use crate::operator::{Data, DataKey, ExchangeData, KeyerFn, Operator};
 use crate::stream::Stream;
 
@@ -32,7 +32,7 @@ where
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
-    inner: Stream<BinaryElement<Out1, Out2>, BinaryStartOperator<Out1, Out2>>,
+    inner: Stream<BinaryStartOperator<Out1, Out2>>,
     keyer1: Keyer1,
     keyer2: Keyer2,
     _key: PhantomData<Key>,
@@ -52,7 +52,7 @@ pub struct JoinStreamShipBroadcastRight<
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
-    inner: Stream<BinaryElement<Out1, Out2>, BinaryStartOperator<Out1, Out2>>,
+    inner: Stream<BinaryStartOperator<Out1, Out2>>,
     keyer1: Keyer1,
     keyer2: Keyer2,
     _key: PhantomData<Key>,

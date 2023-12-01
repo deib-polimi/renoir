@@ -241,7 +241,7 @@ pub struct JoinStreamLocalSortMerge<
     Keyer2: KeyerFn<Key, Out2>,
     ShipStrat: ShipStrategy,
 > {
-    stream: Stream<BinaryElement<Out1, Out2>, BinaryStartOperator<Out1, Out2>>,
+    stream: Stream<BinaryStartOperator<Out1, Out2>>,
     keyer1: Keyer1,
     keyer2: Keyer2,
     _key: PhantomData<Key>,
@@ -256,7 +256,7 @@ where
     ShipStrat: ShipStrategy,
 {
     pub(crate) fn new(
-        stream: Stream<BinaryElement<Out1, Out2>, BinaryStartOperator<Out1, Out2>>,
+        stream: Stream<BinaryStartOperator<Out1, Out2>>,
         keyer1: Keyer1,
         keyer2: Keyer2,
     ) -> Self {
@@ -373,12 +373,7 @@ where
     /// This is an inner join, very similarly to `SELECT a, b FROM a JOIN b ON keyer1(a) = keyer2(b)`.
     ///
     /// **Note**: this operator will split the current block.
-    pub fn inner(
-        self,
-    ) -> Stream<
-        (Key, InnerJoinTuple<Out1, Out2>),
-        impl Operator<Out = (Key, InnerJoinTuple<Out1, Out2>)>,
-    > {
+    pub fn inner(self) -> Stream<impl Operator<Out = (Key, InnerJoinTuple<Out1, Out2>)>> {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         self.stream
@@ -399,12 +394,7 @@ where
     /// This is very similar to `SELECT a, b FROM a LEFT JOIN b ON keyer1(a) = keyer2(b)`.    
     ///
     /// **Note**: this operator will split the current block.
-    pub fn left(
-        self,
-    ) -> Stream<
-        (Key, LeftJoinTuple<Out1, Out2>),
-        impl Operator<Out = (Key, LeftJoinTuple<Out1, Out2>)>,
-    > {
+    pub fn left(self) -> Stream<impl Operator<Out = (Key, LeftJoinTuple<Out1, Out2>)>> {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         self.stream

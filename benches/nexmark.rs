@@ -31,8 +31,8 @@ fn watermark_gen(ts: &Timestamp, count: &mut usize, interval: usize) -> Option<T
 
 /// For each concluded auction, find its winning bid.
 fn winning_bids(
-    events: Stream<Event, impl Operator<Out = Event> + 'static>,
-) -> Stream<(Auction, Bid), impl Operator<Out = (Auction, Bid)>> {
+    events: Stream<impl Operator<Out = Event> + 'static>,
+) -> Stream<impl Operator<Out = (Auction, Bid)>> {
     events
         .filter(|e| matches!(e, Event::Auction(_) | Event::Bid(_)))
         .add_timestamps(timestamp_gen, {
@@ -87,7 +87,7 @@ fn winning_bids(
 }
 
 /// Query 0: Passthrough
-fn query0(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query0(events: Stream<impl Operator<Out = Event> + 'static>) {
     events.for_each(std::mem::drop)
 }
 
@@ -97,7 +97,7 @@ fn query0(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
 /// SELECT Istream(auction, DOLTOEUR(price), bidder, datetime)
 /// FROM bid [ROWS UNBOUNDED];
 /// ```
-fn query1(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query1(events: Stream<impl Operator<Out = Event> + 'static>) {
     events
         .filter_map(filter_bid)
         .map(|mut b| {
@@ -114,7 +114,7 @@ fn query1(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
 /// FROM Bid [NOW]
 /// WHERE auction = 1007 OR auction = 1020 OR auction = 2001 OR auction = 2019 OR auction = 2087;
 /// ```
-fn query2(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query2(events: Stream<impl Operator<Out = Event> + 'static>) {
     events
         .filter_map(filter_bid)
         .filter(|b| b.auction % 123 == 0)
@@ -128,7 +128,7 @@ fn query2(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
 /// FROM Auction A [ROWS UNBOUNDED], Person P [ROWS UNBOUNDED]
 /// WHERE A.seller = P.id AND (P.state = `OR' OR P.state = `ID' OR P.state = `CA') AND A.category = 10;
 /// ```
-fn query3(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query3(events: Stream<impl Operator<Out = Event> + 'static>) {
     let mut routes = events
         .route()
         .add_route(|e| matches!(e, Event::Person(_)))
@@ -168,7 +168,7 @@ fn query3(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
 /// WHERE Q.category = C.id
 /// GROUP BY C.id;
 /// ```
-fn query4(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query4(events: Stream<impl Operator<Out = Event> + 'static>) {
     winning_bids(events)
         // GROUP BY category, AVG(price)
         .map(|(a, b)| (a.category, b.price))
@@ -189,7 +189,7 @@ fn query4(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
 ///                   FROM Bid [RANGE 60 MINUTE SLIDE 1 MINUTE] B2
 ///                   GROUP BY B2.auction);
 /// ```
-fn query5(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query5(events: Stream<impl Operator<Out = Event> + 'static>) {
     let window_descr = EventTimeWindow::sliding(10 * SECOND_MILLIS, 2 * SECOND_MILLIS);
     let bid = events
         .add_timestamps(timestamp_gen, {
@@ -222,7 +222,7 @@ fn query5(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
 ///       GROUP BY A.id, A.seller) [PARTITION BY A.seller ROWS 10] Q
 /// GROUP BY Q.seller;
 /// ```
-fn query6(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query6(events: Stream<impl Operator<Out = Event> + 'static>) {
     winning_bids(events)
         // [PARTITION BY A.seller ROWS 10]
         .map(|(a, b)| (a.seller, b.price))
@@ -246,7 +246,7 @@ fn query6(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
 /// WHERE B.price = (SELECT MAX(B1.price)
 ///                  FROM BID [RANGE 1 MINUTE SLIDE 1 MINUTE] B1);
 /// ```
-fn query7(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query7(events: Stream<impl Operator<Out = Event> + 'static>) {
     let bid = events
         .add_timestamps(timestamp_gen, {
             let mut count = 0;
@@ -271,7 +271,7 @@ fn query7(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
 /// FROM Person [RANGE 12 HOUR] P, Auction [RANGE 12 HOUR] A
 /// WHERE P.id = A.seller;
 /// ```
-fn query8(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
+fn query8(events: Stream<impl Operator<Out = Event> + 'static>) {
     let window_descr = EventTimeWindow::tumbling(10 * SECOND_MILLIS);
 
     let mut routes = events
@@ -304,7 +304,7 @@ fn query8(events: Stream<Event, impl Operator<Out = Event> + 'static>) {
         .for_each(std::mem::drop)
 }
 
-fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<Event, impl Operator<Out = Event>> {
+fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<impl Operator<Out = Event>> {
     env.stream_par_iter(move |i, n| {
         let conf = NexmarkConfig {
             num_event_generators: n as usize,

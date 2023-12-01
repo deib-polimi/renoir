@@ -69,7 +69,7 @@ impl StreamEnvironment {
     }
 
     /// Construct a new stream bound to this environment starting with the specified source.
-    pub fn stream<Out: Data, S>(&mut self, source: S) -> Stream<Out, S>
+    pub fn stream<Out: Data, S>(&mut self, source: S) -> Stream<S>
     where
         S: Source<Out> + Send + 'static,
     {
@@ -167,10 +167,7 @@ impl StreamEnvironmentInner {
         }
     }
 
-    pub fn stream<Out: Data, S>(
-        env_rc: Arc<Mutex<StreamEnvironmentInner>>,
-        source: S,
-    ) -> Stream<Out, S>
+    pub fn stream<Out: Data, S>(env_rc: Arc<Mutex<StreamEnvironmentInner>>, source: S) -> Stream<S>
     where
         S: Source<Out> + Send + 'static,
     {
@@ -195,7 +192,7 @@ impl StreamEnvironmentInner {
         source: S,
         batch_mode: BatchMode,
         iteration_ctx: Vec<Arc<IterationStateLock>>,
-    ) -> Block<Out, S> {
+    ) -> Block<S> {
         let new_id = self.new_block_id();
         let parallelism = source.replication();
         info!("new block (b{new_id:02}), replication {parallelism:?}",);
@@ -204,7 +201,7 @@ impl StreamEnvironmentInner {
 
     pub(crate) fn close_block<Out: Data, Op: Operator<Out = Out> + 'static>(
         &mut self,
-        block: Block<Out, Op>,
+        block: Block<Op>,
     ) -> BlockId {
         let id = block.id;
         let scheduler = self.scheduler_mut();

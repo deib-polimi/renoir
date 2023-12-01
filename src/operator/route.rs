@@ -31,14 +31,14 @@ impl<Out> Debug for FilterFn<Out> {
 }
 
 pub struct RouterBuilder<T: ExchangeData, O: Operator<Out = T>> {
-    stream: Stream<T, O>,
+    stream: Stream<O>,
     routes: Vec<FilterFn<T>>,
 }
 
 impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
     RouterBuilder<Out, OperatorChain>
 {
-    pub(super) fn new(stream: Stream<Out, OperatorChain>) -> Self {
+    pub(super) fn new(stream: Stream<OperatorChain>) -> Self {
         Self {
             stream,
             routes: Vec::new(),
@@ -50,11 +50,11 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
         self
     }
 
-    pub fn build(self) -> Vec<Stream<Out, impl Operator<Out = Out>>> {
+    pub fn build(self) -> Vec<Stream<impl Operator<Out = Out>>> {
         self.build_inner()
     }
 
-    pub(crate) fn build_inner(self) -> Vec<Stream<Out, Start<Out, SimpleStartReceiver<Out>>>> {
+    pub(crate) fn build_inner(self) -> Vec<Stream<Start<Out, SimpleStartReceiver<Out>>>> {
         // This is needed to maintain the same parallelism of the split block
         let env_lock = self.stream.env.clone();
         let mut env = env_lock.lock();

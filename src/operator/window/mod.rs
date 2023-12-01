@@ -320,7 +320,7 @@ where
     }
 }
 
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<OperatorChain>
 where
     OperatorChain: Operator<Out = Out> + 'static,
 {

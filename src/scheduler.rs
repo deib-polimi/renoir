@@ -90,10 +90,8 @@ impl Scheduler {
     /// This spawns a worker for each replica of the block in the execution graph and saves its
     /// start handle. The handle will be later used to actually start the worker when the
     /// computation is asked to begin.
-    pub(crate) fn schedule_block<Out: Data, OperatorChain>(
-        &mut self,
-        block: Block<Out, OperatorChain>,
-    ) where
+    pub(crate) fn schedule_block<Out: Data, OperatorChain>(&mut self, block: Block<OperatorChain>)
+    where
         OperatorChain: Operator<Out = Out> + 'static,
     {
         let block_id = block.id;
@@ -331,7 +329,7 @@ impl Scheduler {
     /// Extract the `SchedulerBlockInfo` of a block.
     fn block_info<Out: Data, OperatorChain>(
         &self,
-        block: &Block<Out, OperatorChain>,
+        block: &Block<OperatorChain>,
     ) -> SchedulerBlockInfo
     where
         OperatorChain: Operator<Out = Out>,
@@ -350,7 +348,7 @@ impl Scheduler {
     ///  - the `replication` of the block.
     fn local_block_info<Out: Data, OperatorChain>(
         &self,
-        block: &Block<Out, OperatorChain>,
+        block: &Block<OperatorChain>,
         local: &LocalRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
@@ -383,7 +381,7 @@ impl Scheduler {
     /// replicas starting from the first host giving as much replicas as possible..
     fn remote_block_info<Out: Data, OperatorChain>(
         &self,
-        block: &Block<Out, OperatorChain>,
+        block: &Block<OperatorChain>,
         remote: &RemoteRuntimeConfig,
     ) -> SchedulerBlockInfo
     where

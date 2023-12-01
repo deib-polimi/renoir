@@ -55,7 +55,7 @@ impl<F: FnOnce()> Drop for CatchPanic<F> {
 }
 
 pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out = Out> + 'static>(
-    mut block: Block<Out, OperatorChain>,
+    mut block: Block<OperatorChain>,
     metadata: &mut ExecutionMetadata,
 ) -> (JoinHandle<()>, BlockStructure) {
     let coord = metadata.coord;
@@ -77,7 +77,7 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out = Out> + 'stat
     (join_handle, structure)
 }
 
-fn do_work<Out: Data, Op: Operator<Out = Out> + 'static>(mut block: Block<Out, Op>, coord: Coord) {
+fn do_work<Out: Data, Op: Operator<Out = Out> + 'static>(mut block: Block<Op>, coord: Coord) {
     let mut catch_panic = CatchPanic::new(|| {
         error!("worker {} crashed!", coord);
     });

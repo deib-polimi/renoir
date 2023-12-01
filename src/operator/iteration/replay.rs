@@ -203,7 +203,7 @@ where
     }
 }
 
-impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: Data, OperatorChain> Stream<OperatorChain>
 where
     OperatorChain: Operator<Out = Out> + 'static,
 {
@@ -266,12 +266,12 @@ where
         local_fold: impl Fn(&mut DeltaUpdate, Out) + Send + Clone + 'static,
         global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Clone + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
-    ) -> Stream<State, impl Operator<Out = State>>
+    ) -> Stream<impl Operator<Out = State>>
     where
         Body: FnOnce(
-            Stream<Out, Replay<Out, State, OperatorChain>>,
+            Stream<Replay<Out, State, OperatorChain>>,
             IterationStateHandle<State>,
-        ) -> Stream<Out, OperatorChain2>,
+        ) -> Stream<OperatorChain2>,
         OperatorChain2: Operator<Out = Out> + 'static,
     {
         // this is required because if the iteration block is not present on all the hosts, the ones

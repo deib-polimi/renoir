@@ -27,9 +27,9 @@ pub mod structure;
 /// `OperatorChain` is the type of the chain of operators inside the block. It must be an operator
 /// that yields values of type `Out`.
 #[derive(Debug, Clone)]
-pub(crate) struct Block<Out: Data, OperatorChain>
+pub(crate) struct Block<OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
+    OperatorChain: Operator,
 {
     /// The identifier of the block inside the environment.
     pub(crate) id: BlockId,
@@ -45,15 +45,15 @@ where
     /// The set of requirements that the block imposes on the scheduler.
     pub(crate) scheduler_requirements: SchedulerRequirements,
 
-    pub _out_type: PhantomData<Out>,
+    pub _out_type: PhantomData<OperatorChain::Out>,
 }
 
-impl<Out: Data, OperatorChain> Block<Out, OperatorChain>
+impl<Out: Data, OperatorChain> Block<OperatorChain>
 where
     OperatorChain: Operator<Out = Out>,
 {
     /// Add an operator to the end of the block
-    pub fn add_operator<NewOut: Data, Op, GetOp>(self, get_operator: GetOp) -> Block<NewOut, Op>
+    pub fn add_operator<NewOut: Data, Op, GetOp>(self, get_operator: GetOp) -> Block<Op>
     where
         Op: Operator<Out = NewOut> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
@@ -135,7 +135,7 @@ impl Replication {
     }
 }
 
-impl<Out: Data, OperatorChain> Block<Out, OperatorChain>
+impl<Out: Data, OperatorChain> Block<OperatorChain>
 where
     OperatorChain: Operator<Out = Out>,
 {
@@ -168,9 +168,9 @@ where
     }
 }
 
-impl<Out: Data, OperatorChain> Display for Block<Out, OperatorChain>
+impl<OperatorChain> Display for Block<OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
+    OperatorChain: Operator,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.operators)

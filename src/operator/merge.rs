@@ -11,7 +11,7 @@ pub enum MergeElement<A, B> {
     Right(B),
 }
 
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<OperatorChain>
 where
     OperatorChain: Operator<Out = Out> + 'static,
 {
@@ -39,8 +39,8 @@ where
     /// ```
     pub fn merge<OperatorChain2>(
         self,
-        oth: Stream<Out, OperatorChain2>,
-    ) -> Stream<Out, impl Operator<Out = Out>>
+        oth: Stream<OperatorChain2>,
+    ) -> Stream<impl Operator<Out = Out>>
     where
         OperatorChain2: Operator<Out = Out> + 'static,
     {
@@ -60,8 +60,8 @@ where
     #[cfg(feature = "timestamp")]
     pub(crate) fn merge_distinct<Out2, OperatorChain2>(
         self,
-        right: Stream<Out2, OperatorChain2>,
-    ) -> Stream<MergeElement<Out, Out2>, impl Operator<Out = MergeElement<Out, Out2>>>
+        right: Stream<OperatorChain2>,
+    ) -> Stream<impl Operator<Out = MergeElement<Out, Out2>>>
     where
         Out2: ExchangeData,
         OperatorChain2: Operator<Out = Out2> + 'static,

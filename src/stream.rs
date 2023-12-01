@@ -24,12 +24,12 @@ use crate::scheduler::BlockId;
 /// The type of the chain inside the block is `OperatorChain` and it's required as type argument of
 /// the stream. This type only represents the chain inside the last block of the stream, not all the
 /// blocks inside of it.
-pub struct Stream<Out: Data, OperatorChain>
+pub struct Stream<Op>
 where
-    OperatorChain: Operator<Out = Out>,
+    Op: Operator,
 {
     /// The last block inside the stream.
-    pub(crate) block: Block<Out, OperatorChain>,
+    pub(crate) block: Block<Op>,
     /// A reference to the environment this stream lives in.
     pub(crate) env: Arc<Mutex<StreamEnvironmentInner>>,
 }
@@ -39,7 +39,7 @@ where
 /// [`KeyedStream`] semantics.
 ///
 /// The type of the `Key` must be a valid key inside an hashmap.
-pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(pub Stream<(Key, Out), OperatorChain>)
+pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(pub Stream<OperatorChain>)
 where
     OperatorChain: Operator<Out = (Key, Out)>;
 
@@ -76,7 +76,7 @@ where
     pub(crate) _win_out: PhantomData<O>,
 }
 
-impl<I: Data, Op> Stream<I, Op>
+impl<I: Data, Op> Stream<Op>
 where
     Op: Operator<Out = I> + 'static,
 {
@@ -89,7 +89,7 @@ where
     ///
     /// **Note**: this is an advanced function that manipulates the block structure. Probably it is
     /// not what you are looking for.
-    pub fn add_operator<O: Data, Op2, GetOp>(self, get_operator: GetOp) -> Stream<O, Op2>
+    pub fn add_operator<O: Data, Op2, GetOp>(self, get_operator: GetOp) -> Stream<Op2>
     where
         Op2: Operator<Out = O> + 'static,
         GetOp: FnOnce(Op) -> Op2,
@@ -112,7 +112,7 @@ where
         self,
         get_end_operator: GetEndOp,
         next_strategy: NextStrategy<I, IndexFn>,
-    ) -> Stream<I, impl Operator<Out = I>>
+    ) -> Stream<impl Operator<Out = I>>
     where
         IndexFn: KeyerFn<u64, I>,
         I: ExchangeData,
@@ -157,11 +157,11 @@ where
     /// of the new block.
     pub(crate) fn binary_connection<I2, Op2, O, S, Fs, Fi, Fj>(
         self,
-        oth: Stream<I2, Op2>,
+        oth: Stream<Op2>,
         get_start_operator: Fs,
         next_strategy1: NextStrategy<I, Fi>,
         next_strategy2: NextStrategy<I2, Fj>,
-    ) -> Stream<O, S>
+    ) -> Stream<S>
     where
         I: ExchangeData,
         I2: ExchangeData,
@@ -293,7 +293,7 @@ where
     }
 }
 
-impl<K: DataKey, V: Data, OperatorChain> Stream<(K, V), OperatorChain>
+impl<K: DataKey, V: Data, OperatorChain> Stream<OperatorChain>
 where
     OperatorChain: Operator<Out = (K, V)>,
 {

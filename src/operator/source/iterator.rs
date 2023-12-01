@@ -110,7 +110,7 @@ impl crate::StreamEnvironment {
     pub fn stream_iter<Out: Data, It: Iterator<Item = Out> + Send + 'static>(
         &mut self,
         iterator: It,
-    ) -> Stream<Out, IteratorSource<Out, It>> {
+    ) -> Stream<IteratorSource<Out, It>> {
         let source = IteratorSource::new(iterator);
         self.stream(source)
     }

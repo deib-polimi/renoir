@@ -304,7 +304,7 @@ impl<Out: ExchangeData, State: ExchangeData + Sync> Display for Iterate<Out, Sta
     }
 }
 
-impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
+impl<Out: ExchangeData, OperatorChain> Stream<OperatorChain>
 where
     OperatorChain: Operator<Out = Out> + 'static,
 {
@@ -373,14 +373,14 @@ where
         global_fold: impl Fn(&mut State, StateUpdate) + Send + Clone + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
     ) -> (
-        Stream<State, impl Operator<Out = State>>,
-        Stream<Out, impl Operator<Out = Out>>,
+        Stream<impl Operator<Out = State>>,
+        Stream<impl Operator<Out = Out>>,
     )
     where
         Body: FnOnce(
-            Stream<Out, Iterate<Out, State>>,
+            Stream<Iterate<Out, State>>,
             IterationStateHandle<State>,
-        ) -> Stream<Out, OperatorChain2>,
+        ) -> Stream<OperatorChain2>,
         OperatorChain2: Operator<Out = Out> + 'static,
     {
         // this is required because if the iteration block is not present on all the hosts, the ones
