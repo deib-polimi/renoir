@@ -21,7 +21,7 @@ use crate::operator::ExchangeData;
 /// arrival they are routed to the correct receiver according to the `ReceiverEndpoint` the message
 /// is tagged with.
 #[derive(Debug)]
-pub(crate) struct DemuxHandle<In: ExchangeData> {
+pub(crate) struct DemuxHandle<In: Send + 'static> {
     coord: DemuxCoord,
     /// Tell the dem&ultiplexer that a new receiver is present,
     tx_senders: UnboundedSender<(ReceiverEndpoint, Sender<NetworkMessage<In>>)>,

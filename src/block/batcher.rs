@@ -45,7 +45,7 @@ impl BatchMode {
 /// A `Batcher` wraps a sender and sends the messages in batches to reduce the network overhead.
 ///
 /// Internally it spawns a new task to handle the timeouts and join it at the end.
-pub(crate) struct Batcher<Out: ExchangeData> {
+pub(crate) struct Batcher<Out: Send + 'static> {
     /// Sender used to communicate with the other replicas
     remote_sender: NetworkSender<Out>,
     /// Batching mode used by the batcher

@@ -348,13 +348,7 @@ where
     /// This is an inner join, very similarly to `SELECT a, b FROM a JOIN b ON keyer1(a) = keyer2(b)`.
     ///
     /// **Note**: this operator will split the current block.
-    pub fn inner(
-        self,
-    ) -> KeyedStream<
-        Key,
-        InnerJoinTuple<Out1, Out2>,
-        impl Operator<Out = (Key, InnerJoinTuple<Out1, Out2>)>,
-    > {
+    pub fn inner(self) -> KeyedStream<impl Operator<Out = (Key, InnerJoinTuple<Out1, Out2>)>> {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         let inner = self
@@ -376,13 +370,7 @@ where
     /// This is very similar to `SELECT a, b FROM a LEFT JOIN b ON keyer1(a) = keyer2(b)`.    
     ///
     /// **Note**: this operator will split the current block.
-    pub fn left(
-        self,
-    ) -> KeyedStream<
-        Key,
-        LeftJoinTuple<Out1, Out2>,
-        impl Operator<Out = (Key, LeftJoinTuple<Out1, Out2>)>,
-    > {
+    pub fn left(self) -> KeyedStream<impl Operator<Out = (Key, LeftJoinTuple<Out1, Out2>)>> {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         let inner = self
@@ -405,13 +393,7 @@ where
     /// This is very similar to `SELECT a, b FROM a FULL OUTER JOIN b ON keyer1(a) = keyer2(b)`.
     ///
     /// **Note**: this operator will split the current block.
-    pub fn outer(
-        self,
-    ) -> KeyedStream<
-        Key,
-        OuterJoinTuple<Out1, Out2>,
-        impl Operator<Out = (Key, OuterJoinTuple<Out1, Out2>)>,
-    > {
+    pub fn outer(self) -> KeyedStream<impl Operator<Out = (Key, OuterJoinTuple<Out1, Out2>)>> {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         let inner = self

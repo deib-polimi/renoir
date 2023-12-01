@@ -21,28 +21,67 @@ impl BlockSenders {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Clone, Debug)]
-pub struct End<Out: ExchangeData, OperatorChain, IndexFn>
+pub struct End<OperatorChain, IndexFn>
 where
-    IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out = Out>,
+    IndexFn: KeyerFn<u64, OperatorChain::Out>,
+    OperatorChain: Operator,
+    OperatorChain::Out: Send + 'static,
 {
     prev: OperatorChain,
     coord: Option<Coord>,
-    next_strategy: NextStrategy<Out, IndexFn>,
+    next_strategy: NextStrategy<OperatorChain::Out, IndexFn>,
     batch_mode: BatchMode,
     block_senders: Vec<BlockSenders>,
-    #[derivative(Debug = "ignore", Clone(clone_with = "clone_default"))]
-    senders: Vec<(ReceiverEndpoint, Batcher<Out>)>,
+    senders: Vec<(ReceiverEndpoint, Batcher<OperatorChain::Out>)>,
     feedback_id: Option<BlockId>,
     ignore_block_ids: Vec<BlockId>,
 }
 
-impl<Out: ExchangeData, OperatorChain, IndexFn> Display for End<Out, OperatorChain, IndexFn>
+impl<OperatorChain: std::fmt::Debug, IndexFn: std::fmt::Debug> std::fmt::Debug
+    for End<OperatorChain, IndexFn>
 where
-    IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out = Out>,
+    IndexFn: KeyerFn<u64, OperatorChain::Out>,
+    OperatorChain: Operator,
+    OperatorChain::Out: Send + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("End")
+            .field("prev", &self.prev)
+            .field("coord", &self.coord)
+            .field("next_strategy", &self.next_strategy)
+            .field("batch_mode", &self.batch_mode)
+            .field("block_senders", &self.block_senders)
+            .field("feedback_id", &self.feedback_id)
+            .field("ignore_block_ids", &self.ignore_block_ids)
+            .finish()
+    }
+}
+
+impl<OperatorChain: Clone, IndexFn: Clone> Clone for End<OperatorChain, IndexFn>
+where
+    IndexFn: KeyerFn<u64, OperatorChain::Out>,
+    OperatorChain: Operator,
+    OperatorChain::Out: Send + 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            prev: self.prev.clone(),
+            coord: self.coord.clone(),
+            next_strategy: self.next_strategy.clone(),
+            batch_mode: self.batch_mode.clone(),
+            block_senders: self.block_senders.clone(),
+            senders: Default::default(),
+            feedback_id: self.feedback_id.clone(),
+            ignore_block_ids: self.ignore_block_ids.clone(),
+        }
+    }
+}
+
+impl<OperatorChain, IndexFn> Display for End<OperatorChain, IndexFn>
+where
+    IndexFn: KeyerFn<u64, OperatorChain::Out>,
+    OperatorChain: Operator,
+    OperatorChain::Out: Send + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.next_strategy {
@@ -53,14 +92,15 @@ where
     }
 }
 
-impl<Out: ExchangeData, OperatorChain, IndexFn> End<Out, OperatorChain, IndexFn>
+impl<OperatorChain, IndexFn> End<OperatorChain, IndexFn>
 where
-    IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out = Out>,
+    IndexFn: KeyerFn<u64, OperatorChain::Out>,
+    OperatorChain: Operator,
+    OperatorChain::Out: Send + 'static,
 {
     pub(crate) fn new(
         prev: OperatorChain,
-        next_strategy: NextStrategy<Out, IndexFn>,
+        next_strategy: NextStrategy<OperatorChain::Out, IndexFn>,
         batch_mode: BatchMode,
     ) -> Self {
         Self {
@@ -117,10 +157,11 @@ where
     }
 }
 
-impl<Out: ExchangeData, OperatorChain, IndexFn> Operator for End<Out, OperatorChain, IndexFn>
+impl<OperatorChain, IndexFn> Operator for End<OperatorChain, IndexFn>
 where
-    IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out = Out>,
+    IndexFn: KeyerFn<u64, OperatorChain::Out>,
+    OperatorChain: Operator,
+    OperatorChain::Out: ExchangeData,
 {
     type Out = ();
 
@@ -201,22 +242,18 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("End");
+        let mut operator = OperatorStructure::new::<OperatorChain::Out, _>("End");
         for sender_group in &self.block_senders {
             if !sender_group.indexes.is_empty() {
                 let block_id = self.senders[sender_group.indexes[0]].0.coord.block_id;
                 operator
                     .connections
-                    .push(Connection::new::<Out, _>(block_id, &self.next_strategy));
+                    .push(Connection::new::<OperatorChain::Out, _>(
+                        block_id,
+                        &self.next_strategy,
+                    ));
             }
         }
         self.prev.structure().add_operator(operator)
     }
-}
-
-fn clone_default<T>(_: &T) -> T
-where
-    T: Default,
-{
-    T::default()
 }

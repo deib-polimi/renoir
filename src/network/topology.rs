@@ -61,8 +61,6 @@ struct SenderMetadata {
 
 /// This struct keeps track of the network topology, all the registered replicas and their
 /// connections.
-#[derive(Derivative)]
-#[derivative(Debug)]
 pub(crate) struct NetworkTopology {
     /// Configuration of the environment.
     config: EnvironmentConfig,
@@ -80,25 +78,21 @@ pub(crate) struct NetworkTopology {
     /// actually start or exit.
     ///
     /// This map is indexed using `ReceiverKey`.
-    #[derivative(Debug = "ignore")]
     receivers: Option<TypeMap>,
     /// All the registered local senders.
     ///
     /// It works exactly like `self.receivers`.
     ///
     /// This map is indexed using `SenderKey`.
-    #[derivative(Debug = "ignore")]
     senders: Option<TypeMap>,
 
     /// All the registered demultiplexers.
     ///
     /// This map is indexed using `DemultiplexingReceiverKey`.
-    #[derivative(Debug = "ignore")]
     demultiplexers: Option<TypeMap>,
     /// All the registered multiplexers.
     ///
     /// This map is indexed using `MultiplexingSenderKey`.
-    #[derivative(Debug = "ignore")]
     multiplexers: Option<TypeMap>,
 
     /// The adjacency list of the execution graph.
@@ -130,6 +124,18 @@ pub(crate) struct NetworkTopology {
 
     #[cfg(feature = "async-tokio")]
     async_join_handles: Vec<tokio::task::JoinHandle<()>>,
+}
+
+impl std::fmt::Debug for NetworkTopology {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NetworkTopology")
+            .field("config", &self.config)
+            .field("next", &self.next)
+            .field("senders_metadata", &self.senders_metadata)
+            .field("block_replicas", &self.block_replicas)
+            .field("demultiplexer_addresses", &self.demultiplexer_addresses)
+            .finish()
+    }
 }
 
 impl NetworkTopology {

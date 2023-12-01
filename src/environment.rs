@@ -209,7 +209,7 @@ impl StreamEnvironmentInner {
         id
     }
 
-    pub(crate) fn connect_blocks<Out: Data>(&mut self, from: BlockId, to: BlockId) {
+    pub(crate) fn connect_blocks<Out: 'static>(&mut self, from: BlockId, to: BlockId) {
         let scheduler = self.scheduler_mut();
         scheduler.connect_blocks(from, to, TypeId::of::<Out>());
     }

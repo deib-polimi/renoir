@@ -127,7 +127,7 @@ where
         self,
         init: NewOut,
         fold: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<Out = (Key, NewOut)>>
+    ) -> KeyedStream<impl Operator<Out = (Key, NewOut)>>
     where
         F: FnMut(&mut NewOut, Out) + Clone + Send + 'static,
     {
@@ -139,7 +139,7 @@ where
     ///
     /// TODO DOCS
     ///
-    pub fn fold_first<F>(self, fold: F) -> KeyedStream<Key, Out, impl Operator<Out = (Key, Out)>>
+    pub fn fold_first<F>(self, fold: F) -> KeyedStream<impl Operator<Out = (Key, Out)>>
     where
         F: FnMut(&mut Out, Out) + Clone + Send + 'static,
     {

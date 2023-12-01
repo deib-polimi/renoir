@@ -117,11 +117,7 @@ where
         rhs: Stream<OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
-    ) -> KeyedStream<
-        Key,
-        InnerJoinTuple<Out, Out2>,
-        impl Operator<Out = (Key, InnerJoinTuple<Out, Out2>)>,
-    >
+    ) -> KeyedStream<impl Operator<Out = (Key, InnerJoinTuple<Out, Out2>)>>
     where
         Key: DataKey,
         OperatorChain2: Operator<Out = Out2> + 'static,
@@ -169,11 +165,7 @@ where
         rhs: Stream<OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
-    ) -> KeyedStream<
-        Key,
-        LeftJoinTuple<Out, Out2>,
-        impl Operator<Out = (Key, LeftJoinTuple<Out, Out2>)>,
-    >
+    ) -> KeyedStream<impl Operator<Out = (Key, LeftJoinTuple<Out, Out2>)>>
     where
         Key: DataKey,
         OperatorChain2: Operator<Out = Out2> + 'static,
@@ -222,11 +214,7 @@ where
         rhs: Stream<OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
-    ) -> KeyedStream<
-        Key,
-        OuterJoinTuple<Out, Out2>,
-        impl Operator<Out = (Key, OuterJoinTuple<Out, Out2>)>,
-    >
+    ) -> KeyedStream<impl Operator<Out = (Key, OuterJoinTuple<Out, Out2>)>>
     where
         Key: DataKey,
         OperatorChain2: Operator<Out = Out2> + 'static,

@@ -383,14 +383,14 @@ impl<K: DataKey + ExchangeData + Debug, V1: ExchangeData + Debug, V2: ExchangeDa
     }
 }
 
-impl<K: DataKey + ExchangeData + Debug, V1: Data + ExchangeData + Debug, O1> KeyedStream<K, V1, O1>
+impl<K: DataKey + ExchangeData + Debug, V1: Data + ExchangeData + Debug, O1> KeyedStream<O1>
 where
     O1: Operator<Out = (K, V1)> + 'static,
 {
     pub fn join_outer<V2: Data + ExchangeData + Debug, O2>(
         self,
-        rhs: KeyedStream<K, V2, O2>,
-    ) -> KeyedStream<K, (Option<V1>, Option<V2>), impl Operator<Out = (K, (Option<V1>, Option<V2>))>>
+        rhs: KeyedStream<O2>,
+    ) -> KeyedStream<impl Operator<Out = (K, (Option<V1>, Option<V2>))>>
     where
         O2: Operator<Out = (K, V2)> + 'static,
     {
@@ -407,8 +407,8 @@ where
 
     pub fn join<V2: Data + ExchangeData + Debug, O2>(
         self,
-        rhs: KeyedStream<K, V2, O2>,
-    ) -> KeyedStream<K, (V1, V2), impl Operator<Out = (K, (V1, V2))>>
+        rhs: KeyedStream<O2>,
+    ) -> KeyedStream<impl Operator<Out = (K, (V1, V2))>>
     where
         O2: Operator<Out = (K, V2)> + 'static,
     {

@@ -21,6 +21,7 @@ pub use rich_map_custom::ElementGenerator;
 
 use crate::block::{group_by_hash, BlockStructure, NextStrategy, Replication};
 use crate::scheduler::ExecutionMetadata;
+
 use crate::{BatchMode, KeyedStream, Stream};
 
 #[cfg(feature = "async-tokio")]
@@ -820,7 +821,7 @@ where
         init: O,
         local: F,
         global: G,
-    ) -> KeyedStream<K, O, impl Operator<Out = (K, O)>>
+    ) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         Fk: Fn(&I) -> K + Send + Clone + 'static,
         F: Fn(&mut O, I) + Send + Clone + 'static,
@@ -867,7 +868,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0), (0, 2), (0, 4), (1, 1), (1, 3)]);
     /// ```
-    pub fn key_by<K, Fk>(self, keyer: Fk) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    pub fn key_by<K, Fk>(self, keyer: Fk) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         Fk: Fn(&I) -> K + Send + Clone + 'static,
         K: DataKey,
@@ -1067,7 +1068,7 @@ where
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let keyed = s.group_by(|&n| n % 2); // partition even and odd elements
     /// ```
-    pub fn group_by<K, Fk>(self, keyer: Fk) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    pub fn group_by<K, Fk>(self, keyer: Fk) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         Fk: Fn(&I) -> K + Send + Clone + 'static,
         K: DataKey,
@@ -1112,7 +1113,7 @@ where
         self,
         keyer: Fk,
         get_value: Fv,
-    ) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    ) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         Fk: KeyerFn<K, I> + Fn(&I) -> K,
         Fv: KeyerFn<V, I> + Fn(&I) -> V,
@@ -1161,7 +1162,7 @@ where
         self,
         keyer: Fk,
         get_value: Fv,
-    ) -> KeyedStream<K, V, impl Operator<Out = (K, V)>>
+    ) -> KeyedStream<impl Operator<Out = (K, V)>>
     where
         Fk: KeyerFn<K, I> + Fn(&I) -> K,
         Fv: Fn(I) -> V + Clone + Send + 'static,
@@ -1225,7 +1226,7 @@ where
         self,
         keyer: Fk,
         get_value: Fv,
-    ) -> KeyedStream<K, V, impl Operator<Out = (K, V)>>
+    ) -> KeyedStream<impl Operator<Out = (K, V)>>
     where
         Fk: KeyerFn<K, I> + Fn(&I) -> K,
         Fv: KeyerFn<V, I> + Fn(&I) -> V,
@@ -1284,10 +1285,7 @@ where
     /// res.sort_by_key(|(k, _)| *k);
     /// assert_eq!(res, vec![(0, 3), (1, 2)]);
     /// ```
-    pub fn group_by_count<K, Fk>(
-        self,
-        keyer: Fk,
-    ) -> KeyedStream<K, usize, impl Operator<Out = (K, usize)>>
+    pub fn group_by_count<K, Fk>(self, keyer: Fk) -> KeyedStream<impl Operator<Out = (K, usize)>>
     where
         Fk: KeyerFn<K, I> + Fn(&I) -> K,
         K: ExchangeDataKey,
@@ -1333,7 +1331,7 @@ where
         self,
         keyer: Fk,
         get_value: Fv,
-    ) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    ) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         Fk: KeyerFn<K, I> + Fn(&I) -> K,
         Fv: KeyerFn<V, I> + Fn(&I) -> V,
@@ -1390,7 +1388,7 @@ where
         self,
         keyer: Fk,
         f: F,
-    ) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    ) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         Fk: Fn(&I) -> K + Send + Clone + 'static,
         F: Fn(&mut I, I) + Send + Clone + 'static,
@@ -1955,11 +1953,11 @@ where
     }
 }
 
-impl<K, I, Op> KeyedStream<K, I, Op>
+impl<Op, K, I> KeyedStream<Op>
 where
-    Op: Operator<Out = (K, I)> + 'static,
     K: DataKey,
     I: Data,
+    Op: Operator<Out = (K, I)> + 'static,
 {
     /// Given a keyed stream without timestamps nor watermarks, tag each item with a timestamp and insert
     /// watermarks.
@@ -1996,16 +1994,16 @@ where
         self,
         timestamp_gen: F,
         watermark_gen: G,
-    ) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    ) -> KeyedStream<impl Operator<Out = Op::Out>>
     where
-        F: FnMut(&(K, I)) -> Timestamp + Clone + Send + 'static,
-        G: FnMut(&(K, I), &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+        F: FnMut(&Op::Out) -> Timestamp + Clone + Send + 'static,
+        G: FnMut(&Op::Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
     {
         self.add_operator(|prev| AddTimestamp::new(prev, timestamp_gen, watermark_gen))
     }
 
     #[cfg(feature = "timestamp")]
-    pub fn drop_timestamps(self) -> KeyedStream<K, I, impl Operator<Out = (K, I)>> {
+    pub fn drop_timestamps(self) -> KeyedStream<impl Operator<Out = Op::Out>> {
         self.add_operator(|prev| DropTimestamp::new(prev))
     }
 
@@ -2050,7 +2048,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0), (0, 24), (1, 12), (1, 36)]);
     /// ```
-    pub fn filter_map<O, F>(self, f: F) -> KeyedStream<K, O, impl Operator<Out = (K, O)>>
+    pub fn filter_map<O, F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         F: Fn((&K, I)) -> Option<O> + Send + Clone + 'static,
         O: Data,
@@ -2079,7 +2077,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0), (0, 6), (1, 3), (1, 9)]);
     /// ```
-    pub fn filter<F>(self, predicate: F) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    pub fn filter<F>(self, predicate: F) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         F: Fn(&(K, I)) -> bool + Clone + Send + 'static,
     {
@@ -2106,7 +2104,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0), (0, 0), (0, 2), (0, 2), (1, 1), (1, 1)]);
     /// ```
-    pub fn flat_map<O, It, F>(self, f: F) -> KeyedStream<K, O, impl Operator<Out = (K, O)>>
+    pub fn flat_map<O, It, F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         It: IntoIterator<Item = O>,
         <It as IntoIterator>::IntoIter: Send + 'static,
@@ -2130,7 +2128,7 @@ where
     ///
     /// env.execute_blocking();
     /// ```
-    pub fn inspect<F>(self, f: F) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    pub fn inspect<F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         F: FnMut(&(K, I)) + Send + Clone + 'static,
     {
@@ -2174,7 +2172,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0 + 2 + 4), (1, 1 + 3)]);
     /// ```
-    pub fn fold<O, F>(self, init: O, f: F) -> KeyedStream<K, O, impl Operator<Out = (K, O)>>
+    pub fn fold<O, F>(self, init: O, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         F: Fn(&mut O, I) + Send + Clone + 'static,
         O: Data,
@@ -2219,7 +2217,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0 + 2 + 4), (1, 1 + 3)]);
     /// ```
-    pub fn reduce<F>(self, f: F) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    pub fn reduce<F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         F: Fn(&mut I, I) + Send + Clone + 'static,
     {
@@ -2249,7 +2247,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0), (0, 20), (0, 40), (1, 10), (1, 30)]);
     /// ```
-    pub fn map<O, F>(self, f: F) -> KeyedStream<K, O, impl Operator<Out = (K, O)>>
+    pub fn map<O, F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         F: Fn((&K, I)) -> O + Send + Clone + 'static,
         O: Data,
@@ -2264,7 +2262,7 @@ where
 
     /// # TODO
     /// Reorder timestamped items
-    pub fn reorder(self) -> KeyedStream<K, I, impl Operator<Out = (K, I)>> {
+    pub fn reorder(self) -> KeyedStream<impl Operator<Out = (K, I)>> {
         self.add_operator(|prev| Reorder::new(prev))
     }
 
@@ -2272,7 +2270,7 @@ where
     ///
     /// This is exactly like [`Stream::rich_map`], but the function is cloned for each key. This
     /// means that each key will have a unique mapping function (and therefore a unique state).
-    pub fn rich_map<O, F>(self, f: F) -> KeyedStream<K, O, impl Operator<Out = (K, O)>>
+    pub fn rich_map<O, F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         F: FnMut((&K, I)) -> O + Clone + Send + 'static,
         O: Data,
@@ -2285,7 +2283,7 @@ where
     ///
     /// This is exactly like [`Stream::rich_flat_map`], but the function is cloned for each key.
     /// This means that each key will have a unique mapping function (and therefore a unique state).
-    pub fn rich_flat_map<O, It, F>(self, f: F) -> KeyedStream<K, O, impl Operator<Out = (K, O)>>
+    pub fn rich_flat_map<O, It, F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         It: IntoIterator<Item = O>,
         <It as IntoIterator>::IntoIter: Clone + Send + 'static,
@@ -2301,7 +2299,7 @@ where
     ///
     /// This is exactly like [`Stream::rich_filter_map`], but the function is cloned for each key.
     /// This means that each key will have a unique mapping function (and therefore a unique state).
-    pub fn rich_filter_map<O, F>(self, f: F) -> KeyedStream<K, O, impl Operator<Out = (K, O)>>
+    pub fn rich_filter_map<O, F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         F: FnMut((&K, I)) -> Option<O> + Send + Clone + 'static,
         O: Data,
@@ -2389,7 +2387,7 @@ where
     }
 }
 
-impl<K, I, Op> KeyedStream<K, I, Op>
+impl<K, I, Op> KeyedStream<Op>
 where
     Op: Operator<Out = (K, I)> + 'static,
     K: ExchangeDataKey,
@@ -2409,10 +2407,10 @@ where
     #[cfg(feature = "timestamp")]
     pub fn interval_join<I2, Op2>(
         self,
-        right: KeyedStream<K, I2, Op2>,
+        right: KeyedStream<Op2>,
         lower_bound: Timestamp,
         upper_bound: Timestamp,
-    ) -> KeyedStream<K, (I, I2), impl Operator<Out = (K, (I, I2))>>
+    ) -> KeyedStream<impl Operator<Out = (K, (I, I2))>>
     where
         I2: ExchangeData,
         Op2: Operator<Out = (K, I2)> + 'static,
@@ -2444,10 +2442,7 @@ where
     /// res.sort_unstable(); // the output order is nondeterministic
     /// assert_eq!(res, vec![(0, 0), (0, 2), (0, 4), (1, 1), (1, 3)]);
     /// ```
-    pub fn merge<Op2>(
-        self,
-        oth: KeyedStream<K, I, Op2>,
-    ) -> KeyedStream<K, I, impl Operator<Out = (K, I)>>
+    pub fn merge<Op2>(self, oth: KeyedStream<Op2>) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
         Op2: Operator<Out = (K, I)> + 'static,
     {
@@ -2456,8 +2451,8 @@ where
 
     pub(crate) fn merge_distinct<I2, Op2>(
         self,
-        right: KeyedStream<K, I2, Op2>,
-    ) -> KeyedStream<K, MergeElement<I, I2>, impl Operator<Out = (K, MergeElement<I, I2>)>>
+        right: KeyedStream<Op2>,
+    ) -> KeyedStream<impl Operator<Out = (K, MergeElement<I, I2>)>>
     where
         I2: ExchangeData,
         Op2: Operator<Out = (K, I2)> + 'static,
@@ -2486,7 +2481,7 @@ where
     /// let res = s.shuffle();
     /// ```
 
-    pub fn shuffle(self) -> Stream<impl Operator<Out = (K, I)>> {
+    pub fn shuffle(self) -> Stream<impl Operator<Out = Op::Out>> {
         self.0.split_block(End::new, NextStrategy::random())
     }
 
@@ -2606,7 +2601,7 @@ where
     }
 }
 
-impl<K, I, O, It, Op> KeyedStream<K, I, Op>
+impl<K, I, O, It, Op> KeyedStream<Op>
 where
     K: DataKey,
     Op: Operator<Out = (K, I)> + 'static,
@@ -2640,7 +2635,7 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, vec![(0, 0), (0, 1), (0, 2), (0, 6), (0, 7), (1, 3), (1, 4), (1, 5)]);
     /// ```
-    pub fn flatten(self) -> KeyedStream<K, O, impl Operator<Out = (K, O)>> {
+    pub fn flatten(self) -> KeyedStream<impl Operator<Out = (K, O)>> {
         self.add_operator(|prev| KeyedFlatten::new(prev))
     }
 }

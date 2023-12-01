@@ -310,9 +310,9 @@ impl<OutL: ExchangeData, OutR: ExchangeData> BinaryStartReceiver<OutL, OutR> {
     }
 }
 
-impl<OutL: ExchangeData, OutR: ExchangeData> StartReceiver<BinaryElement<OutL, OutR>>
-    for BinaryStartReceiver<OutL, OutR>
-{
+impl<OutL: ExchangeData, OutR: ExchangeData> StartReceiver for BinaryStartReceiver<OutL, OutR> {
+    type Out = BinaryElement<OutL, OutR>;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.left.setup(metadata);
         self.right.setup(metadata);

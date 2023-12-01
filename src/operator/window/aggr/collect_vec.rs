@@ -44,7 +44,7 @@ where
     pub fn map<NewOut: Data, F: Fn(Vec<Out>) -> NewOut + Send + Clone + 'static>(
         self,
         f: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<Out = (Key, NewOut)>> {
+    ) -> KeyedStream<impl Operator<Out = (Key, NewOut)>> {
         let acc = CollectVec::<Out, NewOut, _> {
             vec: Default::default(),
             f,

@@ -10,7 +10,7 @@ pub(crate) use next_strategy::*;
 pub(crate) use structure::*;
 
 use crate::operator::iteration::IterationStateLock;
-use crate::operator::{Data, Operator};
+use crate::operator::Operator;
 use crate::scheduler::BlockId;
 use crate::CoordUInt;
 
@@ -26,7 +26,7 @@ pub mod structure;
 ///
 /// `OperatorChain` is the type of the chain of operators inside the block. It must be an operator
 /// that yields values of type `Out`.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Block<OperatorChain>
 where
     OperatorChain: Operator,
@@ -48,15 +48,32 @@ where
     pub _out_type: PhantomData<OperatorChain::Out>,
 }
 
-impl<Out: Data, OperatorChain> Block<OperatorChain>
+impl<OperatorChain> Clone for Block<OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
+    OperatorChain: Operator,
+{
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            operators: self.operators.clone(),
+            batch_mode: self.batch_mode.clone(),
+            iteration_ctx: self.iteration_ctx.clone(),
+            is_only_one_strategy: self.is_only_one_strategy.clone(),
+            scheduler_requirements: self.scheduler_requirements.clone(),
+            _out_type: self._out_type.clone(),
+        }
+    }
+}
+
+impl<OperatorChain> Block<OperatorChain>
+where
+    OperatorChain: Operator,
 {
     /// Add an operator to the end of the block
-    pub fn add_operator<NewOut: Data, Op, GetOp>(self, get_operator: GetOp) -> Block<Op>
+    pub fn add_operator<Op2, GetOp>(self, get_operator: GetOp) -> Block<Op2>
     where
-        Op: Operator<Out = NewOut> + 'static,
-        GetOp: FnOnce(OperatorChain) -> Op,
+        Op2: Operator,
+        GetOp: FnOnce(OperatorChain) -> Op2,
     {
         Block {
             id: self.id,
@@ -135,9 +152,9 @@ impl Replication {
     }
 }
 
-impl<Out: Data, OperatorChain> Block<OperatorChain>
+impl<OperatorChain> Block<OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
+    OperatorChain: Operator,
 {
     pub fn new(
         id: BlockId,

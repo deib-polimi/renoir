@@ -34,14 +34,37 @@ where
     pub(crate) env: Arc<Mutex<StreamEnvironmentInner>>,
 }
 
+pub trait KeyedItem {
+    type Key;
+    type Value;
+    fn key(&self) -> &Self::Key;
+    fn value(&self) -> &Self::Value;
+    fn into_kv(self) -> (Self::Key, Self::Value);
+}
+
+impl<K: DataKey, V> KeyedItem for (K, V) {
+    type Key = K;
+    type Value = V;
+    fn key(&self) -> &Self::Key {
+        &self.0
+    }
+    fn value(&self) -> &Self::Value {
+        &self.1
+    }
+    fn into_kv(self) -> (Self::Key, Self::Value) {
+        self
+    }
+}
+
 /// A [`KeyedStream`] is like a set of [`Stream`]s, each of which partitioned by some `Key`. Internally
 /// it's just a stream whose elements are `(K, V)` pairs and the operators behave following the
 /// [`KeyedStream`] semantics.
 ///
 /// The type of the `Key` must be a valid key inside an hashmap.
-pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(pub Stream<OperatorChain>)
+pub struct KeyedStream<OperatorChain>(pub Stream<OperatorChain>)
 where
-    OperatorChain: Operator<Out = (Key, Out)>;
+    OperatorChain: Operator,
+    OperatorChain::Out: KeyedItem;
 
 /// A [`WindowedStream`] is a data stream partitioned by `Key`, where elements of each partition
 /// are divided in groups called windows.
@@ -71,14 +94,14 @@ where
     Op: Operator<Out = (K, I)>,
     WinDescr: WindowDescription<I>,
 {
-    pub(crate) inner: KeyedStream<K, I, Op>,
+    pub(crate) inner: KeyedStream<Op>,
     pub(crate) descr: WinDescr,
     pub(crate) _win_out: PhantomData<O>,
 }
 
-impl<I: Data, Op> Stream<Op>
+impl<Op> Stream<Op>
 where
-    Op: Operator<Out = I> + 'static,
+    Op: Operator,
 {
     /// Add a new operator to the current chain inside the stream. This consumes the stream and
     /// returns a new one with the operator added.
@@ -89,9 +112,9 @@ where
     ///
     /// **Note**: this is an advanced function that manipulates the block structure. Probably it is
     /// not what you are looking for.
-    pub fn add_operator<O: Data, Op2, GetOp>(self, get_operator: GetOp) -> Stream<Op2>
+    pub fn add_operator<Op2, GetOp>(self, get_operator: GetOp) -> Stream<Op2>
     where
-        Op2: Operator<Out = O> + 'static,
+        Op2: Operator,
         GetOp: FnOnce(Op) -> Op2,
     {
         Stream {
@@ -108,16 +131,16 @@ where
     /// be an `Operator<()>`.
     ///
     /// The new block is initialized with a `Start`.
-    pub(crate) fn split_block<GetEndOp, Op2, IndexFn>(
+    pub(crate) fn split_block<GetEndOp, OpEnd, IndexFn>(
         self,
         get_end_operator: GetEndOp,
-        next_strategy: NextStrategy<I, IndexFn>,
-    ) -> Stream<impl Operator<Out = I>>
+        next_strategy: NextStrategy<Op::Out, IndexFn>,
+    ) -> Stream<impl Operator<Out = Op::Out>>
     where
-        IndexFn: KeyerFn<u64, I>,
-        I: ExchangeData,
-        Op2: Operator<Out = ()> + 'static,
-        GetEndOp: FnOnce(Op, NextStrategy<I, IndexFn>, BatchMode) -> Op2,
+        IndexFn: KeyerFn<u64, Op::Out>,
+        Op::Out: ExchangeData,
+        OpEnd: Operator<Out = ()> + 'static,
+        GetEndOp: FnOnce(Op, NextStrategy<Op::Out, IndexFn>, BatchMode) -> OpEnd,
     {
         let Stream { block, env } = self;
         // Clone parameters for new block
@@ -135,7 +158,7 @@ where
         let source = Start::single(prev_id, iteration_ctx.last().cloned());
         let new_block = env_lock.new_block(source, batch_mode, iteration_ctx);
         // Connect blocks
-        env_lock.connect_blocks::<I>(prev_id, new_block.id);
+        env_lock.connect_blocks::<Op::Out>(prev_id, new_block.id);
 
         drop(env_lock);
         Stream {
@@ -155,19 +178,20 @@ where
     /// The start operator of the new block must support multiple inputs: the provided function
     /// will be called with the ids of the 2 input blocks and should return the new start operator
     /// of the new block.
-    pub(crate) fn binary_connection<I2, Op2, O, S, Fs, Fi, Fj>(
+    pub(crate) fn binary_connection<Op2, O, S, Fs, F1, F2>(
         self,
         oth: Stream<Op2>,
         get_start_operator: Fs,
-        next_strategy1: NextStrategy<I, Fi>,
-        next_strategy2: NextStrategy<I2, Fj>,
+        next_strategy1: NextStrategy<Op::Out, F1>,
+        next_strategy2: NextStrategy<Op2::Out, F2>,
     ) -> Stream<S>
     where
-        I: ExchangeData,
-        I2: ExchangeData,
-        Fi: KeyerFn<u64, I>,
-        Fj: KeyerFn<u64, I2>,
-        Op2: Operator<Out = I2> + 'static,
+        Op: 'static,
+        Op2: Operator + 'static,
+        Op::Out: ExchangeData,
+        Op2::Out: ExchangeData,
+        F1: KeyerFn<u64, Op::Out>,
+        F2: KeyerFn<u64, Op2::Out>,
         O: Data,
         S: Operator<Out = O> + Source<O>,
         Fs: FnOnce(BlockId, BlockId, bool, bool, Option<Arc<IterationStateLock>>) -> S,
@@ -230,8 +254,8 @@ where
         let mut new_block = env_lock.new_block(source, batch_mode, iteration_ctx);
         let id_new = new_block.id;
 
-        env_lock.connect_blocks::<I>(id_1, id_new);
-        env_lock.connect_blocks::<I2>(id_2, id_new);
+        env_lock.connect_blocks::<Op::Out>(id_1, id_new);
+        env_lock.connect_blocks::<Op2::Out>(id_2, id_new);
 
         drop(env_lock);
 
@@ -268,23 +292,26 @@ where
             env: self.env.clone(),
         }
     }
-
     /// Like `add_block` but without creating a new block. Therefore this closes the current stream
     /// and just add the last block to the scheduler.
-    pub(crate) fn finalize_block(self) {
+    pub(crate) fn finalize_block(self)
+    where
+        Op: 'static,
+        Op::Out: Send,
+    {
         let mut env = self.env.lock();
         env.scheduler_mut().schedule_block(self.block);
     }
 }
 
-impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<OperatorChain>
 where
     OperatorChain: Operator<Out = (Key, Out)> + 'static,
 {
     pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
         self,
         get_operator: GetOp,
-    ) -> KeyedStream<Key, NewOut, Op>
+    ) -> KeyedStream<Op>
     where
         Op: Operator<Out = (Key, NewOut)> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
@@ -298,7 +325,7 @@ where
     OperatorChain: Operator<Out = (K, V)>,
 {
     /// TODO DOCS
-    pub fn to_keyed(self) -> KeyedStream<K, V, OperatorChain> {
+    pub fn to_keyed(self) -> KeyedStream<OperatorChain> {
         KeyedStream(self)
     }
 }

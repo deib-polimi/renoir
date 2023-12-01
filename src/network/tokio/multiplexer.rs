@@ -36,7 +36,7 @@ const MUX_CHANNEL_CAPACITY: usize = 10;
 ///
 /// The `ReceiverEndpoint` is sent alongside the actual message in order to demultiplex it.
 #[derive(Debug)]
-pub struct MultiplexingSender<Out: ExchangeData> {
+pub struct MultiplexingSender<Out: Send + 'static> {
     tx: Option<Sender<(ReceiverEndpoint, NetworkMessage<Out>)>>,
 }
 

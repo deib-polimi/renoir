@@ -259,7 +259,7 @@ where
         self,
         name: &str,
         accumulator: A,
-    ) -> KeyedStream<Key, NewOut, impl Operator<Out = (Key, NewOut)>>
+    ) -> KeyedStream<impl Operator<Out = (Key, NewOut)>>
     where
         NewOut: Data,
         A: WindowAccumulator<In = Out, Out = NewOut>,
@@ -280,7 +280,7 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
+impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<OperatorChain>
 where
     OperatorChain: Operator<Out = (Key, Out)> + 'static,
 {

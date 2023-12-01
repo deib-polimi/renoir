@@ -54,7 +54,7 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
         self.build_inner()
     }
 
-    pub(crate) fn build_inner(self) -> Vec<Stream<Start<Out, SimpleStartReceiver<Out>>>> {
+    pub(crate) fn build_inner(self) -> Vec<Stream<Start<SimpleStartReceiver<Out>>>> {
         // This is needed to maintain the same parallelism of the split block
         let env_lock = self.stream.env.clone();
         let mut env = env_lock.lock();

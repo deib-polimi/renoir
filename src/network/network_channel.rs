@@ -50,7 +50,7 @@ pub(crate) fn mux_sender<T: ExchangeData>(
 /// socket and send to the same in-memory channel the received messages.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(crate) struct NetworkReceiver<In: ExchangeData> {
+pub(crate) struct NetworkReceiver<In: Send + 'static> {
     /// The ReceiverEndpoint of the current receiver.
     pub receiver_endpoint: ReceiverEndpoint,
     /// The actual receiver where the users of this struct will wait upon.
@@ -58,7 +58,7 @@ pub(crate) struct NetworkReceiver<In: ExchangeData> {
     receiver: Receiver<NetworkMessage<In>>,
 }
 
-impl<In: ExchangeData> NetworkReceiver<In> {
+impl<In: Send + 'static> NetworkReceiver<In> {
     #[inline]
     fn profile_message<E>(
         &self,
@@ -118,7 +118,7 @@ impl<In: ExchangeData> NetworkReceiver<In> {
 /// connection internally this points to the multiplexer that handles the remote channel.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub(crate) struct NetworkSender<Out: ExchangeData> {
+pub(crate) struct NetworkSender<Out: Send + 'static> {
     /// The ReceiverEndpoint of the recipient.
     pub receiver_endpoint: ReceiverEndpoint,
     /// The generic sender that will send the message either locally or remotely.
@@ -127,7 +127,7 @@ pub(crate) struct NetworkSender<Out: ExchangeData> {
 }
 
 #[derive(Clone)]
-enum SenderInner<Out: ExchangeData> {
+enum SenderInner<Out: Send + 'static> {
     Mux(Sender<(ReceiverEndpoint, NetworkMessage<Out>)>),
     Local(Sender<NetworkMessage<Out>>),
 }

@@ -8,7 +8,7 @@ use itertools::Itertools;
 use crate::block::{BatchMode, Block, BlockStructure, JobGraphGenerator, Replication};
 use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
-use crate::operator::{Data, Operator};
+use crate::operator::Operator;
 use crate::profiler::{wait_profiler, ProfilerResult};
 use crate::worker::spawn_worker;
 use crate::CoordUInt;
@@ -90,9 +90,10 @@ impl Scheduler {
     /// This spawns a worker for each replica of the block in the execution graph and saves its
     /// start handle. The handle will be later used to actually start the worker when the
     /// computation is asked to begin.
-    pub(crate) fn schedule_block<Out: Data, OperatorChain>(&mut self, block: Block<OperatorChain>)
+    pub(crate) fn schedule_block<OperatorChain>(&mut self, block: Block<OperatorChain>)
     where
-        OperatorChain: Operator<Out = Out> + 'static,
+        OperatorChain: Operator + 'static,
+        OperatorChain::Out: Send,
     {
         let block_id = block.id;
         let info = self.block_info(&block);
@@ -327,12 +328,9 @@ impl Scheduler {
     }
 
     /// Extract the `SchedulerBlockInfo` of a block.
-    fn block_info<Out: Data, OperatorChain>(
-        &self,
-        block: &Block<OperatorChain>,
-    ) -> SchedulerBlockInfo
+    fn block_info<OperatorChain>(&self, block: &Block<OperatorChain>) -> SchedulerBlockInfo
     where
-        OperatorChain: Operator<Out = Out>,
+        OperatorChain: Operator,
     {
         match &self.config.runtime {
             ExecutionRuntime::Local(local) => self.local_block_info(block, local),
@@ -346,13 +344,13 @@ impl Scheduler {
     ///
     ///  - the number of logical cores.
     ///  - the `replication` of the block.
-    fn local_block_info<Out: Data, OperatorChain>(
+    fn local_block_info<OperatorChain>(
         &self,
         block: &Block<OperatorChain>,
         local: &LocalRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        OperatorChain: Operator<Out = Out>,
+        OperatorChain: Operator,
     {
         let replication = block.scheduler_requirements.replication;
         let instances = replication.clamp(local.num_cores);
@@ -379,13 +377,13 @@ impl Scheduler {
     ///
     /// The block can be replicated at most `replication` times (if specified). Assign the
     /// replicas starting from the first host giving as much replicas as possible..
-    fn remote_block_info<Out: Data, OperatorChain>(
+    fn remote_block_info<OperatorChain>(
         &self,
         block: &Block<OperatorChain>,
         remote: &RemoteRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        OperatorChain: Operator<Out = Out>,
+        OperatorChain: Operator,
     {
         let replication = block.scheduler_requirements.replication;
         // number of replicas we can assign at most

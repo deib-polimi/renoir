@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 
 use crate::block::{Block, BlockStructure};
 use crate::network::Coord;
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 thread_local! {
@@ -54,10 +54,14 @@ impl<F: FnOnce()> Drop for CatchPanic<F> {
     }
 }
 
-pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out = Out> + 'static>(
+pub(crate) fn spawn_worker<OperatorChain>(
     mut block: Block<OperatorChain>,
     metadata: &mut ExecutionMetadata,
-) -> (JoinHandle<()>, BlockStructure) {
+) -> (JoinHandle<()>, BlockStructure)
+where
+    OperatorChain: Operator + 'static,
+    OperatorChain::Out: Send,
+{
     let coord = metadata.coord;
 
     debug!("starting worker {}: {}", coord, block.to_string(),);
@@ -77,7 +81,7 @@ pub(crate) fn spawn_worker<Out: Data, OperatorChain: Operator<Out = Out> + 'stat
     (join_handle, structure)
 }
 
-fn do_work<Out: Data, Op: Operator<Out = Out> + 'static>(mut block: Block<Op>, coord: Coord) {
+fn do_work<Op: Operator>(mut block: Block<Op>, coord: Coord) {
     let mut catch_panic = CatchPanic::new(|| {
         error!("worker {} crashed!", coord);
     });

@@ -27,7 +27,7 @@ where
     Key: DataKey,
     Out: Data,
 {
-    pub fn count(self) -> KeyedStream<Key, usize, impl Operator<Out = (Key, usize)>> {
+    pub fn count(self) -> KeyedStream<impl Operator<Out = (Key, usize)>> {
         let acc = Count(0, PhantomData);
         self.add_window_operator("WindowCount", acc)
     }

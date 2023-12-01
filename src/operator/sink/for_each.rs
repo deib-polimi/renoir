@@ -88,7 +88,7 @@ impl<Out: Data, OperatorChain> Stream<OperatorChain> where
 {
 }
 
-impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain> where
+impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<OperatorChain> where
     OperatorChain: Operator<Out = (Key, Out)> + 'static
 {
 }

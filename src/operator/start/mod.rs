@@ -21,7 +21,8 @@ mod simple;
 mod watermark_frontier;
 
 /// Trait that abstract the receiving part of the `Start`.
-pub(crate) trait StartReceiver<Out>: Clone {
+pub(crate) trait StartReceiver: Clone {
+    type Out;
     /// Setup the internal state of the receiver.
     fn setup(&mut self, metadata: &mut ExecutionMetadata);
 
@@ -36,19 +37,21 @@ pub(crate) trait StartReceiver<Out>: Clone {
 
     /// Try to receive a batch from the previous blocks, or fail with an error if the timeout
     /// expires.
-    fn recv_timeout(&mut self, timeout: Duration) -> Result<NetworkMessage<Out>, RecvTimeoutError>;
+    fn recv_timeout(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<NetworkMessage<Self::Out>, RecvTimeoutError>;
 
     /// Receive a batch from the previous blocks waiting indefinitely.
-    fn recv(&mut self) -> NetworkMessage<Out>;
+    fn recv(&mut self) -> NetworkMessage<Self::Out>;
 
     /// Like `Operator::structure`.
     fn structure(&self) -> BlockStructure;
 }
 
-pub(crate) type BinaryStartOperator<OutL, OutR> =
-    Start<BinaryElement<OutL, OutR>, BinaryStartReceiver<OutL, OutR>>;
+pub(crate) type BinaryStartOperator<OutL, OutR> = Start<BinaryStartReceiver<OutL, OutR>>;
 
-pub(crate) type SimpleStartOperator<Out> = Start<Out, SimpleStartReceiver<Out>>;
+pub(crate) type SimpleStartOperator<Out> = Start<SimpleStartReceiver<Out>>;
 
 /// Each block should start with a `Start` operator, whose task is to read from the network,
 /// receive from the previous operators and handle the watermark frontier.
@@ -61,8 +64,8 @@ pub(crate) type SimpleStartOperator<Out> = Start<Out, SimpleStartReceiver<Out>>;
 /// Following operators will receive the messages in an unspecified order but the watermark property
 /// is followed. Note that the timestamps of the messages are not sorted, it's only guaranteed that
 /// when a watermark is emitted, all the previous messages are already been emitted (in some order).
-#[derive(Clone, Debug)]
-pub(crate) struct Start<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> {
+#[derive(Debug)]
+pub(crate) struct Start<Receiver: StartReceiver + Send> {
     /// Execution metadata of this block.
     max_delay: Option<Duration>,
 
@@ -72,7 +75,7 @@ pub(crate) struct Start<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> 
     receiver: Receiver,
 
     /// Inner iterator over batch items, contains coordinate of the sender
-    batch_iter: Option<(Coord, NetworkDataIterator<StreamElement<Out>>)>,
+    batch_iter: Option<(Coord, NetworkDataIterator<StreamElement<Receiver::Out>>)>,
 
     /// The number of `StreamElement::Terminate` messages yet to be received. When this value
     /// reaches zero this operator will emit the terminate.
@@ -98,13 +101,32 @@ pub(crate) struct Start<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> 
     state_generation: usize,
 }
 
-impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Display for Start<Out, Receiver> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}]", std::any::type_name::<Out>())
+impl<Receiver: StartReceiver + Send> Clone for Start<Receiver> {
+    fn clone(&self) -> Self {
+        Self {
+            max_delay: self.max_delay.clone(),
+            coord: self.coord.clone(),
+            receiver: self.receiver.clone(),
+            batch_iter: Default::default(),
+            missing_terminate: self.missing_terminate.clone(),
+            missing_flush_and_restart: self.missing_flush_and_restart.clone(),
+            num_previous_replicas: self.num_previous_replicas.clone(),
+            already_timed_out: self.already_timed_out.clone(),
+            watermark_frontier: self.watermark_frontier.clone(),
+            wait_for_state: self.wait_for_state.clone(),
+            state_lock: self.state_lock.clone(),
+            state_generation: self.state_generation.clone(),
+        }
     }
 }
 
-impl<Out: ExchangeData> Start<Out, SimpleStartReceiver<Out>> {
+impl<Receiver: StartReceiver + Send> Display for Start<Receiver> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}]", std::any::type_name::<Receiver::Out>())
+    }
+}
+
+impl<Out: ExchangeData> Start<SimpleStartReceiver<Out>> {
     /// Create a `Start` able to receive data only from a single previous block.
     pub(crate) fn single(
         previous_block_id: BlockId,
@@ -114,9 +136,7 @@ impl<Out: ExchangeData> Start<Out, SimpleStartReceiver<Out>> {
     }
 }
 
-impl<OutL: ExchangeData, OutR: ExchangeData>
-    Start<BinaryElement<OutL, OutR>, BinaryStartReceiver<OutL, OutR>>
-{
+impl<OutL: ExchangeData, OutR: ExchangeData> Start<BinaryStartReceiver<OutL, OutR>> {
     /// Create a `Start` able to receive data from 2 previous blocks, setting up the cache.
     pub(crate) fn multiple(
         previous_block_id1: BlockId,
@@ -137,7 +157,7 @@ impl<OutL: ExchangeData, OutR: ExchangeData>
     }
 }
 
-impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Start<Out, Receiver> {
+impl<Receiver: StartReceiver + Send> Start<Receiver> {
     fn new(receiver: Receiver, state_lock: Option<Arc<IterationStateLock>>) -> Self {
         Self {
             coord: Default::default(),
@@ -165,8 +185,12 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Start<Out, Receiver
     }
 }
 
-impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator for Start<Out, Receiver> {
-    type Out = Out;
+impl<Receiver> Operator for Start<Receiver>
+where
+    Receiver: StartReceiver + Send,
+    Receiver::Out: ExchangeData,
+{
+    type Out = Receiver::Out;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.receiver.setup(metadata);
@@ -180,13 +204,13 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator for Start<
         log::trace!(
             "{} initialized <{}>",
             metadata.coord,
-            std::any::type_name::<Out>()
+            std::any::type_name::<Receiver::Out>()
         );
         self.coord = Some(metadata.coord);
         self.max_delay = metadata.batch_mode.max_delay();
     }
 
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Receiver::Out> {
         let coord = self.coord.unwrap();
 
         loop {
@@ -291,7 +315,11 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator for Start<
     }
 }
 
-impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Source<Out> for Start<Out, Receiver> {
+impl<Receiver> Source<Receiver::Out> for Start<Receiver>
+where
+    Receiver: StartReceiver + Send,
+    Receiver::Out: ExchangeData,
+{
     fn replication(&self) -> Replication {
         Replication::Unlimited
     }
@@ -314,8 +342,7 @@ mod tests {
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
         let (from2, sender2) = t.senders_mut()[0].pop().unwrap();
 
-        let mut start_block =
-            Start::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
+        let mut start_block = Start::single(sender1.receiver_endpoint.prev_block_id, None);
         start_block.setup(&mut t.metadata());
 
         sender1
@@ -354,8 +381,7 @@ mod tests {
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
         let (from2, sender2) = t.senders_mut()[0].pop().unwrap();
 
-        let mut start_block =
-            Start::<i32, _>::single(sender1.receiver_endpoint.prev_block_id, None);
+        let mut start_block = Start::single(sender1.receiver_endpoint.prev_block_id, None);
         start_block.setup(&mut t.metadata());
 
         sender1
@@ -403,13 +429,7 @@ mod tests {
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
         let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
-        let mut start_block = Start::<BinaryElement<i32, i32>, _>::multiple(
-            from1.block_id,
-            from2.block_id,
-            false,
-            false,
-            None,
-        );
+        let mut start_block = Start::multiple(from1.block_id, from2.block_id, false, false, None);
         start_block.setup(&mut t.metadata());
 
         sender1
@@ -473,13 +493,7 @@ mod tests {
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
         let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
-        let mut start_block = Start::<BinaryElement<i32, i32>, _>::multiple(
-            from1.block_id,
-            from2.block_id,
-            true,
-            false,
-            None,
-        );
+        let mut start_block = Start::multiple(from1.block_id, from2.block_id, true, false, None);
         start_block.setup(&mut t.metadata());
 
         sender1
@@ -554,13 +568,7 @@ mod tests {
         let (from1, sender1) = t.senders_mut()[0].pop().unwrap();
         let (from2, sender2) = t.senders_mut()[1].pop().unwrap();
 
-        let mut start_block = Start::<BinaryElement<i32, i32>, _>::multiple(
-            from1.block_id,
-            from2.block_id,
-            false,
-            true,
-            None,
-        );
+        let mut start_block = Start::multiple(from1.block_id, from2.block_id, false, true, None);
         start_block.setup(&mut t.metadata());
 
         sender1

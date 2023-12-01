@@ -11,8 +11,7 @@ use super::group_by_hash;
 ///
 /// A block in the job graph may have many next blocks. Each of them will receive the message, which
 /// of their replica will receive it depends on the value of the next strategy.
-#[derive(Clone, Debug)]
-pub(crate) enum NextStrategy<Out: ExchangeData, IndexFn = fn(&Out) -> u64>
+pub(crate) enum NextStrategy<Out, IndexFn = fn(&Out) -> u64>
 where
     IndexFn: KeyerFn<u64, Out>,
 {
@@ -29,6 +28,34 @@ where
     GroupBy(IndexFn, PhantomData<Out>),
     /// Every following replica will receive every message.
     All,
+}
+
+impl<Out, IndexFn> std::fmt::Debug for NextStrategy<Out, IndexFn>
+where
+    IndexFn: KeyerFn<u64, Out>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::OnlyOne => write!(f, "OnlyOne"),
+            Self::Random => write!(f, "Random"),
+            Self::GroupBy(_, _) => write!(f, "GroupBy"),
+            Self::All => write!(f, "All"),
+        }
+    }
+}
+
+impl<Out, IndexFn: Clone> Clone for NextStrategy<Out, IndexFn>
+where
+    IndexFn: KeyerFn<u64, Out>,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::OnlyOne => Self::OnlyOne,
+            Self::Random => Self::Random,
+            Self::GroupBy(idx, _) => Self::GroupBy(idx.clone(), PhantomData),
+            Self::All => Self::All,
+        }
+    }
 }
 
 impl<Out: ExchangeData> NextStrategy<Out> {

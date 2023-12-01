@@ -26,7 +26,9 @@ impl<Out: ExchangeData> SimpleStartReceiver<Out> {
     }
 }
 
-impl<Out: ExchangeData> StartReceiver<Out> for SimpleStartReceiver<Out> {
+impl<Out: ExchangeData> StartReceiver for SimpleStartReceiver<Out> {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let in_type = TypeId::of::<Out>();
 
