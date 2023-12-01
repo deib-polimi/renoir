@@ -30,12 +30,14 @@ impl<Out> Debug for FilterFn<Out> {
     }
 }
 
-pub struct RouterBuilder<T: ExchangeData, O: Operator<T>> {
+pub struct RouterBuilder<T: ExchangeData, O: Operator<Out = T>> {
     stream: Stream<T, O>,
     routes: Vec<FilterFn<T>>,
 }
 
-impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Out, OperatorChain> {
+impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
+    RouterBuilder<Out, OperatorChain>
+{
     pub(super) fn new(stream: Stream<Out, OperatorChain>) -> Self {
         Self {
             stream,
@@ -48,7 +50,7 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Ou
         self
     }
 
-    pub fn build(self) -> Vec<Stream<Out, impl Operator<Out>>> {
+    pub fn build(self) -> Vec<Stream<Out, impl Operator<Out = Out>>> {
         self.build_inner()
     }
 
@@ -99,7 +101,7 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out> + 'static> RouterBuilder<Ou
 pub struct RoutingEnd<Out: ExchangeData, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     prev: OperatorChain,
     coord: Option<Coord>,
@@ -115,7 +117,7 @@ where
 impl<Out: ExchangeData, OperatorChain, IndexFn> Display for RoutingEnd<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.next_strategy {
@@ -129,7 +131,7 @@ where
 impl<Out: ExchangeData, OperatorChain, IndexFn> RoutingEnd<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     pub(crate) fn new(
         prev: OperatorChain,
@@ -193,12 +195,13 @@ impl<Out: Debug> Debug for Endpoint<Out> {
     }
 }
 
-impl<Out: ExchangeData, OperatorChain, IndexFn> Operator<()>
-    for RoutingEnd<Out, OperatorChain, IndexFn>
+impl<Out: ExchangeData, OperatorChain, IndexFn> Operator for RoutingEnd<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
+    type Out = ();
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
 

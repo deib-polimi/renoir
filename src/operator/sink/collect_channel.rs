@@ -13,7 +13,7 @@ use flume::Sender;
 #[derive(Debug, Clone)]
 pub struct CollectChannelSink<Out: ExchangeData, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     prev: PreviousOperators,
     tx: Option<Sender<Out>>,
@@ -21,7 +21,7 @@ where
 
 impl<Out: ExchangeData, PreviousOperators> CollectChannelSink<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     pub(crate) fn new(prev: PreviousOperators, tx: Sender<Out>) -> Self {
         Self { prev, tx: Some(tx) }
@@ -30,18 +30,19 @@ where
 
 impl<Out: ExchangeData, PreviousOperators> Display for CollectChannelSink<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> CollectChannelSink", self.prev)
     }
 }
 
-impl<Out: ExchangeData, PreviousOperators> Operator<()>
-    for CollectChannelSink<Out, PreviousOperators>
+impl<Out: ExchangeData, PreviousOperators> Operator for CollectChannelSink<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
+    type Out = ();
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -70,7 +71,7 @@ where
 }
 
 impl<Out: ExchangeData, PreviousOperators> Sink for CollectChannelSink<Out, PreviousOperators> where
-    PreviousOperators: Operator<Out>
+    PreviousOperators: Operator<Out = Out>
 {
 }
 

@@ -23,11 +23,11 @@ impl<T: Data> WindowAccumulator for Count<T> {
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<Out>,
-    OperatorChain: Operator<(Key, Out)> + 'static,
+    OperatorChain: Operator<Out = (Key, Out)> + 'static,
     Key: DataKey,
     Out: Data,
 {
-    pub fn count(self) -> KeyedStream<Key, usize, impl Operator<(Key, usize)>> {
+    pub fn count(self) -> KeyedStream<Key, usize, impl Operator<Out = (Key, usize)>> {
         let acc = Count(0, PhantomData);
         self.add_window_operator("WindowCount", acc)
     }

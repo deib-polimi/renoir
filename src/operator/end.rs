@@ -26,7 +26,7 @@ impl BlockSenders {
 pub struct End<Out: ExchangeData, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     prev: OperatorChain,
     coord: Option<Coord>,
@@ -42,7 +42,7 @@ where
 impl<Out: ExchangeData, OperatorChain, IndexFn> Display for End<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.next_strategy {
@@ -56,7 +56,7 @@ where
 impl<Out: ExchangeData, OperatorChain, IndexFn> End<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     pub(crate) fn new(
         prev: OperatorChain,
@@ -117,11 +117,13 @@ where
     }
 }
 
-impl<Out: ExchangeData, OperatorChain, IndexFn> Operator<()> for End<Out, OperatorChain, IndexFn>
+impl<Out: ExchangeData, OperatorChain, IndexFn> Operator for End<Out, OperatorChain, IndexFn>
 where
     IndexFn: KeyerFn<u64, Out>,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
+    type Out = ();
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
 

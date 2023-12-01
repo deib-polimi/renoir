@@ -72,7 +72,7 @@ impl<L: Clone, R: Clone> Iterator for ProductIterator<L, R> {
 
 impl<Key, Out, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<(Key, Out)> + 'static,
+    OperatorChain: Operator<Out = (Key, Out)> + 'static,
     Key: ExchangeData + DataKey,
     Out: ExchangeData,
 {
@@ -80,9 +80,9 @@ where
         self,
         descr: WindowDescr,
         right: KeyedStream<Key, Out2, OperatorChain2>,
-    ) -> KeyedStream<Key, (Out, Out2), impl Operator<(Key, (Out, Out2))>>
+    ) -> KeyedStream<Key, (Out, Out2), impl Operator<Out = (Key, (Out, Out2))>>
     where
-        OperatorChain2: Operator<(Key, Out2)> + 'static,
+        OperatorChain2: Operator<Out = (Key, Out2)> + 'static,
         Out2: ExchangeData,
         WindowDescr: WindowDescription<MergeElement<Out, Out2>> + 'static,
     {

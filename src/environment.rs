@@ -202,7 +202,7 @@ impl StreamEnvironmentInner {
         Block::new(new_id, source, batch_mode, iteration_ctx)
     }
 
-    pub(crate) fn close_block<Out: Data, Op: Operator<Out> + 'static>(
+    pub(crate) fn close_block<Out: Data, Op: Operator<Out = Out> + 'static>(
         &mut self,
         block: Block<Out, Op>,
     ) -> BlockId {

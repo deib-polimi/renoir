@@ -156,14 +156,16 @@ where
     }
 }
 
-impl<Key, In, Out, Prev, W> Operator<(Key, Out)> for WindowOperator<Key, In, Out, Prev, W>
+impl<Key, In, Out, Prev, W> Operator for WindowOperator<Key, In, Out, Prev, W>
 where
     W: WindowManager<In = In, Out = Out> + Send,
-    Prev: Operator<(Key, In)>,
+    Prev: Operator<Out = (Key, In)>,
     Key: DataKey,
     In: Data,
     Out: Data,
 {
+    type Out = (Key, Out);
+
     fn setup(&mut self, metadata: &mut crate::ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -246,7 +248,7 @@ where
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<Out>,
-    OperatorChain: Operator<(Key, Out)> + 'static,
+    OperatorChain: Operator<Out = (Key, Out)> + 'static,
     Key: DataKey,
     Out: Data,
 {
@@ -257,7 +259,7 @@ where
         self,
         name: &str,
         accumulator: A,
-    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<Out = (Key, NewOut)>>
     where
         NewOut: Data,
         A: WindowAccumulator<In = Out, Out = NewOut>,
@@ -280,7 +282,7 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<(Key, Out)> + 'static,
+    OperatorChain: Operator<Out = (Key, Out)> + 'static,
 {
     /// Apply a window to the stream.
     ///
@@ -309,7 +311,7 @@ where
     pub fn window<WinOut: Data, WinDescr: WindowDescription<Out>>(
         self,
         descr: WinDescr,
-    ) -> WindowedStream<Key, Out, impl Operator<(Key, Out)>, WinOut, WinDescr> {
+    ) -> WindowedStream<Key, Out, impl Operator<Out = (Key, Out)>, WinOut, WinDescr> {
         WindowedStream {
             inner: self,
             descr,
@@ -320,7 +322,7 @@ where
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + 'static,
+    OperatorChain: Operator<Out = Out> + 'static,
 {
     /// Send all elements to a single node and apply a window to the stream.
     ///
@@ -351,7 +353,7 @@ where
     pub fn window_all<WinOut: Data, WinDescr: WindowDescription<Out>>(
         self,
         descr: WinDescr,
-    ) -> WindowedStream<(), Out, impl Operator<((), Out)>, WinOut, WinDescr> {
+    ) -> WindowedStream<(), Out, impl Operator<Out = ((), Out)>, WinOut, WinDescr> {
         // replication and key_by are used instead of group_by so that there is exactly one
         // replica, since window_all cannot be parallelized
         self.replication(Replication::new_one())

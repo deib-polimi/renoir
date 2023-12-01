@@ -49,7 +49,7 @@ impl Accident {
 }
 
 fn query1_with_source(
-    source: Stream<Accident, impl Operator<Accident> + 'static>,
+    source: Stream<Accident, impl Operator<Out = Accident> + 'static>,
 ) -> StreamOutput<Vec<(Week, u32)>> {
     source
         // map to the week with 1 if it was lethal, 0 otherwise
@@ -104,7 +104,7 @@ fn print_query1(res: Vec<(Week, u32)>) {
 }
 
 fn query2_with_source(
-    source: Stream<Accident, impl Operator<Accident> + 'static>,
+    source: Stream<Accident, impl Operator<Out = Accident> + 'static>,
 ) -> StreamOutput<Vec<(String, i32, u32)>> {
     source
         // extract (factor, num accidents, num kills)
@@ -175,7 +175,7 @@ fn print_query2(res: Vec<(String, i32, u32)>) {
 
 #[allow(clippy::type_complexity)]
 fn query3_with_source(
-    source: Stream<Accident, impl Operator<Accident> + 'static>,
+    source: Stream<Accident, impl Operator<Out = Accident> + 'static>,
 ) -> (
     StreamOutput<Vec<(String, Week, i32, u32)>>,
     StreamOutput<Vec<((String, u16), (i32, u32, f64))>>,

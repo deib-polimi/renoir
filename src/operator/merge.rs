@@ -13,7 +13,7 @@ pub enum MergeElement<A, B> {
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + 'static,
+    OperatorChain: Operator<Out = Out> + 'static,
 {
     /// Merge the items of this stream with the items of another stream with the same type.
     ///
@@ -40,9 +40,9 @@ where
     pub fn merge<OperatorChain2>(
         self,
         oth: Stream<Out, OperatorChain2>,
-    ) -> Stream<Out, impl Operator<Out>>
+    ) -> Stream<Out, impl Operator<Out = Out>>
     where
-        OperatorChain2: Operator<Out> + 'static,
+        OperatorChain2: Operator<Out = Out> + 'static,
     {
         self.binary_connection(
             oth,
@@ -61,10 +61,10 @@ where
     pub(crate) fn merge_distinct<Out2, OperatorChain2>(
         self,
         right: Stream<Out2, OperatorChain2>,
-    ) -> Stream<MergeElement<Out, Out2>, impl Operator<MergeElement<Out, Out2>>>
+    ) -> Stream<MergeElement<Out, Out2>, impl Operator<Out = MergeElement<Out, Out2>>>
     where
         Out2: ExchangeData,
-        OperatorChain2: Operator<Out2> + 'static,
+        OperatorChain2: Operator<Out = Out2> + 'static,
     {
         // map the left and right streams to the same type
         let left = self.map(MergeElement::Left);

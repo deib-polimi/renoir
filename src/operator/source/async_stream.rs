@@ -69,10 +69,12 @@ where
     }
 }
 
-impl<Out: Data, S> Operator<Out> for AsyncStreamSource<Out, S>
+impl<Out: Data, S> Operator for AsyncStreamSource<Out, S>
 where
     S: Stream<Item = Out> + Send + Unpin + 'static,
 {
+    type Out = Out;
+
     fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {

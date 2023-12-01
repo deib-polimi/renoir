@@ -9,7 +9,7 @@ use crate::scheduler::ExecutionMetadata;
 #[derive(Debug)]
 pub struct CollectCountSink<PreviousOperators>
 where
-    PreviousOperators: Operator<usize>,
+    PreviousOperators: Operator<Out = usize>,
 {
     prev: PreviousOperators,
     result: usize,
@@ -18,7 +18,7 @@ where
 
 impl<PreviousOperators> CollectCountSink<PreviousOperators>
 where
-    PreviousOperators: Operator<usize>,
+    PreviousOperators: Operator<Out = usize>,
 {
     pub(crate) fn new(prev: PreviousOperators, output: StreamOutputRef<usize>) -> Self {
         Self {
@@ -31,17 +31,19 @@ where
 
 impl<PreviousOperators> Display for CollectCountSink<PreviousOperators>
 where
-    PreviousOperators: Operator<usize>,
+    PreviousOperators: Operator<Out = usize>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> CollectCountSink", self.prev)
     }
 }
 
-impl<PreviousOperators> Operator<()> for CollectCountSink<PreviousOperators>
+impl<PreviousOperators> Operator for CollectCountSink<PreviousOperators>
 where
-    PreviousOperators: Operator<usize>,
+    PreviousOperators: Operator<Out = usize>,
 {
+    type Out = ();
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -70,13 +72,13 @@ where
 }
 
 impl<PreviousOperators> Sink for CollectCountSink<PreviousOperators> where
-    PreviousOperators: Operator<usize>
+    PreviousOperators: Operator<Out = usize>
 {
 }
 
 impl<PreviousOperators> Clone for CollectCountSink<PreviousOperators>
 where
-    PreviousOperators: Operator<usize>,
+    PreviousOperators: Operator<Out = usize>,
 {
     fn clone(&self) -> Self {
         panic!("CollectVecSink cannot be cloned, replication should be 1");

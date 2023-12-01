@@ -73,7 +73,9 @@ impl Source<String> for FileSource {
     }
 }
 
-impl Operator<String> for FileSource {
+impl Operator for FileSource {
+    type Out = String;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let global_id = metadata.global_id;
         let instances = metadata.replicas.len();

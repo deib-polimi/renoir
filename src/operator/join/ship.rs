@@ -68,8 +68,8 @@ where
         prev: JoinStream<Key, Out1, Out2, OperatorChain1, OperatorChain2, Keyer1, Keyer2>,
     ) -> Self
     where
-        OperatorChain1: Operator<Out1> + 'static,
-        OperatorChain2: Operator<Out2> + 'static,
+        OperatorChain1: Operator<Out = Out1> + 'static,
+        OperatorChain2: Operator<Out = Out2> + 'static,
     {
         let keyer1 = prev.keyer1;
         let keyer2 = prev.keyer2;
@@ -116,8 +116,8 @@ where
         prev: JoinStream<Key, Out1, Out2, OperatorChain1, OperatorChain2, Keyer1, Keyer2>,
     ) -> Self
     where
-        OperatorChain1: Operator<Out1> + 'static,
-        OperatorChain2: Operator<Out2> + 'static,
+        OperatorChain1: Operator<Out = Out1> + 'static,
+        OperatorChain2: Operator<Out = Out2> + 'static,
     {
         let keyer1 = prev.keyer1;
         let keyer2 = prev.keyer2;

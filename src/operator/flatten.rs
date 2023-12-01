@@ -10,7 +10,7 @@ use crate::scheduler::ExecutionMetadata;
 #[derivative(Debug)]
 pub struct Flatten<In, Out, InnerIterator, PreviousOperators>
 where
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     In: Data + IntoIterator<Item = Out>,
     Out: Data,
     InnerIterator: Iterator,
@@ -32,7 +32,7 @@ where
 impl<In, Out, InnerIterator, PreviousOperators> Display
     for Flatten<In, Out, InnerIterator, PreviousOperators>
 where
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     In: Data + IntoIterator<Item = Out>,
     Out: Data,
     InnerIterator: Iterator,
@@ -50,7 +50,7 @@ where
 
 impl<In, Out, InnerIterator, PreviousOperators> Flatten<In, Out, InnerIterator, PreviousOperators>
 where
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
     Out: Data + Clone,
     InnerIterator: Iterator<Item = Out> + Clone + Send,
@@ -67,14 +67,16 @@ where
     }
 }
 
-impl<In, Out, InnerIterator, PreviousOperators> Operator<Out>
+impl<In, Out, InnerIterator, PreviousOperators> Operator
     for Flatten<In, Out, InnerIterator, PreviousOperators>
 where
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
     Out: Data + Clone,
     InnerIterator: Iterator<Item = Out> + Clone + Send,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -130,7 +132,7 @@ where
 pub struct KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
 where
     Key: DataKey,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     In: Data + IntoIterator<Item = Out>,
     Out: Data,
     InnerIterator: Iterator,
@@ -153,7 +155,7 @@ impl<Key, In, Out, InnerIterator, PreviousOperators> Display
     for KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
 where
     Key: DataKey,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     In: Data + IntoIterator<Item = Out>,
     Out: Data,
     InnerIterator: Iterator,
@@ -173,7 +175,7 @@ impl<Key, In, Out, InnerIterator, PreviousOperators>
     KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
 where
     Key: DataKey,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
     Out: Data + Clone,
     InnerIterator: Iterator<Item = Out> + Clone + Send,
@@ -190,15 +192,17 @@ where
     }
 }
 
-impl<Key, In, Out, InnerIterator, PreviousOperators> Operator<(Key, Out)>
+impl<Key, In, Out, InnerIterator, PreviousOperators> Operator
     for KeyedFlatten<Key, In, Out, InnerIterator, PreviousOperators>
 where
     Key: DataKey,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     In: Data + IntoIterator<IntoIter = InnerIterator, Item = InnerIterator::Item>,
     Out: Data + Clone,
     InnerIterator: Iterator<Item = Out> + Clone + Send,
 {
+    type Out = (Key, Out);
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

@@ -13,7 +13,7 @@ use crate::scheduler::{BlockId, ExecutionMetadata};
 #[derive(Debug, Clone)]
 pub struct IterationEnd<DeltaUpdate: ExchangeData, OperatorChain>
 where
-    OperatorChain: Operator<DeltaUpdate>,
+    OperatorChain: Operator<Out = DeltaUpdate>,
 {
     /// The chain of previous operators.
     ///
@@ -35,7 +35,7 @@ where
 impl<DeltaUpdate: ExchangeData, OperatorChain> std::fmt::Display
     for IterationEnd<DeltaUpdate, OperatorChain>
 where
-    OperatorChain: Operator<DeltaUpdate>,
+    OperatorChain: Operator<Out = DeltaUpdate>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -49,7 +49,7 @@ where
 
 impl<DeltaUpdate: ExchangeData, OperatorChain> IterationEnd<DeltaUpdate, OperatorChain>
 where
-    OperatorChain: Operator<DeltaUpdate>,
+    OperatorChain: Operator<Out = DeltaUpdate>,
 {
     pub fn new(prev: OperatorChain, leader_block_id: BlockId) -> Self {
         Self {
@@ -62,12 +62,13 @@ where
     }
 }
 
-impl<DeltaUpdate: ExchangeData, OperatorChain> Operator<()>
-    for IterationEnd<DeltaUpdate, OperatorChain>
+impl<DeltaUpdate: ExchangeData, OperatorChain> Operator for IterationEnd<DeltaUpdate, OperatorChain>
 where
     DeltaUpdate: Default,
-    OperatorChain: Operator<DeltaUpdate>,
+    OperatorChain: Operator<Out = DeltaUpdate>,
 {
+    type Out = ();
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let replicas = metadata.network.replicas(self.leader_block_id);
         assert_eq!(

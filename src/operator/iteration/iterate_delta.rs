@@ -68,9 +68,11 @@ pub struct DeltaIterate<
     prev: SimpleStartOperator<(Key, Msg<I, U, D, O>)>,
 }
 
-impl<Key: ExchangeData, I: ExchangeData, U: ExchangeData, D: ExchangeData, O: ExchangeData>
-    Operator<(Key, U)> for DeltaIterate<Key, I, U, D, O>
+impl<Key: ExchangeData, I: ExchangeData, U: ExchangeData, D: ExchangeData, O: ExchangeData> Operator
+    for DeltaIterate<Key, I, U, D, O>
 {
+    type Out = (Key, U);
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -97,7 +99,7 @@ impl<Key: ExchangeData, I: ExchangeData, U: ExchangeData, D: ExchangeData, O: Ex
 impl<Key: ExchangeDataKey, In: ExchangeData + Default, OperatorChain>
     KeyedStream<Key, In, OperatorChain>
 where
-    OperatorChain: Operator<(Key, In)> + 'static,
+    OperatorChain: Operator<Out = (Key, In)> + 'static,
 {
     /// TODO DOCS
     pub fn delta_iterate<U: ExchangeData, D: ExchangeData, O: ExchangeData, Body, BodyOperator>(
@@ -108,13 +110,13 @@ where
         make_output: impl Fn(&Key, In) -> O + Clone + Send + 'static,
         condition: impl Fn(&D) -> bool + Clone + Send + 'static,
         body: Body,
-    ) -> KeyedStream<Key, O, impl Operator<(Key, O)>>
+    ) -> KeyedStream<Key, O, impl Operator<Out = (Key, O)>>
     where
         Body: FnOnce(
                 KeyedStream<Key, U, DeltaIterate<Key, In, U, D, O>>,
             ) -> KeyedStream<Key, D, BodyOperator>
             + 'static,
-        BodyOperator: Operator<(Key, D)> + 'static,
+        BodyOperator: Operator<Out = (Key, D)> + 'static,
     {
         let (state, out) = self.map(|(_, v)| Msg::Init(v)).unkey().iterate(
             num_iterations,

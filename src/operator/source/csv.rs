@@ -266,7 +266,9 @@ impl<Out: Data + for<'a> Deserialize<'a>> Source<Out> for CsvSource<Out> {
     }
 }
 
-impl<Out: Data + for<'a> Deserialize<'a>> Operator<Out> for CsvSource<Out> {
+impl<Out: Data + for<'a> Deserialize<'a>> Operator for CsvSource<Out> {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         let global_id = metadata.global_id;
         let instances = metadata.replicas.len();

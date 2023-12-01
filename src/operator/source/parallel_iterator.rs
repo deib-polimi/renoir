@@ -207,12 +207,14 @@ where
     }
 }
 
-impl<Source> Operator<Source::Item> for ParallelIteratorSource<Source>
+impl<Source> Operator for ParallelIteratorSource<Source>
 where
     Source: IntoParallelSource,
     Source::Iter: Send,
     Source::Item: Data,
 {
+    type Out = Source::Item;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.inner.generate(
             metadata.global_id,

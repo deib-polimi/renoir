@@ -195,9 +195,11 @@ impl<K: DataKey + ExchangeData, V1: ExchangeData, V2: ExchangeData> Display
     }
 }
 
-impl<K: DataKey + ExchangeData, V1: ExchangeData, V2: ExchangeData>
-    Operator<(K, OuterJoinTuple<V1, V2>)> for JoinKeyedOuter<K, V1, V2>
+impl<K: DataKey + ExchangeData, V1: ExchangeData, V2: ExchangeData> Operator
+    for JoinKeyedOuter<K, V1, V2>
 {
+    type Out = (K, OuterJoinTuple<V1, V2>);
+
     fn setup(&mut self, metadata: &mut crate::ExecutionMetadata) {
         self.prev.setup(metadata);
         self.coord = Some(metadata.coord);
@@ -337,9 +339,11 @@ impl<K: DataKey + ExchangeData + Debug, V1: ExchangeData + Debug, V2: ExchangeDa
     }
 }
 
-impl<K: DataKey + ExchangeData + Debug, V1: ExchangeData + Debug, V2: ExchangeData + Debug>
-    Operator<(K, InnerJoinTuple<V1, V2>)> for JoinKeyedInner<K, V1, V2>
+impl<K: DataKey + ExchangeData + Debug, V1: ExchangeData + Debug, V2: ExchangeData + Debug> Operator
+    for JoinKeyedInner<K, V1, V2>
 {
+    type Out = (K, InnerJoinTuple<V1, V2>);
+
     fn setup(&mut self, metadata: &mut crate::ExecutionMetadata) {
         self.coord = Some(metadata.coord);
         self.prev.setup(metadata);
@@ -381,14 +385,14 @@ impl<K: DataKey + ExchangeData + Debug, V1: ExchangeData + Debug, V2: ExchangeDa
 
 impl<K: DataKey + ExchangeData + Debug, V1: Data + ExchangeData + Debug, O1> KeyedStream<K, V1, O1>
 where
-    O1: Operator<(K, V1)> + 'static,
+    O1: Operator<Out = (K, V1)> + 'static,
 {
     pub fn join_outer<V2: Data + ExchangeData + Debug, O2>(
         self,
         rhs: KeyedStream<K, V2, O2>,
-    ) -> KeyedStream<K, (Option<V1>, Option<V2>), impl Operator<(K, (Option<V1>, Option<V2>))>>
+    ) -> KeyedStream<K, (Option<V1>, Option<V2>), impl Operator<Out = (K, (Option<V1>, Option<V2>))>>
     where
-        O2: Operator<(K, V2)> + 'static,
+        O2: Operator<Out = (K, V2)> + 'static,
     {
         let next_strategy1 = NextStrategy::only_one();
         let next_strategy2 = NextStrategy::only_one();
@@ -404,9 +408,9 @@ where
     pub fn join<V2: Data + ExchangeData + Debug, O2>(
         self,
         rhs: KeyedStream<K, V2, O2>,
-    ) -> KeyedStream<K, (V1, V2), impl Operator<(K, (V1, V2))>>
+    ) -> KeyedStream<K, (V1, V2), impl Operator<Out = (K, (V1, V2))>>
     where
-        O2: Operator<(K, V2)> + 'static,
+        O2: Operator<Out = (K, V2)> + 'static,
     {
         let next_strategy1 = NextStrategy::only_one();
         let next_strategy2 = NextStrategy::only_one();

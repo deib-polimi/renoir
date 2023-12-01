@@ -203,7 +203,9 @@ impl<Out: ExchangeData, State: ExchangeData> Iterate<Out, State> {
     }
 }
 
-impl<Out: ExchangeData, State: ExchangeData + Sync> Operator<Out> for Iterate<Out, State> {
+impl<Out: ExchangeData, State: ExchangeData + Sync> Operator for Iterate<Out, State> {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
 
@@ -304,7 +306,7 @@ impl<Out: ExchangeData, State: ExchangeData + Sync> Display for Iterate<Out, Sta
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + 'static,
+    OperatorChain: Operator<Out = Out> + 'static,
 {
     /// Construct an iterative dataflow where the input stream is fed inside a cycle. What comes
     /// out of the loop will be fed back at the next iteration.
@@ -371,15 +373,15 @@ where
         global_fold: impl Fn(&mut State, StateUpdate) + Send + Clone + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
     ) -> (
-        Stream<State, impl Operator<State>>,
-        Stream<Out, impl Operator<Out>>,
+        Stream<State, impl Operator<Out = State>>,
+        Stream<Out, impl Operator<Out = Out>>,
     )
     where
         Body: FnOnce(
             Stream<Out, Iterate<Out, State>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,
-        OperatorChain2: Operator<Out> + 'static,
+        OperatorChain2: Operator<Out = Out> + 'static,
     {
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.

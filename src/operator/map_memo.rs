@@ -19,7 +19,7 @@ pub struct MapMemo<I, O, K, F, Fk, Op, H: BuildHasher + Clone = GroupHasherBuild
 where
     F: Fn(I) -> O + Send + Clone,
     Fk: Fn(&I) -> K + Send + Clone,
-    Op: Operator<I>,
+    Op: Operator<Out = I>,
     I: Data,
     O: Data + Sync,
     K: DataKey + Sync,
@@ -37,7 +37,7 @@ impl<I, O, K, F, Fk, Op> Display for MapMemo<I, O, K, F, Fk, Op>
 where
     F: Fn(I) -> O + Send + Clone,
     Fk: Fn(&I) -> K + Send + Clone,
-    Op: Operator<I>,
+    Op: Operator<Out = I>,
     I: Data,
     O: Data + Sync,
     K: DataKey + Sync,
@@ -57,7 +57,7 @@ impl<I, O, K, F, Fk, Op> MapMemo<I, O, K, F, Fk, Op>
 where
     F: Fn(I) -> O + Send + Clone,
     Fk: Fn(&I) -> K + Send + Clone,
-    Op: Operator<I>,
+    Op: Operator<Out = I>,
     I: Data,
     O: Data + Sync,
     K: DataKey + Sync,
@@ -79,15 +79,17 @@ where
     }
 }
 
-impl<I, O, K, F, Fk, Op> Operator<O> for MapMemo<I, O, K, F, Fk, Op>
+impl<I, O, K, F, Fk, Op> Operator for MapMemo<I, O, K, F, Fk, Op>
 where
     F: Fn(I) -> O + Send + Clone,
     Fk: Fn(&I) -> K + Send + Clone,
-    Op: Operator<I>,
+    Op: Operator<Out = I>,
     I: Data,
     O: Data + Sync,
     K: DataKey + Sync,
 {
+    type Out = O;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

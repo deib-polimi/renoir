@@ -12,7 +12,7 @@ use crate::stream::{KeyedStream, Stream};
 pub struct ForEach<Out: Data, F, PreviousOperators>
 where
     F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -23,7 +23,7 @@ where
 impl<Out: Data, F, PreviousOperators> ForEach<Out, F, PreviousOperators>
 where
     F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     pub(crate) fn new(prev: PreviousOperators, f: F) -> Self {
         Self {
@@ -37,18 +37,20 @@ where
 impl<Out: Data, F, PreviousOperators> Display for ForEach<Out, F, PreviousOperators>
 where
     F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> ForEach", self.prev)
     }
 }
 
-impl<Out: Data, F, PreviousOperators> Operator<()> for ForEach<Out, F, PreviousOperators>
+impl<Out: Data, F, PreviousOperators> Operator for ForEach<Out, F, PreviousOperators>
 where
     F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
+    type Out = ();
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -77,17 +79,17 @@ where
 impl<Out: Data, F, PreviousOperators> Sink for ForEach<Out, F, PreviousOperators>
 where
     F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
 }
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain> where
-    OperatorChain: Operator<Out> + 'static
+    OperatorChain: Operator<Out = Out> + 'static
 {
 }
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain> where
-    OperatorChain: Operator<(Key, Out)> + 'static
+    OperatorChain: Operator<Out = (Key, Out)> + 'static
 {
 }
 

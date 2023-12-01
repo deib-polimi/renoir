@@ -32,7 +32,7 @@ static TEST_INDEX: AtomicU16 = AtomicU16::new(0);
 #[derive(Clone)]
 pub struct WatermarkChecker<Out: Data, PreviousOperator>
 where
-    PreviousOperator: Operator<Out>,
+    PreviousOperator: Operator<Out = Out>,
 {
     last_watermark: Option<Timestamp>,
     prev: PreviousOperator,
@@ -42,14 +42,14 @@ where
 
 impl<Out: Data, PreviousOperator> Display for WatermarkChecker<Out, PreviousOperator>
 where
-    PreviousOperator: Operator<Out>,
+    PreviousOperator: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "WatermarkChecker")
     }
 }
 
-impl<Out: Data, PreviousOperator: Operator<Out>> WatermarkChecker<Out, PreviousOperator> {
+impl<Out: Data, PreviousOperator: Operator<Out = Out>> WatermarkChecker<Out, PreviousOperator> {
     pub fn new(prev: PreviousOperator, received_watermarks: Arc<AtomicUsize>) -> Self {
         Self {
             last_watermark: None,
@@ -60,9 +60,11 @@ impl<Out: Data, PreviousOperator: Operator<Out>> WatermarkChecker<Out, PreviousO
     }
 }
 
-impl<Out: Data, PreviousOperator: Operator<Out>> Operator<Out>
+impl<Out: Data, PreviousOperator: Operator<Out = Out>> Operator
     for WatermarkChecker<Out, PreviousOperator>
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

@@ -54,7 +54,9 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Zip<Out1, Out2> {
     }
 }
 
-impl<Out1: ExchangeData, Out2: ExchangeData> Operator<(Out1, Out2)> for Zip<Out1, Out2> {
+impl<Out1: ExchangeData, Out2: ExchangeData> Operator for Zip<Out1, Out2> {
+    type Out = (Out1, Out2);
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

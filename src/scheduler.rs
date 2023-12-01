@@ -94,7 +94,7 @@ impl Scheduler {
         &mut self,
         block: Block<Out, OperatorChain>,
     ) where
-        OperatorChain: Operator<Out> + 'static,
+        OperatorChain: Operator<Out = Out> + 'static,
     {
         let block_id = block.id;
         let info = self.block_info(&block);
@@ -334,7 +334,7 @@ impl Scheduler {
         block: &Block<Out, OperatorChain>,
     ) -> SchedulerBlockInfo
     where
-        OperatorChain: Operator<Out>,
+        OperatorChain: Operator<Out = Out>,
     {
         match &self.config.runtime {
             ExecutionRuntime::Local(local) => self.local_block_info(block, local),
@@ -354,7 +354,7 @@ impl Scheduler {
         local: &LocalRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        OperatorChain: Operator<Out>,
+        OperatorChain: Operator<Out = Out>,
     {
         let replication = block.scheduler_requirements.replication;
         let instances = replication.clamp(local.num_cores);
@@ -387,7 +387,7 @@ impl Scheduler {
         remote: &RemoteRuntimeConfig,
     ) -> SchedulerBlockInfo
     where
-        OperatorChain: Operator<Out>,
+        OperatorChain: Operator<Out = Out>,
     {
         let replication = block.scheduler_requirements.replication;
         // number of replicas we can assign at most

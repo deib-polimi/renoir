@@ -14,7 +14,7 @@ use crate::scheduler::ExecutionMetadata;
 pub struct KeyedFold<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<(Key, Out)>,
+    PreviousOperators: Operator<Out = (Key, Out)>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -33,7 +33,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Display
     for KeyedFold<Key, Out, NewOut, F, PreviousOperators>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<(Key, Out)>,
+    PreviousOperators: Operator<Out = (Key, Out)>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -46,7 +46,7 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators: Operator<(Key, Out)>>
+impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators: Operator<Out = (Key, Out)>>
     KeyedFold<Key, Out, NewOut, F, PreviousOperators>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
@@ -81,12 +81,14 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Operator<(Key, NewOut)>
+impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Operator
     for KeyedFold<Key, Out, NewOut, F, PreviousOperators>
 where
     F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<(Key, Out)>,
+    PreviousOperators: Operator<Out = (Key, Out)>,
 {
+    type Out = (Key, NewOut);
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

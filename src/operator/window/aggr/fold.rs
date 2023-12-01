@@ -91,7 +91,7 @@ where
 impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<Out>,
-    OperatorChain: Operator<(Key, Out)> + 'static,
+    OperatorChain: Operator<Out = (Key, Out)> + 'static,
     Key: DataKey,
     Out: Data,
 {
@@ -127,7 +127,7 @@ where
         self,
         init: NewOut,
         fold: F,
-    ) -> KeyedStream<Key, NewOut, impl Operator<(Key, NewOut)>>
+    ) -> KeyedStream<Key, NewOut, impl Operator<Out = (Key, NewOut)>>
     where
         F: FnMut(&mut NewOut, Out) + Clone + Send + 'static,
     {
@@ -139,7 +139,7 @@ where
     ///
     /// TODO DOCS
     ///
-    pub fn fold_first<F>(self, fold: F) -> KeyedStream<Key, Out, impl Operator<(Key, Out)>>
+    pub fn fold_first<F>(self, fold: F) -> KeyedStream<Key, Out, impl Operator<Out = (Key, Out)>>
     where
         F: FnMut(&mut Out, Out) + Clone + Send + 'static,
     {

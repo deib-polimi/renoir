@@ -10,7 +10,7 @@ use crate::scheduler::ExecutionMetadata;
 pub struct RichMap<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain>
 where
     F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
-    OperatorChain: Operator<(Key, Out)>,
+    OperatorChain: Operator<Out = (Key, Out)>,
 {
     prev: OperatorChain,
     maps_fn: HashMap<Key, F, crate::block::GroupHasherBuilder>,
@@ -23,7 +23,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, F: Clone, OperatorChain: Clone> Clon
     for RichMap<Key, Out, NewOut, F, OperatorChain>
 where
     F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
-    OperatorChain: Operator<(Key, Out)>,
+    OperatorChain: Operator<Out = (Key, Out)>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -40,7 +40,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain> Display
     for RichMap<Key, Out, NewOut, F, OperatorChain>
 where
     F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
-    OperatorChain: Operator<(Key, Out)>,
+    OperatorChain: Operator<Out = (Key, Out)>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -57,7 +57,7 @@ impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain>
     RichMap<Key, Out, NewOut, F, OperatorChain>
 where
     F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
-    OperatorChain: Operator<(Key, Out)>,
+    OperatorChain: Operator<Out = (Key, Out)>,
 {
     pub(super) fn new(prev: OperatorChain, f: F) -> Self {
         Self {
@@ -70,12 +70,14 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain> Operator<(Key, NewOut)>
+impl<Key: DataKey, Out: Data, NewOut: Data, F, OperatorChain> Operator
     for RichMap<Key, Out, NewOut, F, OperatorChain>
 where
     F: FnMut((&Key, Out)) -> NewOut + Clone + Send,
-    OperatorChain: Operator<(Key, Out)>,
+    OperatorChain: Operator<Out = (Key, Out)>,
 {
+    type Out = (Key, NewOut);
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

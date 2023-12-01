@@ -65,8 +65,8 @@ pub struct JoinStream<
     Keyer1,
     Keyer2,
 > where
-    OperatorChain1: Operator<Out1>,
-    OperatorChain2: Operator<Out2>,
+    OperatorChain1: Operator<Out = Out1>,
+    OperatorChain2: Operator<Out = Out2>,
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {
@@ -84,7 +84,7 @@ pub struct JoinStream<
 
 impl<Out: ExchangeData, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + 'static,
+    OperatorChain: Operator<Out = Out> + 'static,
 {
     /// Given two stream, create a stream with all the pairs (left item from the left stream, right
     /// item from the right), such that the key obtained with `keyer1` on an item from the left is
@@ -117,10 +117,14 @@ where
         rhs: Stream<Out2, OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
-    ) -> KeyedStream<Key, InnerJoinTuple<Out, Out2>, impl Operator<(Key, InnerJoinTuple<Out, Out2>)>>
+    ) -> KeyedStream<
+        Key,
+        InnerJoinTuple<Out, Out2>,
+        impl Operator<Out = (Key, InnerJoinTuple<Out, Out2>)>,
+    >
     where
         Key: DataKey,
-        OperatorChain2: Operator<Out2> + 'static,
+        OperatorChain2: Operator<Out = Out2> + 'static,
         Keyer1: Fn(&Out) -> Key + KeyerFn<Key, Out>,
         Keyer2: Fn(&Out2) -> Key + KeyerFn<Key, Out2>,
     {
@@ -165,10 +169,14 @@ where
         rhs: Stream<Out2, OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
-    ) -> KeyedStream<Key, LeftJoinTuple<Out, Out2>, impl Operator<(Key, LeftJoinTuple<Out, Out2>)>>
+    ) -> KeyedStream<
+        Key,
+        LeftJoinTuple<Out, Out2>,
+        impl Operator<Out = (Key, LeftJoinTuple<Out, Out2>)>,
+    >
     where
         Key: DataKey,
-        OperatorChain2: Operator<Out2> + 'static,
+        OperatorChain2: Operator<Out = Out2> + 'static,
         Keyer1: Fn(&Out) -> Key + KeyerFn<Key, Out>,
         Keyer2: Fn(&Out2) -> Key + KeyerFn<Key, Out2>,
     {
@@ -214,10 +222,14 @@ where
         rhs: Stream<Out2, OperatorChain2>,
         keyer1: Keyer1,
         keyer2: Keyer2,
-    ) -> KeyedStream<Key, OuterJoinTuple<Out, Out2>, impl Operator<(Key, OuterJoinTuple<Out, Out2>)>>
+    ) -> KeyedStream<
+        Key,
+        OuterJoinTuple<Out, Out2>,
+        impl Operator<Out = (Key, OuterJoinTuple<Out, Out2>)>,
+    >
     where
         Key: DataKey,
-        OperatorChain2: Operator<Out2> + 'static,
+        OperatorChain2: Operator<Out = Out2> + 'static,
         Keyer1: Fn(&Out) -> Key + KeyerFn<Key, Out>,
         Keyer2: Fn(&Out2) -> Key + KeyerFn<Key, Out2>,
     {
@@ -271,7 +283,7 @@ where
         keyer2: Keyer2,
     ) -> JoinStream<Key, Out, Out2, OperatorChain, OperatorChain2, Keyer1, Keyer2>
     where
-        OperatorChain2: Operator<Out2>,
+        OperatorChain2: Operator<Out = Out2>,
         Keyer1: Fn(&Out) -> Key + KeyerFn<Key, Out>,
         Keyer2: Fn(&Out2) -> Key + KeyerFn<Key, Out2>,
     {
@@ -295,8 +307,8 @@ impl<
         Keyer2,
     > JoinStream<Key, Out1, Out2, OperatorChain1, OperatorChain2, Keyer1, Keyer2>
 where
-    OperatorChain1: Operator<Out1> + 'static,
-    OperatorChain2: Operator<Out2> + 'static,
+    OperatorChain1: Operator<Out = Out1> + 'static,
+    OperatorChain2: Operator<Out = Out2> + 'static,
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
 {

@@ -45,7 +45,9 @@ impl<Out: Data> FakeOperator<Out> {
     }
 }
 
-impl<Out: Data> Operator<Out> for FakeOperator<Out> {
+impl<Out: Data> Operator for FakeOperator<Out> {
+    type Out = Out;
+
     fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {

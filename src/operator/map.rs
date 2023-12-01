@@ -10,7 +10,7 @@ use crate::scheduler::ExecutionMetadata;
 pub struct Map<Out: Data, NewOut: Data, F, PreviousOperators>
 where
     F: Fn(Out) -> NewOut + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -23,7 +23,7 @@ impl<Out: Data, NewOut: Data, F, PreviousOperators> Display
     for Map<Out, NewOut, F, PreviousOperators>
 where
     F: Fn(Out) -> NewOut + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -39,7 +39,7 @@ where
 impl<Out: Data, NewOut: Data, F, PreviousOperators> Map<Out, NewOut, F, PreviousOperators>
 where
     F: Fn(Out) -> NewOut + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     pub(super) fn new(prev: PreviousOperators, f: F) -> Self {
         Self {
@@ -51,12 +51,14 @@ where
     }
 }
 
-impl<Out: Data, NewOut: Data, F, PreviousOperators> Operator<NewOut>
+impl<Out: Data, NewOut: Data, F, PreviousOperators> Operator
     for Map<Out, NewOut, F, PreviousOperators>
 where
     F: Fn(Out) -> NewOut + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
+    type Out = NewOut;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

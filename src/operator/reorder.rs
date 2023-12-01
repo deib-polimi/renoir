@@ -35,7 +35,7 @@ impl<Out> PartialEq for TimestampedItem<Out> {
 #[derive(Clone)]
 pub(crate) struct Reorder<Out: Data, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     buffer: VecDeque<TimestampedItem<Out>>,
     // Scratch memory used for glidesort
@@ -47,7 +47,7 @@ where
 
 impl<Out: Data, PreviousOperators> Display for Reorder<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -61,7 +61,7 @@ where
 
 impl<Out: Data, PreviousOperators> Reorder<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     pub(crate) fn new(prev: PreviousOperators) -> Self {
         Self {
@@ -74,10 +74,12 @@ where
     }
 }
 
-impl<Out: Data, PreviousOperators> Operator<Out> for Reorder<Out, PreviousOperators>
+impl<Out: Data, PreviousOperators> Operator for Reorder<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

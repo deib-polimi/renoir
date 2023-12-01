@@ -12,7 +12,7 @@ use super::StreamElement;
 pub struct FilterMap<In: Data, Out: Data, PreviousOperator, Predicate>
 where
     Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-    PreviousOperator: Operator<In> + 'static,
+    PreviousOperator: Operator<Out = In> + 'static,
 {
     prev: PreviousOperator,
     predicate: Predicate,
@@ -24,7 +24,7 @@ impl<In: Data, Out: Data, PreviousOperator, Predicate> Display
     for FilterMap<In, Out, PreviousOperator, Predicate>
 where
     Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-    PreviousOperator: Operator<In> + 'static,
+    PreviousOperator: Operator<Out = In> + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -40,7 +40,7 @@ impl<In: Data, Out: Data, PreviousOperator, Predicate>
     FilterMap<In, Out, PreviousOperator, Predicate>
 where
     Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-    PreviousOperator: Operator<In> + 'static,
+    PreviousOperator: Operator<Out = In> + 'static,
 {
     pub(super) fn new(prev: PreviousOperator, predicate: Predicate) -> Self {
         Self {
@@ -52,12 +52,14 @@ where
     }
 }
 
-impl<In: Data, Out: Data, PreviousOperator, Predicate> Operator<Out>
+impl<In: Data, Out: Data, PreviousOperator, Predicate> Operator
     for FilterMap<In, Out, PreviousOperator, Predicate>
 where
     Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-    PreviousOperator: Operator<In> + 'static,
+    PreviousOperator: Operator<Out = In> + 'static,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

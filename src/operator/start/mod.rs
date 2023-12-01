@@ -165,9 +165,9 @@ impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Start<Out, Receiver
     }
 }
 
-impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator<Out>
-    for Start<Out, Receiver>
-{
+impl<Out: ExchangeData, Receiver: StartReceiver<Out> + Send> Operator for Start<Out, Receiver> {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.receiver.setup(metadata);
 

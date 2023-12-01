@@ -26,7 +26,7 @@ use crate::scheduler::BlockId;
 /// blocks inside of it.
 pub struct Stream<Out: Data, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     /// The last block inside the stream.
     pub(crate) block: Block<Out, OperatorChain>,
@@ -41,7 +41,7 @@ where
 /// The type of the `Key` must be a valid key inside an hashmap.
 pub struct KeyedStream<Key: Data, Out: Data, OperatorChain>(pub Stream<(Key, Out), OperatorChain>)
 where
-    OperatorChain: Operator<(Key, Out)>;
+    OperatorChain: Operator<Out = (Key, Out)>;
 
 /// A [`WindowedStream`] is a data stream partitioned by `Key`, where elements of each partition
 /// are divided in groups called windows.
@@ -68,7 +68,7 @@ where
 ///
 pub struct WindowedStream<K: DataKey, I: Data, Op, O: Data, WinDescr>
 where
-    Op: Operator<(K, I)>,
+    Op: Operator<Out = (K, I)>,
     WinDescr: WindowDescription<I>,
 {
     pub(crate) inner: KeyedStream<K, I, Op>,
@@ -78,7 +78,7 @@ where
 
 impl<I: Data, Op> Stream<I, Op>
 where
-    Op: Operator<I> + 'static,
+    Op: Operator<Out = I> + 'static,
 {
     /// Add a new operator to the current chain inside the stream. This consumes the stream and
     /// returns a new one with the operator added.
@@ -91,7 +91,7 @@ where
     /// not what you are looking for.
     pub fn add_operator<O: Data, Op2, GetOp>(self, get_operator: GetOp) -> Stream<O, Op2>
     where
-        Op2: Operator<O> + 'static,
+        Op2: Operator<Out = O> + 'static,
         GetOp: FnOnce(Op) -> Op2,
     {
         Stream {
@@ -112,11 +112,11 @@ where
         self,
         get_end_operator: GetEndOp,
         next_strategy: NextStrategy<I, IndexFn>,
-    ) -> Stream<I, impl Operator<I>>
+    ) -> Stream<I, impl Operator<Out = I>>
     where
         IndexFn: KeyerFn<u64, I>,
         I: ExchangeData,
-        Op2: Operator<()> + 'static,
+        Op2: Operator<Out = ()> + 'static,
         GetEndOp: FnOnce(Op, NextStrategy<I, IndexFn>, BatchMode) -> Op2,
     {
         let Stream { block, env } = self;
@@ -167,9 +167,9 @@ where
         I2: ExchangeData,
         Fi: KeyerFn<u64, I>,
         Fj: KeyerFn<u64, I2>,
-        Op2: Operator<I2> + 'static,
+        Op2: Operator<Out = I2> + 'static,
         O: Data,
-        S: Operator<O> + Source<O>,
+        S: Operator<Out = O> + Source<O>,
         Fs: FnOnce(BlockId, BlockId, bool, bool, Option<Arc<IterationStateLock>>) -> S,
     {
         let Stream { block: b1, env } = self;
@@ -279,14 +279,14 @@ where
 
 impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<Key, Out, OperatorChain>
 where
-    OperatorChain: Operator<(Key, Out)> + 'static,
+    OperatorChain: Operator<Out = (Key, Out)> + 'static,
 {
     pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
         self,
         get_operator: GetOp,
     ) -> KeyedStream<Key, NewOut, Op>
     where
-        Op: Operator<(Key, NewOut)> + 'static,
+        Op: Operator<Out = (Key, NewOut)> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
     {
         KeyedStream(self.0.add_operator(get_operator))
@@ -295,7 +295,7 @@ where
 
 impl<K: DataKey, V: Data, OperatorChain> Stream<(K, V), OperatorChain>
 where
-    OperatorChain: Operator<(K, V)>,
+    OperatorChain: Operator<Out = (K, V)>,
 {
     /// TODO DOCS
     pub fn to_keyed(self) -> KeyedStream<K, V, OperatorChain> {

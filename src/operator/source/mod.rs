@@ -22,7 +22,7 @@ mod iterator;
 mod parallel_iterator;
 
 /// This trait marks all the operators that can be used as sinks.
-pub trait Source<Out: Data>: Operator<Out> {
+pub trait Source<Out: Data>: Operator<Out = Out> {
     /// The maximum parallelism offered by this operator.
     fn replication(&self) -> Replication;
 }

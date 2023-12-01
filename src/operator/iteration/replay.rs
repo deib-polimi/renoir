@@ -23,7 +23,7 @@ use crate::stream::Stream;
 #[derive(Debug, Clone)]
 pub struct Replay<Out: Data, State: ExchangeData, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     /// The coordinate of this replica.
     coord: Coord,
@@ -45,7 +45,7 @@ where
 
 impl<Out: Data, State: ExchangeData, OperatorChain> Display for Replay<Out, State, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -59,7 +59,7 @@ where
 
 impl<Out: Data, State: ExchangeData, OperatorChain> Replay<Out, State, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     fn new(
         prev: OperatorChain,
@@ -143,11 +143,13 @@ where
     }
 }
 
-impl<Out: Data, State: ExchangeData + Sync, OperatorChain> Operator<Out>
+impl<Out: Data, State: ExchangeData + Sync, OperatorChain> Operator
     for Replay<Out, State, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
         self.prev.setup(metadata);
@@ -203,7 +205,7 @@ where
 
 impl<Out: Data, OperatorChain> Stream<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out> + 'static,
+    OperatorChain: Operator<Out = Out> + 'static,
 {
     /// Construct an iterative dataflow where the input stream is repeatedly fed inside a cycle,
     /// i.e. what comes into the cycle is _replayed_ at every iteration.
@@ -264,13 +266,13 @@ where
         local_fold: impl Fn(&mut DeltaUpdate, Out) + Send + Clone + 'static,
         global_fold: impl Fn(&mut State, DeltaUpdate) + Send + Clone + 'static,
         loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
-    ) -> Stream<State, impl Operator<State>>
+    ) -> Stream<State, impl Operator<Out = State>>
     where
         Body: FnOnce(
             Stream<Out, Replay<Out, State, OperatorChain>>,
             IterationStateHandle<State>,
         ) -> Stream<Out, OperatorChain2>,
-        OperatorChain2: Operator<Out> + 'static,
+        OperatorChain2: Operator<Out = Out> + 'static,
     {
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.

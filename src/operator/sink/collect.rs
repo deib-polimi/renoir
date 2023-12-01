@@ -9,7 +9,7 @@ use crate::scheduler::ExecutionMetadata;
 #[derive(Debug)]
 pub struct Collect<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     prev: PreviousOperators,
     output: StreamOutputRef<C>,
@@ -19,7 +19,7 @@ where
 impl<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators>
     Collect<Out, C, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     pub fn new(prev: PreviousOperators, output: StreamOutputRef<C>) -> Self {
         Self {
@@ -33,7 +33,7 @@ where
 impl<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators> Display
     for Collect<Out, C, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -45,11 +45,13 @@ where
     }
 }
 
-impl<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators> Operator<()>
+impl<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators> Operator
     for Collect<Out, C, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
+    type Out = ();
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -78,14 +80,14 @@ where
 impl<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators> Sink
     for Collect<Out, C, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
 }
 
 impl<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators> Clone
     for Collect<Out, C, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn clone(&self) -> Self {
         panic!("Collect cannot be cloned, replication should be 1");

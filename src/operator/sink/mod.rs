@@ -14,7 +14,7 @@ pub(super) mod collect_vec;
 pub(super) mod for_each;
 
 /// This trait marks all the operators that can be used as sinks.
-pub(crate) trait Sink: Operator<()> {}
+pub(crate) trait Sink: Operator<Out = ()> {}
 
 pub(crate) type StreamOutputRef<Out> = Arc<Mutex<Option<Out>>>;
 

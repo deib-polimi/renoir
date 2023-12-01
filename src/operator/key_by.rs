@@ -11,7 +11,7 @@ use crate::scheduler::ExecutionMetadata;
 pub struct KeyBy<Key: DataKey, Out: Data, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     prev: OperatorChain,
     #[derivative(Debug = "ignore")]
@@ -24,7 +24,7 @@ impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Display
     for KeyBy<Key, Out, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -39,7 +39,7 @@ where
 impl<Key: DataKey, Out: Data, Keyer, OperatorChain> KeyBy<Key, Out, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     pub fn new(prev: OperatorChain, keyer: Keyer) -> Self {
         Self {
@@ -51,12 +51,14 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Operator<(Key, Out)>
+impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Operator
     for KeyBy<Key, Out, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
+    type Out = (Key, Out);
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

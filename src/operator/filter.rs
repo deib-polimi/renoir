@@ -9,7 +9,7 @@ use crate::scheduler::ExecutionMetadata;
 pub struct Filter<Out: Data, PreviousOperator, Predicate>
 where
     Predicate: Fn(&Out) -> bool + Send + Clone + 'static,
-    PreviousOperator: Operator<Out> + 'static,
+    PreviousOperator: Operator<Out = Out> + 'static,
 {
     prev: PreviousOperator,
     predicate: Predicate,
@@ -19,7 +19,7 @@ where
 impl<Out: Data, PreviousOperator, Predicate> Display for Filter<Out, PreviousOperator, Predicate>
 where
     Predicate: Fn(&Out) -> bool + Send + Clone + 'static,
-    PreviousOperator: Operator<Out> + 'static,
+    PreviousOperator: Operator<Out = Out> + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -34,7 +34,7 @@ where
 impl<Out: Data, PreviousOperator, Predicate> Filter<Out, PreviousOperator, Predicate>
 where
     Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
-    PreviousOperator: Operator<Out> + 'static,
+    PreviousOperator: Operator<Out = Out> + 'static,
 {
     pub(super) fn new(prev: PreviousOperator, predicate: Predicate) -> Self {
         Self {
@@ -45,12 +45,13 @@ where
     }
 }
 
-impl<Out: Data, PreviousOperator, Predicate> Operator<Out>
-    for Filter<Out, PreviousOperator, Predicate>
+impl<Out: Data, PreviousOperator, Predicate> Operator for Filter<Out, PreviousOperator, Predicate>
 where
     Predicate: Fn(&Out) -> bool + Clone + Send + 'static,
-    PreviousOperator: Operator<Out> + 'static,
+    PreviousOperator: Operator<Out = Out> + 'static,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

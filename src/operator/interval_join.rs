@@ -22,7 +22,7 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
+    OperatorChain: Operator<Out = (Key, MergeElement<Out, Out2>)>,
 {
     prev: OperatorChain,
     /// Elements of the left side to be processed.
@@ -46,7 +46,7 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
+    OperatorChain: Operator<Out = (Key, MergeElement<Out, Out2>)>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -65,7 +65,7 @@ where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
+    OperatorChain: Operator<Out = (Key, MergeElement<Out, Out2>)>,
 {
     pub(super) fn new(prev: OperatorChain, lower_bound: Timestamp, upper_bound: Timestamp) -> Self {
         Self {
@@ -135,14 +135,15 @@ where
     }
 }
 
-impl<Key, Out, Out2, OperatorChain> Operator<(Key, (Out, Out2))>
-    for IntervalJoin<Key, Out, Out2, OperatorChain>
+impl<Key, Out, Out2, OperatorChain> Operator for IntervalJoin<Key, Out, Out2, OperatorChain>
 where
     Key: ExchangeDataKey,
     Out: ExchangeData,
     Out2: ExchangeData,
-    OperatorChain: Operator<(Key, MergeElement<Out, Out2>)>,
+    OperatorChain: Operator<Out = (Key, MergeElement<Out, Out2>)>,
 {
+    type Out = (Key, (Out, Out2));
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

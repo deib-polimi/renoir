@@ -12,7 +12,7 @@ pub struct FlatMap<In, Out, Iter, F, PreviousOperators>
 where
     In: Data,
     Out: Data,
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn(In) -> Iter + Clone + Send + 'static,
@@ -37,7 +37,7 @@ impl<In: Clone, Out: Clone, Iter, F: Clone, PreviousOperators: Clone> Clone
 where
     In: Data,
     Out: Data,
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn(In) -> Iter + Clone + Send + 'static,
@@ -59,7 +59,7 @@ impl<In, Out, Iter, F, PreviousOperators> Display for FlatMap<In, Out, Iter, F, 
 where
     In: Data,
     Out: Data,
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn(In) -> Iter + Clone + Send + 'static,
@@ -79,7 +79,7 @@ impl<In, Out, Iter, F, PreviousOperators> FlatMap<In, Out, Iter, F, PreviousOper
 where
     In: Data,
     Out: Data,
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn(In) -> Iter + Clone + Send + 'static,
@@ -97,16 +97,17 @@ where
     }
 }
 
-impl<In, Out, Iter, F, PreviousOperators> Operator<Out>
-    for FlatMap<In, Out, Iter, F, PreviousOperators>
+impl<In, Out, Iter, F, PreviousOperators> Operator for FlatMap<In, Out, Iter, F, PreviousOperators>
 where
     In: Data,
     Out: Data,
-    PreviousOperators: Operator<In>,
+    PreviousOperators: Operator<Out = In>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn(In) -> Iter + Clone + Send + 'static,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -163,7 +164,7 @@ where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -189,7 +190,7 @@ where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -213,7 +214,7 @@ where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -235,7 +236,7 @@ where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
@@ -253,17 +254,19 @@ where
     }
 }
 
-impl<Key, In, Out, Iter, F, PreviousOperators> Operator<(Key, Out)>
+impl<Key, In, Out, Iter, F, PreviousOperators> Operator
     for KeyedFlatMap<Key, In, Out, Iter, F, PreviousOperators>
 where
     In: Data,
     Key: DataKey,
     Out: Data,
-    PreviousOperators: Operator<(Key, In)>,
+    PreviousOperators: Operator<Out = (Key, In)>,
     Iter: IntoIterator<Item = Out>,
     <Iter as IntoIterator>::IntoIter: Send + 'static,
     F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
 {
+    type Out = (Key, Out);
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

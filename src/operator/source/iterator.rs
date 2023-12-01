@@ -66,10 +66,12 @@ where
     }
 }
 
-impl<Out: Data, It> Operator<Out> for IteratorSource<Out, It>
+impl<Out: Data, It> Operator for IteratorSource<Out, It>
 where
     It: Iterator<Item = Out> + Send + 'static,
 {
+    type Out = Out;
+
     fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {

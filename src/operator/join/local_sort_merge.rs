@@ -24,7 +24,7 @@ struct JoinLocalSortMerge<
     Out2: ExchangeData,
     Keyer1: KeyerFn<Key, Out1>,
     Keyer2: KeyerFn<Key, Out2>,
-    OperatorChain: Operator<BinaryElement<Out1, Out2>>,
+    OperatorChain: Operator<Out = BinaryElement<Out1, Out2>>,
 > {
     prev: OperatorChain,
 
@@ -55,7 +55,7 @@ impl<
         Out2: ExchangeData,
         Keyer1: KeyerFn<Key, Out1>,
         Keyer2: KeyerFn<Key, Out2>,
-        OperatorChain: Operator<BinaryElement<Out1, Out2>>,
+        OperatorChain: Operator<Out = BinaryElement<Out1, Out2>>,
     > Display for JoinLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -73,7 +73,7 @@ impl<
         Out2: ExchangeData,
         Keyer1: KeyerFn<Key, Out1>,
         Keyer2: KeyerFn<Key, Out2>,
-        OperatorChain: Operator<BinaryElement<Out1, Out2>>,
+        OperatorChain: Operator<Out = BinaryElement<Out1, Out2>>,
     > JoinLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
     fn new(prev: OperatorChain, variant: JoinVariant, keyer1: Keyer1, keyer2: Keyer2) -> Self {
@@ -158,10 +158,11 @@ impl<
         Out2: ExchangeData,
         Keyer1: KeyerFn<Key, Out1>,
         Keyer2: KeyerFn<Key, Out2>,
-        OperatorChain: Operator<BinaryElement<Out1, Out2>>,
-    > Operator<(Key, OuterJoinTuple<Out1, Out2>)>
-    for JoinLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
+        OperatorChain: Operator<Out = BinaryElement<Out1, Out2>>,
+    > Operator for JoinLocalSortMerge<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
+    type Out = (Key, OuterJoinTuple<Out1, Out2>);
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -289,7 +290,7 @@ where
     ) -> KeyedStream<
         Key,
         InnerJoinTuple<Out1, Out2>,
-        impl Operator<(Key, InnerJoinTuple<Out1, Out2>)>,
+        impl Operator<Out = (Key, InnerJoinTuple<Out1, Out2>)>,
     > {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
@@ -314,8 +315,11 @@ where
     /// **Note**: this operator will split the current block.
     pub fn left(
         self,
-    ) -> KeyedStream<Key, LeftJoinTuple<Out1, Out2>, impl Operator<(Key, LeftJoinTuple<Out1, Out2>)>>
-    {
+    ) -> KeyedStream<
+        Key,
+        LeftJoinTuple<Out1, Out2>,
+        impl Operator<Out = (Key, LeftJoinTuple<Out1, Out2>)>,
+    > {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         let inner = self
@@ -343,7 +347,7 @@ where
     ) -> KeyedStream<
         Key,
         OuterJoinTuple<Out1, Out2>,
-        impl Operator<(Key, OuterJoinTuple<Out1, Out2>)>,
+        impl Operator<Out = (Key, OuterJoinTuple<Out1, Out2>)>,
     > {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
@@ -371,8 +375,10 @@ where
     /// **Note**: this operator will split the current block.
     pub fn inner(
         self,
-    ) -> Stream<(Key, InnerJoinTuple<Out1, Out2>), impl Operator<(Key, InnerJoinTuple<Out1, Out2>)>>
-    {
+    ) -> Stream<
+        (Key, InnerJoinTuple<Out1, Out2>),
+        impl Operator<Out = (Key, InnerJoinTuple<Out1, Out2>)>,
+    > {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         self.stream
@@ -395,8 +401,10 @@ where
     /// **Note**: this operator will split the current block.
     pub fn left(
         self,
-    ) -> Stream<(Key, LeftJoinTuple<Out1, Out2>), impl Operator<(Key, LeftJoinTuple<Out1, Out2>)>>
-    {
+    ) -> Stream<
+        (Key, LeftJoinTuple<Out1, Out2>),
+        impl Operator<Out = (Key, LeftJoinTuple<Out1, Out2>)>,
+    > {
         let keyer1 = self.keyer1;
         let keyer2 = self.keyer2;
         self.stream

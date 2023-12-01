@@ -78,7 +78,7 @@ pub struct MapAsync<I, O, F, Fut, PreviousOperators>
 where
     F: Fn(I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<I>,
+    PreviousOperators: Operator<Out = I>,
     I: Data,
 {
     prev: PreviousOperators,
@@ -97,7 +97,7 @@ impl<I, O, F, Fut, PreviousOperators> Clone for MapAsync<I, O, F, Fut, PreviousO
 where
     F: Fn(I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<I>,
+    PreviousOperators: Operator<Out = I>,
     I: Data,
     O: Data,
     F: Clone,
@@ -113,7 +113,7 @@ impl<I: Data, O: Data, F, Fut, PreviousOperators> Display
 where
     F: Fn(I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<I>,
+    PreviousOperators: Operator<Out = I>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -130,7 +130,7 @@ impl<I: Data, O: Data, F, Fut, PreviousOperators> MapAsync<I, O, F, Fut, Previou
 where
     F: Fn(I) -> Fut + Send + Sync + 'static + Clone,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<I>,
+    PreviousOperators: Operator<Out = I>,
 {
     pub(super) fn new(prev: PreviousOperators, f: F, buffer: usize) -> Self {
         const CH: usize = 2;
@@ -188,13 +188,15 @@ where
     }
 }
 
-impl<I: Data, O: Data, F, Fut, PreviousOperators> Operator<O>
+impl<I: Data, O: Data, F, Fut, PreviousOperators> Operator
     for MapAsync<I, O, F, Fut, PreviousOperators>
 where
     F: Fn(I) -> Fut + Send + Sync + 'static + Clone,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<I>,
+    PreviousOperators: Operator<Out = I>,
 {
+    type Out = O;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
         self.batcher.mode = metadata.batch_mode;

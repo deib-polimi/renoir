@@ -65,7 +65,9 @@ impl<Out: Data + core::fmt::Debug> Source<Out> for ChannelSource<Out> {
     }
 }
 
-impl<Out: Data + core::fmt::Debug> Operator<Out> for ChannelSource<Out> {
+impl<Out: Data + core::fmt::Debug> Operator for ChannelSource<Out> {
+    type Out = Out;
+
     fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
     fn next(&mut self) -> StreamElement<Out> {

@@ -8,7 +8,7 @@ use crate::scheduler::ExecutionMetadata;
 #[derive(Clone)]
 pub struct AddTimestamp<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
     TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
     WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
@@ -22,7 +22,7 @@ where
 impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain> Display
     for AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
     TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
     WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
@@ -34,7 +34,7 @@ where
 impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
     AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
     TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
     WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
@@ -53,13 +53,15 @@ where
     }
 }
 
-impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain> Operator<Out>
+impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain> Operator
     for AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
     TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
     WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -95,7 +97,7 @@ where
 #[derive(Clone)]
 pub struct DropTimestamp<Out: Data, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     prev: OperatorChain,
     _out: PhantomData<Out>,
@@ -103,7 +105,7 @@ where
 
 impl<Out: Data, OperatorChain> Display for DropTimestamp<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> DropTimestamp", self.prev)
@@ -112,7 +114,7 @@ where
 
 impl<Out: Data, OperatorChain> DropTimestamp<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     pub(super) fn new(prev: OperatorChain) -> Self {
         Self {
@@ -122,10 +124,12 @@ where
     }
 }
 
-impl<Out: Data, OperatorChain> Operator<Out> for DropTimestamp<Out, OperatorChain>
+impl<Out: Data, OperatorChain> Operator for DropTimestamp<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

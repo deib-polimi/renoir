@@ -168,12 +168,14 @@ where
     }
 }
 
-impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond> Operator<State>
+impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond> Operator
     for IterationLeader<DeltaUpdate, State, Global, LoopCond>
 where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,
     LoopCond: Fn(&mut State) -> bool + Send + Clone,
 {
+    type Out = State;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.coord = metadata.coord;
         self.feedback_senders = metadata

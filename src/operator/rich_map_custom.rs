@@ -10,7 +10,7 @@ pub struct ElementGenerator<'a, Out, Op> {
     _out: PhantomData<Out>,
 }
 
-impl<'a, Out: Data, Op: Operator<Out>> ElementGenerator<'a, Out, Op> {
+impl<'a, Out: Data, Op: Operator<Out = Out>> ElementGenerator<'a, Out, Op> {
     pub fn new(inner: &'a mut Op) -> Self {
         Self {
             inner,
@@ -28,7 +28,7 @@ impl<'a, Out: Data, Op: Operator<Out>> ElementGenerator<'a, Out, Op> {
 pub struct RichMapCustom<Out: Data, NewOut: Data, F, OperatorChain>
 where
     F: FnMut(ElementGenerator<Out, OperatorChain>) -> StreamElement<NewOut> + Clone + Send,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     prev: OperatorChain,
     map_fn: F,
@@ -40,7 +40,7 @@ impl<Out: Data, NewOut: Data, F, OperatorChain> Display
     for RichMapCustom<Out, NewOut, F, OperatorChain>
 where
     F: FnMut(ElementGenerator<Out, OperatorChain>) -> StreamElement<NewOut> + Clone + Send,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -56,7 +56,7 @@ where
 impl<Out: Data, NewOut: Data, F, OperatorChain> RichMapCustom<Out, NewOut, F, OperatorChain>
 where
     F: FnMut(ElementGenerator<Out, OperatorChain>) -> StreamElement<NewOut> + Clone + Send,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     pub(super) fn new(prev: OperatorChain, f: F) -> Self {
         Self {
@@ -68,12 +68,14 @@ where
     }
 }
 
-impl<Out: Data, NewOut: Data, F, OperatorChain> Operator<NewOut>
+impl<Out: Data, NewOut: Data, F, OperatorChain> Operator
     for RichMapCustom<Out, NewOut, F, OperatorChain>
 where
     F: FnMut(ElementGenerator<Out, OperatorChain>) -> StreamElement<NewOut> + Clone + Send,
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
+    type Out = NewOut;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }

@@ -8,7 +8,7 @@ use crate::scheduler::ExecutionMetadata;
 #[derive(Debug)]
 pub struct CollectVecSink<Out: ExchangeData, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     prev: PreviousOperators,
     result: Option<Vec<Out>>,
@@ -17,7 +17,7 @@ where
 
 impl<Out: ExchangeData, PreviousOperators> CollectVecSink<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     pub(crate) fn new(prev: PreviousOperators, output: StreamOutputRef<Vec<Out>>) -> Self {
         Self {
@@ -30,17 +30,19 @@ where
 
 impl<Out: ExchangeData, PreviousOperators> Display for CollectVecSink<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> CollectVecSink", self.prev)
     }
 }
 
-impl<Out: ExchangeData, PreviousOperators> Operator<()> for CollectVecSink<Out, PreviousOperators>
+impl<Out: ExchangeData, PreviousOperators> Operator for CollectVecSink<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
+    type Out = ();
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
@@ -74,13 +76,13 @@ where
 }
 
 impl<Out: ExchangeData, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators> where
-    PreviousOperators: Operator<Out>
+    PreviousOperators: Operator<Out = Out>
 {
 }
 
 impl<Out: ExchangeData, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
 where
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn clone(&self) -> Self {
         panic!("CollectVecSink cannot be cloned, replication should be 1");

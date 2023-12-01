@@ -29,7 +29,7 @@ pub mod structure;
 #[derive(Debug, Clone)]
 pub(crate) struct Block<Out: Data, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     /// The identifier of the block inside the environment.
     pub(crate) id: BlockId,
@@ -50,12 +50,12 @@ where
 
 impl<Out: Data, OperatorChain> Block<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     /// Add an operator to the end of the block
     pub fn add_operator<NewOut: Data, Op, GetOp>(self, get_operator: GetOp) -> Block<NewOut, Op>
     where
-        Op: Operator<NewOut> + 'static,
+        Op: Operator<Out = NewOut> + 'static,
         GetOp: FnOnce(OperatorChain) -> Op,
     {
         Block {
@@ -137,7 +137,7 @@ impl Replication {
 
 impl<Out: Data, OperatorChain> Block<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     pub fn new(
         id: BlockId,
@@ -170,7 +170,7 @@ where
 
 impl<Out: Data, OperatorChain> Display for Block<Out, OperatorChain>
 where
-    OperatorChain: Operator<Out>,
+    OperatorChain: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.operators)

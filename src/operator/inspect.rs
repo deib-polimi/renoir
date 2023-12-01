@@ -10,7 +10,7 @@ use crate::scheduler::ExecutionMetadata;
 pub struct Inspect<Out: Data, F, PreviousOperators>
 where
     F: FnMut(&Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     prev: PreviousOperators,
     #[derivative(Debug = "ignore")]
@@ -21,7 +21,7 @@ where
 impl<Out: Data, F, PreviousOperators> Inspect<Out, F, PreviousOperators>
 where
     F: FnMut(&Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     pub fn new(prev: PreviousOperators, f: F) -> Self {
         Self {
@@ -35,18 +35,20 @@ where
 impl<Out: Data, F, PreviousOperators> Display for Inspect<Out, F, PreviousOperators>
 where
     F: FnMut(&Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> Inspect", self.prev)
     }
 }
 
-impl<Out: Data, F, PreviousOperators> Operator<Out> for Inspect<Out, F, PreviousOperators>
+impl<Out: Data, F, PreviousOperators> Operator for Inspect<Out, F, PreviousOperators>
 where
     F: FnMut(&Out) + Send + Clone,
-    PreviousOperators: Operator<Out>,
+    PreviousOperators: Operator<Out = Out>,
 {
+    type Out = Out;
+
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
