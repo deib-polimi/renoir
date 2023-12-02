@@ -1,52 +1,48 @@
 use std::fmt::Display;
-use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, Operator, StreamElement, Timestamp};
+use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Fold<Out: Data, NewOut: Data, F, PreviousOperators>
+pub struct Fold<O: Send + Clone, F, Op>
 where
-    F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: Fn(&mut O, Op::Out) + Send + Clone,
+    Op: Operator,
 {
-    prev: PreviousOperators,
+    prev: Op,
     #[derivative(Debug = "ignore")]
     fold: F,
-    init: NewOut,
-    accumulator: Option<NewOut>,
+    init: O,
+    accumulator: Option<O>,
     timestamp: Option<Timestamp>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
     received_end_iter: bool,
-    _out: PhantomData<Out>,
 }
 
-impl<Out: Data, NewOut: Data, F, PreviousOperators> Display
-    for Fold<Out, NewOut, F, PreviousOperators>
+impl<O: Send + Clone, F, Op> Display for Fold<O, F, Op>
 where
-    F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: Fn(&mut O, Op::Out) + Send + Clone,
+    Op: Operator,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> Fold<{} -> {}>",
             self.prev,
-            std::any::type_name::<Out>(),
-            std::any::type_name::<NewOut>()
+            std::any::type_name::<Op::Out>(),
+            std::any::type_name::<O>()
         )
     }
 }
 
-impl<Out: Data, NewOut: Data, F, PreviousOperators: Operator<Out = Out>>
-    Fold<Out, NewOut, F, PreviousOperators>
+impl<O: Send + Clone, F, Op: Operator> Fold<O, F, Op>
 where
-    F: Fn(&mut NewOut, Out) + Send + Clone,
+    F: Fn(&mut O, Op::Out) + Send + Clone,
 {
-    pub(super) fn new(prev: PreviousOperators, init: NewOut, fold: F) -> Self {
+    pub(super) fn new(prev: Op, init: O, fold: F) -> Self {
         Fold {
             prev,
             fold,
@@ -56,25 +52,23 @@ where
             max_watermark: None,
             received_end: false,
             received_end_iter: false,
-            _out: Default::default(),
         }
     }
 }
 
-impl<Out: Data, NewOut: Data, F, PreviousOperators> Operator
-    for Fold<Out, NewOut, F, PreviousOperators>
+impl<O: Send + Clone, F, Op> Operator for Fold<O, F, Op>
 where
-    F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: Fn(&mut O, Op::Out) + Send + Clone,
+    Op: Operator,
 {
-    type Out = NewOut;
+    type Out = O;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<NewOut> {
+    fn next(&mut self) -> StreamElement<O> {
         while !self.received_end {
             match self.prev.next() {
                 StreamElement::Terminate => self.received_end = true,
@@ -130,7 +124,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<NewOut, _>("Fold"))
+            .add_operator(OperatorStructure::new::<O, _>("Fold"))
     }
 }
 

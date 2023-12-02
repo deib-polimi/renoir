@@ -72,69 +72,62 @@ impl<T> Batcher<T> {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct MapAsync<I, O, F, Fut, PreviousOperators>
+pub struct MapAsync<O: Send + 'static, F, Fut, Op>
 where
-    F: Fn(I) -> Fut + Send + Sync + 'static,
+    F: Fn(Op::Out) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<Out = I>,
-    I: Data,
+    Op: Operator,
 {
-    prev: PreviousOperators,
-    batcher: Batcher<I>,
+    prev: Op,
+    batcher: Batcher<Op::Out>,
     buffer: Option<VecIter<StreamElement<O>>>,
     flushing: bool,
     pending: usize,
     f: F,
-    #[derivative(Debug = "ignore")]
-    i_tx: Sender<Vec<StreamElement<I>>>,
-    #[derivative(Debug = "ignore")]
+    i_tx: Sender<Vec<StreamElement<Op::Out>>>,
     o_rx: Receiver<Vec<StreamElement<O>>>,
 }
 
-impl<I, O, F, Fut, PreviousOperators> Clone for MapAsync<I, O, F, Fut, PreviousOperators>
+impl<O: Send + 'static, F, Fut, Op> Clone for MapAsync<O, F, Fut, Op>
 where
-    F: Fn(I) -> Fut + Send + Sync + 'static,
+    F: Fn(Op::Out) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<Out = I>,
-    I: Data,
-    O: Data,
+    Op: Operator,
+    Op::Out: 'static,
     F: Clone,
-    PreviousOperators: Clone,
 {
     fn clone(&self) -> Self {
         Self::new(self.prev.clone(), self.f.clone(), 4)
     }
 }
 
-impl<I: Data, O: Data, F, Fut, PreviousOperators> Display
-    for MapAsync<I, O, F, Fut, PreviousOperators>
+impl<O: Data, F, Fut, Op> Display for MapAsync<O, F, Fut, Op>
 where
-    F: Fn(I) -> Fut + Send + Sync + 'static,
+    F: Fn(Op::Out) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<Out = I>,
+    Op: Operator,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> MapAsync<{} -> {}>",
             self.prev,
-            std::any::type_name::<I>(),
+            std::any::type_name::<Op::Out>(),
             std::any::type_name::<O>()
         )
     }
 }
 
-impl<I: Data, O: Data, F, Fut, PreviousOperators> MapAsync<I, O, F, Fut, PreviousOperators>
+impl<O: Send + 'static, F, Fut, Op> MapAsync<O, F, Fut, Op>
 where
-    F: Fn(I) -> Fut + Send + Sync + 'static + Clone,
+    F: Fn(Op::Out) -> Fut + Send + Sync + 'static + Clone,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<Out = I>,
+    Op: Operator,
+    Op::Out: 'static,
 {
-    pub(super) fn new(prev: PreviousOperators, f: F, buffer: usize) -> Self {
+    pub(super) fn new(prev: Op, f: F, buffer: usize) -> Self {
         const CH: usize = 2;
-        let (i_tx, i_rx) = flume::bounded::<Vec<StreamElement<I>>>(CH);
+        let (i_tx, i_rx) = flume::bounded::<Vec<StreamElement<Op::Out>>>(CH);
         let (o_tx, o_rx) = flume::bounded::<Vec<StreamElement<O>>>(CH);
 
         let ff = Arc::new(f.clone());
@@ -166,7 +159,7 @@ where
         }
     }
 
-    fn schedule_batch(&mut self, b: Vec<StreamElement<I>>) {
+    fn schedule_batch(&mut self, b: Vec<StreamElement<Op::Out>>) {
         match self.i_tx.try_send(b) {
             Ok(()) => self.pending += 1,
             Err(flume::TrySendError::Full(b)) => {
@@ -188,12 +181,12 @@ where
     }
 }
 
-impl<I: Data, O: Data, F, Fut, PreviousOperators> Operator
-    for MapAsync<I, O, F, Fut, PreviousOperators>
+impl<O: Data, F, Fut, Op> Operator for MapAsync<O, F, Fut, Op>
 where
-    F: Fn(I) -> Fut + Send + Sync + 'static + Clone,
+    F: Fn(Op::Out) -> Fut + Send + Sync + 'static + Clone,
     Fut: Future<Output = O> + Send,
-    PreviousOperators: Operator<Out = I>,
+    Op: Operator,
+    Op::Out: 'static,
 {
     type Out = O;
 

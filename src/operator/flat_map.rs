@@ -3,21 +3,21 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
+use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
+use crate::stream::KeyedItem;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct FlatMap<In, Out, Iter, F, PreviousOperators>
+pub struct FlatMap<O, It, F, Op>
 where
-    In: Data,
-    Out: Data,
-    PreviousOperators: Operator<Out = In>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn(In) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
-    prev: PreviousOperators,
+    prev: Op,
     f: F,
     // used to store elements that have not been returned by next() yet
     // buffer: VecDeque<StreamElement<NewOut>>,
@@ -25,22 +25,18 @@ where
     // This is used to make `FlatMap` behave differently when applied to `Stream` or `KeyedStream`
     // Takes `Out` as input, returns an `Iterator` with items of type `NewOut`
     #[derivative(Debug = "ignore")]
-    frontiter: Option<<Iter as IntoIterator>::IntoIter>,
+    frontiter: Option<<It as IntoIterator>::IntoIter>,
     #[cfg(feature = "timestamp")]
     timestamp: Option<Timestamp>,
-    _out: PhantomData<In>,
-    _iter_out: PhantomData<Out>,
+    _iter_out: PhantomData<O>,
 }
 
-impl<In: Clone, Out: Clone, Iter, F: Clone, PreviousOperators: Clone> Clone
-    for FlatMap<In, Out, Iter, F, PreviousOperators>
+impl<O: Send, It, F: Clone, Op: Clone> Clone for FlatMap<O, It, F, Op>
 where
-    In: Data,
-    Out: Data,
-    PreviousOperators: Operator<Out = In>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn(In) -> Iter + Clone + Send + 'static,
+    Op: Operator,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
     fn clone(&self) -> Self {
         Self {
@@ -49,70 +45,65 @@ where
             frontiter: None,
             #[cfg(feature = "timestamp")]
             timestamp: self.timestamp,
-            _out: self._out,
-            _iter_out: self._iter_out,
+            _iter_out: PhantomData,
         }
     }
 }
 
-impl<In, Out, Iter, F, PreviousOperators> Display for FlatMap<In, Out, Iter, F, PreviousOperators>
+impl<O, It, F, Op> Display for FlatMap<O, It, F, Op>
 where
-    In: Data,
-    Out: Data,
-    PreviousOperators: Operator<Out = In>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn(In) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> FlatMap<{} -> {}>",
             self.prev,
-            std::any::type_name::<In>(),
-            std::any::type_name::<Out>()
+            std::any::type_name::<Op::Out>(),
+            std::any::type_name::<O>()
         )
     }
 }
 
-impl<In, Out, Iter, F, PreviousOperators> FlatMap<In, Out, Iter, F, PreviousOperators>
+impl<O, It, F, Op> FlatMap<O, It, F, Op>
 where
-    In: Data,
-    Out: Data,
-    PreviousOperators: Operator<Out = In>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn(In) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
-    pub(super) fn new(prev: PreviousOperators, f: F) -> Self {
+    pub(super) fn new(prev: Op, f: F) -> Self {
         Self {
             prev,
             f,
             frontiter: None,
             #[cfg(feature = "timestamp")]
             timestamp: None,
-            _out: Default::default(),
             _iter_out: Default::default(),
         }
     }
 }
 
-impl<In, Out, Iter, F, PreviousOperators> Operator for FlatMap<In, Out, Iter, F, PreviousOperators>
+impl<O, It, F, Op> Operator for FlatMap<O, It, F, Op>
 where
-    In: Data,
-    Out: Data,
-    PreviousOperators: Operator<Out = In>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn(In) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
-    type Out = Out;
+    type Out = O;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         loop {
             if let Some(ref mut inner) = self.frontiter {
                 match inner.next() {
@@ -153,23 +144,22 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<Out, _>("FlatMap"))
+            .add_operator(OperatorStructure::new::<O, _>("FlatMap"))
     }
 }
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct KeyedFlatMap<Key, In, Out, Iter, F, PreviousOperators>
+pub struct KeyedFlatMap<O, It, F, Op>
 where
-    In: Data,
-    Key: DataKey,
-    Out: Data,
-    PreviousOperators: Operator<Out = (Key, In)>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    Op::Out: KeyedItem,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
-    prev: PreviousOperators,
+    prev: Op,
     f: F,
     // used to store elements that have not been returned by next() yet
     // buffer: VecDeque<StreamElement<NewOut>>,
@@ -177,23 +167,19 @@ where
     // This is used to make `FlatMap` behave differently when applied to `Stream` or `KeyedStream`
     // Takes `Out` as input, returns an `Iterator` with items of type `NewOut`
     #[derivative(Debug = "ignore")]
-    frontiter: Option<(Key, Iter::IntoIter)>,
+    frontiter: Option<(<Op::Out as KeyedItem>::Key, It::IntoIter)>,
     timestamp: Option<Timestamp>,
-    _key: PhantomData<Key>,
-    _in: PhantomData<In>,
-    _iter_out: PhantomData<Out>,
+    _iter_out: PhantomData<O>,
 }
 
-impl<Key: Clone, In: Clone, Out: Clone, Iter, F: Clone, PreviousOperators: Clone> Clone
-    for KeyedFlatMap<Key, In, Out, Iter, F, PreviousOperators>
+impl<O: Send, It, F: Clone, Op: Clone> Clone for KeyedFlatMap<O, It, F, Op>
 where
-    In: Data,
-    Key: DataKey,
-    Out: Data,
-    PreviousOperators: Operator<Out = (Key, In)>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    Op::Out: KeyedItem,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
     fn clone(&self) -> Self {
         Self {
@@ -201,78 +187,68 @@ where
             f: self.f.clone(),
             frontiter: None,
             timestamp: self.timestamp,
-            _key: self._key,
-            _in: self._in,
             _iter_out: self._iter_out,
         }
     }
 }
 
-impl<Key, In, Out, Iter, F, PreviousOperators> Display
-    for KeyedFlatMap<Key, In, Out, Iter, F, PreviousOperators>
+impl<O, It, F, Op> Display for KeyedFlatMap<O, It, F, Op>
 where
-    In: Data,
-    Key: DataKey,
-    Out: Data,
-    PreviousOperators: Operator<Out = (Key, In)>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    Op::Out: KeyedItem,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> KeyedFlatMap<{} -> {}>",
             self.prev,
-            std::any::type_name::<In>(),
-            std::any::type_name::<Out>()
+            std::any::type_name::<Op::Out>(),
+            std::any::type_name::<O>()
         )
     }
 }
 
-impl<Key, In, Out, Iter, F, PreviousOperators>
-    KeyedFlatMap<Key, In, Out, Iter, F, PreviousOperators>
+impl<O, It, F, Op> KeyedFlatMap<O, It, F, Op>
 where
-    In: Data,
-    Key: DataKey,
-    Out: Data,
-    PreviousOperators: Operator<Out = (Key, In)>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    Op::Out: KeyedItem,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
-    pub(super) fn new(prev: PreviousOperators, f: F) -> Self {
+    pub(super) fn new(prev: Op, f: F) -> Self {
         Self {
             prev,
             f,
             frontiter: None,
             timestamp: None,
-            _key: Default::default(),
-            _in: Default::default(),
             _iter_out: Default::default(),
         }
     }
 }
 
-impl<Key, In, Out, Iter, F, PreviousOperators> Operator
-    for KeyedFlatMap<Key, In, Out, Iter, F, PreviousOperators>
+impl<O, It, F, Op> Operator for KeyedFlatMap<O, It, F, Op>
 where
-    In: Data,
-    Key: DataKey,
-    Out: Data,
-    PreviousOperators: Operator<Out = (Key, In)>,
-    Iter: IntoIterator<Item = Out>,
-    <Iter as IntoIterator>::IntoIter: Send + 'static,
-    F: Fn((&Key, In)) -> Iter + Clone + Send + 'static,
+    O: Send,
+    Op: Operator,
+    Op::Out: KeyedItem,
+    It: IntoIterator<Item = O>,
+    <It as IntoIterator>::IntoIter: Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send + 'static,
 {
-    type Out = (Key, Out);
+    type Out = (<Op::Out as KeyedItem>::Key, O);
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<(Key, Out)> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         loop {
             if let Some((ref key, ref mut inner)) = self.frontiter {
                 match inner.next() {
@@ -293,14 +269,16 @@ where
                     self.frontiter = Some((key, iter));
                 }
                 #[cfg(feature = "timestamp")]
-                StreamElement::Item((key, inner)) => {
-                    let iter = (self.f)((&key, inner)).into_iter();
+                StreamElement::Item(kv) => {
+                    let key = kv.key().clone();
+                    let iter = (self.f)(kv).into_iter();
                     self.frontiter = Some((key, iter));
                     self.timestamp = None;
                 }
                 #[cfg(feature = "timestamp")]
-                StreamElement::Timestamped((key, inner), ts) => {
-                    let iter = (self.f)((&key, inner)).into_iter();
+                StreamElement::Timestamped(kv, ts) => {
+                    let key = kv.key().clone();
+                    let iter = (self.f)(kv).into_iter();
                     self.frontiter = Some((key, iter));
                     self.timestamp = Some(ts);
                 }
@@ -315,7 +293,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<Out, _>("KeyedFlatMap"))
+            .add_operator(OperatorStructure::new::<Self::Out, _>("KeyedFlatMap"))
     }
 }
 

@@ -9,22 +9,20 @@ use crate::ExecutionMetadata;
 use super::StreamElement;
 
 #[derive(Clone)]
-pub struct FilterMap<In: Data, Out: Data, PreviousOperator, Predicate>
+pub struct FilterMap<Out: Data, PreviousOperator, Predicate>
 where
-    Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-    PreviousOperator: Operator<Out = In> + 'static,
+    Predicate: Fn(PreviousOperator::Out) -> Option<Out> + Send + Clone + 'static,
+    PreviousOperator: Operator + 'static,
 {
     prev: PreviousOperator,
     predicate: Predicate,
-    _in: PhantomData<In>,
     _out: PhantomData<Out>,
 }
 
-impl<In: Data, Out: Data, PreviousOperator, Predicate> Display
-    for FilterMap<In, Out, PreviousOperator, Predicate>
+impl<Out: Data, PreviousOperator, Predicate> Display for FilterMap<Out, PreviousOperator, Predicate>
 where
-    Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-    PreviousOperator: Operator<Out = In> + 'static,
+    Predicate: Fn(PreviousOperator::Out) -> Option<Out> + Send + Clone + 'static,
+    PreviousOperator: Operator + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -36,27 +34,25 @@ where
     }
 }
 
-impl<In: Data, Out: Data, PreviousOperator, Predicate>
-    FilterMap<In, Out, PreviousOperator, Predicate>
+impl<Out: Data, PreviousOperator, Predicate> FilterMap<Out, PreviousOperator, Predicate>
 where
-    Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-    PreviousOperator: Operator<Out = In> + 'static,
+    Predicate: Fn(PreviousOperator::Out) -> Option<Out> + Send + Clone + 'static,
+    PreviousOperator: Operator + 'static,
 {
     pub(super) fn new(prev: PreviousOperator, predicate: Predicate) -> Self {
         Self {
             prev,
             predicate,
-            _in: Default::default(),
             _out: Default::default(),
         }
     }
 }
 
-impl<In: Data, Out: Data, PreviousOperator, Predicate> Operator
-    for FilterMap<In, Out, PreviousOperator, Predicate>
+impl<Out: Data, PreviousOperator, Predicate> Operator
+    for FilterMap<Out, PreviousOperator, Predicate>
 where
-    Predicate: Fn(In) -> Option<Out> + Send + Clone + 'static,
-    PreviousOperator: Operator<Out = In> + 'static,
+    Predicate: Fn(PreviousOperator::Out) -> Option<Out> + Send + Clone + 'static,
+    PreviousOperator: Operator + 'static,
 {
     type Out = Out;
 

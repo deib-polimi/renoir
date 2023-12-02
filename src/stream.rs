@@ -35,7 +35,7 @@ where
 }
 
 pub trait KeyedItem {
-    type Key;
+    type Key: DataKey;
     type Value;
     fn key(&self) -> &Self::Key;
     fn value(&self) -> &Self::Value;
@@ -89,10 +89,11 @@ where
 ///  - [`SessionWindow`][crate::operator::window::SessionWindow]
 ///  - [`TransactionWindow`][crate::operator::window::TransactionWindow]
 ///
-pub struct WindowedStream<K: DataKey, I: Data, Op, O: Data, WinDescr>
+pub struct WindowedStream<Op, O: Data, WinDescr>
 where
-    Op: Operator<Out = (K, I)>,
-    WinDescr: WindowDescription<I>,
+    Op: Operator,
+    Op::Out: KeyedItem,
+    WinDescr: WindowDescription<<Op::Out as KeyedItem>::Value>,
 {
     pub(crate) inner: KeyedStream<Op>,
     pub(crate) descr: WinDescr,
@@ -304,25 +305,25 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<OperatorChain>
+impl<OperatorChain> KeyedStream<OperatorChain>
 where
-    OperatorChain: Operator<Out = (Key, Out)> + 'static,
+    OperatorChain: Operator + 'static,
+    OperatorChain::Out: KeyedItem,
 {
-    pub(crate) fn add_operator<NewOut: Data, Op, GetOp>(
-        self,
-        get_operator: GetOp,
-    ) -> KeyedStream<Op>
+    pub(crate) fn add_operator<Op2, GetOp>(self, get_operator: GetOp) -> KeyedStream<Op2>
     where
-        Op: Operator<Out = (Key, NewOut)> + 'static,
-        GetOp: FnOnce(OperatorChain) -> Op,
+        Op2: Operator + 'static,
+        GetOp: FnOnce(OperatorChain) -> Op2,
+        Op2::Out: KeyedItem<Key = <OperatorChain::Out as KeyedItem>::Key>,
     {
         KeyedStream(self.0.add_operator(get_operator))
     }
 }
 
-impl<K: DataKey, V: Data, OperatorChain> Stream<OperatorChain>
+impl<OperatorChain> Stream<OperatorChain>
 where
-    OperatorChain: Operator<Out = (K, V)>,
+    OperatorChain: Operator,
+    OperatorChain::Out: KeyedItem,
 {
     /// TODO DOCS
     pub fn to_keyed(self) -> KeyedStream<OperatorChain> {

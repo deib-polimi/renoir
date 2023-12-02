@@ -2,76 +2,86 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
-#[derive(Clone, Derivative)]
+#[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Map<Out: Data, NewOut: Data, F, PreviousOperators>
+pub struct Map<O: Send, F, Op>
 where
-    F: Fn(Out) -> NewOut + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Op: Operator,
 {
-    prev: PreviousOperators,
+    prev: Op,
     #[derivative(Debug = "ignore")]
     f: F,
-    _out: PhantomData<Out>,
-    _new_out: PhantomData<NewOut>,
+    _out: PhantomData<O>,
 }
 
-impl<Out: Data, NewOut: Data, F, PreviousOperators> Display
-    for Map<Out, NewOut, F, PreviousOperators>
+impl<O: Send, F: Clone, Op: Clone> Clone for Map<O, F, Op>
 where
-    F: Fn(Out) -> NewOut + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Op: Operator,
+{
+    fn clone(&self) -> Self {
+        Self {
+            prev: self.prev.clone(),
+            f: self.f.clone(),
+            _out: self._out.clone(),
+        }
+    }
+}
+
+impl<O: Send, F, Op> Display for Map<O, F, Op>
+where
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Op: Operator,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> Map<{} -> {}>",
             self.prev,
-            std::any::type_name::<Out>(),
-            std::any::type_name::<NewOut>()
+            std::any::type_name::<Op::Out>(),
+            std::any::type_name::<O>()
         )
     }
 }
 
-impl<Out: Data, NewOut: Data, F, PreviousOperators> Map<Out, NewOut, F, PreviousOperators>
+impl<O: Send, F, Op> Map<O, F, Op>
 where
-    F: Fn(Out) -> NewOut + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Op: Operator,
 {
-    pub(super) fn new(prev: PreviousOperators, f: F) -> Self {
+    pub(super) fn new(prev: Op, f: F) -> Self {
         Self {
             prev,
             f,
             _out: Default::default(),
-            _new_out: Default::default(),
         }
     }
 }
 
-impl<Out: Data, NewOut: Data, F, PreviousOperators> Operator
-    for Map<Out, NewOut, F, PreviousOperators>
+impl<O: Send, F, Op> Operator for Map<O, F, Op>
 where
-    F: Fn(Out) -> NewOut + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Op: Operator,
 {
-    type Out = NewOut;
+    type Out = O;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<NewOut> {
+    fn next(&mut self) -> StreamElement<O> {
         self.prev.next().map(&self.f)
     }
 
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<NewOut, _>("Map"))
+            .add_operator(OperatorStructure::new::<O, _>("Map"))
     }
 }
 

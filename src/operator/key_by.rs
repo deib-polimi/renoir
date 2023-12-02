@@ -2,13 +2,13 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, DataKey};
+use crate::operator::DataKey;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
-#[derive(Clone, Derivative)]
+#[derive(Derivative)]
 #[derivative(Debug)]
-pub struct KeyBy<Key: DataKey, Out: Data, Keyer, OperatorChain>
+pub struct KeyBy<Key: DataKey, Out: Send, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,
     OperatorChain: Operator<Out = Out>,
@@ -20,7 +20,23 @@ where
     _out: PhantomData<Out>,
 }
 
-impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Display
+impl<Key: DataKey, Out: Send, Keyer: Clone, OperatorChain: Clone> Clone
+    for KeyBy<Key, Out, Keyer, OperatorChain>
+where
+    Keyer: Fn(&Out) -> Key + Send + Clone,
+    OperatorChain: Operator<Out = Out>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            prev: self.prev.clone(),
+            keyer: self.keyer.clone(),
+            _key: self._key.clone(),
+            _out: self._out.clone(),
+        }
+    }
+}
+
+impl<Key: DataKey, Out: Send, Keyer, OperatorChain> Display
     for KeyBy<Key, Out, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,
@@ -36,7 +52,7 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, Keyer, OperatorChain> KeyBy<Key, Out, Keyer, OperatorChain>
+impl<Key: DataKey, Out: Send, Keyer, OperatorChain> KeyBy<Key, Out, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,
     OperatorChain: Operator<Out = Out>,
@@ -51,7 +67,7 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, Keyer, OperatorChain> Operator
+impl<Key: DataKey, Out: Send, Keyer, OperatorChain> Operator
     for KeyBy<Key, Out, Keyer, OperatorChain>
 where
     Keyer: Fn(&Out) -> Key + Send + Clone,

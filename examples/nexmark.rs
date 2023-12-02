@@ -197,7 +197,7 @@ struct AuctionState {
 impl Q4Unary {
     fn process(
         &mut self,
-        mut gen: ElementGenerator<(usize, Event), impl Operator<Out = (usize, Event)>>,
+        mut gen: ElementGenerator<impl Operator<Out = (usize, Event)>>,
     ) -> StreamElement<(Auction, Bid)> {
         fn is_valid_bid(bid: &Bid, auction: &Auction) -> bool {
             bid.price >= auction.reserve

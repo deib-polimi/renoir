@@ -2,56 +2,76 @@ use core::iter::Iterator;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
 
-use crate::operator::{Data, DataKey, Operator, StreamElement, Timestamp};
+use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
+use crate::stream::KeyedItem;
 
-#[derive(Derivative)]
-#[derivative(Debug, Clone)]
-pub struct KeyedFold<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators>
+pub struct KeyedFold<O: Send + Clone, F, Op>
 where
-    F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<Out = (Key, Out)>,
+    F: Fn(&mut O, <Op::Out as KeyedItem>::Value) + Send + Clone,
+    Op: Operator,
+    Op::Out: KeyedItem,
 {
-    prev: PreviousOperators,
-    #[derivative(Debug = "ignore")]
+    prev: Op,
     fold: F,
-    init: NewOut,
-    accumulators: HashMap<Key, NewOut, crate::block::GroupHasherBuilder>,
-    timestamps: HashMap<Key, Timestamp, crate::block::GroupHasherBuilder>,
-    ready: Vec<StreamElement<(Key, NewOut)>>,
+    init: O,
+    accumulators: HashMap<<Op::Out as KeyedItem>::Key, O, crate::block::GroupHasherBuilder>,
+    timestamps: HashMap<<Op::Out as KeyedItem>::Key, Timestamp, crate::block::GroupHasherBuilder>,
+    ready: Vec<StreamElement<(<Op::Out as KeyedItem>::Key, O)>>,
     max_watermark: Option<Timestamp>,
     received_end: bool,
     received_end_iter: bool,
-    _out: PhantomData<Out>,
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Display
-    for KeyedFold<Key, Out, NewOut, F, PreviousOperators>
+impl<O: Send + Clone, F: Clone, Op: Clone> Clone for KeyedFold<O, F, Op>
 where
-    F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<Out = (Key, Out)>,
+    F: Fn(&mut O, <Op::Out as KeyedItem>::Value) + Send + Clone,
+    Op: Operator,
+    Op::Out: KeyedItem,
+{
+    fn clone(&self) -> Self {
+        Self {
+            prev: self.prev.clone(),
+            fold: self.fold.clone(),
+            init: self.init.clone(),
+            accumulators: self.accumulators.clone(),
+            timestamps: self.timestamps.clone(),
+            ready: self.ready.clone(),
+            max_watermark: self.max_watermark.clone(),
+            received_end: self.received_end.clone(),
+            received_end_iter: self.received_end_iter.clone(),
+        }
+    }
+}
+
+impl<O: Send + Clone, F, Op> Display for KeyedFold<O, F, Op>
+where
+    F: Fn(&mut O, <Op::Out as KeyedItem>::Value) + Send + Clone,
+    Op: Operator,
+    Op::Out: KeyedItem,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> KeyedFold<{} -> {}>",
             self.prev,
-            std::any::type_name::<(Key, Out)>(),
-            std::any::type_name::<(Key, NewOut)>()
+            std::any::type_name::<Op::Out>(),
+            std::any::type_name::<(<Op::Out as KeyedItem>::Key, O)>()
         )
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators: Operator<Out = (Key, Out)>>
-    KeyedFold<Key, Out, NewOut, F, PreviousOperators>
+impl<O, F, Op> KeyedFold<O, F, Op>
 where
-    F: Fn(&mut NewOut, Out) + Send + Clone,
+    Op::Out: KeyedItem,
+    F: Fn(&mut O, <Op::Out as KeyedItem>::Value) + Send + Clone,
+    O: Send + Clone,
+    Op: Operator,
 {
-    pub(super) fn new(prev: PreviousOperators, init: NewOut, fold: F) -> Self {
+    pub(super) fn new(prev: Op, init: O, fold: F) -> Self {
         KeyedFold {
             prev,
             fold,
@@ -62,12 +82,15 @@ where
             max_watermark: None,
             received_end: false,
             received_end_iter: false,
-            _out: Default::default(),
         }
     }
 
     /// Process a new item, folding it with the accumulator inside the hashmap.
-    fn process_item(&mut self, key: Key, value: Out) {
+    fn process_item(
+        &mut self,
+        key: <Op::Out as KeyedItem>::Key,
+        value: <Op::Out as KeyedItem>::Value,
+    ) {
         match self.accumulators.entry(key) {
             Entry::Vacant(entry) => {
                 let mut acc = self.init.clone();
@@ -81,20 +104,20 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Data, NewOut: Data, F, PreviousOperators> Operator
-    for KeyedFold<Key, Out, NewOut, F, PreviousOperators>
+impl<O: Send + Clone, F, Op> Operator for KeyedFold<O, F, Op>
 where
-    F: Fn(&mut NewOut, Out) + Send + Clone,
-    PreviousOperators: Operator<Out = (Key, Out)>,
+    F: Fn(&mut O, <Op::Out as KeyedItem>::Value) + Send + Clone,
+    Op: Operator,
+    Op::Out: KeyedItem,
 {
-    type Out = (Key, NewOut);
+    type Out = (<Op::Out as KeyedItem>::Key, O);
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<(Key, NewOut)> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         while !self.received_end {
             match self.prev.next() {
                 StreamElement::Terminate => self.received_end = true,
@@ -105,10 +128,12 @@ where
                 StreamElement::Watermark(ts) => {
                     self.max_watermark = Some(self.max_watermark.unwrap_or(ts).max(ts))
                 }
-                StreamElement::Item((k, v)) => {
+                StreamElement::Item(kv) => {
+                    let (k, v) = kv.into_kv();
                     self.process_item(k, v);
                 }
-                StreamElement::Timestamped((k, v), ts) => {
+                StreamElement::Timestamped(kv, ts) => {
+                    let (k, v) = kv.into_kv();
                     self.process_item(k.clone(), v);
                     self.timestamps
                         .entry(k)
@@ -156,7 +181,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<(Key, NewOut), _>("KeyedFold"))
+            .add_operator(OperatorStructure::new::<Self::Out, _>("KeyedFold"))
     }
 }
 

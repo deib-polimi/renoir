@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, Operator, StreamElement, Timestamp};
+use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Clone)]
@@ -32,38 +32,56 @@ impl<Out> PartialEq for TimestampedItem<Out> {
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct Reorder<Out: Data, PreviousOperators>
+pub(crate) struct Reorder<Op>
 where
-    PreviousOperators: Operator<Out = Out>,
+    Op: Operator,
+    Op::Out: Send,
 {
-    buffer: VecDeque<TimestampedItem<Out>>,
+    buffer: VecDeque<TimestampedItem<Op::Out>>,
     // Scratch memory used for glidesort
-    scratch: Vec<TimestampedItem<Out>>,
+    scratch: Vec<TimestampedItem<Op::Out>>,
     last_watermark: Option<Timestamp>,
-    prev: PreviousOperators,
+    prev: Op,
     received_end: bool,
 }
 
-impl<Out: Data, PreviousOperators> Display for Reorder<Out, PreviousOperators>
+impl<Op: Clone> Clone for Reorder<Op>
 where
-    PreviousOperators: Operator<Out = Out>,
+    Op: Operator,
+    Op::Out: Send,
+{
+    fn clone(&self) -> Self {
+        Self {
+            buffer: Default::default(),
+            scratch: Default::default(),
+            last_watermark: self.last_watermark.clone(),
+            prev: self.prev.clone(),
+            received_end: self.received_end.clone(),
+        }
+    }
+}
+
+impl<Op> Display for Reorder<Op>
+where
+    Op: Operator,
+    Op::Out: Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> Reorder<{}>",
             self.prev,
-            std::any::type_name::<Out>(),
+            std::any::type_name::<Op::Out>(),
         )
     }
 }
 
-impl<Out: Data, PreviousOperators> Reorder<Out, PreviousOperators>
+impl<Op> Reorder<Op>
 where
-    PreviousOperators: Operator<Out = Out>,
+    Op: Operator,
+    Op::Out: Send,
 {
-    pub(crate) fn new(prev: PreviousOperators) -> Self {
+    pub(crate) fn new(prev: Op) -> Self {
         Self {
             buffer: Default::default(),
             scratch: Default::default(),
@@ -74,18 +92,19 @@ where
     }
 }
 
-impl<Out: Data, PreviousOperators> Operator for Reorder<Out, PreviousOperators>
+impl<Op> Operator for Reorder<Op>
 where
-    PreviousOperators: Operator<Out = Out>,
+    Op: Operator,
+    Op::Out: Send,
 {
-    type Out = Out;
+    type Out = Op::Out;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Op::Out> {
         while !self.received_end && self.last_watermark.is_none() {
             match self.prev.next() {
                 element @ StreamElement::Item(_) => return element,
@@ -129,7 +148,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<Out, _>("Reorder"))
+            .add_operator(OperatorStructure::new::<Op::Out, _>("Reorder"))
     }
 }
 

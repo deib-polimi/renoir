@@ -2,85 +2,91 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
-pub struct ElementGenerator<'a, Out, Op> {
+pub struct ElementGenerator<'a, Op> {
     inner: &'a mut Op,
-    _out: PhantomData<Out>,
 }
 
-impl<'a, Out: Data, Op: Operator<Out = Out>> ElementGenerator<'a, Out, Op> {
+impl<'a, Op: Operator> ElementGenerator<'a, Op> {
     pub fn new(inner: &'a mut Op) -> Self {
-        Self {
-            inner,
-            _out: PhantomData,
-        }
+        Self { inner }
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> StreamElement<Out> {
+    pub fn next(&mut self) -> StreamElement<Op::Out> {
         self.inner.next()
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct RichMapCustom<Out: Data, NewOut: Data, F, OperatorChain>
+#[derive(Debug)]
+pub struct RichMapCustom<O: Send, F, Op>
 where
-    F: FnMut(ElementGenerator<Out, OperatorChain>) -> StreamElement<NewOut> + Clone + Send,
-    OperatorChain: Operator<Out = Out>,
+    F: FnMut(ElementGenerator<Op>) -> StreamElement<O> + Clone + Send,
+    Op: Operator,
 {
-    prev: OperatorChain,
+    prev: Op,
     map_fn: F,
-    _out: PhantomData<Out>,
-    _new_out: PhantomData<NewOut>,
+    _new_out: PhantomData<O>,
 }
 
-impl<Out: Data, NewOut: Data, F, OperatorChain> Display
-    for RichMapCustom<Out, NewOut, F, OperatorChain>
+impl<O: Send, F: Clone, Op: Clone> Clone for RichMapCustom<O, F, Op>
 where
-    F: FnMut(ElementGenerator<Out, OperatorChain>) -> StreamElement<NewOut> + Clone + Send,
-    OperatorChain: Operator<Out = Out>,
+    F: FnMut(ElementGenerator<Op>) -> StreamElement<O> + Clone + Send,
+    Op: Operator,
+{
+    fn clone(&self) -> Self {
+        Self {
+            prev: self.prev.clone(),
+            map_fn: self.map_fn.clone(),
+            _new_out: PhantomData,
+        }
+    }
+}
+
+impl<O: Send, F, Op> Display for RichMapCustom<O, F, Op>
+where
+    F: FnMut(ElementGenerator<Op>) -> StreamElement<O> + Clone + Send,
+    Op: Operator,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{} -> RichMapCustom<{} -> {}>",
             self.prev,
-            std::any::type_name::<Out>(),
-            std::any::type_name::<NewOut>()
+            std::any::type_name::<Op::Out>(),
+            std::any::type_name::<O>()
         )
     }
 }
 
-impl<Out: Data, NewOut: Data, F, OperatorChain> RichMapCustom<Out, NewOut, F, OperatorChain>
+impl<O: Send, F, Op> RichMapCustom<O, F, Op>
 where
-    F: FnMut(ElementGenerator<Out, OperatorChain>) -> StreamElement<NewOut> + Clone + Send,
-    OperatorChain: Operator<Out = Out>,
+    F: FnMut(ElementGenerator<Op>) -> StreamElement<O> + Clone + Send,
+    Op: Operator,
 {
-    pub(super) fn new(prev: OperatorChain, f: F) -> Self {
+    pub(super) fn new(prev: Op, f: F) -> Self {
         Self {
             prev,
             map_fn: f,
-            _out: Default::default(),
             _new_out: Default::default(),
         }
     }
 }
 
-impl<Out: Data, NewOut: Data, F, OperatorChain> Operator
-    for RichMapCustom<Out, NewOut, F, OperatorChain>
+impl<O: Send, F, Op> Operator for RichMapCustom<O, F, Op>
 where
-    F: FnMut(ElementGenerator<Out, OperatorChain>) -> StreamElement<NewOut> + Clone + Send,
-    OperatorChain: Operator<Out = Out>,
+    F: FnMut(ElementGenerator<Op>) -> StreamElement<O> + Clone + Send,
+    Op: Operator,
 {
-    type Out = NewOut;
+    type Out = O;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
-    fn next(&mut self) -> StreamElement<NewOut> {
+    fn next(&mut self) -> StreamElement<O> {
         let eg = ElementGenerator::new(&mut self.prev);
         (self.map_fn)(eg)
     }
@@ -88,6 +94,6 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<NewOut, _>("RichMapCustom"))
+            .add_operator(OperatorStructure::new::<O, _>("RichMapCustom"))
     }
 }

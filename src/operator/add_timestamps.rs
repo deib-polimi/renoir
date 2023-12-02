@@ -1,42 +1,43 @@
 use std::fmt::Display;
-use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, Operator, StreamElement, Timestamp};
+use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Clone)]
-pub struct AddTimestamp<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
+pub struct AddTimestamp<TimestampGen, WatermarkGen, OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
-    TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
-    WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+    OperatorChain: Operator,
+    TimestampGen: FnMut(&OperatorChain::Out) -> Timestamp + Clone + Send + 'static,
+    WatermarkGen:
+        FnMut(&OperatorChain::Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
     prev: OperatorChain,
     timestamp_gen: TimestampGen,
     watermark_gen: WatermarkGen,
     pending_watermark: Option<Timestamp>,
-    _out: PhantomData<Out>,
 }
 
-impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain> Display
-    for AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
+impl<TimestampGen, WatermarkGen, OperatorChain> Display
+    for AddTimestamp<TimestampGen, WatermarkGen, OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
-    TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
-    WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+    OperatorChain: Operator,
+    TimestampGen: FnMut(&OperatorChain::Out) -> Timestamp + Clone + Send + 'static,
+    WatermarkGen:
+        FnMut(&OperatorChain::Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> AddTimestamp", self.prev)
     }
 }
 
-impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain>
-    AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
+impl<TimestampGen, WatermarkGen, OperatorChain>
+    AddTimestamp<TimestampGen, WatermarkGen, OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
-    TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
-    WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+    OperatorChain: Operator,
+    TimestampGen: FnMut(&OperatorChain::Out) -> Timestamp + Clone + Send + 'static,
+    WatermarkGen:
+        FnMut(&OperatorChain::Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
     pub(super) fn new(
         prev: OperatorChain,
@@ -48,26 +49,26 @@ where
             timestamp_gen,
             watermark_gen,
             pending_watermark: None,
-            _out: Default::default(),
         }
     }
 }
 
-impl<Out: Data, TimestampGen, WatermarkGen, OperatorChain> Operator
-    for AddTimestamp<Out, TimestampGen, WatermarkGen, OperatorChain>
+impl<TimestampGen, WatermarkGen, OperatorChain> Operator
+    for AddTimestamp<TimestampGen, WatermarkGen, OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
-    TimestampGen: FnMut(&Out) -> Timestamp + Clone + Send + 'static,
-    WatermarkGen: FnMut(&Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
+    OperatorChain: Operator,
+    TimestampGen: FnMut(&OperatorChain::Out) -> Timestamp + Clone + Send + 'static,
+    WatermarkGen:
+        FnMut(&OperatorChain::Out, &Timestamp) -> Option<Timestamp> + Clone + Send + 'static,
 {
-    type Out = Out;
+    type Out = OperatorChain::Out;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         if let Some(ts) = self.pending_watermark.take() {
             return StreamElement::Watermark(ts);
         }
@@ -90,52 +91,48 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<Out, _>("AddTimestamp"))
+            .add_operator(OperatorStructure::new::<Self::Out, _>("AddTimestamp"))
     }
 }
 
 #[derive(Clone)]
-pub struct DropTimestamp<Out: Data, OperatorChain>
+pub struct DropTimestamp<OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
+    OperatorChain: Operator,
 {
     prev: OperatorChain,
-    _out: PhantomData<Out>,
 }
 
-impl<Out: Data, OperatorChain> Display for DropTimestamp<Out, OperatorChain>
+impl<OperatorChain> Display for DropTimestamp<OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
+    OperatorChain: Operator,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> DropTimestamp", self.prev)
     }
 }
 
-impl<Out: Data, OperatorChain> DropTimestamp<Out, OperatorChain>
+impl<OperatorChain> DropTimestamp<OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
+    OperatorChain: Operator,
 {
     pub(super) fn new(prev: OperatorChain) -> Self {
-        Self {
-            prev,
-            _out: Default::default(),
-        }
+        Self { prev }
     }
 }
 
-impl<Out: Data, OperatorChain> Operator for DropTimestamp<Out, OperatorChain>
+impl<OperatorChain> Operator for DropTimestamp<OperatorChain>
 where
-    OperatorChain: Operator<Out = Out>,
+    OperatorChain: Operator,
 {
-    type Out = Out;
+    type Out = OperatorChain::Out;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         loop {
             match self.prev.next() {
                 StreamElement::Watermark(_) => continue,
@@ -148,7 +145,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<Out, _>("DropTimestamp"))
+            .add_operator(OperatorStructure::new::<Self::Out, _>("DropTimestamp"))
     }
 }
 

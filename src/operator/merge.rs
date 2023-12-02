@@ -11,9 +11,10 @@ pub enum MergeElement<A, B> {
     Right(B),
 }
 
-impl<Out: ExchangeData, OperatorChain> Stream<OperatorChain>
+impl<Op> Stream<Op>
 where
-    OperatorChain: Operator<Out = Out> + 'static,
+    Op: Operator + 'static,
+    Op::Out: ExchangeData,
 {
     /// Merge the items of this stream with the items of another stream with the same type.
     ///
@@ -37,12 +38,10 @@ where
     /// res.sort_unstable();
     /// assert_eq!(res, (0..20).collect::<Vec<_>>());
     /// ```
-    pub fn merge<OperatorChain2>(
-        self,
-        oth: Stream<OperatorChain2>,
-    ) -> Stream<impl Operator<Out = Out>>
+    pub fn merge<Op2>(self, oth: Stream<Op2>) -> Stream<impl Operator<Out = Op::Out>>
     where
-        OperatorChain2: Operator<Out = Out> + 'static,
+        Op: 'static,
+        Op2: Operator<Out = Op::Out> + 'static,
     {
         self.binary_connection(
             oth,
@@ -57,14 +56,14 @@ where
         })
     }
 
-    #[cfg(feature = "timestamp")]
-    pub(crate) fn merge_distinct<Out2, OperatorChain2>(
+    pub(crate) fn merge_distinct<Op2>(
         self,
-        right: Stream<OperatorChain2>,
-    ) -> Stream<impl Operator<Out = MergeElement<Out, Out2>>>
+        right: Stream<Op2>,
+    ) -> Stream<impl Operator<Out = MergeElement<Op::Out, Op2::Out>>>
     where
-        Out2: ExchangeData,
-        OperatorChain2: Operator<Out = Out2> + 'static,
+        Op: 'static,
+        Op2: Operator + 'static,
+        Op2::Out: ExchangeData,
     {
         // map the left and right streams to the same type
         let left = self.map(MergeElement::Left);

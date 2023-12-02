@@ -1,7 +1,6 @@
 use std::convert::Infallible;
 use std::fmt::Display;
 use std::hash::BuildHasher;
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use quick_cache::sync::Cache;
@@ -15,12 +14,17 @@ use super::DataKey;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct MapMemo<I, O, K, F, Fk, Op, H: BuildHasher + Clone = GroupHasherBuilder>
-where
-    F: Fn(I) -> O + Send + Clone,
-    Fk: Fn(&I) -> K + Send + Clone,
-    Op: Operator<Out = I>,
-    I: Data,
+pub struct MapMemo<
+    O: Data + Sync,
+    K: DataKey + Sync,
+    F,
+    Fk,
+    Op,
+    H: BuildHasher + Clone = GroupHasherBuilder,
+> where
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Fk: Fn(&Op::Out) -> K + Send + Clone,
+    Op: Operator,
     O: Data + Sync,
     K: DataKey + Sync,
 {
@@ -30,15 +34,13 @@ where
     #[derivative(Debug = "ignore")]
     fk: Fk,
     cache: Arc<Cache<K, O, UnitWeighter, H>>,
-    _i: PhantomData<I>,
 }
 
-impl<I, O, K, F, Fk, Op> Display for MapMemo<I, O, K, F, Fk, Op>
+impl<O, K, F, Fk, Op> Display for MapMemo<O, K, F, Fk, Op>
 where
-    F: Fn(I) -> O + Send + Clone,
-    Fk: Fn(&I) -> K + Send + Clone,
-    Op: Operator<Out = I>,
-    I: Data,
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Fk: Fn(&Op::Out) -> K + Send + Clone,
+    Op: Operator,
     O: Data + Sync,
     K: DataKey + Sync,
 {
@@ -47,18 +49,17 @@ where
             f,
             "{} -> MapMemo<{} -> {}>",
             self.prev,
-            std::any::type_name::<I>(),
+            std::any::type_name::<Op::Out>(),
             std::any::type_name::<O>()
         )
     }
 }
 
-impl<I, O, K, F, Fk, Op> MapMemo<I, O, K, F, Fk, Op>
+impl<O, K, F, Fk, Op> MapMemo<O, K, F, Fk, Op>
 where
-    F: Fn(I) -> O + Send + Clone,
-    Fk: Fn(&I) -> K + Send + Clone,
-    Op: Operator<Out = I>,
-    I: Data,
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Fk: Fn(&Op::Out) -> K + Send + Clone,
+    Op: Operator,
     O: Data + Sync,
     K: DataKey + Sync,
 {
@@ -67,7 +68,6 @@ where
             prev,
             f,
             fk,
-            _i: Default::default(),
             cache: Arc::new(Cache::with(
                 capacity,
                 capacity as u64,
@@ -79,12 +79,11 @@ where
     }
 }
 
-impl<I, O, K, F, Fk, Op> Operator for MapMemo<I, O, K, F, Fk, Op>
+impl<O, K, F, Fk, Op> Operator for MapMemo<O, K, F, Fk, Op>
 where
-    F: Fn(I) -> O + Send + Clone,
-    Fk: Fn(&I) -> K + Send + Clone,
-    Op: Operator<Out = I>,
-    I: Data,
+    F: Fn(Op::Out) -> O + Send + Clone,
+    Fk: Fn(&Op::Out) -> K + Send + Clone,
+    Op: Operator,
     O: Data + Sync,
     K: DataKey + Sync,
 {

@@ -1,53 +1,46 @@
 use std::fmt::Display;
-use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::operator::sink::Sink;
-use crate::operator::{Data, DataKey, Operator, StreamElement};
+
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
-use crate::stream::{KeyedStream, Stream};
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct ForEach<Out: Data, F, PreviousOperators>
+pub struct ForEach<F, Op>
 where
-    F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: FnMut(Op::Out) + Send + Clone,
+    Op: Operator,
 {
-    prev: PreviousOperators,
+    prev: Op,
     #[derivative(Debug = "ignore")]
     f: F,
-    _out: PhantomData<Out>,
 }
 
-impl<Out: Data, F, PreviousOperators> ForEach<Out, F, PreviousOperators>
+impl<F, Op> ForEach<F, Op>
 where
-    F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: FnMut(Op::Out) + Send + Clone,
+    Op: Operator,
 {
-    pub(crate) fn new(prev: PreviousOperators, f: F) -> Self {
-        Self {
-            prev,
-            f,
-            _out: PhantomData,
-        }
+    pub(crate) fn new(prev: Op, f: F) -> Self {
+        Self { prev, f }
     }
 }
 
-impl<Out: Data, F, PreviousOperators> Display for ForEach<Out, F, PreviousOperators>
+impl<F, Op> Display for ForEach<F, Op>
 where
-    F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: FnMut(Op::Out) + Send + Clone,
+    Op: Operator,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> ForEach", self.prev)
     }
 }
 
-impl<Out: Data, F, PreviousOperators> Operator for ForEach<Out, F, PreviousOperators>
+impl<F, Op> Operator for ForEach<F, Op>
 where
-    F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: FnMut(Op::Out) + Send + Clone,
+    Op: Operator,
 {
     type Out = ();
 
@@ -70,27 +63,10 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("ForEachSink");
+        let mut operator = OperatorStructure::new::<Op::Out, _>("ForEachSink");
         operator.kind = OperatorKind::Sink;
         self.prev.structure().add_operator(operator)
     }
-}
-
-impl<Out: Data, F, PreviousOperators> Sink for ForEach<Out, F, PreviousOperators>
-where
-    F: FnMut(Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
-{
-}
-
-impl<Out: Data, OperatorChain> Stream<OperatorChain> where
-    OperatorChain: Operator<Out = Out> + 'static
-{
-}
-
-impl<Key: DataKey, Out: Data, OperatorChain> KeyedStream<OperatorChain> where
-    OperatorChain: Operator<Out = (Key, Out)> + 'static
-{
 }
 
 #[cfg(test)]

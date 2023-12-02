@@ -4,7 +4,7 @@ use super::{super::*, Fold};
 use crate::operator::{Data, DataKey, Operator};
 use crate::stream::{KeyedStream, WindowedStream};
 
-impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<Key, Out, OperatorChain, Out, WindowDescr>
+impl<Key, Out, WindowDescr, OperatorChain> WindowedStream<OperatorChain, Out, WindowDescr>
 where
     WindowDescr: WindowDescription<Out>,
     OperatorChain: Operator<Out = (Key, Out)> + 'static,

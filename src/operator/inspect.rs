@@ -1,60 +1,54 @@
 use std::fmt::Display;
-use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
-pub struct Inspect<Out: Data, F, PreviousOperators>
+pub struct Inspect<F, Op>
 where
-    F: FnMut(&Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: FnMut(&Op::Out) + Send + Clone,
+    Op: Operator,
 {
-    prev: PreviousOperators,
+    prev: Op,
     #[derivative(Debug = "ignore")]
     f: F,
-    _out: PhantomData<Out>,
 }
 
-impl<Out: Data, F, PreviousOperators> Inspect<Out, F, PreviousOperators>
+impl<F, Op> Inspect<F, Op>
 where
-    F: FnMut(&Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: FnMut(&Op::Out) + Send + Clone,
+    Op: Operator,
 {
-    pub fn new(prev: PreviousOperators, f: F) -> Self {
-        Self {
-            prev,
-            f,
-            _out: PhantomData,
-        }
+    pub fn new(prev: Op, f: F) -> Self {
+        Self { prev, f }
     }
 }
 
-impl<Out: Data, F, PreviousOperators> Display for Inspect<Out, F, PreviousOperators>
+impl<F, Op> Display for Inspect<F, Op>
 where
-    F: FnMut(&Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: FnMut(&Op::Out) + Send + Clone,
+    Op: Operator,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} -> Inspect", self.prev)
     }
 }
 
-impl<Out: Data, F, PreviousOperators> Operator for Inspect<Out, F, PreviousOperators>
+impl<F, Op> Operator for Inspect<F, Op>
 where
-    F: FnMut(&Out) + Send + Clone,
-    PreviousOperators: Operator<Out = Out>,
+    F: FnMut(&Op::Out) + Send + Clone,
+    Op: Operator,
 {
-    type Out = Out;
+    type Out = Op::Out;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         let el = self.prev.next();
         match &el {
             StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
@@ -66,7 +60,7 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let operator = OperatorStructure::new::<Out, _>("Inspect");
+        let operator = OperatorStructure::new::<Op::Out, _>("Inspect");
         self.prev.structure().add_operator(operator)
     }
 }
