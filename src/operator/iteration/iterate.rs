@@ -552,7 +552,7 @@ where
     }
 }
 
-impl<Out: ExchangeData, State: ExchangeData + Sync> Source<Out> for Iterate<Out, State> {
+impl<Out: ExchangeData, State: ExchangeData + Sync> Source for Iterate<Out, State> {
     fn replication(&self) -> Replication {
         Replication::Unlimited
     }

@@ -260,7 +260,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
     }
 }
 
-impl<Out: Data + for<'a> Deserialize<'a>> Source<Out> for CsvSource<Out> {
+impl<Out: Data + for<'a> Deserialize<'a>> Source for CsvSource<Out> {
     fn replication(&self) -> Replication {
         Replication::Unlimited
     }

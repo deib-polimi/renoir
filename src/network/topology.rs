@@ -638,7 +638,7 @@ mod tests {
             + " - address: 127.0.0.1\n"
             + "   base_port: 31258\n"
             + "   num_cores: 1\n";
-        config.write_all(config_yaml.as_bytes()).unwrap();
+        std::io::Write::write_all(&mut config, config_yaml.as_bytes()).unwrap();
         let config = EnvironmentConfig::remote(config.path()).unwrap();
 
         // s1 [b0, h0, r0] -> r1 [b2, h1, r0] (endpoint 1) type=i32
@@ -765,7 +765,10 @@ mod tests {
     }
 
     #[cfg(not(feature = "async-tokio"))]
-    fn receiver<T: ExchangeData + Ord + Debug>(receiver: NetworkReceiver<T>, expected: Vec<T>) {
+    fn receiver<T: ExchangeData + Ord + std::fmt::Debug>(
+        receiver: NetworkReceiver<T>,
+        expected: Vec<T>,
+    ) {
         let res = (0..expected.len())
             .flat_map(|_| receiver.recv().unwrap().into_iter())
             .sorted()

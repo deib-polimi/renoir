@@ -63,7 +63,7 @@ impl<Out: Data> Operator for FakeOperator<Out> {
     }
 }
 
-impl<Out: Data> Source<Out> for FakeOperator<Out> {
+impl<Out: Data> Source for FakeOperator<Out> {
     fn replication(&self) -> Replication {
         Replication::Unlimited
     }

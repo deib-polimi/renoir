@@ -54,9 +54,9 @@ where
         Self {
             buffer: Default::default(),
             scratch: Default::default(),
-            last_watermark: self.last_watermark.clone(),
+            last_watermark: self.last_watermark,
             prev: self.prev.clone(),
-            received_end: self.received_end.clone(),
+            received_end: self.received_end,
         }
     }
 }

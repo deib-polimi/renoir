@@ -69,9 +69,9 @@ impl StreamEnvironment {
     }
 
     /// Construct a new stream bound to this environment starting with the specified source.
-    pub fn stream<Out: Data, S>(&mut self, source: S) -> Stream<S>
+    pub fn stream<S>(&mut self, source: S) -> Stream<S>
     where
-        S: Source<Out> + Send + 'static,
+        S: Source + Send + 'static,
     {
         let inner = self.inner.lock();
         let config = &inner.config;
@@ -167,9 +167,9 @@ impl StreamEnvironmentInner {
         }
     }
 
-    pub fn stream<Out: Data, S>(env_rc: Arc<Mutex<StreamEnvironmentInner>>, source: S) -> Stream<S>
+    pub fn stream<S>(env_rc: Arc<Mutex<StreamEnvironmentInner>>, source: S) -> Stream<S>
     where
-        S: Source<Out> + Send + 'static,
+        S: Source + Send + 'static,
     {
         let mut env = env_rc.lock();
         if matches!(env.config.runtime, ExecutionRuntime::Remote(_)) {
@@ -187,7 +187,7 @@ impl StreamEnvironmentInner {
         Stream { block, env: env_rc }
     }
 
-    pub(crate) fn new_block<Out: Data, S: Source<Out>>(
+    pub(crate) fn new_block<S: Source>(
         &mut self,
         source: S,
         batch_mode: BatchMode,

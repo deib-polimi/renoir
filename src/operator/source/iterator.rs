@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::Stream;
 
@@ -11,27 +11,30 @@ use crate::Stream;
 /// The iterator will be consumed **only from one replica**, therefore this source is not parallel.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct IteratorSource<Out: Data, It>
+pub struct IteratorSource<It>
 where
-    It: Iterator<Item = Out> + Send + 'static,
+    It: Iterator + Send + 'static,
+    It::Item: Send,
 {
     #[derivative(Debug = "ignore")]
     inner: It,
     terminated: bool,
 }
 
-impl<Out: Data, It> Display for IteratorSource<Out, It>
+impl<It> Display for IteratorSource<It>
 where
-    It: Iterator<Item = Out> + Send + 'static,
+    It: Iterator + Send + 'static,
+    It::Item: Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "IteratorSource<{}>", std::any::type_name::<Out>())
+        write!(f, "IteratorSource<{}>", std::any::type_name::<It::Item>())
     }
 }
 
-impl<Out: Data, It> IteratorSource<Out, It>
+impl<It> IteratorSource<It>
 where
-    It: Iterator<Item = Out> + Send + 'static,
+    It: Iterator + Send + 'static,
+    It::Item: Send,
 {
     /// Create a new source that reads the items from the iterator provided as input.
     ///
@@ -57,24 +60,26 @@ where
     }
 }
 
-impl<Out: Data, It> Source<Out> for IteratorSource<Out, It>
+impl<It> Source for IteratorSource<It>
 where
-    It: Iterator<Item = Out> + Send + 'static,
+    It: Iterator + Send + 'static,
+    It::Item: Send,
 {
     fn replication(&self) -> Replication {
         Replication::One
     }
 }
 
-impl<Out: Data, It> Operator for IteratorSource<Out, It>
+impl<It> Operator for IteratorSource<It>
 where
-    It: Iterator<Item = Out> + Send + 'static,
+    It: Iterator + Send + 'static,
+    It::Item: Send,
 {
-    type Out = Out;
+    type Out = It::Item;
 
     fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         if self.terminated {
             return StreamElement::Terminate;
         }
@@ -89,15 +94,16 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("IteratorSource");
+        let mut operator = OperatorStructure::new::<Self::Out, _>("IteratorSource");
         operator.kind = OperatorKind::Source;
         BlockStructure::default().add_operator(operator)
     }
 }
 
-impl<Out: Data, It> Clone for IteratorSource<Out, It>
+impl<It> Clone for IteratorSource<It>
 where
-    It: Iterator<Item = Out> + Send + 'static,
+    It: Iterator + Send + 'static,
+    It::Item: Send,
 {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
@@ -107,10 +113,11 @@ where
 
 impl crate::StreamEnvironment {
     /// Convenience method, creates a `IteratorSource` and makes a stream using `StreamEnvironment::stream`
-    pub fn stream_iter<Out: Data, It: Iterator<Item = Out> + Send + 'static>(
-        &mut self,
-        iterator: It,
-    ) -> Stream<IteratorSource<Out, It>> {
+    pub fn stream_iter<It>(&mut self, iterator: It) -> Stream<IteratorSource<It>>
+    where
+        It: Iterator + Send + 'static,
+        It::Item: Send,
+    {
         let source = IteratorSource::new(iterator);
         self.stream(source)
     }

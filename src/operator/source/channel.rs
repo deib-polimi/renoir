@@ -4,7 +4,7 @@ use crate::channel::{bounded, Receiver, RecvError, Sender, TryRecvError};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 const MAX_RETRY: u8 = 8;
@@ -15,20 +15,20 @@ const MAX_RETRY: u8 = 8;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct ChannelSource<Out: Data> {
+pub struct ChannelSource<Out: Send + 'static> {
     #[derivative(Debug = "ignore")]
     rx: Receiver<Out>,
     terminated: bool,
     retry_count: u8,
 }
 
-impl<Out: Data> Display for ChannelSource<Out> {
+impl<Out: Send> Display for ChannelSource<Out> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ChannelSource<{}>", std::any::type_name::<Out>())
     }
 }
 
-impl<Out: Data> ChannelSource<Out> {
+impl<Out: Send + 'static> ChannelSource<Out> {
     /// Create a new source that reads the items from the iterator provided as input.
     ///
     /// **Note**: this source is **not parallel**, the iterator will be consumed only on a single
@@ -59,13 +59,13 @@ impl<Out: Data> ChannelSource<Out> {
     }
 }
 // TODO: remove Debug requirement
-impl<Out: Data + core::fmt::Debug> Source<Out> for ChannelSource<Out> {
+impl<Out: Send + core::fmt::Debug> Source for ChannelSource<Out> {
     fn replication(&self) -> Replication {
         Replication::One
     }
 }
 
-impl<Out: Data + core::fmt::Debug> Operator for ChannelSource<Out> {
+impl<Out: Send + core::fmt::Debug> Operator for ChannelSource<Out> {
     type Out = Out;
 
     fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
@@ -121,7 +121,7 @@ impl<Out: Data + core::fmt::Debug> Operator for ChannelSource<Out> {
     }
 }
 
-impl<Out: Data> Clone for ChannelSource<Out> {
+impl<Out: Send> Clone for ChannelSource<Out> {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value
         panic!("ChannelSource cannot be cloned, replication should be 1");

@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Operator, StreamElement};
@@ -15,7 +14,6 @@ where
     prev: Op,
     #[derivative(Debug = "ignore")]
     f: F,
-    _out: PhantomData<O>,
 }
 
 impl<O: Send, F: Clone, Op: Clone> Clone for Map<O, F, Op>
@@ -27,7 +25,6 @@ where
         Self {
             prev: self.prev.clone(),
             f: self.f.clone(),
-            _out: self._out.clone(),
         }
     }
 }
@@ -57,7 +54,6 @@ where
         Self {
             prev,
             f,
-            _out: Default::default(),
         }
     }
 }

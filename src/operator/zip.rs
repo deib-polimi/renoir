@@ -125,7 +125,7 @@ impl<Out1: ExchangeData, Out2: ExchangeData> Operator for Zip<Out1, Out2> {
     }
 }
 
-impl<Out1: ExchangeData, Out2: ExchangeData> Source<(Out1, Out2)> for Zip<Out1, Out2> {
+impl<Out1: ExchangeData, Out2: ExchangeData> Source for Zip<Out1, Out2> {
     fn replication(&self) -> Replication {
         Replication::Unlimited
     }

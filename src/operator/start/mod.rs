@@ -104,18 +104,18 @@ pub(crate) struct Start<Receiver: StartReceiver + Send> {
 impl<Receiver: StartReceiver + Send> Clone for Start<Receiver> {
     fn clone(&self) -> Self {
         Self {
-            max_delay: self.max_delay.clone(),
-            coord: self.coord.clone(),
+            max_delay: self.max_delay,
+            coord: self.coord,
             receiver: self.receiver.clone(),
             batch_iter: Default::default(),
-            missing_terminate: self.missing_terminate.clone(),
-            missing_flush_and_restart: self.missing_flush_and_restart.clone(),
-            num_previous_replicas: self.num_previous_replicas.clone(),
-            already_timed_out: self.already_timed_out.clone(),
+            missing_terminate: self.missing_terminate,
+            missing_flush_and_restart: self.missing_flush_and_restart,
+            num_previous_replicas: self.num_previous_replicas,
+            already_timed_out: self.already_timed_out,
             watermark_frontier: self.watermark_frontier.clone(),
-            wait_for_state: self.wait_for_state.clone(),
+            wait_for_state: self.wait_for_state,
             state_lock: self.state_lock.clone(),
-            state_generation: self.state_generation.clone(),
+            state_generation: self.state_generation,
         }
     }
 }
@@ -315,7 +315,7 @@ where
     }
 }
 
-impl<Receiver> Source<Receiver::Out> for Start<Receiver>
+impl<Receiver> Source for Start<Receiver>
 where
     Receiver: StartReceiver + Send,
     Receiver::Out: ExchangeData,

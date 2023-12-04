@@ -12,7 +12,7 @@ repository = "https://github.com/deib-polimi/noir"
 readme = "README.md"
 
 [features]
-default = ["flume", "clap", "ssh", "timestamp", "async-tokio"]
+default = ["flume", "clap", "ssh", "timestamp"]
 crossbeam = ["crossbeam-channel"]
 timestamp = []
 ssh = ["ssh2", "whoami", "shell-escape", "sha2", "base64"]

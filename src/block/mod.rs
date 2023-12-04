@@ -1,6 +1,5 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 pub use batcher::BatchMode;
@@ -44,8 +43,6 @@ where
     pub(crate) is_only_one_strategy: bool,
     /// The set of requirements that the block imposes on the scheduler.
     pub(crate) scheduler_requirements: SchedulerRequirements,
-
-    pub _out_type: PhantomData<OperatorChain::Out>,
 }
 
 impl<OperatorChain> Clone for Block<OperatorChain>
@@ -54,13 +51,12 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            id: self.id.clone(),
+            id: self.id,
             operators: self.operators.clone(),
-            batch_mode: self.batch_mode.clone(),
+            batch_mode: self.batch_mode,
             iteration_ctx: self.iteration_ctx.clone(),
-            is_only_one_strategy: self.is_only_one_strategy.clone(),
+            is_only_one_strategy: self.is_only_one_strategy,
             scheduler_requirements: self.scheduler_requirements.clone(),
-            _out_type: self._out_type.clone(),
         }
     }
 }
@@ -82,7 +78,6 @@ where
             iteration_ctx: self.iteration_ctx,
             is_only_one_strategy: false,
             scheduler_requirements: self.scheduler_requirements,
-            _out_type: Default::default(),
         }
     }
 }
@@ -169,7 +164,6 @@ where
             iteration_ctx,
             is_only_one_strategy: false,
             scheduler_requirements: Default::default(),
-            _out_type: Default::default(),
         }
     }
 

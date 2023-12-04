@@ -249,7 +249,7 @@ where
     }
 }
 
-impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond> Source<State>
+impl<DeltaUpdate: ExchangeData, State: ExchangeData, Global, LoopCond> Source
     for IterationLeader<DeltaUpdate, State, Global, LoopCond>
 where
     Global: Fn(&mut State, DeltaUpdate) + Send + Clone,

@@ -4,7 +4,7 @@ use futures::{Stream, StreamExt};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 /// Source that consumes an iterator and emits all its elements into the stream.
@@ -13,27 +13,30 @@ use crate::scheduler::ExecutionMetadata;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct AsyncStreamSource<Out: Data, S>
+pub struct AsyncStreamSource<S>
 where
-    S: Stream<Item = Out> + Send + Unpin + 'static,
+    S: Stream + Send + Unpin + 'static,
+    S::Item: Send,
 {
     #[derivative(Debug = "ignore")]
     inner: S,
     terminated: bool,
 }
 
-impl<Out: Data, S> Display for AsyncStreamSource<Out, S>
+impl<S> Display for AsyncStreamSource<S>
 where
-    S: Stream<Item = Out> + Send + Unpin + 'static,
+    S: Stream + Send + Unpin + 'static,
+    S::Item: Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "StreamSource<{}>", std::any::type_name::<Out>())
+        write!(f, "StreamSource<{}>", std::any::type_name::<S::Item>())
     }
 }
 
-impl<Out: Data, S> AsyncStreamSource<Out, S>
+impl<S> AsyncStreamSource<S>
 where
-    S: Stream<Item = Out> + Send + Unpin + 'static,
+    S: Stream + Send + Unpin + 'static,
+    S::Item: Send,
 {
     /// Create a new source that reads the items from the iterator provided as input.
     ///
@@ -60,24 +63,26 @@ where
     }
 }
 
-impl<Out: Data, S> Source<Out> for AsyncStreamSource<Out, S>
+impl<S> Source for AsyncStreamSource<S>
 where
-    S: Stream<Item = Out> + Send + Unpin + 'static,
+    S: Stream + Send + Unpin + 'static,
+    S::Item: Send,
 {
     fn replication(&self) -> Replication {
         Replication::One
     }
 }
 
-impl<Out: Data, S> Operator for AsyncStreamSource<Out, S>
+impl<S> Operator for AsyncStreamSource<S>
 where
-    S: Stream<Item = Out> + Send + Unpin + 'static,
+    S: Stream + Send + Unpin + 'static,
+    S::Item: Send,
 {
-    type Out = Out;
+    type Out = <S as Stream>::Item;
 
     fn setup(&mut self, _metadata: &mut ExecutionMetadata) {}
 
-    fn next(&mut self) -> StreamElement<Out> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         if self.terminated {
             return StreamElement::Terminate;
         }
@@ -93,15 +98,16 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Out, _>("AsyncStreamSource");
+        let mut operator = OperatorStructure::new::<Self::Out, _>("AsyncStreamSource");
         operator.kind = OperatorKind::Source;
         BlockStructure::default().add_operator(operator)
     }
 }
 
-impl<Out: Data, S> Clone for AsyncStreamSource<Out, S>
+impl<S> Clone for AsyncStreamSource<S>
 where
-    S: Stream<Item = Out> + Send + Unpin + 'static,
+    S: Stream + Send + Unpin + 'static,
+    S::Item: Send,
 {
     fn clone(&self) -> Self {
         // Since this is a non-parallel source, we don't want the other replicas to emit any value

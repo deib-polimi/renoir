@@ -66,12 +66,12 @@ where
     fn clone(&self) -> Self {
         Self {
             prev: self.prev.clone(),
-            coord: self.coord.clone(),
+            coord: self.coord,
             next_strategy: self.next_strategy.clone(),
-            batch_mode: self.batch_mode.clone(),
+            batch_mode: self.batch_mode,
             block_senders: self.block_senders.clone(),
             senders: Default::default(),
-            feedback_id: self.feedback_id.clone(),
+            feedback_id: self.feedback_id,
             ignore_block_ids: self.ignore_block_ids.clone(),
         }
     }

@@ -8,10 +8,7 @@ pub use file::*;
 pub use iterator::*;
 pub use parallel_iterator::*;
 
-use crate::{
-    block::Replication,
-    operator::{Data, Operator},
-};
+use crate::{block::Replication, operator::Operator};
 
 #[cfg(feature = "tokio")]
 mod async_stream;
@@ -22,7 +19,7 @@ mod iterator;
 mod parallel_iterator;
 
 /// This trait marks all the operators that can be used as sinks.
-pub trait Source<Out: Data>: Operator<Out = Out> {
+pub trait Source: Operator {
     /// The maximum parallelism offered by this operator.
     fn replication(&self) -> Replication;
 }

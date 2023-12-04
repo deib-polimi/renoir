@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::DataKey;
@@ -8,39 +7,33 @@ use crate::scheduler::ExecutionMetadata;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct KeyBy<Key: DataKey, Out: Send, Keyer, OperatorChain>
+pub struct KeyBy<Key: DataKey, Keyer, Op>
 where
-    Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out = Out>,
+    Keyer: Fn(&Op::Out) -> Key + Send + Clone,
+    Op: Operator,
 {
-    prev: OperatorChain,
+    prev: Op,
     #[derivative(Debug = "ignore")]
     keyer: Keyer,
-    _key: PhantomData<Key>,
-    _out: PhantomData<Out>,
 }
 
-impl<Key: DataKey, Out: Send, Keyer: Clone, OperatorChain: Clone> Clone
-    for KeyBy<Key, Out, Keyer, OperatorChain>
+impl<Key: DataKey, Keyer: Clone, Op: Clone> Clone for KeyBy<Key, Keyer, Op>
 where
-    Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out = Out>,
+    Keyer: Fn(&Op::Out) -> Key + Send + Clone,
+    Op: Operator,
 {
     fn clone(&self) -> Self {
         Self {
             prev: self.prev.clone(),
             keyer: self.keyer.clone(),
-            _key: self._key.clone(),
-            _out: self._out.clone(),
         }
     }
 }
 
-impl<Key: DataKey, Out: Send, Keyer, OperatorChain> Display
-    for KeyBy<Key, Out, Keyer, OperatorChain>
+impl<Key: DataKey, Keyer, Op> Display for KeyBy<Key, Keyer, Op>
 where
-    Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out = Out>,
+    Keyer: Fn(&Op::Out) -> Key + Send + Clone,
+    Op: Operator,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -52,35 +45,32 @@ where
     }
 }
 
-impl<Key: DataKey, Out: Send, Keyer, OperatorChain> KeyBy<Key, Out, Keyer, OperatorChain>
+impl<Key: DataKey, Keyer, Op> KeyBy<Key, Keyer, Op>
 where
-    Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out = Out>,
+    Keyer: Fn(&Op::Out) -> Key + Send + Clone,
+    Op: Operator,
 {
-    pub fn new(prev: OperatorChain, keyer: Keyer) -> Self {
+    pub fn new(prev: Op, keyer: Keyer) -> Self {
         Self {
             prev,
             keyer,
-            _key: Default::default(),
-            _out: Default::default(),
         }
     }
 }
 
-impl<Key: DataKey, Out: Send, Keyer, OperatorChain> Operator
-    for KeyBy<Key, Out, Keyer, OperatorChain>
+impl<Key: DataKey, Keyer, Op> Operator for KeyBy<Key, Keyer, Op>
 where
-    Keyer: Fn(&Out) -> Key + Send + Clone,
-    OperatorChain: Operator<Out = Out>,
+    Keyer: Fn(&Op::Out) -> Key + Send + Clone,
+    Op: Operator,
 {
-    type Out = (Key, Out);
+    type Out = (Key, Op::Out);
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);
     }
 
     #[inline]
-    fn next(&mut self) -> StreamElement<(Key, Out)> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         match self.prev.next() {
             StreamElement::Item(t) => StreamElement::Item(((self.keyer)(&t), t)),
             StreamElement::Timestamped(t, ts) => {
@@ -96,7 +86,7 @@ where
     fn structure(&self) -> BlockStructure {
         self.prev
             .structure()
-            .add_operator(OperatorStructure::new::<(Key, Out), _>("KeyBy"))
+            .add_operator(OperatorStructure::new::<Self::Out, _>("KeyBy"))
     }
 }
 

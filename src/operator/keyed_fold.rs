@@ -40,9 +40,9 @@ where
             accumulators: self.accumulators.clone(),
             timestamps: self.timestamps.clone(),
             ready: self.ready.clone(),
-            max_watermark: self.max_watermark.clone(),
-            received_end: self.received_end.clone(),
-            received_end_iter: self.received_end_iter.clone(),
+            max_watermark: self.max_watermark,
+            received_end: self.received_end,
+            received_end_iter: self.received_end_iter,
         }
     }
 }

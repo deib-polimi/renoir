@@ -3,23 +3,20 @@ use std::ops::Range;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
-use crate::operator::{Data, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::{CoordUInt, Stream};
 
 pub trait IntoParallelSource: Clone + Send {
-    type Item;
-    type Iter: Iterator<Item = Self::Item>;
+    type Iter: Iterator;
     fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter;
 }
 
-impl<It, GenIt, Out> IntoParallelSource for GenIt
+impl<It, G> IntoParallelSource for G
 where
-    It: Iterator<Item = Out> + Send + 'static,
-    GenIt: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
+    It: Iterator + Send + 'static,
+    G: FnOnce(CoordUInt, CoordUInt) -> It + Send + Clone,
 {
-    type Item = Out;
-
     type Iter = It;
 
     fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter {
@@ -28,8 +25,6 @@ where
 }
 
 impl IntoParallelSource for Range<u64> {
-    type Item = u64;
-
     type Iter = Range<u64>;
 
     fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter {
@@ -44,11 +39,9 @@ impl IntoParallelSource for Range<u64> {
     }
 }
 
-macro_rules! impl_into_parallel_source {
+macro_rules! impl_into_parallel_source_range {
     ($t:ty) => {
         impl IntoParallelSource for Range<$t> {
-            type Item = $t;
-
             type Iter = Range<$t>;
 
             fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter {
@@ -68,17 +61,17 @@ macro_rules! impl_into_parallel_source {
     };
 }
 
-impl_into_parallel_source!(u8);
-impl_into_parallel_source!(u16);
-impl_into_parallel_source!(u32);
+impl_into_parallel_source_range!(u8);
+impl_into_parallel_source_range!(u16);
+impl_into_parallel_source_range!(u32);
 
-impl_into_parallel_source!(usize);
+impl_into_parallel_source_range!(usize);
 
-impl_into_parallel_source!(i8);
-impl_into_parallel_source!(i16);
-impl_into_parallel_source!(i32);
-impl_into_parallel_source!(i64);
-impl_into_parallel_source!(isize);
+impl_into_parallel_source_range!(i8);
+impl_into_parallel_source_range!(i16);
+impl_into_parallel_source_range!(i32);
+impl_into_parallel_source_range!(i64);
+impl_into_parallel_source_range!(isize);
 
 /// This enum wraps either an `Iterator` that yields the items, or a generator function that
 /// produces such iterator.
@@ -109,7 +102,7 @@ impl<Source: IntoParallelSource> IteratorGenerator<Source> {
     }
 
     /// If the `generate` method has been called, get the next element from the iterator.
-    fn next(&mut self) -> Option<Source::Item> {
+    fn next(&mut self) -> Option<<Source::Iter as Iterator>::Item> {
         match self {
             IteratorGenerator::Iterator(iter) => iter.next(),
             _ => unreachable!("next on non-Iterator variant"),
@@ -136,7 +129,6 @@ impl<Source: IntoParallelSource> Clone for IteratorGenerator<Source> {
 pub struct ParallelIteratorSource<Source>
 where
     Source: IntoParallelSource,
-    Source::Item: Data,
 {
     #[derivative(Debug = "ignore")]
     inner: IteratorGenerator<Source>,
@@ -146,74 +138,23 @@ where
 impl<Source> Display for ParallelIteratorSource<Source>
 where
     Source: IntoParallelSource,
-    Source::Item: Data,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "ParallelIteratorSource<{}>",
-            std::any::type_name::<Source::Item>()
+            std::any::type_name::<<Source::Iter as Iterator>::Item>()
         )
     }
 }
 
-impl<Source> ParallelIteratorSource<Source>
-where
-    Source: IntoParallelSource,
-    Source::Item: Data,
-{
-    /// Create a new source that ingest items into the stream using the maximum parallelism
-    /// available.
-    ///
-    /// The function passed as argument is cloned in each core, and called to get the iterator for
-    /// that replica. The first parameter passed to the function is a 0-based index of the replica,
-    /// while the second is the total number of replicas.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::ParallelIteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// // generate the numbers from 0 to 99 using multiple replicas
-    /// let n = 100;
-    /// let source = ParallelIteratorSource::new(move |id, instances| {
-    ///     let chunk_size = (n + instances - 1) / instances;
-    ///     let remaining = n - n.min(chunk_size * id);
-    ///     let range = remaining.min(chunk_size);
-    ///     
-    ///     let start = id * chunk_size;
-    ///     let stop = id * chunk_size + range;
-    ///     start..stop
-    /// });
-    /// let s = env.stream(source);
-    /// ```
-    pub fn new(generator: Source) -> Self {
-        Self {
-            inner: IteratorGenerator::Generator(generator),
-            terminated: false,
-        }
-    }
-}
-
-impl<S> Source<S::Item> for ParallelIteratorSource<S>
+impl<S> Operator for ParallelIteratorSource<S>
 where
     S: IntoParallelSource,
-    S::Item: Data,
     S::Iter: Send,
+    <S::Iter as Iterator>::Item: Send,
 {
-    fn replication(&self) -> Replication {
-        Replication::Unlimited
-    }
-}
-
-impl<Source> Operator for ParallelIteratorSource<Source>
-where
-    Source: IntoParallelSource,
-    Source::Iter: Send,
-    Source::Item: Data,
-{
-    type Out = Source::Item;
+    type Out = <S::Iter as Iterator>::Item;
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.inner.generate(
@@ -226,7 +167,7 @@ where
         );
     }
 
-    fn next(&mut self) -> StreamElement<Source::Item> {
+    fn next(&mut self) -> StreamElement<Self::Out> {
         if self.terminated {
             return StreamElement::Terminate;
         }
@@ -241,16 +182,16 @@ where
     }
 
     fn structure(&self) -> BlockStructure {
-        let mut operator = OperatorStructure::new::<Source::Item, _>("ParallelIteratorSource");
+        let mut operator =
+            OperatorStructure::new::<<S::Iter as Iterator>::Item, _>("ParallelIteratorSource");
         operator.kind = OperatorKind::Source;
         BlockStructure::default().add_operator(operator)
     }
 }
 
-impl<Source> Clone for ParallelIteratorSource<Source>
+impl<S> Clone for ParallelIteratorSource<S>
 where
-    Source: IntoParallelSource,
-    Source::Item: Data,
+    S: IntoParallelSource,
 {
     fn clone(&self) -> Self {
         Self {
@@ -293,9 +234,58 @@ impl crate::StreamEnvironment {
     where
         Source: IntoParallelSource + 'static,
         Source::Iter: Send,
-        Source::Item: Data,
+        <Source::Iter as Iterator>::Item: Send,
     {
         let source = ParallelIteratorSource::new(generator);
         self.stream(source)
+    }
+}
+
+impl<S> ParallelIteratorSource<S>
+where
+    S: IntoParallelSource,
+{
+    /// Create a new source that ingest items into the stream using the maximum parallelism
+    /// available.
+    ///
+    /// The function passed as argument is cloned in each core, and called to get the iterator for
+    /// that replica. The first parameter passed to the function is a 0-based index of the replica,
+    /// while the second is the total number of replicas.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::ParallelIteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// // generate the numbers from 0 to 99 using multiple replicas
+    /// let n = 100;
+    /// let source = ParallelIteratorSource::new(move |id, instances| {
+    ///     let chunk_size = (n + instances - 1) / instances;
+    ///     let remaining = n - n.min(chunk_size * id);
+    ///     let range = remaining.min(chunk_size);
+    ///     
+    ///     let start = id * chunk_size;
+    ///     let stop = id * chunk_size + range;
+    ///     start..stop
+    /// });
+    /// let s = env.stream(source);
+    /// ```
+    pub fn new(generator: S) -> Self {
+        Self {
+            inner: IteratorGenerator::Generator(generator),
+            terminated: false,
+        }
+    }
+}
+
+impl<S> Source for ParallelIteratorSource<S>
+where
+    S: IntoParallelSource,
+    S::Iter: Send,
+    <S::Iter as Iterator>::Item: Send,
+{
+    fn replication(&self) -> Replication {
+        Replication::Unlimited
     }
 }

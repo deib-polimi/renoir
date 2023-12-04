@@ -67,7 +67,7 @@ impl FileSource {
     }
 }
 
-impl Source<String> for FileSource {
+impl Source for FileSource {
     fn replication(&self) -> Replication {
         Replication::Unlimited
     }

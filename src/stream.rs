@@ -179,7 +179,7 @@ where
     /// The start operator of the new block must support multiple inputs: the provided function
     /// will be called with the ids of the 2 input blocks and should return the new start operator
     /// of the new block.
-    pub(crate) fn binary_connection<Op2, O, S, Fs, F1, F2>(
+    pub(crate) fn binary_connection<Op2, S, Fs, F1, F2>(
         self,
         oth: Stream<Op2>,
         get_start_operator: Fs,
@@ -193,8 +193,7 @@ where
         Op2::Out: ExchangeData,
         F1: KeyerFn<u64, Op::Out>,
         F2: KeyerFn<u64, Op2::Out>,
-        O: Data,
-        S: Operator<Out = O> + Source<O>,
+        S: Operator + Source,
         Fs: FnOnce(BlockId, BlockId, bool, bool, Option<Arc<IterationStateLock>>) -> S,
     {
         let Stream { block: b1, env } = self;
