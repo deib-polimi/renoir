@@ -99,8 +99,8 @@ pub trait ExchangeData: Serialize + for<'a> Deserialize<'a> + Clone + Send + 'st
 impl<T: Serialize + for<'a> Deserialize<'a> + Clone + Send + 'static> ExchangeData for T {}
 
 /// Marker trait that all the keys should implement.
-pub trait DataKey: Data + Hash + Eq {}
-impl<T: Data + Hash + Eq> DataKey for T {}
+pub trait DataKey: Clone + Send + Hash + Eq + 'static {}
+impl<T: Clone + Send + Hash + Eq + 'static> DataKey for T {}
 
 /// Marker trait for key types that are used when communicating between different blocks.
 pub trait ExchangeDataKey: DataKey + ExchangeData {}
@@ -519,7 +519,7 @@ where
     pub fn rich_map<O, F>(self, mut f: F) -> Stream<impl Operator<Out = O>>
     where
         F: FnMut(Op::Out) -> O + Send + Clone + 'static,
-        O: Data,
+        O: Send + 'static,
     {
         self.key_by(|_| ())
             .add_operator(|prev| RichMap::new(prev, move |(_, value)| f(value)))
@@ -934,13 +934,12 @@ where
     ///
     /// assert_eq!(res.get().unwrap(), vec![(0, 1), (0, 2), (1, 2), (0, 3), (1, 3), (2, 3)]);
     /// ```
-    pub fn rich_flat_map<It, O, F>(self, f: F) -> Stream<impl Operator<Out = O>>
+    pub fn rich_flat_map<It, F>(self, f: F) -> Stream<impl Operator<Out = It::Item>>
     where
-        It: IntoIterator<Item = O>,
-        <It as IntoIterator>::IntoIter: Clone + Send + 'static,
+        It: IntoIterator + Send + 'static,
+        <It as IntoIterator>::IntoIter: Send + 'static,
+        <It as IntoIterator>::Item: Send,
         F: FnMut(Op::Out) -> It + Send + Clone + 'static,
-        It: Data,
-        O: Data,
     {
         self.rich_map(f).flatten()
     }
@@ -989,13 +988,12 @@ where
     ///
     /// assert_eq!(res.get().unwrap(), vec![0, 0, 1, 1, 2, 2]);
     /// ```
-    pub fn flat_map<It, O, F>(self, f: F) -> Stream<impl Operator<Out = O>>
+    pub fn flat_map<It, F>(self, f: F) -> Stream<impl Operator<Out = It::Item>>
     where
-        It: IntoIterator<Item = O>,
-        <It as IntoIterator>::IntoIter: Send + 'static,
+        It: IntoIterator + 'static,
+        It::IntoIter: Send + 'static,
+        It::Item: Send,
         F: Fn(Op::Out) -> It + Send + Clone + 'static,
-        It: 'static,
-        O: Data,
     {
         self.add_operator(|prev| FlatMap::new(prev, f))
     }
@@ -1019,6 +1017,36 @@ where
     {
         self.add_operator(|prev| ForEach::new(prev, f))
             .finalize_block();
+    }
+
+    /// Transform this stream of containers into a stream of all the contained values.
+    ///
+    /// **Note**: this is very similar to [`Iteartor::flatten`](std::iter::Iterator::flatten)
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new(vec![
+    ///     vec![1, 2, 3],
+    ///     vec![],
+    ///     vec![4, 5],
+    /// ].into_iter()));
+    /// let res = s.flatten().collect_vec();
+    ///
+    /// env.execute_blocking();
+    ///
+    /// assert_eq!(res.get().unwrap(), vec![1, 2, 3, 4, 5]);
+    /// ```
+    pub fn flatten(self) -> Stream<impl Operator<Out = <Op::Out as IntoIterator>::Item>>
+    where
+        Op::Out: IntoIterator,
+        <Op::Out as IntoIterator>::IntoIter: Send,
+        <Op::Out as IntoIterator>::Item: Send,
+    {
+        self.add_operator(|prev| Flatten::new(prev))
     }
 }
 
@@ -1843,39 +1871,6 @@ where
     }
 }
 
-impl<O, It, Op> Stream<Op>
-where
-    Op: Operator + 'static,
-    Op::Out: IntoIterator<IntoIter = It, Item = It::Item>,
-    It: Iterator<Item = O> + Clone + Send + 'static,
-    O: Send,
-{
-    /// Transform this stream of containers into a stream of all the contained values.
-    ///
-    /// **Note**: this is very similar to [`Iteartor::flatten`](std::iter::Iterator::flatten)
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
-    /// let s = env.stream(IteratorSource::new(vec![
-    ///     vec![1, 2, 3],
-    ///     vec![],
-    ///     vec![4, 5],
-    /// ].into_iter()));
-    /// let res = s.flatten().collect_vec();
-    ///
-    /// env.execute_blocking();
-    ///
-    /// assert_eq!(res.get().unwrap(), vec![1, 2, 3, 4, 5]);
-    /// ```
-    pub fn flatten(self) -> Stream<impl Operator<Out = O>> {
-        self.add_operator(|prev| Flatten::new(prev))
-    }
-}
-
 impl<Op> Stream<Op>
 where
     Op: Operator + 'static,
@@ -1957,7 +1952,7 @@ where
 impl<Op, K, I> KeyedStream<Op>
 where
     K: DataKey,
-    I: Data,
+    I: Send + 'static,
     Op: Operator<Out = (K, I)> + 'static,
 {
     /// Given a keyed stream without timestamps nor watermarks, tag each item with a timestamp and insert
@@ -2052,7 +2047,7 @@ where
     pub fn filter_map<O, F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         F: Fn((&K, I)) -> Option<O> + Send + Clone + 'static,
-        O: Data,
+        O: Send + 'static,
     {
         self.map(f)
             .filter(|(_, x)| x.is_some())
@@ -2176,7 +2171,7 @@ where
     pub fn fold<O, F>(self, init: O, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         F: Fn(&mut O, <Op::Out as KeyedItem>::Value) + Send + Clone + 'static,
-        O: Data,
+        O: Send + Clone,
     {
         self.add_operator(|prev| KeyedFold::new(prev, init, f))
     }
@@ -2220,6 +2215,7 @@ where
     /// ```
     pub fn reduce<F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, I)>>
     where
+        I: Clone + 'static,
         F: Fn(&mut I, I) + Send + Clone + 'static,
     {
         self.fold(None, move |acc, value| match acc {
@@ -2251,7 +2247,7 @@ where
     pub fn map<O, F>(self, f: F) -> KeyedStream<impl Operator<Out = (K, O)>>
     where
         F: Fn((&K, I)) -> O + Send + Clone + 'static,
-        O: Data,
+        O: Send,
     {
         self.add_operator(|prev| {
             Map::new(prev, move |(k, v)| {

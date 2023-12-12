@@ -311,7 +311,7 @@ where
 {
     pub(crate) fn add_operator<Op2, GetOp>(self, get_operator: GetOp) -> KeyedStream<Op2>
     where
-        Op2: Operator + 'static,
+        Op2: Operator,
         GetOp: FnOnce(OperatorChain) -> Op2,
         Op2::Out: KeyedItem<Key = <OperatorChain::Out as KeyedItem>::Key>,
     {
