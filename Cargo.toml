@@ -1,5 +1,6 @@
 [package]
 name = "noir"
+description = "Network of Operators In Rust"
 version = "0.1.0"
 edition = "2021"
 authors = [
@@ -9,6 +10,7 @@ authors = [
 ]
 license = "LGPL-3.0-or-later"
 repository = "https://github.com/deib-polimi/noir"
+homepage = "https://github.com/deib-polimi/noir"
 readme = "README.md"
 
 [features]
