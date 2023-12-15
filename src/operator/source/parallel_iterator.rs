@@ -205,7 +205,7 @@ impl crate::StreamEnvironment {
     /// Convenience method, creates a `ParallelIteratorSource` and makes a stream using `StreamEnvironment::stream`
     /// # Example:
     /// ```
-    /// use noir::prelude::*;
+    /// use noir_compute::prelude::*;
     ///
     /// let mut env = StreamEnvironment::default();
     ///
@@ -255,8 +255,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::ParallelIteratorSource;
+    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::operator::source::ParallelIteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// // generate the numbers from 0 to 99 using multiple replicas
     /// let n = 100;

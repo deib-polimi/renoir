@@ -1,5 +1,5 @@
-use noir::operator::source::IteratorSource;
-use noir::operator::window::EventTimeWindow;
+use noir_compute::operator::source::IteratorSource;
+use noir_compute::operator::window::EventTimeWindow;
 
 use super::utils::TestHelper;
 

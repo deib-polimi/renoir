@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::time::Instant;
 
-use noir::prelude::*;
+use noir_compute::prelude::*;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

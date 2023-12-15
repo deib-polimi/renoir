@@ -13,8 +13,8 @@ use once_cell::sync::Lazy;
 use rand::prelude::StdRng;
 use rand::SeedableRng;
 
-use noir::BatchMode;
-use noir::StreamEnvironment;
+use noir_compute::BatchMode;
+use noir_compute::StreamEnvironment;
 
 mod common;
 use common::*;

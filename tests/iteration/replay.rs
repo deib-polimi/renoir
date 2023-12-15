@@ -1,5 +1,5 @@
-use noir::operator::sink::StreamOutput;
-use noir::operator::source::IteratorSource;
+use noir_compute::operator::sink::StreamOutput;
+use noir_compute::operator::source::IteratorSource;
 
 use super::utils::TestHelper;
 

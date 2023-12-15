@@ -10,12 +10,12 @@ use std::time::Duration;
 
 use itertools::{process_results, Itertools};
 
-use noir::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
-use noir::operator::{Data, Operator, StreamElement, Timestamp};
-use noir::structure::BlockStructure;
-use noir::CoordUInt;
-use noir::ExecutionMetadata;
-use noir::{EnvironmentConfig, StreamEnvironment};
+use noir_compute::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
+use noir_compute::operator::{Data, Operator, StreamElement, Timestamp};
+use noir_compute::structure::BlockStructure;
+use noir_compute::CoordUInt;
+use noir_compute::ExecutionMetadata;
+use noir_compute::{EnvironmentConfig, StreamEnvironment};
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;

@@ -19,7 +19,7 @@ The common layout of a Noir program starts with the creation of a `StreamEnviron
 #### Wordcount
 
 ```rs
-use noir::prelude::*;
+use noir_compute::prelude::*;
 
 fn main() {
     // Convenience method to parse deployment config from CLI arguments
@@ -58,7 +58,7 @@ fn tokenize(s: &str) -> Vec<String> {
 
 
 ```rs
-use noir::prelude::*;
+use noir_compute::prelude::*;
 
 fn main() {
     // Convenience method to parse deployment config from CLI arguments

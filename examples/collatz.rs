@@ -1,4 +1,4 @@
-use noir::prelude::*;
+use noir_compute::prelude::*;
 use std::time::Instant;
 
 #[global_allocator]

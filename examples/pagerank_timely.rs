@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use noir::prelude::*;
+use noir_compute::prelude::*;
 use rand::prelude::*;
 
 #[global_allocator]

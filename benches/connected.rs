@@ -1,10 +1,10 @@
 use criterion::BenchmarkId;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use fxhash::FxHashMap;
-use noir::operator::Operator;
-use noir::EnvironmentConfig;
-use noir::Stream;
-use noir::StreamEnvironment;
+use noir_compute::operator::Operator;
+use noir_compute::EnvironmentConfig;
+use noir_compute::Stream;
+use noir_compute::StreamEnvironment;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};

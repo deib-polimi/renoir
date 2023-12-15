@@ -51,10 +51,7 @@ where
     Op: Operator,
 {
     pub(super) fn new(prev: Op, f: F) -> Self {
-        Self {
-            prev,
-            f,
-        }
+        Self { prev, f }
     }
 }
 

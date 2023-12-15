@@ -1,10 +1,10 @@
 use clap::Parser;
 use nexmark::config::NexmarkConfig;
-use noir::operator::Operator;
-use noir::operator::Timestamp;
-use noir::prelude::*;
-use noir::Replication;
-use noir::Stream;
+use noir_compute::operator::Operator;
+use noir_compute::operator::Timestamp;
+use noir_compute::prelude::*;
+use noir_compute::Replication;
+use noir_compute::Stream;
 use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;

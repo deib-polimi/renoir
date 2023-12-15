@@ -340,8 +340,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
+    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s = env.stream(IteratorSource::new(0..3)).shuffle();
     /// let (state, items) = s.iterate(

@@ -35,7 +35,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// ## Local environment
 ///
 /// ```
-/// # use noir::{StreamEnvironment, EnvironmentConfig};
+/// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
 /// let config = EnvironmentConfig::local(1);
 /// let mut env = StreamEnvironment::new(config);
 /// ```
@@ -43,7 +43,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// ## Remote environment
 ///
 /// ```
-/// # use noir::{StreamEnvironment, EnvironmentConfig};
+/// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
 /// # use std::fs::File;
 /// # use std::io::Write;
 /// let config = r"
@@ -68,7 +68,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// their docs.
 ///
 /// ```no_run
-/// # use noir::{EnvironmentConfig, StreamEnvironment};
+/// # use noir_compute::{EnvironmentConfig, StreamEnvironment};
 /// let (config, args) = EnvironmentConfig::from_args();
 /// let mut env = StreamEnvironment::new(config);
 /// ```

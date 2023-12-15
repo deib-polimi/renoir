@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use noir::operator::source::IteratorSource;
-use noir::operator::window::ProcessingTimeWindow;
+use noir_compute::operator::source::IteratorSource;
+use noir_compute::operator::window::ProcessingTimeWindow;
 
 use super::utils::TestHelper;
 

@@ -3,7 +3,7 @@ use std::time::{Instant, SystemTime};
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use noir::prelude::*;
+use noir_compute::prelude::*;
 use rand::prelude::*;
 
 const TOPICS: [&str; 50] = [

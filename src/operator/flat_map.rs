@@ -1,9 +1,9 @@
-use core::iter::{IntoIterator, Iterator};
-use std::fmt::Display;
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyedItem;
+use core::iter::{IntoIterator, Iterator};
+use std::fmt::Display;
 
 #[derive(Derivative)]
 #[derivative(Debug)]

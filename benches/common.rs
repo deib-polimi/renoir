@@ -1,13 +1,13 @@
 #![allow(unused)]
 
 use criterion::{black_box, Bencher};
-use noir::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
+use noir_compute::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use noir::*;
+use noir_compute::*;
 
 pub const SAMPLES: usize = 50;
 

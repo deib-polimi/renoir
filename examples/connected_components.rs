@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use noir::prelude::*;
+use noir_compute::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[global_allocator]

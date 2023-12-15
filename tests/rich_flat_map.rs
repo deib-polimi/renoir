@@ -1,6 +1,6 @@
 use itertools::{repeat_n, Itertools};
 
-use noir::operator::source::IteratorSource;
+use noir_compute::operator::source::IteratorSource;
 use utils::TestHelper;
 
 mod utils;

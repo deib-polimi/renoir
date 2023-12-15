@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
-use noir::operator::source::IteratorSource;
-use noir::operator::window::CountWindow;
+use noir_compute::operator::source::IteratorSource;
+use noir_compute::operator::window::CountWindow;
 
 use super::utils::TestHelper;
 

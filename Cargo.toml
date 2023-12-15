@@ -1,10 +1,10 @@
 [package]
-name = "noir"
+name = "noir-compute"
 description = "Network of Operators In Rust"
 version = "0.1.0"
 edition = "2021"
 authors = [
-    "Luca De Martini <luca.de.martini@protonmail.com>",
+    "Luca De Martini <luca.demartini@polimi.it>",
     "Edoardo Morassutto <edoardo.morassutto@gmail.com>",
     "Marco Donadoni <marco.donadoni@mail.polimi.it>"
 ]

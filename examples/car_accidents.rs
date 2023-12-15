@@ -4,8 +4,8 @@ use std::str::FromStr;
 use std::time::Instant;
 
 use itertools::Itertools;
-use noir::operator::Operator;
-use noir::{prelude::*, Stream};
+use noir_compute::operator::Operator;
+use noir_compute::{prelude::*, Stream};
 use serde::{Deserialize, Serialize};
 
 #[global_allocator]

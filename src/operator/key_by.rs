@@ -51,10 +51,7 @@ where
     Op: Operator,
 {
     pub fn new(prev: Op, keyer: Keyer) -> Self {
-        Self {
-            prev,
-            keyer,
-        }
+        Self { prev, keyer }
     }
 }
 

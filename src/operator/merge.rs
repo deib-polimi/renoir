@@ -25,8 +25,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir::{StreamEnvironment, EnvironmentConfig};
-    /// # use noir::operator::source::IteratorSource;
+    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
     /// let s1 = env.stream(IteratorSource::new((0..10)));
     /// let s2 = env.stream(IteratorSource::new((10..20)));

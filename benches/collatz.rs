@@ -1,7 +1,7 @@
 use criterion::BenchmarkId;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use noir::BatchMode;
-use noir::StreamEnvironment;
+use noir_compute::BatchMode;
+use noir_compute::StreamEnvironment;
 
 mod common;
 use common::*;

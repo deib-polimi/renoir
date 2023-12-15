@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use noir::prelude::*;
+use noir_compute::prelude::*;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

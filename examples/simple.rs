@@ -1,4 +1,4 @@
-use noir::prelude::*;
+use noir_compute::prelude::*;
 
 fn main() {
     let (config, _args) = EnvironmentConfig::from_args();

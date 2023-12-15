@@ -1,11 +1,11 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use nexmark::config::NexmarkConfig;
-use noir::operator::window::TransactionOp;
-use noir::operator::window::TransactionWindow;
-use noir::operator::Operator;
-use noir::operator::Timestamp;
-use noir::prelude::*;
-use noir::Stream;
+use noir_compute::operator::window::TransactionOp;
+use noir_compute::operator::window::TransactionWindow;
+use noir_compute::operator::Operator;
+use noir_compute::operator::Timestamp;
+use noir_compute::prelude::*;
+use noir_compute::Stream;
 
 use nexmark::event::*;
 

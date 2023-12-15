@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use itertools::Itertools;
 
-use noir::operator::source::IteratorSource;
-use noir::BatchMode;
+use noir_compute::operator::source::IteratorSource;
+use noir_compute::BatchMode;
 use utils::TestHelper;
 
 mod utils;

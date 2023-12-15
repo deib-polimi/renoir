@@ -2,10 +2,10 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 
-use noir::operator::source::IteratorSource;
-use noir::BatchMode;
-use noir::EnvironmentConfig;
-use noir::StreamEnvironment;
+use noir_compute::operator::source::IteratorSource;
+use noir_compute::BatchMode;
+use noir_compute::EnvironmentConfig;
+use noir_compute::StreamEnvironment;
 
 fn fold(dataset: &'static [u32]) {
     let config = EnvironmentConfig::local(4);
