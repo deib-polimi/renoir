@@ -12,8 +12,8 @@ fn bench_main(c: &mut Criterion) {
     // g.warm_up_time(WARM_UP);
     // g.measurement_time(DURATION);
 
-    for size in [0u32, 1_000, 1_000_000, 100_000_000] {
-        g.throughput(Throughput::Elements(size as u64));
+    for size in [0u64, 1_000, 1_000_000, 100_000_000] {
+        g.throughput(Throughput::Elements(size));
         g.bench_with_input(BenchmarkId::new("collatz", size), &size, |b, n| {
             b.iter(|| {
                 let mut env = StreamEnvironment::default();

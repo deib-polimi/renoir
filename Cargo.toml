@@ -36,31 +36,31 @@ derivative = "2.2.0"
 
 # serialization library used for reading the config file (yaml) and serializing
 # the messages on the network
-serde = { version = "1.0.190", features = ["derive"] }
-serde_yaml = "0.9.27"
+serde = { version = "1.0.193", features = ["derive"] }
+serde_yaml = "0.9.28"
 serde_json = "1.0.108"
 bincode = "1.3.3"
 
 # handy Result type
-anyhow = "1.0.75"
-thiserror = "1.0.50"
+anyhow = "1.0.76"
+thiserror = "1.0.51"
 
 # handy iterators functions
-itertools = "0.11.0"
+itertools = "0.12.0"
 
 # for storing non-mutable static variables with non-trivial initialization
-once_cell = "1.18.0"
+once_cell = "1.19.0"
 
 # used for spawning the remote workers
 ssh2 = { version = "0.9.4", optional = true }
 whoami = { version = "1.4.1", optional = true }
 shell-escape = { version = "0.1.5", optional = true }
-clap = { version = "4.4.7", features = ["derive"], optional = true }
+clap = { version = "4.4.11", features = ["derive"], optional = true }
 sha2 = { version = "0.10.8", optional = true }
 base64 = { version = "0.21.5", optional = true }
 
 # channel implementation
-crossbeam-channel = { version = "0.5.8", optional = true }
+crossbeam-channel = { version = "0.5.9", optional = true }
 flume = { version = "0.11.0", optional = true }
 
 # used for csv file source
@@ -70,9 +70,9 @@ csv = "1.3.0"
 lazy-init = "0.5.1"
 
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
-coarsetime = "0.1.29"
+coarsetime = "0.1.33"
 
-tokio = { version = "1.33.0", features = ["rt"], default-features = false, optional = true }
+tokio = { version = "1.35.1", features = ["rt"], default-features = false, optional = true }
 futures = { version = "0.3.29", optional = true }
 
 parking_lot = "0.12.1"
@@ -80,19 +80,19 @@ parking_lot = "0.12.1"
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 glidesort = "0.1.2"
-indexmap = "2.0.2"
+indexmap = "2.1.0"
 tracing = { version = "0.1.40", features = ["log"] }
 quick_cache = "0.4.0"
 
 [dev-dependencies]
 # for the tests
-env_logger = "0.10.0"
+env_logger = "0.10.1"
 rand = { version = "0.8.5", features = ["small_rng"] }
 tempfile = "3.8.1"
 criterion = { version = "0.5.1", features = ["html_reports"] }
-fake = "2.9.1"
+fake = "2.9.2"
 mimalloc = { version = "0.1.39", default-features = false }
-tracing-subscriber = "0.3.17"
+tracing-subscriber = "0.3.18"
 
 micrometer = { version = "0.2.7", features = ["enable"]}
 
@@ -100,7 +100,7 @@ micrometer = { version = "0.2.7", features = ["enable"]}
 regex = "1.10.2"
 
 # used in the benchmarks
-crossbeam-channel = "0.5.8"
+crossbeam-channel = "0.5.9"
 flume = "0.11.0"
 
 kstring = { version = "2.0.0", features = ["serde"] }
