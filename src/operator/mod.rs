@@ -23,6 +23,7 @@ use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyedItem;
 use crate::{BatchMode, KeyedStream, Stream};
 
+use self::cache::{CacheInnerRef, CacheSink, StreamCache};
 #[cfg(feature = "tokio")]
 use self::map_async::MapAsync;
 use self::map_memo::MapMemo;
@@ -60,6 +61,7 @@ use self::{
 mod add_timestamps;
 mod batch_mode;
 mod boxed;
+pub mod cache;
 pub(crate) mod end;
 mod filter;
 mod filter_map;
@@ -1606,6 +1608,7 @@ where
     /// and will fail otherwise.
     pub fn replication(self, replication: Replication) -> Stream<impl Operator<Out = Op::Out>> {
         let mut new_stream = self.split_block(End::new, NextStrategy::only_one());
+        // TODO: Cannot scale up
         new_stream.block.scheduling.replication(replication);
         new_stream
     }
@@ -2072,6 +2075,85 @@ where
             .add_operator(|prev| Collect::new(prev, output.clone()))
             .finalize_block();
         StreamOutput::from(output)
+    }
+
+    /// Closes the stream, preserving all resulting items in a [`StreamCache`]. This enables the
+    /// stream to be resumed from the last processed element.
+    ///
+    /// **Note**: To resume the stream later, ensure that the stream is executed using
+    /// [`StreamEnvironment::interactive_execute_blocking`]. Failing to do so will consume the environment.
+    ///
+    /// **Note**: Calling [`StreamCache::read`] on the returned cache before the execution of the stream
+    /// will result in a panic.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use renoir::prelude::*;
+    /// let mut ctx = StreamContext::new_local();    ///
+    /// // Create a cached stream by applying filters and caching the results
+    /// let cache = ctx.stream_iter(0..10).filter(|x| x % 3 == 0).collect_cache();
+    ///
+    /// // Execute the stream interactively to capture and store the results in the cache
+    /// ctx.execute_blocking();
+    ///
+    /// // Further process the cached stream, applying additional filters and collecting the results
+    /// let ctx = StreamContext::new(cache.config());
+    /// let res = cache.stream_in(&ctx).filter(|x| x % 2 == 0).collect_vec();
+    ///
+    /// // Execute the environment to finalize the processing
+    /// ctx.execute_blocking();
+    ///
+    /// // Assert the final result matches the expected values
+    /// let expected = (0..10).filter(|x| x % 3 == 0 && x % 2 == 0).collect::<Vec<_>>();
+    /// assert_eq!(expected, res.get().unwrap());
+    /// ```
+    pub fn collect_cache(self) -> StreamCache<I> {
+        let config = self.ctx.lock().config.clone();
+        let replication = self.block.scheduling.replication;
+        let output = CacheInnerRef::default();
+        self.add_operator(|prev| CacheSink::new(prev, config.clone(), output.clone()))
+            .finalize_block();
+        StreamCache::new(config, replication, output)
+    }
+
+    /// Create a checkpoint in a stream by caching all the elements in a [`StreamCache`].
+    /// The function returns a tuple containing the cache and the stream on which operations
+    /// following the checkpoint can be applied.
+    ///
+    /// **Note**: This operator will split the current block.
+    ///
+    /// ## Example
+    /// ```
+    /// # use renoir::prelude::*;
+    /// let ctx = StreamContext::new_local();
+    ///
+    /// // Create a cached stream by applying filters and caching the results
+    /// let (cache, stream) = ctx.stream_iter(0..10).filter(|x| x % 3 == 0).cache();
+    ///
+    /// // Further process the cached stream, applying additional filters and collecting the results
+    /// let result = stream.filter(|x| x % 2 == 0).collect_vec();
+    ///
+    /// // Execute the environment to finalize the processing
+    /// ctx.execute_blocking();
+    ///
+    /// // Assert the final result matches the expected values
+    /// assert_eq!(result.get().unwrap(), (0..10).filter(|x| x % 3 == 0 && x % 2 == 0).collect::<Vec<_>>());
+    ///
+    /// // Further process the cached stream, applying additional filters and collecting the results
+    /// let ctx = StreamContext::new(cache.config());
+    /// let res = cache.stream_in(&ctx).filter(|x| x % 2 == 0).collect_vec();
+    ///
+    /// // Execute the environment to finalize the processing
+    /// ctx.execute_blocking();
+    ///
+    /// // Assert the final result matches the expected values
+    /// let expected = (0..10).filter(|x| x % 3 == 0 && x % 2 == 0).collect::<Vec<_>>();
+    /// assert_eq!(expected, res.get().unwrap());
+    /// ```
+    pub fn cache(self) -> (StreamCache<I>, Stream<impl Operator<Out = Op::Out>>) {
+        let mut splits = self.split(2);
+        (splits.pop().unwrap().collect_cache(), splits.pop().unwrap())
     }
 }
 

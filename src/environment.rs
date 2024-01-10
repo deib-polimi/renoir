@@ -18,7 +18,7 @@ use crate::{BatchMode, CoordUInt};
 /// the blocks.
 pub(crate) struct StreamContextInner {
     /// The configuration of the environment.
-    pub(crate) config: RuntimeConfig,
+    pub(crate) config: Arc<RuntimeConfig>,
     /// The number of blocks in the job graph, it's used to assign new ids to the blocks.
     block_count: CoordUInt,
     /// The scheduler that will start the computation. It's an option because it will be moved out
@@ -46,10 +46,10 @@ pub struct StreamContext {
 
 impl StreamContext {
     /// Construct a new environment from the config.
-    pub fn new(config: RuntimeConfig) -> Self {
+    pub fn new(config: impl Into<Arc<RuntimeConfig>>) -> Self {
         debug!("new environment");
         StreamContext {
-            inner: Arc::new(Mutex::new(StreamContextInner::new(config))),
+            inner: Arc::new(Mutex::new(StreamContextInner::new(config.into()))),
         }
     }
 
@@ -59,6 +59,10 @@ impl StreamContext {
             .unwrap_or(4);
         let conf = RuntimeConfig::local(parallelism as u64).unwrap();
         Self::new(conf)
+    }
+
+    pub fn config(&self) -> Arc<RuntimeConfig> {
+        self.inner.lock().config.clone()
     }
 
     /// Construct a new stream bound to this environment starting with the specified source.
@@ -99,7 +103,7 @@ impl StreamContext {
 
     /// Get the total number of processing cores in the cluster.
     pub fn parallelism(&self) -> CoordUInt {
-        match &self.inner.lock().config {
+        match self.inner.lock().config.as_ref() {
             RuntimeConfig::Local(local) => local.parallelism,
             RuntimeConfig::Remote(remote) => remote.hosts.iter().map(|h| h.num_cores).sum(),
         }
@@ -107,7 +111,7 @@ impl StreamContext {
 }
 
 impl StreamContextInner {
-    fn new(config: RuntimeConfig) -> Self {
+    fn new(config: Arc<RuntimeConfig>) -> Self {
         Self {
             config: config.clone(),
             block_count: 0,

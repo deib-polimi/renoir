@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::marker::PhantomData;
+use std::sync::Arc;
 #[cfg(not(feature = "tokio"))]
 use std::thread::JoinHandle;
 
@@ -63,7 +64,7 @@ struct SenderMetadata {
 /// connections.
 pub(crate) struct NetworkTopology {
     /// Configuration of the environment.
-    config: RuntimeConfig,
+    config: Arc<RuntimeConfig>,
     /// All the registered receivers.
     ///
     /// Since the `NetworkReceiver` is generic over the element type we cannot simply store them
@@ -129,7 +130,7 @@ pub(crate) struct NetworkTopology {
 impl std::fmt::Debug for NetworkTopology {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NetworkTopology")
-            .field("config", &self.config)
+            .field("config", self.config.as_ref())
             .field("next", &self.next)
             .field("senders_metadata", &self.senders_metadata)
             .field("block_replicas", &self.block_replicas)
@@ -139,7 +140,7 @@ impl std::fmt::Debug for NetworkTopology {
 }
 
 impl NetworkTopology {
-    pub(crate) fn new(config: RuntimeConfig) -> Self {
+    pub(crate) fn new(config: Arc<RuntimeConfig>) -> Self {
         NetworkTopology {
             config,
             receivers: Some(TypeMap::new()),
@@ -372,7 +373,7 @@ impl NetworkTopology {
             .get(&receiver_endpoint)
             .unwrap_or_else(|| panic!("Channel for endpoint {receiver_endpoint} not registered",));
 
-        match &self.config {
+        match self.config.as_ref() {
             RuntimeConfig::Remote(_) => {
                 if sender_metadata.to_remote {
                     let sender = self.register_mux(receiver_endpoint);
@@ -504,7 +505,7 @@ impl NetworkTopology {
         log::debug!("finalizing topology");
         // Close handles to multiplexers to start the worker threads
 
-        let config = if let RuntimeConfig::Remote(config) = &self.config {
+        let config = if let RuntimeConfig::Remote(config) = self.config.as_ref() {
             config
         } else {
             return;
@@ -578,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_local_topology() {
-        let config = RuntimeConfig::local(4).unwrap();
+        let config = Arc::new(RuntimeConfig::local(4).unwrap());
         let mut topology = NetworkTopology::new(config);
 
         // s1 [b0, h0] -> r1 [b2, h0] (endpoint 1) type=i32
@@ -657,7 +658,7 @@ num_cores = 1
         // s3 [b1, h0, r0] -> r2 [b2, h1, r1] (endpoint 3) type=u64
         // s4 [b1, h0, r1] -> r2 [b2, h1, r1] (endpoint 3) type=u64
 
-        let run = |config: RuntimeConfig| {
+        let run = |config: Arc<RuntimeConfig>| {
             let host = config.host_id().unwrap();
             let mut topology = NetworkTopology::new(config);
 
@@ -758,19 +759,23 @@ num_cores = 1
             topology.stop_and_wait();
         };
 
-        let config0 = ConfigBuilder::new_remote()
-            .parse_file(toml_path.path())
-            .unwrap()
-            .host_id(0)
-            .build()
-            .unwrap();
+        let config0 = Arc::new(
+            ConfigBuilder::new_remote()
+                .parse_file(toml_path.path())
+                .unwrap()
+                .host_id(0)
+                .build()
+                .unwrap(),
+        );
 
-        let config1 = ConfigBuilder::new_remote()
-            .parse_file(toml_path.path())
-            .unwrap()
-            .host_id(1)
-            .build()
-            .unwrap();
+        let config1 = Arc::new(
+            ConfigBuilder::new_remote()
+                .parse_file(toml_path.path())
+                .unwrap()
+                .host_id(1)
+                .build()
+                .unwrap(),
+        );
 
         let join0 = std::thread::Builder::new()
             .name("host0".into())
@@ -802,7 +807,7 @@ num_cores = 1
 
     #[test]
     fn test_multiple_output_types() {
-        let config = RuntimeConfig::local(4).unwrap();
+        let config = Arc::new(RuntimeConfig::local(4).unwrap());
         let mut topology = NetworkTopology::new(config);
 
         // s1 [b0, h0] -> r1 [b1, h0] (endpoint 1) type=i32

@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::collections::VecDeque;
 use std::fmt::Display;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::block::{BlockStructure, OperatorStructure, Replication};
@@ -79,7 +80,7 @@ impl<T: ExchangeData> FakeNetworkTopology<T> {
     /// Build a fake network topology for a single replica (with coord b0 h0 r0), that receives data
     /// of type `T` from `num_prev_blocks`, each with `instances_per_block` replicas.
     pub fn new(num_prev_blocks: CoordUInt, instances_per_block: CoordUInt) -> Self {
-        let config = RuntimeConfig::local(1).unwrap();
+        let config = Arc::new(RuntimeConfig::local(1).unwrap());
         let mut topology = NetworkTopology::new(config);
 
         let dest = Coord::new(0, 0, 0);

@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use crate::block::{BatchMode, Block, BlockStructure, JobGraphGenerator, Replication};
@@ -57,7 +58,7 @@ struct SchedulerBlockInfo {
 /// execution starts it builds the execution graph and actually start the workers.
 pub(crate) struct Scheduler {
     /// The configuration of the environment.
-    config: RuntimeConfig,
+    config: Arc<RuntimeConfig>,
     /// Adjacency list of the job graph.
     next_blocks: HashMap<BlockId, Vec<(BlockId, TypeId, bool)>, crate::block::CoordHasherBuilder>,
     /// Reverse adjacency list of the job graph.
@@ -71,7 +72,7 @@ pub(crate) struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn new(config: RuntimeConfig) -> Self {
+    pub fn new(config: Arc<RuntimeConfig>) -> Self {
         Self {
             next_blocks: Default::default(),
             prev_blocks: Default::default(),
@@ -318,7 +319,7 @@ impl Scheduler {
     where
         OperatorChain: Operator,
     {
-        match &self.config {
+        match self.config.as_ref() {
             RuntimeConfig::Local(local) => self.local_block_info(block, local),
             RuntimeConfig::Remote(remote) => self.remote_block_info(block, remote),
         }
