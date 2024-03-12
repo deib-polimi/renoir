@@ -37,9 +37,8 @@ fn main() {
     let path_vertices = &args[2];
     let path_edges = &args[3];
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-
-    env.spawn_remote_workers();
 
     let vertices_source = CsvSource::<u64>::new(path_vertices).has_headers(false);
     let edges_source = CsvSource::<(u64, u64)>::new(path_edges)

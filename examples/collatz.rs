@@ -12,9 +12,8 @@ fn main() {
     let limit: u64 = args[0].parse().unwrap();
     let num_iter = 1000;
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-
-    env.spawn_remote_workers();
 
     let output = env
         .stream_par_iter(1..limit)

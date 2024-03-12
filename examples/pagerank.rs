@@ -18,9 +18,8 @@ fn main() {
     let path_pages = &args[2];
     let path_links = &args[3];
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-
-    env.spawn_remote_workers();
 
     let pages_source = CsvSource::<u64>::new(path_pages).has_headers(false);
     let links_source = CsvSource::<(u64, u64)>::new(path_links).has_headers(false);

@@ -2,8 +2,8 @@ use noir_compute::prelude::*;
 
 fn main() {
     let (config, _args) = EnvironmentConfig::from_args();
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
 
     let source = IteratorSource::new(0..100);
     let result = env

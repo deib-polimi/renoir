@@ -113,8 +113,8 @@ fn main() {
     let (config, args) = EnvironmentConfig::from_args();
     let limit: u64 = args[0].parse().expect("Invalid number of events");
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
 
     let source =
         ParallelIteratorSource::new(move |id, instances| TopicSource::new(id, instances, limit));

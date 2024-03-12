@@ -24,9 +24,8 @@ fn main() {
     let path_pages = &args[2];
     let path_links = &args[3];
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-
-    env.spawn_remote_workers();
 
     let q = Instant::now();
     let links = BufReader::new(File::open(path_links).unwrap());

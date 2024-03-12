@@ -470,8 +470,8 @@ fn main() {
     }
     let n: usize = args[0].parse().unwrap();
     let q = &args[1][..];
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
 
     match q {
         "0" => query0(events(&mut env, n)),

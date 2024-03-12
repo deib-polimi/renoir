@@ -14,9 +14,8 @@ fn main() {
     }
     let path = &args[0];
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-
-    env.spawn_remote_workers();
 
     let source = FileSource::new(path);
     let tokenizer = Tokenizer::new();

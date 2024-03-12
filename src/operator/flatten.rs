@@ -6,6 +6,9 @@ use crate::operator::{Operator, StreamElement, Timestamp};
 use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyedItem;
 
+type KeyedFlattenIter<Op> = <<<Op as Operator>::Out as KeyedItem>::Value as IntoIterator>::IntoIter;
+type KeyedFlattenIterItem<Op> = <<<Op as Operator>::Out as KeyedItem>::Value as IntoIterator>::Item;
+
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Flatten<Op>
@@ -144,8 +147,8 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     <Op::Out as KeyedItem>::Value: IntoIterator,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::Item: Send,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::IntoIter: Send,
+    KeyedFlattenIterItem<Op>: Send,
+    KeyedFlattenIter<Op>: Send,
 {
     prev: Op,
     // used to store elements that have not been returned by next() yet
@@ -154,10 +157,7 @@ where
     // This is used to make `Flatten` behave differently when applied to `Stream` or `KeyedStream`
     // Takes `Out` as input, returns an `Iterator` with items of type `NewOut`
     #[derivative(Debug = "ignore")]
-    frontiter: Option<(
-        <Op::Out as KeyedItem>::Key,
-        <<Op::Out as KeyedItem>::Value as IntoIterator>::IntoIter,
-    )>,
+    frontiter: Option<(<Op::Out as KeyedItem>::Key, KeyedFlattenIter<Op>)>,
     timestamp: Option<Timestamp>,
 }
 
@@ -166,8 +166,8 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     <Op::Out as KeyedItem>::Value: IntoIterator,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::Item: Send,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::IntoIter: Send,
+    KeyedFlattenIterItem<Op>: Send,
+    KeyedFlattenIter<Op>: Send,
 {
     fn clone(&self) -> Self {
         Self {
@@ -183,8 +183,8 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     <Op::Out as KeyedItem>::Value: IntoIterator,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::Item: Send,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::IntoIter: Send,
+    KeyedFlattenIterItem<Op>: Send,
+    KeyedFlattenIter<Op>: Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -192,10 +192,7 @@ where
             "{} -> KeyedFlatten<{} -> {}>",
             self.prev,
             std::any::type_name::<Op::Out>(),
-            std::any::type_name::<(
-                <Op::Out as KeyedItem>::Key,
-                <<Op::Out as KeyedItem>::Value as IntoIterator>::Item
-            )>()
+            std::any::type_name::<(<Op::Out as KeyedItem>::Key, KeyedFlattenIterItem<Op>)>()
         )
     }
 }
@@ -205,8 +202,8 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     <Op::Out as KeyedItem>::Value: IntoIterator,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::Item: Send,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::IntoIter: Send,
+    KeyedFlattenIterItem<Op>: Send,
+    KeyedFlattenIter<Op>: Send,
 {
     pub(super) fn new(prev: Op) -> Self {
         Self {
@@ -222,13 +219,10 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     <Op::Out as KeyedItem>::Value: IntoIterator,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::Item: Send,
-    <<Op::Out as KeyedItem>::Value as IntoIterator>::IntoIter: Send,
+    KeyedFlattenIterItem<Op>: Send,
+    KeyedFlattenIter<Op>: Send,
 {
-    type Out = (
-        <Op::Out as KeyedItem>::Key,
-        <<Op::Out as KeyedItem>::Value as IntoIterator>::Item,
-    );
+    type Out = (<Op::Out as KeyedItem>::Key, KeyedFlattenIterItem<Op>);
 
     fn setup(&mut self, metadata: &mut ExecutionMetadata) {
         self.prev.setup(metadata);

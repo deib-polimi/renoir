@@ -312,8 +312,8 @@ fn main() {
         _ => panic!("share_source must be either `true` or `false`, not `{share_source}`"),
     };
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
 
     let (query1, query2, query3) = if share_source {
         let source = CsvSource::<Accident>::new(path).has_headers(true);

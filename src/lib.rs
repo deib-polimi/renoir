@@ -25,8 +25,8 @@ use noir_compute::prelude::*;
 fn main() {
     // Convenience method to parse deployment config from CLI arguments
     let (config, args) = EnvironmentConfig::from_args();
+        config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
 
     let result = env
         // Open and read file line by line in parallel
@@ -124,7 +124,7 @@ use serde::{Deserialize, Serialize};
 pub use block::structure;
 pub use block::BatchMode;
 pub use block::Replication;
-pub use block::{GroupHasherBuilder, group_by_hash};
+pub use block::{group_by_hash, GroupHasherBuilder};
 pub use config::EnvironmentConfig;
 pub use environment::StreamEnvironment;
 pub use operator::iteration::IterationStateHandle;

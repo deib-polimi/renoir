@@ -167,8 +167,8 @@ fn main() {
     let k = 4;
 
     let (config, _args) = EnvironmentConfig::from_args();
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
 
     let source = ParallelIteratorSource::new(TopicSource::new);
     env.stream(source)

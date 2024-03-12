@@ -202,8 +202,8 @@ fn main() {
     let args = Args::parse_from(std::iter::once("nexmark-latency".into()).chain(args));
     let q = &args.q[..];
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
     micrometer::start();
 
     match q {

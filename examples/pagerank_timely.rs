@@ -18,8 +18,8 @@ fn main() {
     let edges: u64 = args[1].parse().unwrap();
     let max_iter: usize = 10000;
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
 
     let source = env
         .stream_par_iter(move |index, peers| {

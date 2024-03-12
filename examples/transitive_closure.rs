@@ -13,9 +13,8 @@ fn main() {
     let num_iterations: usize = args[0].parse().expect("Invalid number of iterations");
     let path_edges = &args[1];
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-
-    env.spawn_remote_workers();
 
     let edges_source = CsvSource::<(u64, u64)>::new(path_edges)
         .delimiter(b',')

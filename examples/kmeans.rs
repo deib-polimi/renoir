@@ -115,9 +115,8 @@ fn main() {
     let num_iters: usize = args[1].parse().expect("Invalid number of iterations");
     let path = &args[2];
 
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-
-    env.spawn_remote_workers();
 
     let centroids = read_centroids(path, num_centroids);
     assert_eq!(centroids.len(), num_centroids);

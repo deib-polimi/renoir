@@ -24,8 +24,8 @@ use noir_compute::prelude::*;
 fn main() {
     // Convenience method to parse deployment config from CLI arguments
     let (config, args) = EnvironmentConfig::from_args();
+    config.spawn_remote_workers();
     let mut env = StreamEnvironment::new(config);
-    env.spawn_remote_workers();
 
     let result = env
         // Open and read file line by line in parallel

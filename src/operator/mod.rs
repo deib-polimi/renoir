@@ -873,7 +873,7 @@ where
                 None
             }
         })
-        .repartition_by(Replication::Unlimited, |el| group_by_hash(el))
+        .repartition_by(Replication::Unlimited, group_by_hash)
         .rich_flat_map(move |el| {
             if !final_set.contains(&el) {
                 final_set.insert(el.clone());

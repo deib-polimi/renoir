@@ -245,7 +245,7 @@ fn remote_worker(
         });
         s.spawn(|| {
             // copy to stderr the output of the remote process
-            for line in stderr_reader.lines().flatten() {
+            for line in stderr_reader.lines().map_while(Result::ok) {
                 if let Some(pos) = line.find("__noir2_TRACING_DATA__") {
                     let json_data = &line[(pos + "__noir2_TRACING_DATA__ ".len())..];
                     match serde_json::from_str(json_data) {
