@@ -9,8 +9,8 @@ use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator};
-#[cfg(feature = "ssh")]
 use crate::runner::spawn_remote_workers;
+#[cfg(feature = "ssh")]
 use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
 use crate::{BatchMode, CoordUInt};
@@ -93,6 +93,7 @@ impl StreamEnvironment {
 
     /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
     /// is already a spawned process nothing is done.
+    #[deprecated = "prefer using `EnvironmentConfig::spawn_remote_workers`"]
     pub fn spawn_remote_workers(&self) {
         match &self.inner.lock().config.runtime {
             ExecutionRuntime::Local(_) => {}

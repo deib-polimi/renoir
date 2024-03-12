@@ -11,9 +11,9 @@ pub struct FlatMap<It, F, Op>
 where
     Op: Operator,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     prev: Op,
     f: F,
@@ -32,9 +32,9 @@ impl<It, F, Op> Clone for FlatMap<It, F, Op>
 where
     Op: Operator,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     fn clone(&self) -> Self {
         Self {
@@ -51,9 +51,9 @@ impl<It, F, Op> Display for FlatMap<It, F, Op>
 where
     Op: Operator,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -70,9 +70,9 @@ impl<It, F, Op> FlatMap<It, F, Op>
 where
     Op: Operator,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     pub(super) fn new(prev: Op, f: F) -> Self {
         Self {
@@ -89,9 +89,9 @@ impl<It, F, Op> Operator for FlatMap<It, F, Op>
 where
     Op: Operator,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     type Out = It::Item;
 
@@ -151,9 +151,9 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     prev: Op,
     f: F,
@@ -172,9 +172,9 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     fn clone(&self) -> Self {
         Self {
@@ -191,9 +191,9 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -211,9 +211,9 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     pub(super) fn new(prev: Op, f: F) -> Self {
         Self {
@@ -230,9 +230,9 @@ where
     Op: Operator,
     Op::Out: KeyedItem,
     It: IntoIterator,
-    It::IntoIter: Send + 'static,
+    It::IntoIter: Send,
     It::Item: Send,
-    F: Fn(Op::Out) -> It + Clone + Send + 'static,
+    F: Fn(Op::Out) -> It + Clone + Send,
 {
     type Out = (<Op::Out as KeyedItem>::Key, It::Item);
 

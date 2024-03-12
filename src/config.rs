@@ -12,6 +12,7 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::runner::spawn_remote_workers;
 use crate::scheduler::HostId;
 use crate::CoordUInt;
 
@@ -202,10 +203,14 @@ impl EnvironmentConfig {
     pub fn from_args() -> (EnvironmentConfig, Vec<String>) {
         let opt: CommandLineOptions = CommandLineOptions::parse();
         opt.validate();
+
+        let mut args = opt.args;
+        args.insert(0, std::env::args().next().unwrap());
+
         if let Some(num_cores) = opt.local {
-            (Self::local(num_cores), opt.args)
+            (Self::local(num_cores), args)
         } else if let Some(remote) = opt.remote {
-            (Self::remote(remote).unwrap(), opt.args)
+            (Self::remote(remote).unwrap(), args)
         } else {
             unreachable!("Invalid configuration")
         }
@@ -282,6 +287,22 @@ impl EnvironmentConfig {
                 Some(config)
             }
             Err(_) => None,
+        }
+    }
+
+    /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
+    /// is already a spawned process nothing is done.
+    pub fn spawn_remote_workers(&self) {
+        match &self.runtime {
+            ExecutionRuntime::Local(_) => {}
+            #[cfg(feature = "ssh")]
+            ExecutionRuntime::Remote(remote) => {
+                spawn_remote_workers(remote.clone());
+            }
+            #[cfg(not(feature = "ssh"))]
+            ExecutionRuntime::Remote(_) => {
+                panic!("spawn_remote_workers() requires the `ssh` feature for remote configs.");
+            }
         }
     }
 }

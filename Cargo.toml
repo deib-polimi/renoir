@@ -83,6 +83,7 @@ glidesort = "0.1.2"
 indexmap = "2.1.0"
 tracing = { version = "0.1.40", features = ["log"] }
 quick_cache = "0.4.0"
+dashmap = "5.5.3"
 
 [dev-dependencies]
 # for the tests
@@ -145,8 +146,8 @@ harness = false
 
 [profile.release]
 lto = true
-strip = "symbols"
-# debug = 1
+# strip = "symbols"
+debug = 1
 
 [profile.release-fast]
 inherits = "release"

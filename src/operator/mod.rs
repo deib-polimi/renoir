@@ -19,7 +19,7 @@ pub(crate) use start::*;
 
 pub use rich_map_custom::ElementGenerator;
 
-use crate::block::{group_by_hash, BlockStructure, NextStrategy, Replication};
+use crate::block::{group_by_hash, BlockStructure, GroupHasherBuilder, NextStrategy, Replication};
 use crate::scheduler::ExecutionMetadata;
 
 use crate::stream::KeyedItem;
@@ -849,6 +849,41 @@ where
         KeyedStream(new_stream)
     }
 
+    /// Deduplicate elements. The resulting stream will contain exactly one occurrence
+    /// for each unique element in the input stream
+    ///
+    /// The current implementation requires `Hash` and `Eq` and it will repartition the stream
+    /// setting replication to Unlimited
+    pub fn unique_assoc(self) -> Stream<impl Operator<Out = Op::Out>>
+    where
+        Op::Out: Hash + Eq + Clone + ExchangeData + Sync,
+    {
+        use dashmap::DashSet;
+        use std::collections::HashSet;
+        use std::sync::Arc;
+
+        let local_set = Arc::new(DashSet::<_, GroupHasherBuilder>::default());
+        let mut final_set = HashSet::<_, GroupHasherBuilder>::default();
+
+        self.rich_flat_map(move |el| {
+            if !local_set.contains(&el) {
+                local_set.insert(el.clone());
+                Some(el)
+            } else {
+                None
+            }
+        })
+        .repartition_by(Replication::Unlimited, |el| group_by_hash(el))
+        .rich_flat_map(move |el| {
+            if !final_set.contains(&el) {
+                final_set.insert(el.clone());
+                Some(el)
+            } else {
+                None
+            }
+        })
+    }
+
     /// Construct a [`KeyedStream`] from a [`Stream`] without shuffling the data.
     ///
     /// **Note**: this violates the semantics of [`KeyedStream`], without sending all the values
@@ -990,10 +1025,10 @@ where
     /// ```
     pub fn flat_map<It, F>(self, f: F) -> Stream<impl Operator<Out = It::Item>>
     where
-        It: IntoIterator + 'static,
-        It::IntoIter: Send + 'static,
+        It: IntoIterator,
+        It::IntoIter: Send,
         It::Item: Send,
-        F: Fn(Op::Out) -> It + Send + Clone + 'static,
+        F: Fn(Op::Out) -> It + Send + Clone,
     {
         self.add_operator(|prev| FlatMap::new(prev, f))
     }
@@ -1490,6 +1525,40 @@ where
         new_stream
     }
 
+    /// Advanced operator that allows changing the replication and forwarding strategy
+    ///
+    /// **Note**: this operator is advanced and is only intended to add functionality
+    /// that is not achievable with other operators. Use with care
+    pub(crate) fn repartition<Fk: KeyerFn<u64, Op::Out>>(
+        self,
+        replication: Replication,
+        next_strategy: NextStrategy<Op::Out, Fk>,
+    ) -> Stream<impl Operator<Out = Op::Out>> {
+        let mut new_stream = self.split_block(End::new, next_strategy);
+        new_stream
+            .block
+            .scheduler_requirements
+            .replication(replication);
+        new_stream
+    }
+
+    /// Advanced operator that allows changing the replication and forwarding strategy
+    ///
+    /// **Note**: this operator is advanced and is only intended to add functionality
+    /// that is not achievable with other operators. Use with care
+    pub fn repartition_by<Fk: KeyerFn<u64, Op::Out>>(
+        self,
+        replication: Replication,
+        partition_fn: Fk,
+    ) -> Stream<impl Operator<Out = Op::Out>> {
+        let mut new_stream = self.split_block(End::new, NextStrategy::group_by(partition_fn));
+        new_stream
+            .block
+            .scheduler_requirements
+            .replication(replication);
+        new_stream
+    }
+
     /// Reduce the stream into a stream that emits a single value.
     ///
     /// The reducing operator consists in adding to the current accumulation value  the value of the
@@ -1840,6 +1909,36 @@ where
         StreamOutput::from(output)
     }
 
+    /// Close the stream and store all the resulting items into a [`Vec`] on a single host.
+    ///
+    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
+    /// replicas sends the items to.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute_blocking();
+    ///
+    /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_vec_all(self) -> StreamOutput<Vec<I>> {
+        let output = StreamOutputRef::default();
+        self.repartition(Replication::Host, NextStrategy::all())
+            .add_operator(|prev| CollectVecSink::new(prev, output.clone()))
+            .finalize_block();
+        StreamOutput::from(output)
+    }
+
     /// Close the stream and store all the resulting items into a collection on a single host.
     ///
     /// If the stream is distributed among multiple replicas, parallelism will
@@ -1865,6 +1964,35 @@ where
     pub fn collect<C: FromIterator<I> + Send + 'static>(self) -> StreamOutput<C> {
         let output = StreamOutputRef::default();
         self.replication(Replication::One)
+            .add_operator(|prev| Collect::new(prev, output.clone()))
+            .finalize_block();
+        StreamOutput::from(output)
+    }
+
+    /// Close the stream and store all the resulting items into a collection on each single host.
+    ///
+    /// Partitioning will be set to Host and results will be replicated
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute_blocking();
+    ///
+    /// assert_eq!(res.get().unwrap(), (0..10).collect::<Vec<_>>());
+    /// ```
+    pub fn collect_all<C: FromIterator<I> + Send + 'static>(self) -> StreamOutput<C> {
+        let output = StreamOutputRef::default();
+        self.repartition(Replication::Host, NextStrategy::all())
             .add_operator(|prev| Collect::new(prev, output.clone()))
             .finalize_block();
         StreamOutput::from(output)
@@ -2568,6 +2696,36 @@ where
         self.unkey().collect_vec()
     }
 
+    /// Close the stream and store all the resulting items into replicated [`Vec`] on all hosts.
+    ///
+    /// If the stream is distributed among multiple replicas, a bottleneck is placed where all the
+    /// replicas sends the items to.
+    ///
+    /// **Note**: the collected items are the pairs `(key, value)`.
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let res = s.collect_vec_all();
+    ///
+    /// env.execute_blocking();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable(); // the output order is nondeterministic
+    /// assert_eq!(res, vec![(0, 0), (0, 2), (1, 1)]);
+    /// ```
+    pub fn collect_vec_all(self) -> StreamOutput<Vec<(K, I)>> {
+        self.unkey().collect_vec_all()
+    }
+
     /// Close the stream and store all the resulting items into a collection on a single host.
     ///
     /// If the stream is distributed among multiple replicas, parallelism will
@@ -2595,6 +2753,34 @@ where
     /// ```
     pub fn collect<C: FromIterator<(K, I)> + Send + 'static>(self) -> StreamOutput<C> {
         self.unkey().collect()
+    }
+
+    /// Close the stream and store all the resulting items into a collection on each single host.
+    ///
+    /// Partitioning will be set to Host and results will be replicated
+    ///
+    ///
+    /// **Note**: the order of items and keys is unspecified.
+    ///
+    /// **Note**: this operator will split the current block.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::operator::source::IteratorSource;
+    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let res = s.collect_vec();
+    ///
+    /// env.execute_blocking();
+    ///
+    /// let mut res = res.get().unwrap();
+    /// res.sort_unstable(); // the output order is nondeterministic
+    /// assert_eq!(res, vec![(0, 0), (0, 2), (1, 1)]);
+    /// ```
+    pub fn collect_all<C: FromIterator<(K, I)> + Send + 'static>(self) -> StreamOutput<C> {
+        self.unkey().collect_all()
     }
 }
 

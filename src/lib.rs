@@ -124,6 +124,7 @@ use serde::{Deserialize, Serialize};
 pub use block::structure;
 pub use block::BatchMode;
 pub use block::Replication;
+pub use block::{GroupHasherBuilder, group_by_hash};
 pub use config::EnvironmentConfig;
 pub use environment::StreamEnvironment;
 pub use operator::iteration::IterationStateHandle;

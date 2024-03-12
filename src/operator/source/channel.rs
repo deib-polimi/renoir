@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::channel::{bounded, Receiver, RecvError, Sender, TryRecvError};
+use flume::{bounded, Receiver, RecvError, Sender, TryRecvError};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
