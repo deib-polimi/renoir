@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use crate::block::{BlockStructure, NextStrategy, OperatorReceiver, OperatorStructure};
-use crate::environment::StreamEnvironmentInner;
+
 use crate::network::Coord;
 use crate::operator::end::End;
 use crate::operator::iteration::iteration_end::IterationEnd;
@@ -236,9 +236,9 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// let s = env.stream(IteratorSource::new(0..3)).shuffle();
     /// let state = s.replay(
     ///     3, // at most 3 iterations
@@ -277,20 +277,19 @@ where
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.
         assert!(
-            self.block.scheduler_requirements.replication.is_unlimited(),
+            self.block.scheduling.replication.is_unlimited(),
             "Cannot have an iteration block with limited parallelism"
         );
 
         let state = IterationStateHandle::new(initial_state.clone());
         let state_clone = state.clone();
-        let env = self.env.clone();
+        let env = self.ctx.clone();
 
         // the id of the block where IterationEnd is. At this moment we cannot know it, so we
         // store a fake value inside this and as soon as we know it we set it to the right value.
         let feedback_block_id = Arc::new(AtomicUsize::new(0));
 
-        let mut output_stream = StreamEnvironmentInner::stream(
-            env,
+        let output_block = env.lock().new_block(
             IterationLeader::new(
                 initial_state,
                 num_iterations,
@@ -298,10 +297,11 @@ where
                 loop_condition,
                 feedback_block_id.clone(),
             ),
+            Default::default(),
+            self.block.iteration_ctx.clone(),
         );
-        let leader_block_id = output_stream.block.id;
+        let leader_block_id = output_block.id;
         // the output stream is outside this loop, so it doesn't have the lock for this state
-        output_stream.block.iteration_ctx = self.block.iteration_ctx.clone();
 
         // the lock for synchronizing the access to the state of this iteration
         let state_lock = Arc::new(IterationStateLock::default());
@@ -328,8 +328,8 @@ where
         let iter_end = iter_end.add_operator(|prev| IterationEnd::new(prev, leader_block_id));
         let iteration_end_block_id = iter_end.block.id;
 
-        let mut env = iter_end.env.lock();
-        let scheduler = env.scheduler_mut();
+        let mut env_lock = iter_end.ctx.lock();
+        let scheduler = env_lock.scheduler_mut();
         scheduler.schedule_block(iter_end.block);
         // connect the IterationEnd to the IterationLeader
         scheduler.connect_blocks(
@@ -342,7 +342,7 @@ where
             replay_block_id,
             TypeId::of::<StateFeedback<State>>(),
         );
-        drop(env);
+        drop(env_lock);
 
         // store the id of the block containing the IterationEnd
         feedback_block_id.store(iteration_end_block_id as usize, Ordering::Release);
@@ -353,6 +353,10 @@ where
         //        is not changed by the following operators. This because the next strategy affects
         //        the connections made by the scheduler and if accidentally set to OnlyOne will
         //        break the connections.
-        output_stream.split_block(End::new, NextStrategy::random())
+        Stream {
+            ctx: env,
+            block: output_block,
+        }
+        .split_block(End::new, NextStrategy::random())
     }
 }

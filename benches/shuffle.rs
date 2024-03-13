@@ -5,10 +5,10 @@ use rand::{Rng, SeedableRng};
 
 use noir_compute::operator::source::IteratorSource;
 use noir_compute::BatchMode;
-use noir_compute::StreamEnvironment;
+use noir_compute::StreamContext;
 
 fn shuffle(dataset: &'static [u32]) {
-    let mut env = StreamEnvironment::default();
+    let env = StreamContext::default();
 
     let source = IteratorSource::new(dataset.iter().cloned());
     let stream = env

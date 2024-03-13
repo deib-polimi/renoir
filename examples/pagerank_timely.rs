@@ -11,7 +11,7 @@ const HOP: i64 = 1_000_000;
 
 fn main() {
     env_logger::init();
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
 
     // command-line args: numbers of nodes and edges in the random graph.
     let nodes: u64 = args[0].parse().unwrap();
@@ -19,7 +19,7 @@ fn main() {
     let max_iter: usize = 10000;
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let source = env
         .stream_par_iter(move |index, peers| {

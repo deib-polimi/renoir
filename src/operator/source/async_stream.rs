@@ -48,9 +48,9 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::AsyncStreamSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// let stream = futures::stream::iter(0..10u32);
     /// let source = AsyncStreamSource::new(stream);
     /// let s = env.stream(source);

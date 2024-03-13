@@ -1,28 +1,25 @@
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use std::any::TypeId;
 use std::sync::Arc;
 use std::thread::available_parallelism;
 
-use crate::block::Block;
-use crate::config::{EnvironmentConfig, ExecutionRuntime, RemoteRuntimeConfig};
+use crate::block::{Block, Scheduling};
+use crate::config::RuntimeConfig;
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator};
-use crate::runner::spawn_remote_workers;
 #[cfg(feature = "ssh")]
 use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
 use crate::{BatchMode, CoordUInt};
 
-static LAST_REMOTE_CONFIG: Lazy<Mutex<Option<RemoteRuntimeConfig>>> =
-    Lazy::new(|| Mutex::new(None));
+// static LAST_REMOTE_CONFIG: Lazy<Mutex<Option<RemoteConfig>>> = Lazy::new(|| Mutex::new(None));
 
-/// Actual content of the StreamEnvironment. This is stored inside a `Rc` and it's shared among all
+/// Actual content of the StreamContext. This is stored inside a `Rc` and it's shared among all
 /// the blocks.
-pub(crate) struct StreamEnvironmentInner {
+pub(crate) struct StreamContextInner {
     /// The configuration of the environment.
-    pub(crate) config: EnvironmentConfig,
+    pub(crate) config: RuntimeConfig,
     /// The number of blocks in the job graph, it's used to assign new ids to the blocks.
     block_count: CoordUInt,
     /// The scheduler that will start the computation. It's an option because it will be moved out
@@ -34,77 +31,51 @@ pub(crate) struct StreamEnvironmentInner {
 /// computation.
 ///
 /// This is the entrypoint for the library: construct an environment providing an
-/// [`EnvironmentConfig`], then you can ask new streams providing the source from where to read from.
+/// [`RuntimeConfig`], then you can ask new streams providing the source from where to read from.
 ///
 /// If you want to use a distributed environment (i.e. using remote workers) you have to spawn them
-/// using [`spawn_remote_workers`](StreamEnvironment::spawn_remote_workers) before asking for some stream.
+/// using [`spawn_remote_workers`](StreamContext::spawn_remote_workers) before asking for some stream.
 ///
-/// When all the stream have been registered you have to call [`execute`](StreamEnvironment::execute_blocking) that will consume the
+/// When all the stream have been registered you have to call [`execute`](StreamContext::execute_blocking) that will consume the
 /// environment and start the computation. This function will return when the computation ends.
 ///
 /// TODO: example usage
-pub struct StreamEnvironment {
+pub struct StreamContext {
     /// Reference to the actual content of the environment.
-    inner: Arc<Mutex<StreamEnvironmentInner>>,
+    inner: Arc<Mutex<StreamContextInner>>,
 }
 
-impl Default for StreamEnvironment {
+impl Default for StreamContext {
     fn default() -> Self {
-        Self::new(EnvironmentConfig::local(
+        Self::new(RuntimeConfig::local(
             available_parallelism().map(|q| q.get()).unwrap_or(1) as u64,
         ))
     }
 }
 
-impl StreamEnvironment {
+impl StreamContext {
     /// Construct a new environment from the config.
-    pub fn new(config: EnvironmentConfig) -> Self {
+    pub fn new(config: RuntimeConfig) -> Self {
         debug!("new environment");
-        if !config.skip_single_remote_check {
-            Self::single_remote_environment_check(&config);
-        }
-        StreamEnvironment {
-            inner: Arc::new(Mutex::new(StreamEnvironmentInner::new(config))),
+        StreamContext {
+            inner: Arc::new(Mutex::new(StreamContextInner::new(config))),
         }
     }
 
     /// Construct a new stream bound to this environment starting with the specified source.
-    pub fn stream<S>(&mut self, source: S) -> Stream<S>
+    pub fn stream<S>(&self, source: S) -> Stream<S>
     where
         S: Source + Send + 'static,
     {
-        let inner = self.inner.lock();
-        let config = &inner.config;
-        if config.host_id.is_none() {
-            match config.runtime {
-                ExecutionRuntime::Remote(_) => {
-                    panic!(
-                        "Call StreamEnvironment::spawn_remote_workers() before calling ::stream()"
-                    );
-                }
-                ExecutionRuntime::Local(_) => {
-                    unreachable!("Local environments do not need an host_id");
-                }
-            }
+        let mut inner = self.inner.lock();
+        if let RuntimeConfig::Remote(remote) = &inner.config {
+            assert!(remote.host_id.is_some(), "remote config must be started using RuntimeConfig::spawn_remote_workers(). (Or initialize `host_id` correctly)");
         }
-        drop(inner);
-        StreamEnvironmentInner::stream(self.inner.clone(), source)
-    }
 
-    /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
-    /// is already a spawned process nothing is done.
-    #[deprecated = "prefer using `EnvironmentConfig::spawn_remote_workers`"]
-    pub fn spawn_remote_workers(&self) {
-        match &self.inner.lock().config.runtime {
-            ExecutionRuntime::Local(_) => {}
-            #[cfg(feature = "ssh")]
-            ExecutionRuntime::Remote(remote) => {
-                spawn_remote_workers(remote.clone());
-            }
-            #[cfg(not(feature = "ssh"))]
-            ExecutionRuntime::Remote(_) => {
-                panic!("spawn_remote_workers() requires the `ssh` feature for remote configs.");
-            }
+        let block = inner.new_block(source, Default::default(), Default::default());
+        Stream {
+            block,
+            ctx: self.inner.clone(),
         }
     }
 
@@ -134,58 +105,20 @@ impl StreamEnvironment {
 
     /// Get the total number of processing cores in the cluster.
     pub fn parallelism(&self) -> CoordUInt {
-        match &self.inner.lock().config.runtime {
-            ExecutionRuntime::Local(local) => local.num_cores,
-            ExecutionRuntime::Remote(remote) => remote.hosts.iter().map(|h| h.num_cores).sum(),
-        }
-    }
-
-    /// Make sure that, if an environment with a remote configuration is built, all the following
-    /// remote environments use the same config.
-    fn single_remote_environment_check(config: &EnvironmentConfig) {
-        if let ExecutionRuntime::Remote(config) = &config.runtime {
-            let mut prev = LAST_REMOTE_CONFIG.lock();
-            match &*prev {
-                Some(prev) => {
-                    if prev != config {
-                        panic!("Spawning remote runtimes with different configurations is not supported");
-                    }
-                }
-                None => {
-                    *prev = Some(config.clone());
-                }
-            }
+        match &self.inner.lock().config {
+            RuntimeConfig::Local(local) => local.num_cores,
+            RuntimeConfig::Remote(remote) => remote.hosts.iter().map(|h| h.num_cores).sum(),
         }
     }
 }
 
-impl StreamEnvironmentInner {
-    fn new(config: EnvironmentConfig) -> Self {
+impl StreamContextInner {
+    fn new(config: RuntimeConfig) -> Self {
         Self {
             config: config.clone(),
             block_count: 0,
             scheduler: Some(Scheduler::new(config)),
         }
-    }
-
-    pub fn stream<S>(env_rc: Arc<Mutex<StreamEnvironmentInner>>, source: S) -> Stream<S>
-    where
-        S: Source + Send + 'static,
-    {
-        let mut env = env_rc.lock();
-        if matches!(env.config.runtime, ExecutionRuntime::Remote(_)) {
-            // calling .spawn_remote_workers() will exit so it wont reach this point
-            if env.config.host_id.is_none() {
-                panic!("Call `StreamEnvironment::spawn_remote_workers` before calling stream!");
-            }
-        }
-
-        let source_replication = source.replication();
-        let mut block = env.new_block(source, Default::default(), Default::default());
-
-        block.scheduler_requirements.replication(source_replication);
-        drop(env);
-        Stream { block, env: env_rc }
     }
 
     pub(crate) fn new_block<S: Source>(
@@ -195,9 +128,10 @@ impl StreamEnvironmentInner {
         iteration_ctx: Vec<Arc<IterationStateLock>>,
     ) -> Block<S> {
         let new_id = self.new_block_id();
-        let parallelism = source.replication();
-        info!("new block (b{new_id:02}), replication {parallelism:?}",);
-        Block::new(new_id, source, batch_mode, iteration_ctx)
+        let replication = source.replication();
+        let scheduling = Scheduling { replication };
+        info!("new block (b{new_id:02}), replication {replication:?}",);
+        Block::new(new_id, source, batch_mode, iteration_ctx, scheduling)
     }
 
     pub(crate) fn close_block<Out: Data, Op: Operator<Out = Out> + 'static>(
@@ -215,8 +149,21 @@ impl StreamEnvironmentInner {
         scheduler.connect_blocks(from, to, TypeId::of::<Out>());
     }
 
+    pub(crate) fn clone_block<Op: Operator>(&mut self, block: &Block<Op>) -> Block<Op> {
+        let mut new_block = block.clone();
+        new_block.id = self.new_block_id();
+
+        let prev_nodes = self.scheduler_mut().prev_blocks(block.id).unwrap();
+        for (prev_node, typ) in prev_nodes.into_iter() {
+            self.scheduler_mut()
+                .connect_blocks(prev_node, new_block.id, typ);
+        }
+
+        new_block
+    }
+
     /// Allocate a new BlockId inside the environment.
-    pub(crate) fn new_block_id(&mut self) -> BlockId {
+    fn new_block_id(&mut self) -> BlockId {
         let new_id = self.block_count;
         self.block_count += 1;
         debug!("new block_id (b{new_id:02})");

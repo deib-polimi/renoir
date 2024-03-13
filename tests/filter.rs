@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn filter_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env.stream(source).filter(|x| x % 2 == 1).collect_vec();
         env.execute_blocking();
@@ -19,7 +19,7 @@ fn filter_stream() {
 
 #[test]
 fn filter_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)

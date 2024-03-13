@@ -7,7 +7,7 @@ use super::utils::TestHelper;
 
 #[test]
 fn tumbling_processing_time() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(1..=1000);
 
         let res = env

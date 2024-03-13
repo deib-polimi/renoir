@@ -3,8 +3,8 @@ use parking_lot::Mutex;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::block::{BatchMode, Block, NextStrategy, SchedulerRequirements};
-use crate::environment::StreamEnvironmentInner;
+use crate::block::{BatchMode, Block, NextStrategy, Scheduling};
+use crate::environment::StreamContextInner;
 use crate::operator::end::End;
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
@@ -31,7 +31,7 @@ where
     /// The last block inside the stream.
     pub(crate) block: Block<Op>,
     /// A reference to the environment this stream lives in.
-    pub(crate) env: Arc<Mutex<StreamEnvironmentInner>>,
+    pub(crate) ctx: Arc<Mutex<StreamContextInner>>,
 }
 
 pub trait KeyedItem {
@@ -120,7 +120,7 @@ where
     {
         Stream {
             block: self.block.add_operator(get_operator),
-            env: self.env,
+            ctx: self.ctx,
         }
     }
 
@@ -143,7 +143,7 @@ where
         OpEnd: Operator<Out = ()> + 'static,
         GetEndOp: FnOnce(Op, NextStrategy<Op::Out, IndexFn>, BatchMode) -> OpEnd,
     {
-        let Stream { block, env } = self;
+        let Stream { block, ctx: env } = self;
         // Clone parameters for new block
         let batch_mode = block.batch_mode;
         let iteration_ctx = block.iteration_ctx.clone();
@@ -164,7 +164,7 @@ where
         drop(env_lock);
         Stream {
             block: new_block,
-            env,
+            ctx: env,
         }
     }
 
@@ -196,14 +196,17 @@ where
         S: Operator + Source,
         Fs: FnOnce(BlockId, BlockId, bool, bool, Option<Arc<IterationStateLock>>) -> S,
     {
-        let Stream { block: b1, env } = self;
+        let Stream {
+            block: b1,
+            ctx: env,
+        } = self;
         let Stream { block: b2, .. } = oth;
 
         let batch_mode = b1.batch_mode;
         let is_one_1 = matches!(next_strategy1, NextStrategy::OnlyOne);
         let is_one_2 = matches!(next_strategy2, NextStrategy::OnlyOne);
-        let sched_1 = b1.scheduler_requirements.clone();
-        let sched_2 = b2.scheduler_requirements.clone();
+        let sched_1 = b1.scheduling.clone();
+        let sched_2 = b2.scheduling.clone();
         if is_one_1 && is_one_2 && sched_1.replication != sched_2.replication {
             panic!(
                 "The parallelism of the 2 blocks coming inside a Y connection must be equal. \
@@ -261,37 +264,29 @@ where
 
         // make sure the new block has the same parallelism of the previous one with OnlyOne
         // strategy
-        new_block.scheduler_requirements = match (is_one_1, is_one_2) {
+        new_block.scheduling = match (is_one_1, is_one_2) {
             (true, _) => sched_1,
             (_, true) => sched_2,
-            _ => SchedulerRequirements::default(),
+            _ => Scheduling::default(),
         };
 
         Stream {
             block: new_block,
-            env,
+            ctx: env,
         }
     }
 
     /// Clone the given block, taking care of connecting the new block to the same previous blocks
     /// of the original one.
     pub(crate) fn clone(&mut self) -> Self {
-        let mut env = self.env.lock();
-        let prev_nodes = env.scheduler_mut().prev_blocks(self.block.id).unwrap();
-        let new_id = env.new_block_id();
+        let new_block = self.ctx.lock().clone_block(&self.block);
 
-        for (prev_node, typ) in prev_nodes.into_iter() {
-            env.scheduler_mut().connect_blocks(prev_node, new_id, typ);
-        }
-        drop(env);
-
-        let mut new_block = self.block.clone();
-        new_block.id = new_id;
         Stream {
             block: new_block,
-            env: self.env.clone(),
+            ctx: self.ctx.clone(),
         }
     }
+
     /// Like `add_block` but without creating a new block. Therefore this closes the current stream
     /// and just add the last block to the scheduler.
     pub(crate) fn finalize_block(self)
@@ -299,7 +294,7 @@ where
         Op: 'static,
         Op::Out: Send,
     {
-        let mut env = self.env.lock();
+        let mut env = self.ctx.lock();
         env.scheduler_mut().schedule_block(self.block);
     }
 }

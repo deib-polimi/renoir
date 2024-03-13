@@ -5,7 +5,7 @@ use std::time::Instant;
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the number of integers to check");
     }
@@ -13,7 +13,7 @@ fn main() {
     let num_iter = 1000;
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let output = env
         .stream_par_iter(1..limit)

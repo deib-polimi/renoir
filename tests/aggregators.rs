@@ -5,7 +5,7 @@ mod utils;
 
 #[test]
 fn group_by_min_element() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -21,7 +21,7 @@ fn group_by_min_element() {
 
 #[test]
 fn group_by_max_element() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -38,7 +38,7 @@ fn group_by_max_element() {
 #[test]
 #[allow(clippy::identity_op)]
 fn group_by_sum() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -55,7 +55,7 @@ fn group_by_sum() {
 #[test]
 #[allow(clippy::identity_op)]
 fn group_by_avg() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -77,7 +77,7 @@ fn group_by_avg() {
 
 #[test]
 fn group_by_count() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env.stream(source).group_by_count(|&x| x % 2).collect_vec();
         env.execute_blocking();

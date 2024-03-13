@@ -5,7 +5,7 @@ mod utils;
 
 #[test]
 fn interval_join_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10);
         let source2 = IteratorSource::new(0..10);
 
@@ -41,7 +41,7 @@ fn interval_join_keyed_stream() {
 
 #[test]
 fn interval_join_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10);
         let source2 = IteratorSource::new(0..10);
 

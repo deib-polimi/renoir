@@ -56,9 +56,9 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
 
     pub(crate) fn build_inner(self) -> Vec<Stream<Start<SimpleStartReceiver<Out>>>> {
         // This is needed to maintain the same parallelism of the split block
-        let env_lock = self.stream.env.clone();
+        let env_lock = self.stream.ctx.clone();
         let mut env = env_lock.lock();
-        let scheduler_requirements = self.stream.block.scheduler_requirements.clone();
+        let scheduler_requirements = self.stream.block.scheduling.clone();
         let batch_mode = self.stream.block.batch_mode;
         let block_id = self.stream.block.id;
         let iteration_context = self.stream.block.iteration_ctx.clone();
@@ -82,7 +82,7 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
 
         for new_block in &mut new_blocks {
             env.connect_blocks::<Out>(block_id, new_block.id);
-            new_block.scheduler_requirements = scheduler_requirements.clone();
+            new_block.scheduling = scheduler_requirements.clone();
         }
 
         drop(env);
@@ -90,7 +90,7 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
             .into_iter()
             .map(|block| Stream {
                 block,
-                env: env_lock.clone(),
+                ctx: env_lock.clone(),
             })
             .collect()
     }
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     #[allow(clippy::identity_op)]
     fn test_route() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+        let env = StreamContext::new(RuntimeConfig::local(1));
         let s = env.stream_iter(0..10);
 
         let mut routes = s

@@ -134,10 +134,7 @@ fn query5(events: Stream<impl Operator<Out = (SystemTime, Event)> + 'static>) {
 
 static TRACK_POINT: micrometer::TrackPoint = micrometer::TrackPoint::new_thread_local();
 
-fn events(
-    env: &mut StreamEnvironment,
-    args: &Args,
-) -> Stream<impl Operator<Out = (SystemTime, Event)>> {
+fn events(env: &StreamContext, args: &Args) -> Stream<impl Operator<Out = (SystemTime, Event)>> {
     env.stream_iter({
         let conf = NexmarkConfig {
             num_event_generators: 1,
@@ -197,19 +194,19 @@ struct Args {
 
 fn main() {
     env_logger::init();
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
 
     let args = Args::parse_from(std::iter::once("nexmark-latency".into()).chain(args));
     let q = &args.q[..];
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
     micrometer::start();
 
     match q {
-        "2" => query2(events(&mut env, &args)),
-        "3" => query3(events(&mut env, &args)),
-        "5" => query5(events(&mut env, &args)),
+        "2" => query2(events(&env, &args)),
+        "3" => query3(events(&env, &args)),
+        "5" => query5(events(&env, &args)),
 
         _ => panic!("Invalid query! {q}"),
     }

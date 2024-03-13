@@ -25,9 +25,9 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// let s1 = env.stream(IteratorSource::new((0..10)));
     /// let s2 = env.stream(IteratorSource::new((10..20)));
     /// let res = s1.merge(s2).collect_vec();

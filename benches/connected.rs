@@ -2,9 +2,9 @@ use criterion::BenchmarkId;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use fxhash::FxHashMap;
 use noir_compute::operator::Operator;
-use noir_compute::EnvironmentConfig;
+use noir_compute::RuntimeConfig;
 use noir_compute::Stream;
-use noir_compute::StreamEnvironment;
+use noir_compute::StreamContext;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
@@ -109,7 +109,7 @@ fn bench_main(c: &mut Criterion) {
         g.throughput(Throughput::Elements(size));
         g.bench_with_input(BenchmarkId::new("connected", size), &size, |b, size| {
             b.iter(|| {
-                let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+                let env = StreamContext::new(RuntimeConfig::local(4));
                 let edges = *size;
                 let nodes = ((edges as f32).sqrt() * 25.) as u64 + 1;
 

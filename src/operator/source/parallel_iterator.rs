@@ -201,13 +201,13 @@ where
     }
 }
 
-impl crate::StreamEnvironment {
-    /// Convenience method, creates a `ParallelIteratorSource` and makes a stream using `StreamEnvironment::stream`
+impl crate::StreamContext {
+    /// Convenience method, creates a `ParallelIteratorSource` and makes a stream using `StreamContext::stream`
     /// # Example:
     /// ```
     /// use noir_compute::prelude::*;
     ///
-    /// let mut env = StreamEnvironment::default();
+    /// let env = StreamContext::default();
     ///
     /// env.stream_par_iter(0..10)
     ///     .for_each(|q| println!("a: {q}"));
@@ -228,7 +228,7 @@ impl crate::StreamEnvironment {
     /// env.execute_blocking();
     /// ```
     pub fn stream_par_iter<Source>(
-        &mut self,
+        &self,
         generator: Source,
     ) -> Stream<ParallelIteratorSource<Source>>
     where
@@ -255,9 +255,9 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::ParallelIteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// // generate the numbers from 0 to 99 using multiple replicas
     /// let n = 100;
     /// let source = ParallelIteratorSource::new(move |id, instances| {

@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn map_memo_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let res = env
             .stream_par_iter(0..100u32)
             .map(|n| n % 5)
@@ -25,7 +25,7 @@ fn map_memo_stream() {
 
 #[test]
 fn map_memo_by_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let res = env
             .stream_par_iter(0..1000u32)
             .map(|v| v as f32 + thread_rng().gen::<f32>() * 0.4)

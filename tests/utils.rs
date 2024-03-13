@@ -10,12 +10,12 @@ use std::time::Duration;
 
 use itertools::{process_results, Itertools};
 
-use noir_compute::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
+use noir_compute::config::{HostConfig, RemoteConfig, RuntimeConfig};
 use noir_compute::operator::{Data, Operator, StreamElement, Timestamp};
 use noir_compute::structure::BlockStructure;
 use noir_compute::CoordUInt;
 use noir_compute::ExecutionMetadata;
-use noir_compute::{EnvironmentConfig, StreamEnvironment};
+use noir_compute::StreamContext;
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;
@@ -109,17 +109,14 @@ impl TestHelper {
     }
 
     /// Crate an environment with the specified config and run the test build by `body`.
-    pub fn env_with_config(
-        config: EnvironmentConfig,
-        body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>,
-    ) {
+    pub fn env_with_config(config: RuntimeConfig, body: Arc<dyn Fn(StreamContext) + Send + Sync>) {
         let timeout_sec = Self::parse_int_from_env("RSTREAM_TEST_TIMEOUT").unwrap_or(10);
         let timeout = Duration::from_secs(timeout_sec);
         let (sender, receiver) = std::sync::mpsc::channel();
         let worker = std::thread::Builder::new()
             .name("Worker".into())
             .spawn(move || {
-                let env = StreamEnvironment::new(config);
+                let env = StreamContext::new(config);
                 body(env);
                 sender.send(()).unwrap();
             })
@@ -137,16 +134,16 @@ impl TestHelper {
     }
 
     /// Run the test body under a local environment.
-    pub fn local_env(body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>, num_cores: CoordUInt) {
+    pub fn local_env(body: Arc<dyn Fn(StreamContext) + Send + Sync>, num_cores: CoordUInt) {
         Self::setup();
-        let config = EnvironmentConfig::local(num_cores);
+        let config = RuntimeConfig::local(num_cores);
         log::debug!("Running test with env: {:?}", config);
         Self::env_with_config(config, body)
     }
 
     /// Run the test body under a simulated remote environment.
     pub fn remote_env(
-        body: Arc<dyn Fn(StreamEnvironment) + Send + Sync>,
+        body: Arc<dyn Fn(StreamContext) + Send + Sync>,
         num_hosts: CoordUInt,
         cores_per_host: CoordUInt,
     ) {
@@ -157,7 +154,7 @@ impl TestHelper {
             let high_part = (test_id & 0xff00) >> 8;
             let low_part = test_id & 0xff;
             let address = format!("127.{high_part}.{low_part}.{host_id}");
-            hosts.push(RemoteHostConfig {
+            hosts.push(HostConfig {
                 address,
                 base_port: TEST_BASE_PORT,
                 num_cores: cores_per_host,
@@ -165,20 +162,15 @@ impl TestHelper {
                 perf_path: None,
             });
         }
-        let runtime = ExecutionRuntime::Remote(RemoteRuntimeConfig {
-            hosts,
-            tracing_dir: None,
-            cleanup_executable: true,
-        });
-        log::debug!("Running with remote configuration: {:?}", runtime);
 
         let mut join_handles = vec![];
         for host_id in 0..num_hosts {
-            let config = EnvironmentConfig {
-                runtime: runtime.clone(),
+            let config = RuntimeConfig::Remote(RemoteConfig {
                 host_id: Some(host_id),
-                skip_single_remote_check: true,
-            };
+                hosts: hosts.clone(),
+                tracing_dir: None,
+                cleanup_executable: true,
+            });
             let body = body.clone();
             join_handles.push(
                 std::thread::Builder::new()
@@ -197,7 +189,7 @@ impl TestHelper {
     /// Run the test body under a local environment and later under a simulated remote environment.
     pub fn local_remote_env<F>(body: F)
     where
-        F: Fn(StreamEnvironment) + Send + Sync + 'static,
+        F: Fn(StreamContext) + Send + Sync + 'static,
     {
         let body = Arc::new(body);
 

@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn group_by_reduce_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u32);
         let res = env
             .stream(source)
@@ -26,7 +26,7 @@ fn group_by_reduce_stream() {
 
 #[test]
 fn reduce_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u32);
         let res = env
             .stream(source)

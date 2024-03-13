@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn unkey_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -26,7 +26,7 @@ fn unkey_keyed_stream() {
 
 #[test]
 fn drop_key_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)

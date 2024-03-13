@@ -35,7 +35,7 @@ fn check_result(n: u64, n_iter: usize, state: Option<Vec<u64>>, items: Option<Ve
 
 #[test]
 fn test_iterate_no_blocks_in_between() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 5u64;
         let n_iter = 5;
 
@@ -62,7 +62,7 @@ fn test_iterate_no_blocks_in_between() {
 
 #[test]
 fn test_iterate_side_input() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 5u64;
         let n_iter = 5;
 
@@ -90,7 +90,7 @@ fn test_iterate_side_input() {
 
 #[test]
 fn test_iterate_with_shuffle() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 5u64;
         let n_iter = 2;
 
@@ -125,7 +125,7 @@ fn test_iterate_with_shuffle() {
 
 #[test]
 fn test_iterate_primes() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 1000u64;
         let n_iter = (n as f64).sqrt().ceil() as usize;
 

@@ -12,8 +12,8 @@ fn main() {}
 // use serde::{Deserialize, Serialize};
 //
 // use noir_compute::operator::source::CsvSource;
-// use noir_compute::EnvironmentConfig;
-// use noir_compute::StreamEnvironment;
+// use noir_compute::RuntimeConfig;
+// use noir_compute::StreamContext;
 //
 // #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 // struct LabeledPoint {
@@ -76,14 +76,14 @@ fn main() {}
 // }
 //
 // fn main() {
-//     let (config, args) = EnvironmentConfig::from_args();
+//     let (config, args) = RuntimeConfig::from_args();
 //     if args.len() != 3 {
 //         panic!("Pass the path to the dataset and the maximum number of iterations");
 //     }
 //     let path = &args[0];
 //     let num_iters: usize = args[1].parse().expect("Invalid number of iterations");
 //
-//     let mut env = StreamEnvironment::new(config);
+//     let env = StreamContext::new(config);
 //     env.spawn_remote_workers();
 //
 //     let state = State {
@@ -139,7 +139,7 @@ fn main() {}
 //     let start = Instant::now();
 //     env.execute_blocking();
 //     let state = &res[0];
-//     env = StreamEnvironment::new();
+//     env = StreamContext::new();
 //     env.spawn_remote_workers();
 //     let accuracy_vector = env
 //         .map(|x: LabeledPoint| vec![x.label, predict(&x, &state.weight)])

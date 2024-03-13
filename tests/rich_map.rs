@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn rich_map_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -30,7 +30,7 @@ fn rich_map_stream() {
 
 #[test]
 fn rich_map_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)

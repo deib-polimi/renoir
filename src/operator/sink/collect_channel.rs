@@ -79,13 +79,13 @@ impl<Out: ExchangeData, PreviousOperators> Sink for CollectChannelSink<Out, Prev
 mod tests {
     use itertools::Itertools;
 
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
+    use crate::config::RuntimeConfig;
+    use crate::environment::StreamContext;
     use crate::operator::source;
 
     #[test]
     fn collect_channel() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4));
         let source = source::IteratorSource::new(0..10u8);
         let rx = env.stream(source).collect_channel();
         env.execute_blocking();

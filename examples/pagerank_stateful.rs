@@ -15,7 +15,7 @@ const EPS: f64 = 1e-8;
 const DAMPENING: f64 = 0.85;
 
 fn main() {
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 4 {
         panic!("Pass the number of iterations, number of pages, pages dataset and links dataset as arguments");
     }
@@ -25,7 +25,7 @@ fn main() {
     let path_links = &args[3];
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let q = Instant::now();
     let links = BufReader::new(File::open(path_links).unwrap());

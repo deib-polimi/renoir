@@ -5,7 +5,7 @@ mod utils;
 
 #[test]
 fn rich_filter_map_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new((0..6u8).map(|_| "a".to_owned()));
         let res = env
             .stream(source)
@@ -30,7 +30,7 @@ fn rich_filter_map_stream() {
 
 #[test]
 fn rich_filter_map_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new((0..10u8).map(|x| if x % 2 == 0 { 'a' } else { 'b' }));
         let res = env
             .stream(source)

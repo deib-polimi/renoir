@@ -106,10 +106,10 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # use noir_compute::operator::window::CountWindow;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// let s = env.stream(IteratorSource::new((0..5)));
     /// let res = s
     ///     .group_by(|&n| n % 2)

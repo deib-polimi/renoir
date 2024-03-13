@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn flatten_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(
             vec![
                 vec![],
@@ -29,7 +29,7 @@ fn flatten_stream() {
 
 #[test]
 fn flatten_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -51,7 +51,7 @@ fn flatten_keyed_stream() {
 
 #[test]
 fn flat_map_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -71,7 +71,7 @@ fn flat_map_stream() {
 
 #[test]
 fn flat_map_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -92,7 +92,7 @@ fn flat_map_keyed_stream() {
 
 #[test]
 fn flatten_not_serializable_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(
             vec![
                 vec![],
@@ -118,7 +118,7 @@ fn flatten_not_serializable_stream() {
 
 #[test]
 fn flat_map_not_serializable_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)

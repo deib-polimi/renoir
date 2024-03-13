@@ -5,7 +5,7 @@ mod utils;
 
 #[test]
 fn broadcast_test() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let parallelism = env.parallelism() as u32;
         let source = IteratorSource::new(0..100u32);
 

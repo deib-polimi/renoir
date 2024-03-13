@@ -110,11 +110,11 @@ fn main() {
     let win_step_millis = 500;
     let k = 4;
 
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     let limit: u64 = args[0].parse().expect("Invalid number of events");
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let source =
         ParallelIteratorSource::new(move |id, instances| TopicSource::new(id, instances, limit));

@@ -14,7 +14,7 @@ use rand::prelude::StdRng;
 use rand::SeedableRng;
 
 use noir_compute::BatchMode;
-use noir_compute::StreamEnvironment;
+use noir_compute::StreamContext;
 
 mod common;
 use common::*;
@@ -58,8 +58,8 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let mut env = StreamEnvironment::default();
-                    wc_fold(&mut env, path);
+                    let env = StreamContext::default();
+                    wc_fold(&env, path);
                     env.execute_blocking();
                 })
             },
@@ -70,8 +70,8 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let mut env = StreamEnvironment::default();
-                    wc_fold_assoc(&mut env, path);
+                    let env = StreamContext::default();
+                    wc_fold_assoc(&env, path);
                     env.execute_blocking();
                 })
             },
@@ -82,8 +82,8 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let mut env = StreamEnvironment::default();
-                    wc_count_assoc(&mut env, path);
+                    let env = StreamContext::default();
+                    wc_count_assoc(&env, path);
                     env.execute_blocking();
                 })
             },
@@ -94,8 +94,8 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let mut env = StreamEnvironment::default();
-                    wc_reduce(&mut env, path);
+                    let env = StreamContext::default();
+                    wc_reduce(&env, path);
                     env.execute_blocking();
                 })
             },
@@ -106,8 +106,8 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let mut env = StreamEnvironment::default();
-                    wc_reduce_assoc(&mut env, path);
+                    let env = StreamContext::default();
+                    wc_reduce_assoc(&env, path);
                     env.execute_blocking();
                 })
             },
@@ -118,8 +118,8 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let mut env = StreamEnvironment::default();
-                    wc_fast(&mut env, path);
+                    let env = StreamContext::default();
+                    wc_fast(&env, path);
                     env.execute_blocking();
                 })
             },
@@ -130,8 +130,8 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let mut env = StreamEnvironment::default();
-                    wc_fast_kstring(&mut env, path);
+                    let env = StreamContext::default();
+                    wc_fast_kstring(&env, path);
                     env.execute_blocking();
                 })
             },
@@ -176,7 +176,7 @@ fn wordcount_bench(c: &mut Criterion) {
     g.finish();
 }
 
-fn wc_fold(env: &mut StreamEnvironment, path: &Path) {
+fn wc_fold(env: &StreamContext, path: &Path) {
     let result = env
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))
@@ -191,7 +191,7 @@ fn wc_fold(env: &mut StreamEnvironment, path: &Path) {
     std::hint::black_box(result);
 }
 
-fn wc_fold_assoc(env: &mut StreamEnvironment, path: &Path) {
+fn wc_fold_assoc(env: &StreamContext, path: &Path) {
     let result = env
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))
@@ -211,7 +211,7 @@ fn wc_fold_assoc(env: &mut StreamEnvironment, path: &Path) {
     std::hint::black_box(result);
 }
 
-fn wc_count_assoc(env: &mut StreamEnvironment, path: &Path) {
+fn wc_count_assoc(env: &StreamContext, path: &Path) {
     let result = env
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))
@@ -226,7 +226,7 @@ fn wc_count_assoc(env: &mut StreamEnvironment, path: &Path) {
     std::hint::black_box(result);
 }
 
-fn wc_reduce(env: &mut StreamEnvironment, path: &Path) {
+fn wc_reduce(env: &StreamContext, path: &Path) {
     let result = env
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))
@@ -242,7 +242,7 @@ fn wc_reduce(env: &mut StreamEnvironment, path: &Path) {
     std::hint::black_box(result);
 }
 
-fn wc_reduce_assoc(env: &mut StreamEnvironment, path: &Path) {
+fn wc_reduce_assoc(env: &StreamContext, path: &Path) {
     let result = env
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))
@@ -258,7 +258,7 @@ fn wc_reduce_assoc(env: &mut StreamEnvironment, path: &Path) {
     std::hint::black_box(result);
 }
 
-fn wc_fast(env: &mut StreamEnvironment, path: &Path) {
+fn wc_fast(env: &StreamContext, path: &Path) {
     let result = env
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))
@@ -285,7 +285,7 @@ fn wc_fast(env: &mut StreamEnvironment, path: &Path) {
     std::hint::black_box(result);
 }
 
-fn wc_fast_kstring(env: &mut StreamEnvironment, path: &Path) {
+fn wc_fast_kstring(env: &StreamContext, path: &Path) {
     let result = env
         .stream_file(path)
         .batch_mode(BatchMode::fixed(1024))

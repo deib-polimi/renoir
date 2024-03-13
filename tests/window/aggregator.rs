@@ -7,7 +7,7 @@ use super::utils::TestHelper;
 
 #[test]
 fn test_first_window() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -34,7 +34,7 @@ fn test_first_window() {
 
 #[test]
 fn test_fold_window() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -64,7 +64,7 @@ fn test_fold_window() {
 
 #[test]
 fn test_sum_window() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -94,7 +94,7 @@ fn test_sum_window() {
 
 #[test]
 fn test_min_window() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -121,7 +121,7 @@ fn test_min_window() {
 
 #[test]
 fn test_max_window() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -148,7 +148,7 @@ fn test_max_window() {
 
 #[test]
 fn test_map_window() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u16);
         let res = env
             .stream(source)

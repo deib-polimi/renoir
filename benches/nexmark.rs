@@ -304,7 +304,7 @@ fn query8(events: Stream<impl Operator<Out = Event> + 'static>) {
         .for_each(std::mem::drop)
 }
 
-fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<impl Operator<Out = Event>> {
+fn events(env: &StreamContext, tot: usize) -> Stream<impl Operator<Out = Event>> {
     env.stream_par_iter(move |i, n| {
         let conf = NexmarkConfig {
             num_event_generators: n as usize,
@@ -339,7 +339,7 @@ fn filter_bid(e: Event) -> Option<Bid> {
     }
 }
 
-fn run_query(env: &mut StreamEnvironment, q: &str, n: usize) {
+fn run_query(env: &StreamContext, q: &str, n: usize) {
     match q {
         "0" => query0(events(env, n)),
         "1" => query1(events(env, n)),
@@ -365,8 +365,8 @@ fn bench_main(c: &mut Criterion) {
         ($q:expr, $n:expr) => {{
             g.bench_with_input(BenchmarkId::new($q, $n), &$n, |b, size| {
                 b.iter(|| {
-                    let mut env = StreamEnvironment::default();
-                    run_query(&mut env, $q, *size);
+                    let env = StreamContext::default();
+                    run_query(&env, $q, *size);
                     env.execute_blocking();
                 })
             });

@@ -12,7 +12,7 @@ use itertools::Itertools;
 use typemap_rev::{TypeMap, TypeMapKey};
 
 use crate::channel::Sender;
-use crate::config::{EnvironmentConfig, ExecutionRuntime};
+use crate::config::RuntimeConfig;
 use crate::network::demultiplexer::DemuxHandle;
 use crate::network::multiplexer::MultiplexingSender;
 use crate::network::{
@@ -63,7 +63,7 @@ struct SenderMetadata {
 /// connections.
 pub(crate) struct NetworkTopology {
     /// Configuration of the environment.
-    config: EnvironmentConfig,
+    config: RuntimeConfig,
     /// All the registered receivers.
     ///
     /// Since the `NetworkReceiver` is generic over the element type we cannot simply store them
@@ -139,7 +139,7 @@ impl std::fmt::Debug for NetworkTopology {
 }
 
 impl NetworkTopology {
-    pub(crate) fn new(config: EnvironmentConfig) -> Self {
+    pub(crate) fn new(config: RuntimeConfig) -> Self {
         NetworkTopology {
             config,
             receivers: Some(TypeMap::new()),
@@ -372,8 +372,8 @@ impl NetworkTopology {
             .get(&receiver_endpoint)
             .unwrap_or_else(|| panic!("Channel for endpoint {receiver_endpoint} not registered",));
 
-        match &self.config.runtime {
-            ExecutionRuntime::Remote(_) => {
+        match &self.config {
+            RuntimeConfig::Remote(_) => {
                 if sender_metadata.to_remote {
                     let sender = self.register_mux(receiver_endpoint);
 
@@ -386,7 +386,7 @@ impl NetworkTopology {
                 } else {
                     let (sender, receiver) = local_channel(receiver_endpoint);
 
-                    if receiver_endpoint.coord.host_id == self.config.host_id.unwrap() {
+                    if receiver_endpoint.coord.host_id == self.config.host_id().unwrap() {
                         self.register_demux(receiver_endpoint, sender.clone_inner());
                     }
 
@@ -404,7 +404,7 @@ impl NetworkTopology {
                         .insert(receiver_endpoint, sender);
                 };
             }
-            ExecutionRuntime::Local(_) => {
+            RuntimeConfig::Local(_) => {
                 let (sender, receiver) = local_channel(receiver_endpoint);
 
                 self.receivers
@@ -433,7 +433,7 @@ impl NetworkTopology {
     /// If `fragile` is set to `true`, this connection won't be available with `get_senders` but
     /// only with `get_sender`.
     pub fn connect(&mut self, from: Coord, to: Coord, typ: TypeId, fragile: bool) {
-        let host_id = self.config.host_id.unwrap();
+        let host_id = self.config.host_id().unwrap();
         let from_remote = from.host_id != host_id;
         let to_remote = to.host_id != host_id;
 
@@ -504,7 +504,7 @@ impl NetworkTopology {
         log::debug!("finalizing topology");
         // Close handles to multiplexers to start the worker threads
 
-        let config = if let ExecutionRuntime::Remote(config) = &self.config.runtime {
+        let config = if let RuntimeConfig::Remote(config) = &self.config {
             config
         } else {
             return;
@@ -572,7 +572,7 @@ mod tests {
 
     #[test]
     fn test_local_topology() {
-        let config = EnvironmentConfig::local(4);
+        let config = RuntimeConfig::local(4);
         let mut topology = NetworkTopology::new(config);
 
         // s1 [b0, h0] -> r1 [b2, h0] (endpoint 1) type=i32
@@ -639,7 +639,7 @@ mod tests {
             + "   base_port: 31258\n"
             + "   num_cores: 1\n";
         std::io::Write::write_all(&mut config, config_yaml.as_bytes()).unwrap();
-        let config = EnvironmentConfig::remote(config.path()).unwrap();
+        let config = RuntimeConfig::remote(config.path()).unwrap();
 
         // s1 [b0, h0, r0] -> r1 [b2, h1, r0] (endpoint 1) type=i32
         // s2 [b0, h1, r0] -> r1 [b2, h1, r0] (endpoint 1) type=i32
@@ -648,8 +648,10 @@ mod tests {
         // s3 [b1, h0, r0] -> r2 [b2, h1, r1] (endpoint 3) type=u64
         // s4 [b1, h0, r1] -> r2 [b2, h1, r1] (endpoint 3) type=u64
 
-        let run = |mut config: EnvironmentConfig, host: HostId| {
-            config.host_id = Some(host);
+        let run = |mut config: RuntimeConfig, host: HostId| {
+            if let RuntimeConfig::Remote(remote) = &mut config {
+                remote.host_id = Some(host);
+            }
 
             let mut topology = NetworkTopology::new(config);
 
@@ -781,7 +783,7 @@ mod tests {
 
     #[test]
     fn test_multiple_output_types() {
-        let config = EnvironmentConfig::local(4);
+        let config = RuntimeConfig::local(4);
         let mut topology = NetworkTopology::new(config);
 
         // s1 [b0, h0] -> r1 [b1, h0] (endpoint 1) type=i32

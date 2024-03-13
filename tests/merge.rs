@@ -11,7 +11,7 @@ mod utils;
 
 #[test]
 fn merge_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(0..10000u16);
         let source2 = IteratorSource::new(10000..20000u16);
 
@@ -30,7 +30,7 @@ fn merge_stream() {
 
 #[test]
 fn merge_stream_with_empty() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(0..10000u16);
         let source2 = IteratorSource::new(0..0u16);
 
@@ -49,7 +49,7 @@ fn merge_stream_with_empty() {
 
 #[test]
 fn merge_stream_with_empty_other_way() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(0..0u16);
         let source2 = IteratorSource::new(0..10000u16);
 
@@ -68,7 +68,7 @@ fn merge_stream_with_empty_other_way() {
 
 #[test]
 fn merge_empty_with_empty() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(0..0u16);
         let source2 = IteratorSource::new(0..0u16);
 
@@ -85,7 +85,7 @@ fn merge_empty_with_empty() {
 
 #[test]
 fn merge_with_timestamps() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(0..10u64);
         let source2 = IteratorSource::new(100..110u64);
 
@@ -122,7 +122,7 @@ fn merge_with_timestamps() {
 
 #[test]
 fn merge_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(0..100u64);
         let source2 = IteratorSource::new(100..200u64);
 

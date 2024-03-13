@@ -1,7 +1,7 @@
 use criterion::BenchmarkId;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use noir_compute::BatchMode;
-use noir_compute::StreamEnvironment;
+use noir_compute::StreamContext;
 
 mod common;
 use common::*;
@@ -16,7 +16,7 @@ fn bench_main(c: &mut Criterion) {
         g.throughput(Throughput::Elements(size));
         g.bench_with_input(BenchmarkId::new("collatz", size), &size, |b, n| {
             b.iter(|| {
-                let mut env = StreamEnvironment::default();
+                let env = StreamContext::default();
                 env.stream_par_iter(0..*n)
                     .batch_mode(BatchMode::fixed(1024))
                     .map(move |n| {

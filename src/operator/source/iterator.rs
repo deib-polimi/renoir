@@ -46,9 +46,9 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// let source = IteratorSource::new((0..5));
     /// let s = env.stream(source);
     /// ```
@@ -111,9 +111,9 @@ where
     }
 }
 
-impl crate::StreamEnvironment {
-    /// Convenience method, creates a `IteratorSource` and makes a stream using `StreamEnvironment::stream`
-    pub fn stream_iter<It>(&mut self, iterator: It) -> Stream<IteratorSource<It>>
+impl crate::StreamContext {
+    /// Convenience method, creates a `IteratorSource` and makes a stream using `StreamContext::stream`
+    pub fn stream_iter<It>(&self, iterator: It) -> Stream<IteratorSource<It>>
     where
         It: Iterator + Send + 'static,
         It::Item: Send,

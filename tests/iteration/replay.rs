@@ -5,7 +5,7 @@ use super::utils::TestHelper;
 
 #[test]
 fn test_replay_no_blocks_in_between() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 5u64;
         let n_iter = 5;
 
@@ -46,7 +46,7 @@ fn test_replay_no_blocks_in_between() {
 
 #[test]
 fn test_replay_with_shuffle() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 20u64;
         let n_iter = 5;
 
@@ -107,7 +107,7 @@ fn check_nested_result(res: StreamOutput<Vec<u64>>) {
 
 #[test]
 fn test_replay_nested_no_shuffle() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u64);
         let stream = env.stream(source).shuffle().replay(
             2,
@@ -134,7 +134,7 @@ fn test_replay_nested_no_shuffle() {
 
 #[test]
 fn test_replay_nested_shuffle_inner() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u64);
         let stream = env.stream(source).shuffle().replay(
             2,
@@ -161,7 +161,7 @@ fn test_replay_nested_shuffle_inner() {
 
 #[test]
 fn test_replay_nested_shuffle_outer() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u64);
         let stream = env.stream(source).shuffle().replay(
             2,
@@ -188,7 +188,7 @@ fn test_replay_nested_shuffle_outer() {
 
 #[test]
 fn test_replay_nested_shuffle_both() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u64);
         let stream = env.stream(source).shuffle().replay(
             2,

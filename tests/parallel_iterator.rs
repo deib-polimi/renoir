@@ -6,7 +6,7 @@ mod utils;
 
 #[test]
 fn parallel_iterator() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 100;
         let source = ParallelIteratorSource::new(move |id, instances| {
             let chunk_size = (n + instances - 1) / instances;

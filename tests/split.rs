@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn split_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..5u8);
         let mut splits = env.stream(source).shuffle().map(|n| n.to_string()).split(2);
         let v1 = splits.pop().unwrap().map(|x| x.clone() + &x).collect_vec();
@@ -31,7 +31,7 @@ fn split_stream() {
 
 #[test]
 fn double_split_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..5u8);
         let mut v1234 = env.stream(source).shuffle().split(2);
         let mut v12 = v1234.pop().unwrap().split(2);

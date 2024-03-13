@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn fold_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -23,7 +23,7 @@ fn fold_stream() {
 
 #[test]
 fn fold_assoc_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -43,7 +43,7 @@ fn fold_assoc_stream() {
 
 #[test]
 fn fold_shuffled_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -61,7 +61,7 @@ fn fold_shuffled_stream() {
 
 #[test]
 fn fold_assoc_shuffled_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)

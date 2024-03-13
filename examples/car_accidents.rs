@@ -58,10 +58,7 @@ fn query1_with_source(
         .collect_vec()
 }
 
-fn query1<P: Into<PathBuf>>(
-    env: &mut StreamEnvironment,
-    path: P,
-) -> StreamOutput<Vec<(Week, u32)>> {
+fn query1<P: Into<PathBuf>>(env: &StreamContext, path: P) -> StreamOutput<Vec<(Week, u32)>> {
     let source = CsvSource::<Accident>::new(path).has_headers(true);
     let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
     query1_with_source(source)
@@ -140,10 +137,7 @@ fn query2_with_source(
         .collect_vec()
 }
 
-fn query2<P: Into<PathBuf>>(
-    env: &mut StreamEnvironment,
-    path: P,
-) -> StreamOutput<Vec<(String, i32, u32)>> {
+fn query2<P: Into<PathBuf>>(env: &StreamContext, path: P) -> StreamOutput<Vec<(String, i32, u32)>> {
     let source = CsvSource::<Accident>::new(path).has_headers(true);
     let source = env.stream(source).batch_mode(BatchMode::fixed(1000));
     query2_with_source(source)
@@ -231,7 +225,7 @@ fn query3_with_source(
 
 #[allow(clippy::type_complexity)]
 fn query3<P: Into<PathBuf>>(
-    env: &mut StreamEnvironment,
+    env: &StreamContext,
     path: P,
 ) -> (
     StreamOutput<Vec<(String, Week, i32, u32)>>,
@@ -297,7 +291,7 @@ fn print_query3(
 }
 
 fn main() {
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 2 {
         panic!(
             "Usage: {} dataset share_source",
@@ -313,7 +307,7 @@ fn main() {
     };
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let (query1, query2, query3) = if share_source {
         let source = CsvSource::<Accident>::new(path).has_headers(true);
@@ -328,11 +322,7 @@ fn main() {
             query3_with_source(splits.next().unwrap()),
         )
     } else {
-        (
-            query1(&mut env, path),
-            query2(&mut env, path),
-            query3(&mut env, path),
-        )
+        (query1(&env, path), query2(&env, path), query3(&env, path))
     };
 
     let start = Instant::now();

@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn shuffle_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..1000u16);
         let parallelism = env.parallelism();
         let res = env

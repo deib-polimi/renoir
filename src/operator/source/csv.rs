@@ -126,10 +126,10 @@ impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::CsvSource;
     /// # use serde::{Deserialize, Serialize};
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// #[derive(Clone, Deserialize, Serialize)]
     /// struct Thing {
     ///     what: String,
@@ -424,10 +424,10 @@ impl<Out: Data + for<'a> Deserialize<'a>> Clone for CsvSource<Out> {
     }
 }
 
-impl crate::StreamEnvironment {
-    /// Convenience method, creates a `CsvSource` and makes a stream using `StreamEnvironment::stream`
+impl crate::StreamContext {
+    /// Convenience method, creates a `CsvSource` and makes a stream using `StreamContext::stream`
     pub fn stream_csv<T: Data + for<'a> Deserialize<'a>>(
-        &mut self,
+        &self,
         path: impl Into<PathBuf>,
     ) -> Stream<CsvSource<T>> {
         let source = CsvSource::new(path);
@@ -443,8 +443,8 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use tempfile::NamedTempFile;
 
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
+    use crate::config::RuntimeConfig;
+    use crate::environment::StreamContext;
     use crate::operator::source::CsvSource;
 
     #[test]
@@ -456,7 +456,7 @@ mod tests {
                     write!(file.as_file(), "{},{}{}", i, i + 1, terminator).unwrap();
                 }
 
-                let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+                let env = StreamContext::new(RuntimeConfig::local(4));
                 let source = CsvSource::<(i32, i32)>::new(file.path()).has_headers(false);
                 let res = env.stream(source).shuffle().collect_vec();
                 env.execute_blocking();
@@ -484,7 +484,7 @@ mod tests {
                     write!(file.as_file(), "{},{}{}", i, i + 1, terminator).unwrap();
                 }
 
-                let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+                let env = StreamContext::new(RuntimeConfig::local(4));
                 let source = CsvSource::<T>::new(file.path());
                 let res = env.stream(source).shuffle().collect_vec();
                 env.execute_blocking();

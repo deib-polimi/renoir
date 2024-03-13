@@ -13,7 +13,7 @@ Noir is a distributed data processing platform based on the dataflow paradigm th
 Noir converts each job into a dataflow graph of
 operators and groups them in blocks. Blocks contain a sequence of operors which process the data sequentially without repartitioning it. They are the deployment unit used by the system and can be distributed and executed on multiple systems.
 
-The common layout of a Noir program starts with the creation of a `StreamEnvironment`, then one or more `Source`s are initialised creating a `Stream`. The graph of operators is composed using the methods of the `Stream` object, which follow a similar approach to Rust's `Iterator` trait allowing ergonomically define a processing workflow through method chaining.
+The common layout of a Noir program starts with the creation of a `StreamContext`, then one or more `Source`s are initialised creating a `Stream`. The graph of operators is composed using the methods of the `Stream` object, which follow a similar approach to Rust's `Iterator` trait allowing ergonomically define a processing workflow through method chaining.
 
 ### Examples
 
@@ -24,9 +24,9 @@ use noir_compute::prelude::*;
 
 fn main() {
     // Convenience method to parse deployment config from CLI arguments
-    let (config, args) = EnvironmentConfig::from_args();
-        config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let (config, args) = RuntimeConfig::from_args();
+    config.spawn_remote_workers();
+    let env = StreamContext::new(config);
 
     let result = env
         // Open and read file line by line in parallel
@@ -63,8 +63,8 @@ use noir_compute::prelude::*;
 
 fn main() {
     // Convenience method to parse deployment config from CLI arguments
-    let (config, args) = EnvironmentConfig::from_args();
-    let mut env = StreamEnvironment::new(config);
+    let (config, args) = RuntimeConfig::from_args();
+    let env = StreamContext::new(config);
 
     let result = env
         .stream_file(&args[0])
@@ -125,8 +125,8 @@ pub use block::structure;
 pub use block::BatchMode;
 pub use block::Replication;
 pub use block::{group_by_hash, GroupHasherBuilder};
-pub use config::EnvironmentConfig;
-pub use environment::StreamEnvironment;
+pub use config::RuntimeConfig;
+pub use environment::StreamContext;
 pub use operator::iteration::IterationStateHandle;
 pub use scheduler::ExecutionMetadata;
 pub use stream::{KeyedStream, Stream, WindowedStream};
@@ -159,7 +159,7 @@ pub mod prelude {
     pub use super::operator::window::{CountWindow, ProcessingTimeWindow, SessionWindow};
     #[cfg(feature = "timestamp")]
     pub use super::operator::window::{EventTimeWindow, TransactionWindow};
-    pub use super::{BatchMode, EnvironmentConfig, StreamEnvironment};
+    pub use super::{BatchMode, RuntimeConfig, StreamContext};
 }
 
 /// Tracing information of the current execution.

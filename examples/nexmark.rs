@@ -426,7 +426,7 @@ fn query8(events: Stream<impl Operator<Out = Event> + 'static>) {
         .for_each(std::mem::drop)
 }
 
-fn events(env: &mut StreamEnvironment, tot: usize) -> Stream<impl Operator<Out = Event>> {
+fn events(env: &StreamContext, tot: usize) -> Stream<impl Operator<Out = Event>> {
     env.stream_par_iter(move |i, n| {
         let conf = NexmarkConfig {
             num_event_generators: n as usize,
@@ -464,27 +464,27 @@ fn filter_bid(e: Event) -> Option<Bid> {
 fn main() {
     tracing_subscriber::fmt::init();
 
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 2 {
         panic!("Pass the element count as argument");
     }
     let n: usize = args[0].parse().unwrap();
     let q = &args[1][..];
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     match q {
-        "0" => query0(events(&mut env, n)),
-        "1" => query1(events(&mut env, n)),
-        "2" => query2(events(&mut env, n)),
-        "3" => query3(events(&mut env, n)),
-        "4" => query4(events(&mut env, n)),
-        "5" => query5(events(&mut env, n)),
-        "6" => query6(events(&mut env, n)),
-        "7" => query7(events(&mut env, n)),
-        "8" => query8(events(&mut env, n)),
+        "0" => query0(events(&env, n)),
+        "1" => query1(events(&env, n)),
+        "2" => query2(events(&env, n)),
+        "3" => query3(events(&env, n)),
+        "4" => query4(events(&env, n)),
+        "5" => query5(events(&env, n)),
+        "6" => query6(events(&env, n)),
+        "7" => query7(events(&env, n)),
+        "8" => query8(events(&env, n)),
 
-        "4-opt" => query4_opt(events(&mut env, n)),
+        "4-opt" => query4_opt(events(&env, n)),
 
         _ => panic!("Invalid query! {q}"),
     }

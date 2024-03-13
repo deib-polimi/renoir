@@ -42,7 +42,7 @@ where
     /// Whether this block has `NextStrategy::OnlyOne`.
     pub(crate) is_only_one_strategy: bool,
     /// The set of requirements that the block imposes on the scheduler.
-    pub(crate) scheduler_requirements: SchedulerRequirements,
+    pub(crate) scheduling: Scheduling,
 }
 
 impl<OperatorChain> Clone for Block<OperatorChain>
@@ -56,7 +56,7 @@ where
             batch_mode: self.batch_mode,
             iteration_ctx: self.iteration_ctx.clone(),
             is_only_one_strategy: self.is_only_one_strategy,
-            scheduler_requirements: self.scheduler_requirements.clone(),
+            scheduling: self.scheduling.clone(),
         }
     }
 }
@@ -77,13 +77,13 @@ where
             batch_mode: self.batch_mode,
             iteration_ctx: self.iteration_ctx,
             is_only_one_strategy: false,
-            scheduler_requirements: self.scheduler_requirements,
+            scheduling: self.scheduling,
         }
     }
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct SchedulerRequirements {
+pub(crate) struct Scheduling {
     /// If some of the operators inside the chain require a limit on the parallelism of this node,
     /// it is stored here. `None` means that the scheduler is allowed to spawn as many copies of
     /// this block as it likes.
@@ -156,6 +156,7 @@ where
         operators: OperatorChain,
         batch_mode: BatchMode,
         iteration_ctx: Vec<Arc<IterationStateLock>>,
+        scheduling: Scheduling,
     ) -> Self {
         Self {
             id,
@@ -163,7 +164,7 @@ where
             batch_mode,
             iteration_ctx,
             is_only_one_strategy: false,
-            scheduler_requirements: Default::default(),
+            scheduling,
         }
     }
 
@@ -188,7 +189,7 @@ where
     }
 }
 
-impl SchedulerRequirements {
+impl Scheduling {
     /// Limit the maximum parallelism of this block.
     pub(crate) fn replication(&mut self, replication: Replication) {
         self.replication = self.replication.intersect(replication);

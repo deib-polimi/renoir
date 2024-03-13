@@ -6,7 +6,7 @@ use noir_compute::prelude::*;
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 2 {
         panic!("Pass the number of iterations and the edges dataset as arguments");
     }
@@ -14,7 +14,7 @@ fn main() {
     let path_edges = &args[1];
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let edges_source = CsvSource::<(u64, u64)>::new(path_edges)
         .delimiter(b',')

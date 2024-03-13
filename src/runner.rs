@@ -17,7 +17,7 @@ use ssh2::Session;
 
 use crate::config::CONFIG_ENV_VAR;
 use crate::config::HOST_ID_ENV_VAR;
-use crate::config::{RemoteHostConfig, RemoteRuntimeConfig};
+use crate::config::{HostConfig, RemoteConfig};
 use crate::scheduler::HostId;
 use crate::TracingData;
 
@@ -59,7 +59,7 @@ fn executable_hash() -> String {
 /// the process,
 ///
 /// If this was already a spawned process to nothing.
-pub(crate) fn spawn_remote_workers(config: RemoteRuntimeConfig) {
+pub(crate) fn spawn_remote_workers(config: RemoteConfig) {
     // if this process already comes from a the spawner do not spawn again!
     if is_spawned_process() {
         return;
@@ -141,8 +141,8 @@ fn is_spawned_process() -> bool {
 /// `spawn_blocking`.
 fn remote_worker(
     host_id: HostId,
-    mut host: RemoteHostConfig,
-    config: RemoteRuntimeConfig,
+    mut host: HostConfig,
+    config: RemoteConfig,
     executable_uid: String,
 ) -> HostExecutionResult {
     if host.ssh.username.is_none() {
@@ -374,7 +374,7 @@ fn send_executable(
 /// This will export all the required variables before executing the binary.
 fn build_remote_command(
     host_id: HostId,
-    config: &RemoteRuntimeConfig,
+    config: &RemoteConfig,
     binary_path: &Path,
     perf_path: &Option<PathBuf>,
 ) -> String {

@@ -120,126 +120,126 @@ fn build_expected_left(n1: u16, n2: u32, m: u8) -> Vec<(u8, (u16, Option<u32>))>
 
 #[test]
 fn join_shortcut() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test_shortcut!(env, 5, 10, 7, inner);
     });
 }
 
 #[test]
 fn left_join_shortcut() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test_shortcut!(env, 5, 10, 7, left);
     });
 }
 
 #[test]
 fn outer_join_shortcut() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test_shortcut!(env, 5, 10, 7, outer);
     });
 }
 
 #[test]
 fn join_hash_hash_inner() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, hash, hash, inner);
     });
 }
 
 #[test]
 fn join_hash_sort_merge_inner() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, hash, sort_merge, inner);
     });
 }
 
 #[test]
 fn join_hash_hash_inner_big() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 200, 200, 7, hash, hash, inner);
     });
 }
 
 #[test]
 fn join_hash_sort_merge_inner_big() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 200, 200, 7, hash, sort_merge, inner);
     });
 }
 
 #[test]
 fn join_bc_hash_inner() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, broadcast_right, hash, inner);
     });
 }
 
 #[test]
 fn join_bc_sort_merge_inner() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, broadcast_right, sort_merge, inner);
     });
 }
 
 #[test]
 fn join_hash_hash_left() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, hash, hash, left);
     });
 }
 
 #[test]
 fn join_hash_sort_merge_left() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, hash, sort_merge, left);
     });
 }
 
 #[test]
 fn join_bc_hash_left() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, broadcast_right, hash, left);
     });
 }
 
 #[test]
 fn join_bc_sort_merge_left() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, broadcast_right, sort_merge, left);
     });
 }
 
 #[test]
 fn join_hash_hash_outer1() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, hash, hash, outer);
     });
 }
 
 #[test]
 fn join_hash_sort_merge_outer1() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 5, 10, 7, hash, sort_merge, outer);
     });
 }
 
 #[test]
 fn join_hash_hash_outer2() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 10, 5, 7, hash, hash, outer);
     });
 }
 
 #[test]
 fn join_hash_sort_merge_outer2() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         run_test!(env, 10, 5, 7, hash, sort_merge, outer);
     });
 }
 
 #[test]
 fn self_join() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 200u32;
         let s1 = env
             .stream(IteratorSource::new(0..n))
@@ -269,7 +269,7 @@ fn self_join() {
 
 #[test]
 fn join_in_loop() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let n = 200u32;
         let n_iter = 10;
         let s = env

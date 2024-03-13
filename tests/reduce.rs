@@ -5,7 +5,7 @@ mod utils;
 
 #[test]
 fn reduce_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env.stream(source).reduce(|a, b| a + b).collect_vec();
         env.execute_blocking();
@@ -18,7 +18,7 @@ fn reduce_stream() {
 
 #[test]
 fn reduce_assoc_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env.stream(source).reduce_assoc(|a, b| a + b).collect_vec();
         env.execute_blocking();
@@ -31,7 +31,7 @@ fn reduce_assoc_stream() {
 
 #[test]
 fn reduce_shuffled_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -48,7 +48,7 @@ fn reduce_shuffled_stream() {
 
 #[test]
 fn reduce_assoc_shuffled_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)

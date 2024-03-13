@@ -107,7 +107,7 @@ impl State {
 }
 
 fn main() {
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 3 {
         panic!("Pass the number of centroid, the number of iterations and the dataset path as arguments");
     }
@@ -116,7 +116,7 @@ fn main() {
     let path = &args[2];
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let centroids = read_centroids(path, num_centroids);
     assert_eq!(centroids.len(), num_centroids);

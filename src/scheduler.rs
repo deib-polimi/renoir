@@ -6,7 +6,7 @@ use std::thread::JoinHandle;
 use itertools::Itertools;
 
 use crate::block::{BatchMode, Block, BlockStructure, JobGraphGenerator, Replication};
-use crate::config::{EnvironmentConfig, ExecutionRuntime, LocalRuntimeConfig, RemoteRuntimeConfig};
+use crate::config::{LocalConfig, RemoteConfig, RuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::Operator;
 use crate::profiler::{wait_profiler, ProfilerResult};
@@ -60,7 +60,7 @@ struct SchedulerBlockInfo {
 /// execution starts it builds the execution graph and actually start the workers.
 pub(crate) struct Scheduler {
     /// The configuration of the environment.
-    config: EnvironmentConfig,
+    config: RuntimeConfig,
     /// Adjacency list of the job graph.
     next_blocks: HashMap<BlockId, Vec<(BlockId, TypeId, bool)>, crate::block::CoordHasherBuilder>,
     /// Reverse adjacency list of the job graph.
@@ -74,7 +74,7 @@ pub(crate) struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn new(config: EnvironmentConfig) -> Self {
+    pub fn new(config: RuntimeConfig) -> Self {
         Self {
             next_blocks: Default::default(),
             prev_blocks: Default::default(),
@@ -106,7 +106,7 @@ impl Scheduler {
 
         // duplicate the block in the execution graph
         let mut blocks = vec![];
-        let local_replicas = info.replicas(self.config.host_id.unwrap());
+        let local_replicas = info.replicas(self.config.host_id().unwrap());
         blocks.reserve(local_replicas.len());
         if !local_replicas.is_empty() {
             let coord = local_replicas[0];
@@ -332,9 +332,9 @@ impl Scheduler {
     where
         OperatorChain: Operator,
     {
-        match &self.config.runtime {
-            ExecutionRuntime::Local(local) => self.local_block_info(block, local),
-            ExecutionRuntime::Remote(remote) => self.remote_block_info(block, remote),
+        match &self.config {
+            RuntimeConfig::Local(local) => self.local_block_info(block, local),
+            RuntimeConfig::Remote(remote) => self.remote_block_info(block, remote),
         }
     }
 
@@ -347,12 +347,12 @@ impl Scheduler {
     fn local_block_info<OperatorChain>(
         &self,
         block: &Block<OperatorChain>,
-        local: &LocalRuntimeConfig,
+        local: &LocalConfig,
     ) -> SchedulerBlockInfo
     where
         OperatorChain: Operator,
     {
-        let replication = block.scheduler_requirements.replication;
+        let replication = block.scheduling.replication;
         let instances = replication.clamp(local.num_cores);
         log::debug!(
             "local (b{:02}): {{ replicas: {:2}, replication: {:?}, only_one: {} }}",
@@ -361,7 +361,7 @@ impl Scheduler {
             replication,
             block.is_only_one_strategy
         );
-        let host_id = self.config.host_id.unwrap();
+        let host_id = self.config.host_id().unwrap();
         let replicas = (0..instances).map(|r| Coord::new(block.id, host_id, r));
         let global_ids = (0..instances).map(|r| (Coord::new(block.id, host_id, r), r));
         SchedulerBlockInfo {
@@ -380,12 +380,12 @@ impl Scheduler {
     fn remote_block_info<OperatorChain>(
         &self,
         block: &Block<OperatorChain>,
-        remote: &RemoteRuntimeConfig,
+        remote: &RemoteConfig,
     ) -> SchedulerBlockInfo
     where
         OperatorChain: Operator,
     {
-        let replication = block.scheduler_requirements.replication;
+        let replication = block.scheduling.replication;
         // number of replicas we can assign at most
         let mut global_counter = 0;
         let mut replicas: HashMap<_, Vec<_>, crate::block::CoordHasherBuilder> = HashMap::default();
@@ -454,14 +454,14 @@ impl SchedulerBlockInfo {
 #[cfg(not(feature = "async-tokio"))]
 #[cfg(test)]
 mod tests {
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
+    use crate::config::RuntimeConfig;
+    use crate::environment::StreamContext;
     use crate::operator::source::IteratorSource;
 
     #[test]
     #[should_panic(expected = "Some streams do not have a sink attached")]
     fn test_scheduler_panic_on_missing_sink() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4));
         let source = IteratorSource::new(vec![1, 2, 3].into_iter());
         let _stream = env.stream(source);
         env.execute_blocking();
@@ -470,7 +470,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Some streams do not have a sink attached")]
     fn test_scheduler_panic_on_missing_sink_shuffle() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4));
         let source = IteratorSource::new(vec![1, 2, 3].into_iter());
         let _stream = env.stream(source).shuffle();
         env.execute_blocking();

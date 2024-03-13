@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use criterion::{black_box, Bencher};
-use noir_compute::config::{ExecutionRuntime, RemoteHostConfig, RemoteRuntimeConfig};
+use noir_compute::config::{HostConfig, RemoteConfig, RuntimeConfig};
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
@@ -17,14 +17,14 @@ const PORT_BASE: u16 = 9090;
 pub fn remote_loopback_deploy(
     num_hosts: CoordUInt,
     cores_per_host: CoordUInt,
-    body: impl Fn(&mut StreamEnvironment) + Send + Sync + 'static,
+    body: impl Fn(&StreamContext) + Send + Sync + 'static,
 ) {
     let mut hosts = vec![];
     for host_id in 0..num_hosts {
         let test_id = NONCE.fetch_add(1, Ordering::SeqCst);
         let [hi, lo] = test_id.to_be_bytes();
         let address = format!("127.{hi}.{lo}.{host_id}");
-        hosts.push(RemoteHostConfig {
+        hosts.push(HostConfig {
             address,
             base_port: PORT_BASE,
             num_cores: cores_per_host,
@@ -33,27 +33,23 @@ pub fn remote_loopback_deploy(
         });
     }
 
-    let runtime = ExecutionRuntime::Remote(RemoteRuntimeConfig {
-        hosts,
-        tracing_dir: None,
-        cleanup_executable: false,
-    });
-
     let mut join_handles = vec![];
     let body = Arc::new(body);
     for host_id in 0..num_hosts {
-        let config = EnvironmentConfig {
-            runtime: runtime.clone(),
+        let config = RuntimeConfig::Remote(RemoteConfig {
             host_id: Some(host_id),
-            skip_single_remote_check: true,
-        };
+            hosts: hosts.clone(),
+            tracing_dir: None,
+            cleanup_executable: false,
+        });
+
         let body = body.clone();
         join_handles.push(
             std::thread::Builder::new()
                 .name(format!("lohost-{host_id:02}"))
                 .spawn(move || {
-                    let mut env = StreamEnvironment::new(config);
-                    body(&mut env);
+                    let env = StreamContext::new(config);
+                    body(&env);
                     env.execute_blocking();
                 })
                 .unwrap(),
@@ -68,8 +64,8 @@ pub fn remote_loopback_deploy(
 
 pub struct NoirBenchBuilder<F, G, R>
 where
-    F: Fn() -> StreamEnvironment,
-    G: Fn(&mut StreamEnvironment) -> R,
+    F: Fn() -> StreamContext,
+    G: Fn(&StreamContext) -> R,
 {
     make_env: F,
     make_network: G,
@@ -78,8 +74,8 @@ where
 
 impl<F, G, R> NoirBenchBuilder<F, G, R>
 where
-    F: Fn() -> StreamEnvironment,
-    G: Fn(&mut StreamEnvironment) -> R,
+    F: Fn() -> StreamContext,
+    G: Fn(&StreamContext) -> R,
 {
     pub fn new(make_env: F, make_network: G) -> Self {
         Self {
@@ -103,7 +99,7 @@ where
     }
 }
 
-pub fn noir_bench_default(b: &mut Bencher, logic: impl Fn(&mut StreamEnvironment)) {
-    let builder = NoirBenchBuilder::new(StreamEnvironment::default, logic);
+pub fn noir_bench_default(b: &mut Bencher, logic: impl Fn(&StreamContext)) {
+    let builder = NoirBenchBuilder::new(StreamContext::default, logic);
     b.iter_custom(|n| builder.bench(n));
 }

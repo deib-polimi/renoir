@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn test_zip_no_shuffle() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let items1 = 0..3u8;
         let items2 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
 
@@ -26,7 +26,7 @@ fn test_zip_no_shuffle() {
 
 #[test]
 fn test_zip_balanced() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let items1 = 0..3u8;
         let items2 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
 
@@ -49,7 +49,7 @@ fn test_zip_balanced() {
 
 #[test]
 fn test_zip_unbalanced() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let items1 = 0..10u8;
         let items2 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
 

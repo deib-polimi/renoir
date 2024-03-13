@@ -166,9 +166,9 @@ fn main() {
     let win_step_millis = 500;
     let k = 4;
 
-    let (config, _args) = EnvironmentConfig::from_args();
+    let (config, _args) = RuntimeConfig::from_args();
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let source = ParallelIteratorSource::new(TopicSource::new);
     env.stream(source)

@@ -7,7 +7,7 @@ use super::utils::TestHelper;
 
 #[test]
 fn test_first_window_keyed() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -36,7 +36,7 @@ fn test_first_window_keyed() {
 #[test]
 #[allow(clippy::identity_op)]
 fn test_fold_window_keyed() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -68,7 +68,7 @@ fn test_fold_window_keyed() {
 #[test]
 #[allow(clippy::identity_op)]
 fn test_sum_window_keyed() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -99,7 +99,7 @@ fn test_sum_window_keyed() {
 
 #[test]
 fn test_min_window_keyed() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -127,7 +127,7 @@ fn test_min_window_keyed() {
 
 #[test]
 fn test_max_window_keyed() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -155,7 +155,7 @@ fn test_max_window_keyed() {
 
 #[test]
 fn test_map_window_keyed() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u16);
         let res = env
             .stream(source)

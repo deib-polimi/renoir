@@ -74,13 +74,13 @@ mod tests {
     use std::sync::atomic::{AtomicU8, Ordering};
     use std::sync::Arc;
 
-    use crate::config::EnvironmentConfig;
-    use crate::environment::StreamEnvironment;
+    use crate::config::RuntimeConfig;
+    use crate::environment::StreamContext;
     use crate::operator::source;
 
     #[test]
     fn for_each() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4));
         let source = source::IteratorSource::new(0..10u8);
         let sum = Arc::new(AtomicU8::new(0));
         let sum2 = sum.clone();
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn for_each_keyed() {
-        let mut env = StreamEnvironment::new(EnvironmentConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4));
         let source = source::IteratorSource::new(0..10u8);
         let sum = Arc::new(AtomicU8::new(0));
         let sum2 = sum.clone();

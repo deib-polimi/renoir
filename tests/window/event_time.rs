@@ -5,7 +5,7 @@ use super::utils::TestHelper;
 
 #[test]
 fn sliding_event_time() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10);
 
         let res = env
@@ -35,7 +35,7 @@ fn sliding_event_time() {
 
 #[test]
 fn tumbling_event_time() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10);
 
         let res = env

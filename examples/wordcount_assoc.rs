@@ -11,14 +11,14 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 fn main() {
     tracing_subscriber::fmt::init();
 
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the dataset path as an argument");
     }
     let path = &args[0];
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let source = FileSource::new(path);
     let tokenizer = Tokenizer::new();
@@ -50,14 +50,14 @@ fn main() {
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the dataset path as an argument");
     }
     let path = &args[0];
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let source = FileSource::new(path);
     let tokenizer = Tokenizer::new();

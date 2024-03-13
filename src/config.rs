@@ -1,6 +1,6 @@
-//! Configuration types used to initialize the [`StreamEnvironment`](crate::StreamEnvironment).
+//! Configuration types used to initialize the [`StreamContext`](crate::StreamContext).
 //!
-//! See the documentation of [`EnvironmentConfig`] for more details.
+//! See the documentation of [`RuntimeConfig`] for more details.
 
 use std::fmt::{Display, Formatter};
 use std::path::Path;
@@ -36,15 +36,15 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// ## Local environment
 ///
 /// ```
-/// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
-/// let config = EnvironmentConfig::local(1);
-/// let mut env = StreamEnvironment::new(config);
+/// # use noir_compute::{StreamContext, RuntimeConfig};
+/// let config = RuntimeConfig::local(1);
+/// let env = StreamContext::new(config);
 /// ```
 ///
 /// ## Remote environment
 ///
 /// ```
-/// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+/// # use noir_compute::{StreamContext, RuntimeConfig};
 /// # use std::fs::File;
 /// # use std::io::Write;
 /// let config = r"
@@ -59,8 +59,8 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// let mut file = File::create("config.yaml").unwrap();
 /// file.write_all(config.as_bytes());
 ///
-/// let config = EnvironmentConfig::remote("config.yaml").expect("cannot read config file");
-/// let mut env = StreamEnvironment::new(config);
+/// let config = RuntimeConfig::remote("config.yaml").expect("cannot read config file");
+/// let env = StreamContext::new(config);
 /// ```
 ///
 /// ## From command line arguments
@@ -69,34 +69,30 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// their docs.
 ///
 /// ```no_run
-/// # use noir_compute::{EnvironmentConfig, StreamEnvironment};
-/// let (config, args) = EnvironmentConfig::from_args();
-/// let mut env = StreamEnvironment::new(config);
+/// # use noir_compute::{RuntimeConfig, StreamContext};
+/// let (config, args) = RuntimeConfig::from_args();
+/// let env = StreamContext::new(config);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct EnvironmentConfig {
-    /// Which runtime to use for the environment.
-    pub runtime: ExecutionRuntime,
-    /// In a remote execution this field represents the identifier of the host, i.e. the index
-    /// inside the host list in the config.
-    pub host_id: Option<HostId>,
-    /// Skip the check that prevents two remote environments with different environments to be
-    /// constructed.
-    pub skip_single_remote_check: bool,
+pub enum RuntimeConfig {
+    /// Use only local threads.
+    Local(LocalConfig),
+    /// Use both local threads and remote workers.
+    Remote(RemoteConfig),
 }
 
-/// Which kind of environment to use for the execution.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum ExecutionRuntime {
-    /// Use only local threads.
-    Local(LocalRuntimeConfig),
-    /// Use both local threads and remote workers.
-    Remote(RemoteRuntimeConfig),
-}
+// #[derive(Debug, Clone, Eq, PartialEq)]
+// pub struct RuntimeConfig {
+//     /// Which runtime to use for the environment.
+//     pub runtime: RuntimeConfig,
+//     /// In a remote execution this field represents the identifier of the host, i.e. the index
+//     /// inside the host list in the config.
+//     pub host_id: Option<HostId>,
+// }
 
 /// This environment uses only local threads.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LocalRuntimeConfig {
+pub struct LocalConfig {
     /// The number of CPU cores of this host.
     ///
     /// A thread will be spawned for each core, for each block in the job graph.
@@ -105,9 +101,12 @@ pub struct LocalRuntimeConfig {
 
 /// This environment uses local threads and remote hosts.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct RemoteRuntimeConfig {
+pub struct RemoteConfig {
+    /// The identifier for this host.
+    #[serde(skip)]
+    pub host_id: Option<HostId>,
     /// The set of remote hosts to use.
-    pub hosts: Vec<RemoteHostConfig>,
+    pub hosts: Vec<HostConfig>,
     /// If specified some debug information will be stored inside this directory.
     pub tracing_dir: Option<PathBuf>,
     /// Remove remote binaries after execution
@@ -117,7 +116,7 @@ pub struct RemoteRuntimeConfig {
 
 /// The configuration of a single remote host.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct RemoteHostConfig {
+pub struct HostConfig {
     /// The IP address or domain name to use for connecting to this remote host.
     ///
     /// This must be reachable from all the hosts in the cluster.
@@ -133,7 +132,7 @@ pub struct RemoteHostConfig {
     pub num_cores: CoordUInt,
     /// The configuration to use to connect via SSH to the remote host.
     #[serde(default)]
-    pub ssh: RemoteHostSSHConfig,
+    pub ssh: SSHConfig,
     /// If specified the remote worker will be spawned under `perf`, and its output will be stored
     /// at this location.
     pub perf_path: Option<PathBuf>,
@@ -143,7 +142,7 @@ pub struct RemoteHostConfig {
 #[derive(Clone, Serialize, Deserialize, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct RemoteHostSSHConfig {
+pub struct SSHConfig {
     /// The SSH port this host listens to.
     #[derivative(Default(value = "22"))]
     #[serde(default = "ssh_default_port")]
@@ -158,7 +157,7 @@ pub struct RemoteHostSSHConfig {
     pub key_passphrase: Option<String>,
 }
 
-impl std::fmt::Debug for RemoteHostSSHConfig {
+impl std::fmt::Debug for SSHConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RemoteHostSSHConfig")
             .field("ssh_port", &self.ssh_port)
@@ -197,10 +196,10 @@ pub struct CommandLineOptions {
     args: Vec<String>,
 }
 
-impl EnvironmentConfig {
+impl RuntimeConfig {
     /// Build the configuration from the specified args list.
     #[cfg(feature = "clap")]
-    pub fn from_args() -> (EnvironmentConfig, Vec<String>) {
+    pub fn from_args() -> (RuntimeConfig, Vec<String>) {
         let opt: CommandLineOptions = CommandLineOptions::parse();
         opt.validate();
 
@@ -217,12 +216,8 @@ impl EnvironmentConfig {
     }
 
     /// Local environment that avoid using the network and runs concurrently using only threads.
-    pub fn local(num_cores: CoordUInt) -> EnvironmentConfig {
-        EnvironmentConfig {
-            runtime: ExecutionRuntime::Local(LocalRuntimeConfig { num_cores }),
-            host_id: Some(0),
-            skip_single_remote_check: false,
-        }
+    pub fn local(num_cores: CoordUInt) -> RuntimeConfig {
+        RuntimeConfig::Local(LocalConfig { num_cores })
     }
 
     /// Remote environment based on the provided configuration file.
@@ -232,8 +227,8 @@ impl EnvironmentConfig {
     /// If it's the runner, the configuration file is read. If it's a worker, the configuration is
     /// read directly from the environment variable and not from the file (remote hosts may not have
     /// the configuration file).
-    pub fn remote<P: AsRef<Path>>(config: P) -> Result<EnvironmentConfig> {
-        let config = if let Some(config) = EnvironmentConfig::config_from_env() {
+    pub fn remote<P: AsRef<Path>>(config: P) -> Result<RuntimeConfig> {
+        let mut config = if let Some(config) = RuntimeConfig::config_from_env() {
             config
         } else {
             log::info!("reading config from: {}", config.as_ref().display());
@@ -248,17 +243,13 @@ impl EnvironmentConfig {
             }
         }
 
-        let host_id = EnvironmentConfig::host_id(config.hosts.len().try_into().unwrap());
-        log::debug!("host id: {host_id:?}, runtime configuration: {config:#?}");
-        Ok(EnvironmentConfig {
-            runtime: ExecutionRuntime::Remote(config),
-            host_id,
-            skip_single_remote_check: false,
-        })
+        config.host_id = RuntimeConfig::host_id_from_env(config.hosts.len().try_into().unwrap());
+        log::debug!("runtime configuration: {config:#?}");
+        Ok(RuntimeConfig::Remote(config))
     }
 
     /// Extract the host id from the environment variable, if present.
-    fn host_id(num_hosts: CoordUInt) -> Option<HostId> {
+    fn host_id_from_env(num_hosts: CoordUInt) -> Option<HostId> {
         let host_id = match std::env::var(HOST_ID_ENV_VAR) {
             Ok(host_id) => host_id,
             Err(_) => return None,
@@ -278,11 +269,11 @@ impl EnvironmentConfig {
     }
 
     /// Extract the configuration from the environment, if it's present.
-    fn config_from_env() -> Option<RemoteRuntimeConfig> {
+    fn config_from_env() -> Option<RemoteConfig> {
         match std::env::var(CONFIG_ENV_VAR) {
             Ok(config) => {
                 info!("reading remote config from env {}", CONFIG_ENV_VAR);
-                let config: RemoteRuntimeConfig =
+                let config: RemoteConfig =
                     serde_yaml::from_str(&config).expect("Invalid configuration from environment");
                 Some(config)
             }
@@ -293,21 +284,28 @@ impl EnvironmentConfig {
     /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
     /// is already a spawned process nothing is done.
     pub fn spawn_remote_workers(&self) {
-        match &self.runtime {
-            ExecutionRuntime::Local(_) => {}
+        match &self {
+            RuntimeConfig::Local(_) => {}
             #[cfg(feature = "ssh")]
-            ExecutionRuntime::Remote(remote) => {
+            RuntimeConfig::Remote(remote) => {
                 spawn_remote_workers(remote.clone());
             }
             #[cfg(not(feature = "ssh"))]
-            ExecutionRuntime::Remote(_) => {
+            RuntimeConfig::Remote(_) => {
                 panic!("spawn_remote_workers() requires the `ssh` feature for remote configs.");
             }
         }
     }
+
+    pub fn host_id(&self) -> Option<HostId> {
+        match self {
+            RuntimeConfig::Local(_) => Some(0),
+            RuntimeConfig::Remote(remote) => remote.host_id,
+        }
+    }
 }
 
-impl Display for RemoteHostConfig {
+impl Display for HostConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}:{}-]", self.address, self.base_port)
     }

@@ -5,7 +5,7 @@ use super::utils::TestHelper;
 
 #[test]
 fn window_join() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(0..10);
         let source2 = IteratorSource::new(0..10);
 
@@ -59,7 +59,7 @@ fn window_join() {
 
 #[test]
 fn window_all_join() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(0..10);
         let source2 = IteratorSource::new(0..10);
 
@@ -101,7 +101,7 @@ fn window_all_join() {
 
 #[test]
 fn session_window_join() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source1 = IteratorSource::new(vec![0, 1, 2, 6, 7, 8].into_iter());
         let source2 = IteratorSource::new(vec![1, 3, 6, 9, 10, 11].into_iter());
 

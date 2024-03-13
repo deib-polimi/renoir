@@ -46,9 +46,9 @@ impl FileSource {
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::FileSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// let source = FileSource::new("/datasets/huge.txt");
     /// let s = env.stream(source);
     /// ```
@@ -169,9 +169,9 @@ impl Clone for FileSource {
     }
 }
 
-impl crate::StreamEnvironment {
-    /// Convenience method, creates a `FileSource` and makes a stream using `StreamEnvironment::stream`
-    pub fn stream_file<P: Into<PathBuf>>(&mut self, path: P) -> Stream<FileSource> {
+impl crate::StreamContext {
+    /// Convenience method, creates a `FileSource` and makes a stream using `StreamContext::stream`
+    pub fn stream_file<P: Into<PathBuf>>(&self, path: P) -> Stream<FileSource> {
         let source = FileSource::new(path);
         self.stream(source)
     }

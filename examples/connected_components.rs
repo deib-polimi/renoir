@@ -28,7 +28,7 @@ impl State {
 }
 
 fn main() {
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 4 {
         panic!("Pass the number of iterations, number of vertices, vertex dataset and edges dataset as arguments");
     }
@@ -38,7 +38,7 @@ fn main() {
     let path_edges = &args[3];
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let vertices_source = CsvSource::<u64>::new(path_vertices).has_headers(false);
     let edges_source = CsvSource::<(u64, u64)>::new(path_edges)

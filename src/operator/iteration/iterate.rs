@@ -5,12 +5,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use crate::block::{
-    Block, BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure,
-    Replication,
+    BlockStructure, Connection, NextStrategy, OperatorReceiver, OperatorStructure, Replication,
 };
 use crate::channel::RecvError::Disconnected;
 use crate::channel::SelectResult;
-use crate::environment::StreamEnvironmentInner;
+
 use crate::network::{Coord, NetworkMessage, NetworkReceiver, NetworkSender, ReceiverEndpoint};
 use crate::operator::end::End;
 use crate::operator::iteration::iteration_end::IterationEnd;
@@ -340,9 +339,9 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamEnvironment, EnvironmentConfig};
+    /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
-    /// # let mut env = StreamEnvironment::new(EnvironmentConfig::local(1));
+    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// let s = env.stream(IteratorSource::new(0..3)).shuffle();
     /// let (state, items) = s.iterate(
     ///     3, // at most 3 iterations
@@ -386,159 +385,152 @@ where
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.
         assert!(
-            self.block.scheduler_requirements.replication.is_unlimited(),
+            self.block.scheduling.replication.is_unlimited(),
             "Cannot have an iteration block with limited parallelism"
         );
 
         let state = IterationStateHandle::new(initial_state.clone());
         let state_clone = state.clone();
-        let env = self.env.clone();
+        let batch_mode = self.block.batch_mode;
+        let ctx = self.ctx;
 
         // the id of the block where IterationEnd is. At this moment we cannot know it, so we
         // store a fake value inside this and as soon as we know it we set it to the right value.
-        let shared_delta_update_end_block_id = Arc::new(AtomicUsize::new(0));
-        let shared_feedback_end_block_id = Arc::new(AtomicUsize::new(0));
-        let shared_output_block_id = Arc::new(AtomicUsize::new(0));
+        let shared_state_update_id = Arc::new(AtomicUsize::new(0));
+        let shared_feedback_id = Arc::new(AtomicUsize::new(0));
+        let shared_output_id = Arc::new(AtomicUsize::new(0));
 
         // prepare the stream with the IterationLeader block, this will provide the state output
-        let mut leader_stream = StreamEnvironmentInner::stream(
-            env.clone(),
+        let leader_block = ctx.lock().new_block(
             IterationLeader::new(
                 initial_state,
                 num_iterations,
                 global_fold,
                 loop_condition,
-                shared_delta_update_end_block_id.clone(),
+                shared_state_update_id.clone(),
             ),
+            batch_mode,
+            self.block.iteration_ctx.clone(),
         );
-        let leader_block_id = leader_stream.block.id;
         // the output stream is outside this loop, so it doesn't have the lock for this state
-        leader_stream.block.iteration_ctx = self.block.iteration_ctx.clone();
 
         // the lock for synchronizing the access to the state of this iteration
         let state_lock = Arc::new(IterationStateLock::default());
 
-        let input_block_id = self.block.id;
-        let batch_mode = self.block.batch_mode;
-        let mut input =
-            self.add_operator(|prev| End::new(prev, NextStrategy::only_one(), batch_mode));
-        input.block.is_only_one_strategy = true;
+        let mut input_block = self
+            .block
+            .add_operator(|prev| End::new(prev, NextStrategy::only_one(), batch_mode));
+        input_block.is_only_one_strategy = true;
 
-        let iterate_block_id = {
-            let mut env = env.lock();
-            env.new_block_id()
-        };
         let iter_source = Iterate::new(
             state,
-            input_block_id,
-            leader_block_id,
-            shared_feedback_end_block_id.clone(),
-            shared_output_block_id.clone(),
+            input_block.id,
+            leader_block.id,
+            shared_feedback_id.clone(),
+            shared_output_id.clone(),
             state_lock.clone(),
         );
+        let mut iter_block =
+            ctx.lock()
+                .new_block(iter_source, batch_mode, input_block.iteration_ctx.clone());
+        let iter_id = iter_block.id;
 
-        let mut iter_start = Stream {
-            block: Block::new(
-                iterate_block_id,
-                iter_source,
-                batch_mode,
-                input.block.iteration_ctx.clone(),
-            ),
-            env: env.clone(),
-        };
-
-        iter_start.block.iteration_ctx.push(state_lock.clone());
+        iter_block.iteration_ctx.push(state_lock.clone());
         // save the stack of the iteration for checking the stream returned by the body
-        let pre_iter_stack = iter_start.block.iteration_ctx();
+        let pre_iter_stack = iter_block.iteration_ctx();
 
         // prepare the stream that will output the content of the loop
-        let output = StreamEnvironmentInner::stream(
-            env.clone(),
-            Start::single(
-                iterate_block_id,
-                iter_start.block.iteration_ctx.last().cloned(),
-            ),
+        let output_block = ctx.lock().new_block(
+            Start::single(iter_block.id, iter_block.iteration_ctx.last().cloned()),
+            batch_mode,
+            Default::default(),
         );
-        let output_block_id = output.block.id;
+        let output_id = output_block.id;
 
+        let iter_stream = Stream {
+            ctx: ctx.clone(),
+            block: iter_block,
+        };
         // attach the body of the loop to the Iterate operator
-        let body = body(iter_start, state_clone);
+        let body_stream = body(iter_stream, state_clone);
 
         // Split the body of the loop in 2: the end block of the loop must ignore the output stream
         // since it's manually handled by the Iterate operator.
-        let mut body = body.split_block(
+        let mut body_stream = body_stream.split_block(
             move |prev, next_strategy, batch_mode| {
                 let mut end = End::new(prev, next_strategy, batch_mode);
-                end.ignore_destination(output_block_id);
+                end.ignore_destination(output_id);
                 end
             },
             NextStrategy::only_one(),
         );
-        let body_block_id = body.block.id;
+        let body_id = body_stream.block.id;
 
-        let post_iter_stack = body.block.iteration_ctx();
-        if pre_iter_stack != post_iter_stack {
-            panic!("The body of the iteration should return the stream given as parameter");
-        }
-        body.block.iteration_ctx.pop().unwrap();
+        let post_iter_stack = body_stream.block.iteration_ctx();
+        assert_eq!(
+            pre_iter_stack, post_iter_stack,
+            "The body of the iteration should return the stream given as parameter"
+        );
+
+        body_stream.block.iteration_ctx.pop().unwrap();
 
         // First split of the body: the data will be reduced into delta updates
-        let state_update_end = StreamEnvironmentInner::stream(
-            env.clone(),
-            Start::single(body.block.id, Some(state_lock)),
-        )
-        .key_by(|_| ())
-        .fold(StateUpdate::default(), local_fold)
-        .drop_key()
-        .add_operator(|prev| IterationEnd::new(prev, leader_block_id));
-        let state_update_end_block_id = state_update_end.block.id;
+        let state_block = ctx.lock().new_block(
+            Start::single(body_stream.block.id, Some(state_lock)),
+            batch_mode,
+            Default::default(),
+        );
+        let state_stream = Stream {
+            ctx: ctx.clone(),
+            block: state_block,
+        };
+        let state_stream = state_stream
+            .key_by(|_| ())
+            .fold(StateUpdate::default(), local_fold)
+            .drop_key()
+            .add_operator(|prev| IterationEnd::new(prev, leader_block.id));
 
         // Second split of the body: the data will be fed back to the Iterate block
-        let batch_mode = body.block.batch_mode;
-        let mut feedback_end = body.add_operator(|prev| {
+        let batch_mode = body_stream.block.batch_mode;
+        let mut feedback_stream = body_stream.add_operator(|prev| {
             let mut end = End::new(prev, NextStrategy::only_one(), batch_mode);
-            end.mark_feedback(iterate_block_id);
+            end.mark_feedback(iter_id);
             end
         });
-        feedback_end.block.is_only_one_strategy = true;
-        let feedback_end_block_id = feedback_end.block.id;
+        feedback_stream.block.is_only_one_strategy = true;
 
-        let mut env = env.lock();
-        let scheduler = env.scheduler_mut();
-        scheduler.schedule_block(state_update_end.block);
-        scheduler.schedule_block(feedback_end.block);
-        scheduler.schedule_block(input.block);
-        scheduler.connect_blocks(input_block_id, iterate_block_id, TypeId::of::<Out>());
+        let mut ctx_lock = ctx.lock();
+        let scheduler = ctx_lock.scheduler_mut();
+        scheduler.connect_blocks(input_block.id, iter_id, TypeId::of::<Out>());
         // connect the end of the loop to the IterationEnd
-        scheduler.connect_blocks(
-            body_block_id,
-            state_update_end_block_id,
-            TypeId::of::<Out>(),
-        );
+        scheduler.connect_blocks(body_id, state_stream.block.id, TypeId::of::<Out>());
         // connect the IterationEnd to the IterationLeader
         scheduler.connect_blocks(
-            state_update_end_block_id,
-            leader_block_id,
+            state_stream.block.id,
+            leader_block.id,
             TypeId::of::<StateUpdate>(),
         );
         // connect the IterationLeader to the Iterate
         scheduler.connect_blocks(
-            leader_block_id,
-            iterate_block_id,
+            leader_block.id,
+            iter_id,
             TypeId::of::<StateFeedback<State>>(),
         );
         // connect the feedback
-        scheduler.connect_blocks(feedback_end_block_id, iterate_block_id, TypeId::of::<Out>());
+        scheduler.connect_blocks(feedback_stream.block.id, iter_id, TypeId::of::<Out>());
         // connect the output stream
-        scheduler.connect_blocks_fragile(iterate_block_id, output_block_id, TypeId::of::<Out>());
-        drop(env);
+        scheduler.connect_blocks_fragile(iter_id, output_block.id, TypeId::of::<Out>());
 
         // store the id of the blocks we now know
-        shared_delta_update_end_block_id
-            .store(state_update_end_block_id as usize, Ordering::Release);
-        shared_feedback_end_block_id.store(feedback_end_block_id as usize, Ordering::Release);
-        shared_output_block_id.store(output_block_id as usize, Ordering::Release);
+        shared_state_update_id.store(state_stream.block.id as usize, Ordering::Release);
+        shared_feedback_id.store(feedback_stream.block.id as usize, Ordering::Release);
+        shared_output_id.store(output_block.id as usize, Ordering::Release);
 
+        scheduler.schedule_block(state_stream.block);
+        scheduler.schedule_block(feedback_stream.block);
+        scheduler.schedule_block(input_block);
+
+        drop(ctx_lock);
         // TODO: check parallelism and make sure the blocks are spawned on the same replicas
 
         // FIXME: this add_block is here just to make sure that the NextStrategy of output_stream
@@ -546,8 +538,15 @@ where
         //        the connections made by the scheduler and if accidentally set to OnlyOne will
         //        break the connections.
         (
-            leader_stream.split_block(End::new, NextStrategy::random()),
-            output,
+            Stream {
+                ctx: ctx.clone(),
+                block: leader_block,
+            }
+            .split_block(End::new, NextStrategy::random()),
+            Stream {
+                ctx,
+                block: output_block,
+            },
         )
     }
 }

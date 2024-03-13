@@ -6,12 +6,12 @@ use rand::{Rng, SeedableRng};
 
 use noir_compute::operator::source::IteratorSource;
 use noir_compute::BatchMode;
-use noir_compute::EnvironmentConfig;
-use noir_compute::StreamEnvironment;
+use noir_compute::RuntimeConfig;
+use noir_compute::StreamContext;
 
 fn batch_mode(batch_mode: BatchMode, dataset: &'static [u32]) {
-    let config = EnvironmentConfig::local(4);
-    let mut env = StreamEnvironment::new(config);
+    let config = RuntimeConfig::local(4);
+    let env = StreamContext::new(config);
 
     let source = IteratorSource::new(dataset.iter().cloned());
     let stream = env

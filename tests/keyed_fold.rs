@@ -5,7 +5,7 @@ mod utils;
 
 #[test]
 fn group_by_fold_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -28,7 +28,7 @@ fn group_by_fold_stream() {
 
 #[test]
 fn fold_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -47,7 +47,7 @@ fn fold_keyed_stream() {
 
 #[test]
 fn group_by_fold_shuffled_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)
@@ -73,7 +73,7 @@ fn group_by_fold_shuffled_stream() {
 
 #[test]
 fn fold_shuffled_keyed_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env
             .stream(source)

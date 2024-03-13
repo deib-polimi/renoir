@@ -7,7 +7,7 @@ mod utils;
 
 #[test]
 fn key_by_stream() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..10u8);
         let res = env.stream(source).shuffle().key_by(|&n| n).collect_vec();
         env.execute_blocking();
@@ -21,7 +21,7 @@ fn key_by_stream() {
 
 #[test]
 fn key_by_stream2() {
-    TestHelper::local_remote_env(|mut env| {
+    TestHelper::local_remote_env(|env| {
         let source = IteratorSource::new(0..100u8);
         let res = env
             .stream(source)

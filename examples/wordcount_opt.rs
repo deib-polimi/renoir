@@ -10,14 +10,14 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 fn main() {
     env_logger::init();
 
-    let (config, args) = EnvironmentConfig::from_args();
+    let (config, args) = RuntimeConfig::from_args();
     if args.len() != 1 {
         panic!("Pass the dataset path as an argument");
     }
     let path = &args[0];
 
     config.spawn_remote_workers();
-    let mut env = StreamEnvironment::new(config);
+    let env = StreamContext::new(config);
 
     let result = env
         .stream_file(path)
