@@ -342,7 +342,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new(0..3)).shuffle();
+    /// let s = env.stream_iter(0..3).shuffle();
     /// let (state, items) = s.iterate(
     ///     3, // at most 3 iterations
     ///     0, // the initial state is zero

@@ -239,7 +239,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new(0..3)).shuffle();
+    /// let s = env.stream_iter(0..3).shuffle();
     /// let state = s.replay(
     ///     3, // at most 3 iterations
     ///     0, // the initial state is zero
@@ -300,14 +300,14 @@ where
             Default::default(),
             self.block.iteration_ctx.clone(),
         );
-        let leader_block_id = output_block.id;
+        let output_id = output_block.id;
         // the output stream is outside this loop, so it doesn't have the lock for this state
 
         // the lock for synchronizing the access to the state of this iteration
         let state_lock = Arc::new(IterationStateLock::default());
 
         let mut iter_start =
-            self.add_operator(|prev| Replay::new(prev, state, leader_block_id, state_lock.clone()));
+            self.add_operator(|prev| Replay::new(prev, state, output_id, state_lock.clone()));
         let replay_block_id = iter_start.block.id;
 
         // save the stack of the iteration for checking the stream returned by the body
@@ -325,24 +325,24 @@ where
         }
         iter_end.block.iteration_ctx.pop().unwrap();
 
-        let iter_end = iter_end.add_operator(|prev| IterationEnd::new(prev, leader_block_id));
+        let iter_end = iter_end.add_operator(|prev| IterationEnd::new(prev, output_id));
         let iteration_end_block_id = iter_end.block.id;
 
-        let mut env_lock = iter_end.ctx.lock();
-        let scheduler = env_lock.scheduler_mut();
-        scheduler.schedule_block(iter_end.block);
+        let mut ctx_lock = iter_end.ctx.lock();
+        let scheduler = ctx_lock.scheduler_mut();
         // connect the IterationEnd to the IterationLeader
         scheduler.connect_blocks(
             iteration_end_block_id,
-            leader_block_id,
+            output_id,
             TypeId::of::<DeltaUpdate>(),
         );
         scheduler.connect_blocks(
-            leader_block_id,
+            output_id,
             replay_block_id,
             TypeId::of::<StateFeedback<State>>(),
         );
-        drop(env_lock);
+        scheduler.schedule_block(iter_end.block);
+        drop(ctx_lock);
 
         // store the id of the block containing the IterationEnd
         feedback_block_id.store(iteration_end_block_id as usize, Ordering::Release);

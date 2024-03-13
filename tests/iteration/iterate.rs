@@ -67,7 +67,7 @@ fn test_iterate_side_input() {
         let n_iter = 5;
 
         let source = IteratorSource::new(0..n);
-        let side = env.stream(IteratorSource::new(0..n));
+        let side = env.stream_iter(0..n);
         let (state, res) = env.stream(source).map(|x| (x, x)).shuffle().iterate(
             n_iter,
             0u64,

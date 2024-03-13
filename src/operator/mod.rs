@@ -314,7 +314,7 @@ where
     /// use noir_compute::operator::Timestamp;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     ///
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// s.add_timestamps(
     ///     |&n| n,
     ///     |&n, &ts| if n % 2 == 0 { Some(ts) } else { None }
@@ -350,7 +350,7 @@ where
     /// use noir_compute::BatchMode;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     ///
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// s.batch_mode(BatchMode::fixed(1024));
     /// ```
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {
@@ -369,7 +369,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// let res = s.filter_map(|n| if n % 2 == 0 { Some(n * 3) } else { None }).collect_vec();
     ///
     /// env.execute_blocking();
@@ -394,7 +394,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// let res = s.filter(|&n| n % 2 == 0).collect_vec();
     ///
     /// env.execute_blocking();
@@ -436,7 +436,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new(std::array::IntoIter::new([1, 2, -5, 3, 1])));
+    /// let s = env.stream_iter((std::array::IntoIter::new([1, 2, -5, 3, 1])));
     /// let res = s.rich_filter_map({
     ///     let mut sum = 0;
     ///     move |x| {
@@ -482,7 +482,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((1..=5)));
+    /// let s = env.stream_iter(1..=5);
     /// let res = s.rich_map({
     ///     let mut sum = 0;
     ///     move |x| {
@@ -503,7 +503,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((1..=5)));
+    /// let s = env.stream_iter(1..=5);
     /// let res = s.rich_map({
     ///     let mut id = 0;
     ///     move |x| {
@@ -536,7 +536,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s.map(|n| n * 10).collect_vec();
     ///
     /// env.execute_blocking();
@@ -663,7 +663,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((5..15)));
+    /// let s = env.stream_iter(5..15);
     /// let res = s.map_memo_by(|n| (n * n) % 7, |n| n % 7, 5).collect_vec();
     ///
     /// env.execute_blocking();
@@ -711,7 +711,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s.fold(0, |acc, value| *acc += value).collect_vec();
     ///
     /// env.execute_blocking();
@@ -757,7 +757,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s.fold_assoc(0, |acc, value| *acc += value, |acc, value| *acc += value).collect_vec();
     ///
     /// env.execute_blocking();
@@ -804,7 +804,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s
     ///     .group_by_fold(|&n| n % 2, 0, |acc, value| *acc += value, |acc, value| *acc += value)
     ///     .collect_vec();
@@ -895,7 +895,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s.key_by(|&n| n % 2).collect_vec();
     ///
     /// env.execute_blocking();
@@ -920,7 +920,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// s.inspect(|n| println!("Item: {}", n)).for_each(std::mem::drop);
     ///
     /// env.execute_blocking();
@@ -952,7 +952,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..=3)));
+    /// let s = env.stream_iter(0..=3);
     /// let res = s.rich_flat_map({
     ///     let mut elements = Vec::new();
     ///     move |y| {
@@ -1016,7 +1016,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..3)));
+    /// let s = env.stream_iter(0..3);
     /// let res = s.flat_map(|n| vec![n, n]).collect_vec();
     ///
     /// env.execute_blocking();
@@ -1041,7 +1041,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// s.for_each(|n| println!("Item: {}", n));
     ///
     /// env.execute_blocking();
@@ -1064,7 +1064,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new(vec![
+    /// let s = env.stream_iter((vec![
     ///     vec![1, 2, 3],
     ///     vec![],
     ///     vec![4, 5],
@@ -1103,7 +1103,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// s.broadcast();
     /// ```
     pub fn broadcast(self) -> Stream<impl Operator<Out = Op::Out>> {
@@ -1129,7 +1129,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let keyed = s.group_by(|&n| n % 2); // partition even and odd elements
     /// ```
     pub fn group_by<K, Fk>(self, keyer: Fk) -> KeyedStream<impl Operator<Out = (K, I)>>
@@ -1162,7 +1162,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s
     ///     .group_by_max_element(|&n| n % 2, |&n| n)
     ///     .collect_vec();
@@ -1211,7 +1211,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s
     ///     .group_by_sum(|&n| n % 2, |n| n)
     ///     .collect_vec();
@@ -1275,7 +1275,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s
     ///     .group_by_avg(|&n| n % 2, |&n| n as f64)
     ///     .collect_vec();
@@ -1338,7 +1338,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s
     ///     .group_by_count(|&n| n % 2)
     ///     .collect_vec();
@@ -1380,7 +1380,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s
     ///     .group_by_min_element(|&n| n % 2, |&n| n)
     ///     .collect_vec();
@@ -1437,7 +1437,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s
     ///     .group_by_reduce(|&n| n % 2, |acc, value| *acc += value)
     ///     .collect_vec();
@@ -1623,7 +1623,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s.reduce_assoc(|a, b| a + b).collect_vec();
     ///
     /// env.execute_blocking();
@@ -1694,7 +1694,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s.shuffle();
     /// ```
     pub fn shuffle(self) -> Stream<impl Operator<Out = Op::Out>> {
@@ -1713,7 +1713,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let mut splits = s.split(3);
     /// let a = splits.pop().unwrap();
     /// let b = splits.pop().unwrap();
@@ -1749,8 +1749,8 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s1 = env.stream(IteratorSource::new(vec!['A', 'B', 'C', 'D'].into_iter()));
-    /// let s2 = env.stream(IteratorSource::new(vec![1, 2, 3].into_iter()));
+    /// let s1 = env.stream_iter((vec!['A', 'B', 'C', 'D'].into_iter()));
+    /// let s2 = env.stream_iter((vec![1, 2, 3].into_iter()));
     /// let res = s1.zip(s2).collect_vec();
     ///
     /// env.execute_blocking();
@@ -1788,7 +1788,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let s = env.stream_iter(0..10u32);
     /// let rx = s.collect_channel();
     ///
     /// env.execute_blocking();
@@ -1819,7 +1819,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let s = env.stream_iter(0..10u32);
     /// let rx = s.collect_channel();
     ///
     /// env.execute_blocking();
@@ -1851,7 +1851,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
     ///
     /// env.execute_blocking();
@@ -1882,7 +1882,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
     ///
     /// env.execute_blocking();
@@ -1912,7 +1912,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
     ///
     /// env.execute_blocking();
@@ -1942,7 +1942,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
     ///
     /// env.execute_blocking();
@@ -1971,7 +1971,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
     ///
     /// env.execute_blocking();
@@ -2093,7 +2093,7 @@ where
     /// use noir_compute::operator::Timestamp;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     ///
-    /// let s = env.stream(IteratorSource::new((0..10)));
+    /// let s = env.stream_iter(0..10);
     /// s
     ///     .group_by(|i| i % 2)
     ///     .add_timestamps(
@@ -2132,7 +2132,7 @@ where
     /// use noir_compute::BatchMode;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     ///
-    /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..10).group_by(|&n| n % 2);
     /// s.batch_mode(BatchMode::fixed(1024));
     /// ```
     pub fn batch_mode(mut self, batch_mode: BatchMode) -> Self {
@@ -2151,7 +2151,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..10).group_by(|&n| n % 2);
     /// let res = s.filter_map(|(_key, n)| if n % 3 == 0 { Some(n * 4) } else { None }).collect_vec();
     ///
     /// env.execute_blocking();
@@ -2180,7 +2180,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..10).group_by(|&n| n % 2);
     /// let res = s.filter(|&(_key, n)| n % 3 == 0).collect_vec();
     ///
     /// env.execute_blocking();
@@ -2207,7 +2207,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.flat_map(|(_key, n)| vec![n, n]).collect_vec();
     ///
     /// env.execute_blocking();
@@ -2235,7 +2235,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// s.inspect(|(key, n)| println!("Item: {} has key {}", n, key)).for_each(std::mem::drop);
     ///
     /// env.execute_blocking();
@@ -2273,7 +2273,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// let res = s
     ///     .fold(0, |acc, value| *acc += value)
     ///     .collect_vec();
@@ -2318,7 +2318,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// let res = s
     ///     .reduce(|acc, value| *acc += value)
     ///     .collect_vec();
@@ -2351,7 +2351,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// let res = s.map(|(_key, n)| 10 * n).collect_vec();
     ///
     /// env.execute_blocking();
@@ -2442,7 +2442,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let stream = env.stream(IteratorSource::new((0..4))).group_by(|&n| n % 2);
+    /// let stream = env.stream_iter(0..4).group_by(|&n| n % 2);
     /// let res = stream.unkey().collect_vec();
     ///
     /// env.execute_blocking();
@@ -2464,7 +2464,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let stream = env.stream(IteratorSource::new((0..4))).group_by(|&n| n % 2);
+    /// let stream = env.stream_iter(0..4).group_by(|&n| n % 2);
     /// let res = stream.drop_key().collect_vec();
     ///
     /// env.execute_blocking();
@@ -2485,7 +2485,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// s.for_each(|(key, n)| println!("Item: {} has key {}", n, key));
     ///
     /// env.execute_blocking();
@@ -2545,8 +2545,8 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s1 = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
-    /// let s2 = env.stream(IteratorSource::new((3..5))).group_by(|&n| n % 2);
+    /// let s1 = env.stream_iter(0..3).group_by(|&n| n % 2);
+    /// let s2 = env.stream_iter(3..5).group_by(|&n| n % 2);
     /// let res = s1.merge(s2).collect_vec();
     ///
     /// env.execute_blocking();
@@ -2590,7 +2590,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5)));
+    /// let s = env.stream_iter(0..5);
     /// let res = s.shuffle();
     /// ```
 
@@ -2613,7 +2613,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let s = env.stream_iter(0..10u32);
     /// let rx = s.collect_channel();
     ///
     /// env.execute_blocking();
@@ -2640,7 +2640,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..10u32)));
+    /// let s = env.stream_iter(0..10u32);
     /// let rx = s.collect_channel();
     ///
     /// env.execute_blocking();
@@ -2671,7 +2671,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.collect_vec();
     ///
     /// env.execute_blocking();
@@ -2701,7 +2701,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.collect_vec_all();
     ///
     /// env.execute_blocking();
@@ -2730,7 +2730,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.collect_vec();
     ///
     /// env.execute_blocking();
@@ -2758,7 +2758,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..3))).group_by(|&n| n % 2);
+    /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.collect_vec();
     ///
     /// env.execute_blocking();
@@ -2792,7 +2792,7 @@ where
     /// # use noir_compute::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
     /// let s = env
-    ///     .stream(IteratorSource::new(vec![
+    ///     .stream_iter((vec![
     ///         vec![0, 1, 2],
     ///         vec![3, 4, 5],
     ///         vec![6, 7]

@@ -295,7 +295,7 @@ where
     /// # use noir_compute::operator::source::IteratorSource;
     /// # use noir_compute::operator::window::CountWindow;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..9)));
+    /// let s = env.stream_iter(0..9);
     /// let res = s
     ///     .group_by(|&n| n % 2)
     ///     .window(CountWindow::sliding(3, 2))
@@ -338,7 +338,7 @@ where
     /// # use noir_compute::operator::source::IteratorSource;
     /// # use noir_compute::operator::window::CountWindow;
     /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
-    /// let s = env.stream(IteratorSource::new((0..5usize)));
+    /// let s = env.stream_iter(0..5usize);
     /// let res = s
     ///     .window_all(CountWindow::tumbling(2))
     ///     .sum::<usize>()

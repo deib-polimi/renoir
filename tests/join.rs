@@ -5,15 +5,14 @@ use std::time::Duration;
 
 use itertools::Itertools;
 
-use noir_compute::operator::source::IteratorSource;
 use noir_compute::BatchMode;
 use utils::TestHelper;
 
 mod utils;
 macro_rules! run_test {
     ($env:expr, $n1:expr, $n2:expr, $m:expr, $ship:tt, $local:tt, $variant:tt) => {{
-        let s1 = $env.stream(IteratorSource::new(0..$n1));
-        let s2 = $env.stream(IteratorSource::new(0..$n2));
+        let s1 = $env.stream_iter(0..$n1);
+        let s2 = $env.stream_iter(0..$n2);
         let join = s1
             .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)))
             .join_with(s2, |x| *x as u8 % $m, |x| *x as u8 % $m);
@@ -54,8 +53,8 @@ macro_rules! run_test {
 
 macro_rules! run_test_shortcut {
     ($env:expr, $n1:expr, $n2:expr, $m:expr, $variant:tt) => {{
-        let s1 = $env.stream(IteratorSource::new(0..$n1));
-        let s2 = $env.stream(IteratorSource::new(0..$n2));
+        let s1 = $env.stream_iter(0..$n1);
+        let s2 = $env.stream_iter(0..$n2);
         let join = s1
             .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)));
         let res = run_test_shortcut!(@variant, $variant, join, s2, |x: &u16| *x as u8 % $m, |x: &u32| *x as u8 % $m);
@@ -242,7 +241,7 @@ fn self_join() {
     TestHelper::local_remote_env(|env| {
         let n = 200u32;
         let s1 = env
-            .stream(IteratorSource::new(0..n))
+            .stream_iter(0..n)
             .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)));
         let mut splits = s1.split(2).into_iter();
 
@@ -273,7 +272,7 @@ fn join_in_loop() {
         let n = 200u32;
         let n_iter = 10;
         let s = env
-            .stream(IteratorSource::new(0..n))
+            .stream_iter(0..n)
             .shuffle()
             .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)));
 
