@@ -185,7 +185,7 @@ impl Scheduler {
         (join, block_structures)
     }
 
-    #[cfg(feature = "async-tokio")]
+    #[cfg(feature = "tokio")]
     /// Start the computation returning the list of handles used to join the workers.
     pub(crate) async fn start(mut self, block_count: CoordUInt) {
         debug!("start scheduler: {:?}", self.config);
@@ -217,7 +217,7 @@ impl Scheduler {
 
     /// Start the computation returning the list of handles used to join the workers.
     ///
-    /// NOTE: If running with the `async-tokio` feature enable, this will create a new
+    /// NOTE: If running with the `tokio` feature enable, this will create a new
     /// tokio runtime.
     pub(crate) fn start_blocking(mut self, num_blocks: CoordUInt) {
         debug!("start scheduler: {:?}", self.config);
@@ -231,7 +231,7 @@ impl Scheduler {
             self.block_info.len(),
         );
 
-        #[cfg(feature = "async-tokio")]
+        #[cfg(feature = "tokio")]
         {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_io()
@@ -253,7 +253,7 @@ impl Scheduler {
                     Self::log_tracing_data(block_structures, wait_profiler());
                 });
         }
-        #[cfg(not(feature = "async-tokio"))]
+        #[cfg(not(feature = "tokio"))]
         {
             let (join, block_structures) = self.build_all();
 
@@ -451,7 +451,7 @@ impl SchedulerBlockInfo {
     }
 }
 
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 #[cfg(test)]
 mod tests {
     use crate::config::RuntimeConfig;

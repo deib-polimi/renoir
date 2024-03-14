@@ -1,8 +1,8 @@
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use tokio::io::AsyncWriteExt;
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use tokio::net::{TcpListener, TcpStream};
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use tokio::task::JoinHandle;
 
 use anyhow::anyhow;
@@ -27,7 +27,7 @@ pub(crate) struct DemuxHandle<In: Send + 'static> {
     tx_senders: UnboundedSender<(ReceiverEndpoint, Sender<NetworkMessage<In>>)>,
 }
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 impl<In: ExchangeData> DemuxHandle<In> {
     /// Construct a new `DemultiplexingReceiver` for a block.
     ///
@@ -64,7 +64,7 @@ impl<In: ExchangeData> DemuxHandle<In> {
 }
 
 /// Bind the socket of this demultiplexer.
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 async fn bind_remotes<In: ExchangeData>(
     coord: DemuxCoord,
     address: (String, u16),
@@ -161,7 +161,7 @@ async fn bind_remotes<In: ExchangeData>(
 /// + Return an enum, either Queued or Overflowed
 ///
 /// if overflowed send a yield request through a second channel
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 async fn demux_thread<In: ExchangeData>(
     coord: DemuxCoord,
     senders: HashMap<ReceiverEndpoint, Sender<NetworkMessage<In>>>,

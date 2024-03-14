@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 use std::io::Read;
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 use std::io::Write;
 
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
@@ -43,7 +43,7 @@ struct MessageHeader {
 /// The network protocol works as follow:
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 pub(crate) fn remote_send<T: ExchangeData, W: Write>(
     msg: NetworkMessage<T>,
     dest: ReceiverEndpoint,
@@ -97,7 +97,7 @@ pub(crate) fn remote_send<T: ExchangeData, W: Write>(
 /// last message.
 ///
 /// The message won't be deserialized, use `deserialize()`.
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 pub(crate) fn remote_recv<T: ExchangeData, R: Read>(
     coord: DemuxCoord,
     reader: &mut R,

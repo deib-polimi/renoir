@@ -17,7 +17,7 @@ readme = "README.md"
 default = ["clap", "ssh", "timestamp"]
 timestamp = []
 ssh = ["ssh2", "whoami", "shell-escape", "sha2", "base64"]
-async-tokio = ["tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
+tokio = ["dep:tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 profiler = []
 
 [dependencies]

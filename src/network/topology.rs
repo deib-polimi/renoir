@@ -3,10 +3,10 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::marker::PhantomData;
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 use std::thread::JoinHandle;
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use futures::StreamExt;
 use itertools::Itertools;
 use typemap_rev::{TypeMap, TypeMapKey};
@@ -119,10 +119,10 @@ pub(crate) struct NetworkTopology {
     demultiplexer_addresses: HashMap<DemuxCoord, (String, u16), crate::block::CoordHasherBuilder>,
 
     /// The set of join handles of the various threads spawned by the topology.
-    #[cfg(not(feature = "async-tokio"))]
+    #[cfg(not(feature = "tokio"))]
     join_handles: Vec<JoinHandle<()>>,
 
-    #[cfg(feature = "async-tokio")]
+    #[cfg(feature = "tokio")]
     async_join_handles: Vec<tokio::task::JoinHandle<()>>,
 }
 
@@ -153,14 +153,14 @@ impl NetworkTopology {
             used_receivers: Default::default(),
             registered_receivers: Default::default(),
             demultiplexer_addresses: Default::default(),
-            #[cfg(not(feature = "async-tokio"))]
+            #[cfg(not(feature = "tokio"))]
             join_handles: Default::default(),
-            #[cfg(feature = "async-tokio")]
+            #[cfg(feature = "tokio")]
             async_join_handles: Default::default(),
         }
     }
 
-    #[cfg(feature = "async-tokio")]
+    #[cfg(feature = "tokio")]
     /// Knowing that the computation ended, tear down the topology wait for all of its thread to
     /// exit.
     pub(crate) async fn stop_and_wait(&mut self) {
@@ -174,7 +174,7 @@ impl NetworkTopology {
             .await;
     }
 
-    #[cfg(not(feature = "async-tokio"))]
+    #[cfg(not(feature = "tokio"))]
     /// Knowing that the computation ended, tear down the topology wait for all of its thread to
     /// exit.
     pub(crate) fn stop_and_wait(&mut self) {
@@ -314,9 +314,9 @@ impl NetworkTopology {
             if !prev.is_empty() {
                 let address = self.demultiplexer_addresses[&demux_coord].clone();
                 let (demux, join_handle) = DemuxHandle::new(demux_coord, address, prev.len());
-                #[cfg(not(feature = "async-tokio"))]
+                #[cfg(not(feature = "tokio"))]
                 self.join_handles.push(join_handle);
-                #[cfg(feature = "async-tokio")]
+                #[cfg(feature = "tokio")]
                 self.async_join_handles.push(join_handle);
                 e.insert(demux);
             } else {
@@ -343,9 +343,9 @@ impl NetworkTopology {
         if let Entry::Vacant(e) = muxers.entry(demux_coord) {
             let address = self.demultiplexer_addresses[&demux_coord].clone();
             let (mux, join_handle) = MultiplexingSender::new(demux_coord, address);
-            #[cfg(not(feature = "async-tokio"))]
+            #[cfg(not(feature = "tokio"))]
             self.join_handles.push(join_handle);
-            #[cfg(feature = "async-tokio")]
+            #[cfg(feature = "tokio")]
             self.async_join_handles.push(join_handle);
             e.insert(mux);
         }
@@ -627,7 +627,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(feature = "async-tokio"))]
+    #[cfg(not(feature = "tokio"))]
     #[test]
     fn test_remote_topology() {
         let mut config = tempfile::NamedTempFile::new().unwrap();
@@ -766,7 +766,7 @@ mod tests {
         join1.join().unwrap();
     }
 
-    #[cfg(not(feature = "async-tokio"))]
+    #[cfg(not(feature = "tokio"))]
     fn receiver<T: ExchangeData + Ord + std::fmt::Debug>(
         receiver: NetworkReceiver<T>,
         expected: Vec<T>,

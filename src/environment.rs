@@ -77,7 +77,7 @@ impl StreamContext {
     }
 
     /// Start the computation. Await on the returned future to actually start the computation.
-    #[cfg(feature = "async-tokio")]
+    #[cfg(feature = "tokio")]
     pub async fn execute(self) {
         let mut env = self.inner.lock();
         info!("starting execution ({} blocks)", env.block_count);

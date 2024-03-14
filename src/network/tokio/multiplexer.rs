@@ -1,13 +1,13 @@
 use std::io::ErrorKind;
 use std::time::Duration;
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use std::net::ToSocketAddrs;
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use tokio::net::TcpStream;
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use tokio::task::JoinHandle;
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use tokio::time::sleep;
 
 use crate::channel::{self, Receiver, Sender};
@@ -15,7 +15,7 @@ use crate::network::remote::remote_send;
 use crate::network::{DemuxCoord, NetworkMessage, ReceiverEndpoint};
 use crate::operator::ExchangeData;
 
-// #[cfg(not(feature = "async-tokio"))]
+// #[cfg(not(feature = "tokio"))]
 // use crate::channel::Selector;
 
 use crate::network::NetworkSender;
@@ -23,7 +23,7 @@ use crate::network::NetworkSender;
 /// Maximum number of attempts to make for connecting to a remote host.
 const CONNECT_ATTEMPTS: usize = 32;
 /// Timeout for connecting to a remote host.
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// To avoid spamming the connections, wait this timeout before trying again. If the connection
 /// fails again this timeout will be doubled up to `RETRY_MAX_TIMEOUT`.
@@ -40,7 +40,7 @@ pub struct MultiplexingSender<Out: Send + 'static> {
     tx: Option<Sender<(ReceiverEndpoint, NetworkMessage<Out>)>>,
 }
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 impl<Out: ExchangeData> MultiplexingSender<Out> {
     /// Construct a new `MultiplexingSender` for a block.
     ///
@@ -81,7 +81,7 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
 /// - Then at most `CONNECT_ATTEMPTS` are performed, and an exponential backoff is used in case
 ///   of errors.
 /// - If the connection cannot be established this function will panic.
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
     let socket_addrs: Vec<_> = address
         .to_socket_addrs()
@@ -137,7 +137,7 @@ async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream 
     );
 }
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 async fn mux_thread<Out: ExchangeData>(
     coord: DemuxCoord,
     rx: Receiver<(ReceiverEndpoint, NetworkMessage<Out>)>,

@@ -8,14 +8,14 @@ pub(crate) use topology::*;
 use crate::operator::StreamElement;
 use crate::scheduler::{BlockId, HostId, ReplicaId};
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 mod tokio;
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use tokio::*;
 
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 mod sync;
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 use sync::*;
 
 mod network_channel;

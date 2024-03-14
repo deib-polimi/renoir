@@ -7,7 +7,7 @@ use noir_compute::prelude::*;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 fn main() {
     tracing_subscriber::fmt::init();
 
@@ -45,7 +45,7 @@ fn main() {
     }
 }
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     tracing_subscriber::fmt::init();

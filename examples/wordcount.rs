@@ -12,7 +12,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 //     s.split_whitespace().map(str::to_lowercase).collect()
 // }
 
-#[cfg(not(feature = "async-tokio"))]
+#[cfg(not(feature = "tokio"))]
 fn main() {
     tracing_subscriber::fmt::init();
     let (config, args) = RuntimeConfig::from_args();
@@ -42,7 +42,7 @@ fn main() {
     }
 }
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 #[tokio::main()]
 async fn main() {
     tracing_subscriber::fmt::init();

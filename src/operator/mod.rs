@@ -8,7 +8,7 @@ use std::hash::Hash;
 use std::ops::{AddAssign, Div};
 
 use flume::{unbounded, Receiver};
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use futures::Future;
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +22,7 @@ use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyedItem;
 use crate::{BatchMode, KeyedStream, Stream};
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use self::map_async::MapAsync;
 use self::map_memo::MapMemo;
 use self::sink::collect::Collect;
@@ -72,7 +72,7 @@ pub mod join;
 mod key_by;
 mod keyed_fold;
 mod map;
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 mod map_async;
 mod map_memo;
 mod merge;
@@ -200,7 +200,7 @@ impl<Out> StreamElement<Out> {
     }
 
     /// Change the type of the element inside the `StreamElement`.
-    #[cfg(feature = "async-tokio")]
+    #[cfg(feature = "tokio")]
     pub async fn map_async<NewOut, F, Fut>(self, f: F) -> StreamElement<NewOut>
     where
         F: FnOnce(Out) -> Fut,
@@ -573,7 +573,7 @@ where
     /// assert_eq!(res.get().unwrap(), vec![4, 1, 0, 1, 4, 2, 2, 4, 1, 0]);
     /// # }
     /// ```
-    #[cfg(feature = "async-tokio")]
+    #[cfg(feature = "tokio")]
     pub fn map_async_memo_by<O, K, F, Fk, Fut>(
         self,
         f: F,
@@ -587,7 +587,6 @@ where
         O: Clone + Send + Sync + 'static,
         K: DataKey + Sync,
     {
-        use crate::block::GroupHasherBuilder;
         use futures::FutureExt;
         use quick_cache::{sync::Cache, UnitWeighter};
         use std::{convert::Infallible, sync::Arc};
@@ -637,7 +636,7 @@ where
     /// assert_eq!(res.get().unwrap(), vec![4, 1, 0, 1, 4, 2, 2, 4, 1, 0]);
     /// # }
     /// ```
-    #[cfg(feature = "async-tokio")]
+    #[cfg(feature = "tokio")]
     pub fn map_async<O: Data, F, Fut>(self, f: F) -> Stream<impl Operator<Out = O>>
     where
         F: Fn(Op::Out) -> Fut + Send + Sync + 'static + Clone,
@@ -2011,7 +2010,7 @@ where
     /// assert_eq!(res.get().unwrap(), vec![0, 1, 4, 9, 0, 1, 4, 9, 0, 1]);
     /// # }
     /// ```
-    #[cfg(feature = "async-tokio")]
+    #[cfg(feature = "tokio")]
     pub fn map_async_memo<O: Clone + Send + Sync + 'static, F, Fut>(
         self,
         f: F,

@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use bincode::config::{FixintEncoding, RejectTrailing, WithOtherIntEncoding, WithOtherTrailing};
@@ -41,7 +41,7 @@ struct MessageHeader {
 /// The network protocol works as follow:
 /// - send a `MessageHeader` serialized with bincode with `FixintEncoding`
 /// - send the message
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 pub(crate) async fn remote_send<T: ExchangeData, W: AsyncWrite + Unpin>(
     msg: NetworkMessage<T>,
     dest: ReceiverEndpoint,
@@ -98,7 +98,7 @@ pub(crate) async fn remote_send<T: ExchangeData, W: AsyncWrite + Unpin>(
     );
 }
 
-#[cfg(feature = "async-tokio")]
+#[cfg(feature = "tokio")]
 pub(crate) async fn remote_recv<T: ExchangeData, R: AsyncRead + Unpin>(
     coord: DemuxCoord,
     reader: &mut R,
