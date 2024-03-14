@@ -378,8 +378,8 @@ fn build_remote_command(
     binary_path: &Path,
     perf_path: &Option<PathBuf>,
 ) -> String {
-    let config_yaml = serde_yaml::to_string(config).unwrap();
-    let config_str = shell_escape::escape(config_yaml.into());
+    let config_toml = toml::to_string(config).unwrap();
+    let config_str = shell_escape::escape(config_toml.into());
     let args = std::env::args()
         .skip(1)
         .map(|arg| shell_escape::escape(arg.into()))

@@ -30,7 +30,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// and remote workers).
 ///
 /// In a remote execution the current binary is copied using scp to a remote host and then executed
-/// using ssh. The configuration of the remote environment should be specified via a YAML
+/// using ssh. The configuration of the remote environment should be specified via a TOML
 /// configuration file.
 ///
 /// ## Local environment
@@ -47,19 +47,21 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// # use noir_compute::{StreamContext, RuntimeConfig};
 /// # use std::fs::File;
 /// # use std::io::Write;
-/// let config = r"
-/// hosts:
-///   - address: host1
-///     base_port: 9500
-///     num_cores: 16
-///   - address: host2
-///     base_port: 9500
-///     num_cores: 24
-/// ";
-/// let mut file = File::create("config.yaml").unwrap();
+/// let config = r#"
+/// [[host]]
+/// address = "host1"
+/// base_port = 9500
+/// num_cores = 16
+/// 
+/// [[host]]
+/// address = "host2"
+/// base_port = 9500
+/// num_cores = 24
+/// "#;
+/// let mut file = File::create("config.toml").unwrap();
 /// file.write_all(config.as_bytes());
 ///
-/// let config = RuntimeConfig::remote("config.yaml").expect("cannot read config file");
+/// let config = RuntimeConfig::remote("config.toml").expect("cannot read config file");
 /// let env = StreamContext::new(config);
 /// ```
 ///
@@ -106,6 +108,7 @@ pub struct RemoteConfig {
     #[serde(skip)]
     pub host_id: Option<HostId>,
     /// The set of remote hosts to use.
+    #[serde(rename = "host")]
     pub hosts: Vec<HostConfig>,
     /// If specified some debug information will be stored inside this directory.
     pub tracing_dir: Option<PathBuf>,
@@ -233,7 +236,7 @@ impl RuntimeConfig {
         } else {
             log::info!("reading config from: {}", config.as_ref().display());
             let content = std::fs::read_to_string(config)?;
-            serde_yaml::from_str(&content)?
+            toml::from_str(&content)?
         };
 
         // validate the configuration
@@ -274,7 +277,7 @@ impl RuntimeConfig {
             Ok(config) => {
                 info!("reading remote config from env {}", CONFIG_ENV_VAR);
                 let config: RemoteConfig =
-                    serde_yaml::from_str(&config).expect("Invalid configuration from environment");
+                    toml::from_str(&config).expect("Invalid configuration from environment");
                 Some(config)
             }
             Err(_) => None,

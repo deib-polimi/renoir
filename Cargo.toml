@@ -33,12 +33,11 @@ nanorand = "0.7.0"
 # utility macros for customizing the derive Debug, Default, ...
 derivative = "2.2.0"
 
-# serialization library used for reading the config file (yaml) and serializing
-# the messages on the network
+# serialization
 serde = { version = "1.0.197", features = ["derive"] }
-serde_yaml = "0.9.32"
 serde_json = "1.0.114"
 bincode = "1.3.3"
+toml = "0.8.11"
 
 # handy Result type
 anyhow = "1.0.81"

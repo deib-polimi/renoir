@@ -465,11 +465,11 @@ fn main() {
     tracing_subscriber::fmt::init();
 
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 2 {
+    if args.len() != 3 {
         panic!("Pass the element count as argument");
     }
-    let n: usize = args[0].parse().unwrap();
-    let q = &args[1][..];
+    let n: usize = args[1].parse().unwrap();
+    let q = &args[2][..];
     config.spawn_remote_workers();
     let env = StreamContext::new(config);
 

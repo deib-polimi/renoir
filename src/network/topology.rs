@@ -631,14 +631,16 @@ mod tests {
     #[test]
     fn test_remote_topology() {
         let mut config = tempfile::NamedTempFile::new().unwrap();
-        let config_yaml = "hosts:\n".to_string()
-            + " - address: 127.0.0.1\n"
-            + "   base_port: 21841\n"
-            + "   num_cores: 1\n"
-            + " - address: 127.0.0.1\n"
-            + "   base_port: 31258\n"
-            + "   num_cores: 1\n";
-        std::io::Write::write_all(&mut config, config_yaml.as_bytes()).unwrap();
+        let config_toml = r#"[[host]]
+address = "127.0.0.1"
+base_port = 21841
+num_cores = 1
+[[host]]
+address = "127.0.0.1"
+base_port = 31258
+num_cores = 1
+"#;
+        std::io::Write::write_all(&mut config, config_toml.as_bytes()).unwrap();
         let config = RuntimeConfig::remote(config.path()).unwrap();
 
         // s1 [b0, h0, r0] -> r1 [b2, h1, r0] (endpoint 1) type=i32

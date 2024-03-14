@@ -90,23 +90,23 @@ fn tokenize(s: &str) -> Vec<String> {
     s.split_whitespace().map(str::to_lowercase).collect()
 }
 
-// Execute on multiple hosts `cargo run -- -r config.yaml input.txt`
+// Execute on multiple hosts `cargo run -- -r config.toml input.txt`
 ```
 
 ### Remote deployment
 
-```yaml
-# config.yaml
-hosts:
-  - address: host1.lan
-    base_port: 9500
-    num_cores: 16
-  - address: host2.lan
-    base_port: 9500
-    num_cores: 8
-    ssh:
-      username: noir-compute
-      key_file: /home/user/.ssh/id_rsa
+```toml
+# config.toml
+[[host]]
+address = "host1.lan"
+base_port = 9500
+num_cores = 16
+
+[[host]]
+address = "host2.lan"
+base_port = 9500
+num_cores = 24
+ssh = { username = "noir", key_file = "/home/noir/.ssh/id_ed25519" }
 ```
 
 Refer to the [examples](examples/) directory for an extended set of working examples
