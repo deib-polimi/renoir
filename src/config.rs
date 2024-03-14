@@ -7,7 +7,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use anyhow::{bail, Result};
 #[cfg(feature = "clap")]
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -52,7 +51,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// address = "host1"
 /// base_port = 9500
 /// num_cores = 16
-/// 
+///
 /// [[host]]
 /// address = "host2"
 /// base_port = 9500
@@ -230,7 +229,7 @@ impl RuntimeConfig {
     /// If it's the runner, the configuration file is read. If it's a worker, the configuration is
     /// read directly from the environment variable and not from the file (remote hosts may not have
     /// the configuration file).
-    pub fn remote<P: AsRef<Path>>(config: P) -> Result<RuntimeConfig> {
+    pub fn remote<P: AsRef<Path>>(config: P) -> Result<RuntimeConfig, ConfigError> {
         let mut config = if let Some(config) = RuntimeConfig::config_from_env() {
             config
         } else {
@@ -242,7 +241,7 @@ impl RuntimeConfig {
         // validate the configuration
         for (host_id, host) in config.hosts.iter().enumerate() {
             if host.ssh.password.is_some() && host.ssh.key_file.is_some() {
-                bail!("Malformed configuration: cannot specify both password and key file on host {}: {}", host_id, host.address);
+                return Err(ConfigError::Invalid(format!("Malformed configuration: cannot specify both password and key file on host {}: {}", host_id, host.address)));
             }
         }
 
@@ -332,4 +331,16 @@ impl CommandLineOptions {
 /// Default port for ssh, used by the serde default value.
 fn ssh_default_port() -> u16 {
     22
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] toml::de::Error),
+
+    #[error("Input-Output error: {0}")]
+    IO(#[from] std::io::Error),
+
+    #[error("Invalid configuration: {0}")]
+    Invalid(String),
 }

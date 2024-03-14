@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use itertools::Itertools;
+use indexmap::IndexMap;
 
 use crate::{
     block::{BlockStructure, ConnectionStrategy, DataType, OperatorKind},
@@ -12,7 +10,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct JobGraphGenerator {
     /// The list of known blocks, indexed by block id.
-    blocks: HashMap<BlockId, BlockStructure, crate::block::CoordHasherBuilder>,
+    blocks: IndexMap<BlockId, BlockStructure, crate::block::CoordHasherBuilder>,
 }
 
 impl JobGraphGenerator {
@@ -30,11 +28,16 @@ impl JobGraphGenerator {
     }
 
     /// Finalize the generator and generate a string representation of the job graph in dot format.
-    pub fn finalize(self) -> String {
+    pub fn finalize(mut self) -> String {
+        self.blocks.sort_keys();
         let attributes = vec!["ranksep=0.1"];
         format!(
             "digraph noir {{\n{attributes}\n{subgraphs}\n{connections}\n}}",
-            attributes = attributes.into_iter().map(|s| format!("  {s};")).join("\n"),
+            attributes = attributes
+                .into_iter()
+                .map(|s| format!("  {s};"))
+                .collect::<Vec<_>>()
+                .join("\n"),
             subgraphs = self.gen_subgraphs(),
             connections = self.gen_connections()
         )
@@ -44,7 +47,7 @@ impl JobGraphGenerator {
     /// the blocks in the network.
     fn gen_subgraphs(&self) -> String {
         let mut result = String::new();
-        for &block_id in self.blocks.keys().sorted() {
+        for &block_id in self.blocks.keys() {
             let block = self.blocks.get(&block_id).unwrap();
             result += &self.gen_subgraph(block_id, block);
         }
@@ -89,11 +92,17 @@ impl JobGraphGenerator {
         let attributes = attributes
             .into_iter()
             .map(|s| format!("    {s};"))
+            .collect::<Vec<_>>()
             .join("\n");
-        let nodes = nodes.into_iter().map(|s| format!("    {s};")).join("\n");
+        let nodes = nodes
+            .into_iter()
+            .map(|s| format!("    {s};"))
+            .collect::<Vec<_>>()
+            .join("\n");
         let connections = connections
             .into_iter()
             .map(|s| format!("    {s};",))
+            .collect::<Vec<_>>()
             .join("\n");
 
         format!("  subgraph {cluster_id} {{\n{attributes}\n{nodes}\n{connections}\n  }}\n",)
@@ -101,7 +110,7 @@ impl JobGraphGenerator {
 
     /// Generate the connections between the operators in different blocks,
     fn gen_connections(&self) -> String {
-        let mut receivers: HashMap<
+        let mut receivers: IndexMap<
             (BlockId, BlockId),
             (usize, DataType),
             crate::block::CoordHasherBuilder,
@@ -150,7 +159,11 @@ impl JobGraphGenerator {
                 }
             }
         }
-        result.into_iter().map(|s| format!("  {s};")).join("\n")
+        result
+            .into_iter()
+            .map(|s| format!("  {s};"))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// Return the identifier of an operator.

@@ -1,7 +1,6 @@
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::thread::JoinHandle;
 
-use anyhow::anyhow;
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 
@@ -76,11 +75,9 @@ fn bind_remotes<In: ExchangeData>(
     log::debug!("{coord} binding {}", address[0]);
     let listener = TcpListener::bind(&*address)
         .map_err(|e| {
-            anyhow!(
+            panic!(
                 "Failed to bind socket for {} at {:?}: {:?}",
-                coord,
-                address,
-                e
+                coord, address, e
             )
         })
         .unwrap();

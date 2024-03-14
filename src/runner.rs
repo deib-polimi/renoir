@@ -10,7 +10,6 @@ use std::time::{Duration, Instant};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
 
-use itertools::Itertools;
 use sha2::Digest;
 #[cfg(feature = "ssh")]
 use ssh2::Session;
@@ -383,6 +382,7 @@ fn build_remote_command(
     let args = std::env::args()
         .skip(1)
         .map(|arg| shell_escape::escape(arg.into()))
+        .collect::<Vec<_>>()
         .join(" ");
     let perf_cmd = if let Some(path) = perf_path.as_ref() {
         warn!("Running remote process on host {} with perf enabled. This may cause performance regressions.", host_id);

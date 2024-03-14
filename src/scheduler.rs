@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::thread::JoinHandle;
 
-use itertools::Itertools;
-
 use crate::block::{BatchMode, Block, BlockStructure, JobGraphGenerator, Replication};
 use crate::config::{LocalConfig, RemoteConfig, RuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
@@ -316,11 +314,11 @@ impl Scheduler {
         for (block_id, block) in self.block_info.iter() {
             write!(&mut topology, "\n  {}: {}", block_id, block.repr).unwrap();
             if let Some(next) = &self.next_blocks.get(block_id) {
-                let sorted = next
+                let mut sorted = next
                     .iter()
                     .map(|(x, _, fragile)| format!("{}{}", x, if *fragile { "*" } else { "" }))
-                    .sorted()
-                    .collect_vec();
+                    .collect::<Vec<_>>();
+                sorted.sort();
                 write!(&mut topology, "\n    -> {sorted:?}",).unwrap();
             }
         }

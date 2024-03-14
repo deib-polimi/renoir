@@ -8,7 +8,7 @@ use std::thread::JoinHandle;
 
 #[cfg(feature = "tokio")]
 use futures::StreamExt;
-use itertools::Itertools;
+use indexmap::IndexSet;
 use typemap_rev::{TypeMap, TypeMapKey};
 
 use crate::channel::Sender;
@@ -509,16 +509,17 @@ impl NetworkTopology {
         } else {
             return;
         };
-        let mut coords = HashSet::new();
+        let mut coords = IndexSet::new();
         for (&(from, _typ), to) in self.next.iter() {
             for &(to, _fragile) in to {
                 let coord = DemuxCoord::new(from, to);
                 coords.insert(coord);
             }
         }
+        coords.sort();
         let mut used_ports: HashMap<HostId, u16> = HashMap::new();
         // sort the coords in order to have a deterministic assignment between all the hosts
-        for coord in coords.into_iter().sorted() {
+        for coord in coords.into_iter() {
             let host_id = coord.coord.host_id;
             let port_offset = used_ports.entry(host_id).or_default();
             let host = &config.hosts[host_id as usize];
@@ -543,9 +544,13 @@ impl NetworkTopology {
 
     pub fn log(&self) {
         let mut topology = "execution graph:".to_owned();
-        for ((coord, _typ), next) in self.next.iter().sorted() {
+        let mut sorted = self.next.iter().collect::<Vec<_>>();
+        sorted.sort();
+        for ((coord, _typ), next) in sorted {
             write!(&mut topology, "\n  {coord}:",).unwrap();
-            for (next, fragile) in next.iter().sorted() {
+            let mut next_sorted = next.iter().collect::<Vec<_>>();
+            next_sorted.sort();
+            for (next, fragile) in next_sorted {
                 write!(
                     &mut topology,
                     " {}{}",
@@ -563,6 +568,7 @@ impl NetworkTopology {
 mod tests {
     use crate::network::NetworkMessage;
     use crate::operator::StreamElement;
+    use itertools::Itertools;
 
     use super::*;
 
