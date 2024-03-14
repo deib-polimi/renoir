@@ -353,10 +353,6 @@ where
         //        is not changed by the following operators. This because the next strategy affects
         //        the connections made by the scheduler and if accidentally set to OnlyOne will
         //        break the connections.
-        Stream {
-            ctx: env,
-            block: output_block,
-        }
-        .split_block(End::new, NextStrategy::random())
+        Stream::new(env, output_block).split_block(End::new, NextStrategy::random())
     }
 }

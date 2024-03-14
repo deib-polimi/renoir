@@ -104,6 +104,10 @@ impl<Op> Stream<Op>
 where
     Op: Operator,
 {
+    pub(crate) fn new(ctx: Arc<Mutex<StreamContextInner>>, block: Block<Op>) -> Self {
+        Self { block, ctx }
+    }
+
     /// Add a new operator to the current chain inside the stream. This consumes the stream and
     /// returns a new one with the operator added.
     ///
@@ -118,10 +122,7 @@ where
         Op2: Operator,
         GetOp: FnOnce(Op) -> Op2,
     {
-        Stream {
-            block: self.block.add_operator(get_operator),
-            ctx: self.ctx,
-        }
+        Stream::new(self.ctx, self.block.add_operator(get_operator))
     }
 
     /// Add a new block to the stream, closing and registering the previous one. The new block is
@@ -143,7 +144,7 @@ where
         OpEnd: Operator<Out = ()> + 'static,
         GetEndOp: FnOnce(Op, NextStrategy<Op::Out, IndexFn>, BatchMode) -> OpEnd,
     {
-        let Stream { block, ctx: env } = self;
+        let Stream { block, ctx } = self;
         // Clone parameters for new block
         let batch_mode = block.batch_mode;
         let iteration_ctx = block.iteration_ctx.clone();
@@ -153,7 +154,7 @@ where
         block.is_only_one_strategy = matches!(next_strategy, NextStrategy::OnlyOne);
 
         // Close old block
-        let mut env_lock = env.lock();
+        let mut env_lock = ctx.lock();
         let prev_id = env_lock.close_block(block);
         // Create new block
         let source = Start::single(prev_id, iteration_ctx.last().cloned());
@@ -162,10 +163,7 @@ where
         env_lock.connect_blocks::<Op::Out>(prev_id, new_block.id);
 
         drop(env_lock);
-        Stream {
-            block: new_block,
-            ctx: env,
-        }
+        Stream::new(ctx, new_block)
     }
 
     /// Similar to `.add_block`, but with 2 incoming blocks.
@@ -196,10 +194,7 @@ where
         S: Operator + Source,
         Fs: FnOnce(BlockId, BlockId, bool, bool, Option<Arc<IterationStateLock>>) -> S,
     {
-        let Stream {
-            block: b1,
-            ctx: env,
-        } = self;
+        let Stream { block: b1, ctx } = self;
         let Stream { block: b2, .. } = oth;
 
         let batch_mode = b1.batch_mode;
@@ -239,7 +234,7 @@ where
         b1.is_only_one_strategy = is_one_1;
         b2.is_only_one_strategy = is_one_2;
 
-        let mut env_lock = env.lock();
+        let mut env_lock = ctx.lock();
         let id_1 = b1.id;
         let id_2 = b2.id;
 
@@ -270,21 +265,14 @@ where
             _ => Scheduling::default(),
         };
 
-        Stream {
-            block: new_block,
-            ctx: env,
-        }
+        Stream::new(ctx, new_block)
     }
 
     /// Clone the given block, taking care of connecting the new block to the same previous blocks
     /// of the original one.
     pub(crate) fn clone(&mut self) -> Self {
         let new_block = self.ctx.lock().clone_block(&self.block);
-
-        Stream {
-            block: new_block,
-            ctx: self.ctx.clone(),
-        }
+        Stream::new(self.ctx.clone(), new_block)
     }
 
     /// Like `add_block` but without creating a new block. Therefore this closes the current stream

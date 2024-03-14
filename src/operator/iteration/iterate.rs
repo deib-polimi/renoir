@@ -447,10 +447,7 @@ where
         );
         let output_id = output_block.id;
 
-        let iter_stream = Stream {
-            ctx: ctx.clone(),
-            block: iter_block,
-        };
+        let iter_stream = Stream::new(ctx.clone(), iter_block);
         // attach the body of the loop to the Iterate operator
         let body_stream = body(iter_stream, state_clone);
 
@@ -480,10 +477,7 @@ where
             batch_mode,
             Default::default(),
         );
-        let state_stream = Stream {
-            ctx: ctx.clone(),
-            block: state_block,
-        };
+        let state_stream = Stream::new(ctx.clone(), state_block);
         let state_stream = state_stream
             .key_by(|_| ())
             .fold(StateUpdate::default(), local_fold)
@@ -538,15 +532,8 @@ where
         //        the connections made by the scheduler and if accidentally set to OnlyOne will
         //        break the connections.
         (
-            Stream {
-                ctx: ctx.clone(),
-                block: leader_block,
-            }
-            .split_block(End::new, NextStrategy::random()),
-            Stream {
-                ctx,
-                block: output_block,
-            },
+            Stream::new(ctx.clone(), leader_block).split_block(End::new, NextStrategy::random()),
+            Stream::new(ctx, output_block),
         )
     }
 }

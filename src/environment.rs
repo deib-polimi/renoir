@@ -73,10 +73,7 @@ impl StreamContext {
         }
 
         let block = inner.new_block(source, Default::default(), Default::default());
-        Stream {
-            block,
-            ctx: self.inner.clone(),
-        }
+        Stream::new(self.inner.clone(), block)
     }
 
     /// Start the computation. Await on the returned future to actually start the computation.

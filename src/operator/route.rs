@@ -56,8 +56,8 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
 
     pub(crate) fn build_inner(self) -> Vec<Stream<Start<SimpleStartReceiver<Out>>>> {
         // This is needed to maintain the same parallelism of the split block
-        let env_lock = self.stream.ctx.clone();
-        let mut env = env_lock.lock();
+        let ctx = self.stream.ctx.clone();
+        let mut ctx_lock = ctx.lock();
         let scheduler_requirements = self.stream.block.scheduling.clone();
         let batch_mode = self.stream.block.batch_mode;
         let block_id = self.stream.block.id;
@@ -65,7 +65,7 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
 
         let mut new_blocks = (0..self.routes.len())
             .map(|_| {
-                env.new_block(
+                ctx_lock.new_block(
                     Start::single(block_id, iteration_context.last().cloned()),
                     batch_mode,
                     iteration_context.clone(),
@@ -78,20 +78,17 @@ impl<Out: ExchangeData, OperatorChain: Operator<Out = Out> + 'static>
             RoutingEnd::new(prev, routes, NextStrategy::only_one(), batch_mode)
         });
 
-        env.close_block(stream.block);
+        ctx_lock.close_block(stream.block);
 
         for new_block in &mut new_blocks {
-            env.connect_blocks::<Out>(block_id, new_block.id);
+            ctx_lock.connect_blocks::<Out>(block_id, new_block.id);
             new_block.scheduling = scheduler_requirements.clone();
         }
 
-        drop(env);
+        drop(ctx_lock);
         new_blocks
             .into_iter()
-            .map(|block| Stream {
-                block,
-                ctx: env_lock.clone(),
-            })
+            .map(|block| Stream::new(ctx.clone(), block))
             .collect()
     }
 }
