@@ -5,9 +5,6 @@ use crate::operator::sink::Sink;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
-#[cfg(feature = "crossbeam")]
-use crossbeam_channel::Sender;
-#[cfg(not(feature = "crossbeam"))]
 use flume::Sender;
 
 #[derive(Debug, Clone)]

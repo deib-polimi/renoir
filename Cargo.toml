@@ -14,11 +14,10 @@ homepage = "https://github.com/deib-polimi/noir"
 readme = "README.md"
 
 [features]
-default = ["flume", "clap", "ssh", "timestamp"]
-crossbeam = ["crossbeam-channel"]
+default = ["clap", "ssh", "timestamp"]
 timestamp = []
 ssh = ["ssh2", "whoami", "shell-escape", "sha2", "base64"]
-async-tokio = ["tokio", "flume", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
+async-tokio = ["tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 profiler = []
 
 [dependencies]
@@ -60,8 +59,7 @@ sha2 = { version = "0.10.8", optional = true }
 base64 = { version = "0.22.0", optional = true }
 
 # channel implementation
-crossbeam-channel = { version = "0.5.12", optional = true }
-flume = { version = "0.11.0", optional = true }
+flume = "0.11.0"
 
 # used for csv file source
 csv = "1.3.0"
@@ -99,10 +97,6 @@ micrometer = { version = "0.2.7", features = ["enable"]}
 
 # for the examples
 regex = "1.10.3"
-
-# used in the benchmarks
-crossbeam-channel = "0.5.12"
-flume = "0.11.0"
 
 kstring = { version = "2.0.0", features = ["serde"] }
 nexmark = { version = "0.2.0", features = ["serde"] }

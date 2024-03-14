@@ -7,9 +7,6 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::{AddAssign, Div};
 
-#[cfg(feature = "crossbeam")]
-use crossbeam_channel::{unbounded, Receiver, Sender};
-#[cfg(not(feature = "crossbeam"))]
 use flume::{unbounded, Receiver};
 #[cfg(feature = "async-tokio")]
 use futures::Future;

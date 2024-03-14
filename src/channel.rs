@@ -5,13 +5,6 @@
 
 use std::time::Duration;
 
-#[cfg(feature = "crossbeam")]
-use crossbeam_channel::{
-    bounded as bounded_ext, select, unbounded as unbounded_ext, Receiver as ReceiverExt,
-    RecvError as ExtRecvError, RecvTimeoutError as ExtRecvTimeoutError, SendError as SendErrorExt,
-    Sender as SenderExt, TryRecvError as ExtTryRecvError,
-};
-#[cfg(feature = "flume")]
 use flume::{
     bounded as bounded_ext, unbounded as unbounded_ext, Receiver as ReceiverExt,
     RecvError as ExtRecvError, RecvTimeoutError as ExtRecvTimeoutError, SendError as SendErrorExt,
@@ -85,30 +78,6 @@ pub enum SelectResult<In1, In2> {
     B(Result<In2, RecvError>),
 }
 
-#[cfg(feature = "crossbeam")]
-#[macro_use]
-mod select_impl {
-    macro_rules! select_impl {
-        ($self:expr, $other:expr) => {
-            select! {
-                recv($self.0) -> el => SelectResult::A(el.map_err(RecvError::from)),
-                recv($other.0) -> el => SelectResult::B(el.map_err(RecvError::from)),
-            }
-        };
-    }
-
-    macro_rules! select_timeout_impl {
-        ($self:expr, $other:expr, $timeout:expr) => {
-            select! {
-                recv($self.0) -> el => Ok(SelectResult::A(el.map_err(RecvError::from))),
-                recv($other.0) -> el => Ok(SelectResult::B(el.map_err(RecvError::from))),
-                default($timeout) => Err(RecvTimeoutError::Timeout),
-            }
-        };
-    }
-}
-
-#[cfg(feature = "flume")]
 #[macro_use]
 mod select_impl {
     macro_rules! select_impl {
@@ -160,7 +129,7 @@ impl<T: ChannelItem> Receiver<T> {
     }
 
     #[inline]
-    #[cfg(feature = "flume")]
+
     pub async fn recv_async(&self) -> Result<T, RecvError> {
         self.0.recv_async().await.map_err(RecvError::from)
     }
