@@ -1,7 +1,7 @@
 use std::time::Instant;
 
-use renoir::prelude::*;
 use rand::prelude::*;
+use renoir::prelude::*;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

@@ -3,8 +3,8 @@ use std::time::{Instant, SystemTime};
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use renoir::prelude::*;
 use rand::prelude::*;
+use renoir::prelude::*;
 
 const TOPICS: [&str; 50] = [
     "#love",
