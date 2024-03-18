@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use noir_compute::operator::source::ParallelIteratorSource;
+use renoir::operator::source::ParallelIteratorSource;
 use utils::TestHelper;
 
 mod utils;

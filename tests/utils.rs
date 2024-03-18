@@ -10,12 +10,12 @@ use std::time::Duration;
 
 use itertools::{process_results, Itertools};
 
-use noir_compute::config::{ConfigBuilder, HostConfig, RuntimeConfig};
-use noir_compute::operator::{Data, Operator, StreamElement, Timestamp};
-use noir_compute::structure::BlockStructure;
-use noir_compute::CoordUInt;
-use noir_compute::ExecutionMetadata;
-use noir_compute::StreamContext;
+use renoir::config::{ConfigBuilder, HostConfig, RuntimeConfig};
+use renoir::operator::{Data, Operator, StreamElement, Timestamp};
+use renoir::structure::BlockStructure;
+use renoir::CoordUInt;
+use renoir::ExecutionMetadata;
+use renoir::StreamContext;
 
 /// Port from which the integration tests start allocating sockets for the remote runtime.
 const TEST_BASE_PORT: u16 = 17666;

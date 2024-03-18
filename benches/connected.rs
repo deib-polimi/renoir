@@ -1,9 +1,9 @@
 use criterion::BenchmarkId;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use fxhash::FxHashMap;
-use noir_compute::operator::Operator;
-use noir_compute::Stream;
-use noir_compute::StreamContext;
+use renoir::operator::Operator;
+use renoir::Stream;
+use renoir::StreamContext;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};

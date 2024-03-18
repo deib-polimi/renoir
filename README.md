@@ -1,25 +1,25 @@
-# Noir
+# Renoir
 
 [Preprint](https://arxiv.org/abs/2306.04421)
 
-### Network of Operators In Rust
+### REactive Network of Operators In Rust
 
-[API Docs](https://deib-polimi.github.io/noir/noir_compute/)
+[API Docs](https://deib-polimi.github.io/renoir/renoir/)
 
-Noir is a distributed data processing platform based on the dataflow paradigm that provides an ergonomic programming interface, similar to that of Apache Flink, but has much better performance characteristics.
+Renoir *(short: Noir)  [/ʁənwaʁ/, /nwaʁ/]* is a distributed data processing platform based on the dataflow paradigm that provides an ergonomic programming interface, similar to that of Apache Flink, but has much better performance characteristics.
 
 
-Noir converts each job into a dataflow graph of
+Renoir converts each job into a dataflow graph of
 operators and groups them in blocks. Blocks contain a sequence of operors which process the data sequentially without repartitioning it. They are the deployment unit used by the system and can be distributed and executed on multiple systems.
 
-The common layout of a Noir program starts with the creation of a `StreamContext`, then one or more `Source`s are initialised creating a `Stream`. The graph of operators is composed using the methods of the `Stream` object, which follow a similar approach to Rust's `Iterator` trait allowing ergonomically define a processing workflow through method chaining.
+The common layout of a Renoir program starts with the creation of a `StreamContext`, then one or more `Source`s are initialised creating a `Stream`. The graph of operators is composed using the methods of the `Stream` object, which follow a similar approach to Rust's `Iterator` trait allowing ergonomically define a processing workflow through method chaining.
 
 ### Examples
 
 #### Wordcount
 
 ```rs
-use noir_compute::prelude::*;
+use renoir::prelude::*;
 
 fn main() {
     // Convenience method to parse deployment config from CLI arguments
@@ -58,7 +58,7 @@ fn tokenize(s: &str) -> Vec<String> {
 
 
 ```rs
-use noir_compute::prelude::*;
+use renoir::prelude::*;
 
 fn main() {
     // Convenience method to parse deployment config from CLI arguments
@@ -106,7 +106,7 @@ num_cores = 16
 address = "host2.lan"
 base_port = 9500
 num_cores = 24
-ssh = { username = "noir", key_file = "/home/noir/.ssh/id_ed25519" }
+ssh = { username = "renoir", key_file = "/home/renoir/.ssh/id_ed25519" }
 ```
 
 Refer to the [examples](examples/) directory for an extended set of working examples

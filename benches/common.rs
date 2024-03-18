@@ -1,13 +1,13 @@
 #![allow(unused)]
 
 use criterion::{black_box, Bencher};
-use noir_compute::config::{ConfigBuilder, HostConfig, RemoteConfig, RuntimeConfig};
+use renoir::config::{ConfigBuilder, HostConfig, RemoteConfig, RuntimeConfig};
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use noir_compute::*;
+use renoir::*;
 
 pub const SAMPLES: usize = 50;
 
@@ -61,7 +61,7 @@ pub fn remote_loopback_deploy(
     }
 }
 
-pub struct NoirBenchBuilder<F, G, R>
+pub struct BenchBuilder<F, G, R>
 where
     F: Fn() -> StreamContext,
     G: Fn(&StreamContext) -> R,
@@ -71,7 +71,7 @@ where
     _result: PhantomData<R>,
 }
 
-impl<F, G, R> NoirBenchBuilder<F, G, R>
+impl<F, G, R> BenchBuilder<F, G, R>
 where
     F: Fn() -> StreamContext,
     G: Fn(&StreamContext) -> R,
@@ -98,7 +98,7 @@ where
     }
 }
 
-pub fn noir_bench_default(b: &mut Bencher, logic: impl Fn(&StreamContext)) {
-    let builder = NoirBenchBuilder::new(StreamContext::new_local, logic);
+pub fn renoir_bench_default(b: &mut Bencher, logic: impl Fn(&StreamContext)) {
+    let builder = BenchBuilder::new(StreamContext::new_local, logic);
     b.iter_custom(|n| builder.bench(n));
 }

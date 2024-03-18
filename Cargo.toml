@@ -1,5 +1,5 @@
 [package]
-name = "noir-compute"
+name = "renoir"
 description = "Network of Operators In Rust"
 version = "0.2.0"
 edition = "2021"
@@ -9,8 +9,8 @@ authors = [
     "Marco Donadoni <marco.donadoni@mail.polimi.it>"
 ]
 license = "LGPL-3.0-or-later"
-repository = "https://github.com/deib-polimi/noir"
-homepage = "https://github.com/deib-polimi/noir"
+repository = "https://github.com/deib-polimi/renoir"
+homepage = "https://github.com/deib-polimi/renoir"
 readme = "README.md"
 
 [features]

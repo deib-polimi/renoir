@@ -25,7 +25,7 @@ pub(crate) const SCP_BUFFER_SIZE: usize = 512 * 1024;
 
 /// Execution results returned by a remote worker.
 struct HostExecutionResult {
-    /// Tracing data if noir is compiled with tracing enabled.
+    /// Tracing data if renoir is compiled with tracing enabled.
     tracing: Option<TracingData>,
     /// Time spent for sending the binary file to the remote worker.
     sync_time: Duration,
@@ -105,7 +105,7 @@ pub(crate) fn spawn_remote_workers(config: RemoteConfig) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap();
-        let file_name = format!("noir-trace-{}.json", now.as_secs());
+        let file_name = format!("renoir-trace-{}.json", now.as_secs());
         let target = path.join(file_name);
         let mut target = std::fs::File::create(target).expect("Cannot create tracing json file");
         serde_json::to_writer(&mut target, &tracing_data)
@@ -199,7 +199,7 @@ fn remote_worker(
     log::debug!("executable located at {}", current_exe.display());
 
     // generate a temporary file on remote host
-    let remote_path = Path::new("/tmp/noir/").join(format!(
+    let remote_path = Path::new("/tmp/renoir/").join(format!(
         "{}-{}",
         current_exe.file_name().unwrap().to_string_lossy(),
         executable_uid
@@ -245,8 +245,8 @@ fn remote_worker(
         s.spawn(|| {
             // copy to stderr the output of the remote process
             for line in stderr_reader.lines().map_while(Result::ok) {
-                if let Some(pos) = line.find("__noir2_TRACING_DATA__") {
-                    let json_data = &line[(pos + "__noir2_TRACING_DATA__ ".len())..];
+                if let Some(pos) = line.find("__renoir_TRACING_DATA__") {
+                    let json_data = &line[(pos + "__renoir_TRACING_DATA__ ".len())..];
                     match serde_json::from_str(json_data) {
                         Ok(data) => tracing_data = Some(data),
                         Err(err) => {
@@ -335,9 +335,9 @@ fn send_executable(
         return;
     }
 
-    let (msg, result) = run_remote_command(session, "mkdir -p /tmp/noir");
+    let (msg, result) = run_remote_command(session, "mkdir -p /tmp/renoir");
     if result != 0 {
-        warn!("failed to create /tmp/noir directory [{result}]: {msg}");
+        warn!("failed to create /tmp/renoir directory [{result}]: {msg}");
     }
 
     let mut local_file = File::open(local_path).unwrap();

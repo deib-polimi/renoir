@@ -39,8 +39,8 @@ impl<Out: Send + 'static> ChannelSource<Out> {
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::ChannelSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::ChannelSource;
     /// # let mut env = StreamContext::new_local();
     /// let (tx_channel, source) = ChannelSource::new(4);
     /// let R = env.stream(source);

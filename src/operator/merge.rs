@@ -25,8 +25,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s1 = env.stream_iter(0..10);
     /// let s2 = env.stream_iter(10..20);

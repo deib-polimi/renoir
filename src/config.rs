@@ -36,7 +36,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// ## Local environment
 ///
 /// ```
-/// # use noir_compute::{StreamContext, RuntimeConfig};
+/// # use renoir::{StreamContext, RuntimeConfig};
 /// let config = RuntimeConfig::local(2).unwrap();
 /// let env = StreamContext::new(config);
 /// ```
@@ -44,7 +44,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// ## Remote environment
 ///
 /// ```
-/// # use noir_compute::{StreamContext, RuntimeConfig};
+/// # use renoir::{StreamContext, RuntimeConfig};
 /// # use std::fs::File;
 /// # use std::io::Write;
 /// let config = r#"
@@ -71,7 +71,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// their docs.
 ///
 /// ```no_run
-/// # use noir_compute::{RuntimeConfig, StreamContext};
+/// # use renoir::{RuntimeConfig, StreamContext};
 /// let (config, args) = RuntimeConfig::from_args();
 /// let env = StreamContext::new(config);
 /// ```
@@ -195,7 +195,7 @@ impl std::fmt::Debug for SSHConfig {
 #[cfg(feature = "clap")]
 #[derive(Debug, Parser)]
 #[clap(
-    name = "noir",
+    name = "renoir",
     about = "Network of Operators In Rust",
     trailing_var_arg = true
 )]

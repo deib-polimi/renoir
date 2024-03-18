@@ -1,10 +1,10 @@
 use clap::Parser;
 use nexmark::config::NexmarkConfig;
-use noir_compute::operator::Operator;
-use noir_compute::operator::Timestamp;
-use noir_compute::prelude::*;
-use noir_compute::Replication;
-use noir_compute::Stream;
+use renoir::operator::Operator;
+use renoir::operator::Timestamp;
+use renoir::prelude::*;
+use renoir::Replication;
+use renoir::Stream;
 use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -217,5 +217,5 @@ fn main() {
 
     eprintln!("==================================================");
     micrometer::summary_grouped();
-    micrometer::append_csv("/tmp/nexmark-latency.csv", "noir").unwrap();
+    micrometer::append_csv("/tmp/nexmark-latency.csv", "renoir").unwrap();
 }

@@ -205,7 +205,7 @@ impl crate::StreamContext {
     /// Convenience method, creates a `ParallelIteratorSource` and makes a stream using `StreamContext::stream`
     /// # Example:
     /// ```
-    /// use noir_compute::prelude::*;
+    /// use renoir::prelude::*;
     ///
     /// let env = StreamContext::new_local();
     ///
@@ -255,8 +255,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::ParallelIteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::ParallelIteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// // generate the numbers from 0 to 99 using multiple replicas
     /// let n = 100;

@@ -11,9 +11,9 @@ fn main() {}
 //
 // use serde::{Deserialize, Serialize};
 //
-// use noir_compute::operator::source::CsvSource;
-// use noir_compute::RuntimeConfig;
-// use noir_compute::StreamContext;
+// use renoir::operator::source::CsvSource;
+// use renoir::RuntimeConfig;
+// use renoir::StreamContext;
 //
 // #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 // struct LabeledPoint {

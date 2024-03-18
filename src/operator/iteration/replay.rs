@@ -236,8 +236,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3).shuffle();
     /// let state = s.replay(

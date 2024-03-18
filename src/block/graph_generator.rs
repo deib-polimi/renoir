@@ -32,7 +32,7 @@ impl JobGraphGenerator {
         self.blocks.sort_keys();
         let attributes = vec!["ranksep=0.1"];
         format!(
-            "digraph noir {{\n{attributes}\n{subgraphs}\n{connections}\n}}",
+            "digraph renoir {{\n{attributes}\n{subgraphs}\n{connections}\n}}",
             attributes = attributes
                 .into_iter()
                 .map(|s| format!("  {s};"))

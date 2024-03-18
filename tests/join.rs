@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use itertools::Itertools;
 
-use noir_compute::BatchMode;
+use renoir::BatchMode;
 use utils::TestHelper;
 
 mod utils;

@@ -304,7 +304,7 @@ impl Scheduler {
             profilers,
         };
         log::trace!(
-            "__noir2_TRACING_DATA__ {}",
+            "__renoir_TRACING_DATA__ {}",
             serde_json::to_string(&data).unwrap()
         );
     }

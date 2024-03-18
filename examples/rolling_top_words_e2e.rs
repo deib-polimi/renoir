@@ -4,7 +4,7 @@ use std::time::Instant;
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use nanorand::Rng;
-use noir_compute::prelude::*;
+use renoir::prelude::*;
 
 const TOPICS: [&str; 50] = [
     "#love",

@@ -4,10 +4,10 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 
-use noir_compute::operator::source::IteratorSource;
-use noir_compute::BatchMode;
-use noir_compute::RuntimeConfig;
-use noir_compute::StreamContext;
+use renoir::operator::source::IteratorSource;
+use renoir::BatchMode;
+use renoir::RuntimeConfig;
+use renoir::StreamContext;
 
 fn batch_mode(batch_mode: BatchMode, dataset: &'static [u32]) {
     let config = RuntimeConfig::local(4).unwrap();

@@ -33,7 +33,7 @@ pub(crate) struct StreamContextInner {
 /// [`RuntimeConfig`], then you can ask new streams providing the source from where to read from.
 ///
 /// If you want to use a distributed environment (i.e. using remote workers) you have to spawn them
-/// using [`spawn_remote_workers`](StreamContext::spawn_remote_workers) before asking for some stream.
+/// using [`spawn_remote_workers`](RuntimeConfig::spawn_remote_workers) before asking for some stream.
 ///
 /// When all the stream have been registered you have to call [`execute`](StreamContext::execute_blocking) that will consume the
 /// environment and start the computation. This function will return when the computation ends.

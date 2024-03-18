@@ -48,8 +48,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::AsyncStreamSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::AsyncStreamSource;
     /// # let mut env = StreamContext::new_local();
     /// let stream = futures::stream::iter(0..10u32);
     /// let source = AsyncStreamSource::new(stream);

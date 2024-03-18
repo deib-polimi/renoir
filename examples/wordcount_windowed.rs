@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use regex::Regex;
 
-use noir_compute::prelude::*;
+use renoir::prelude::*;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

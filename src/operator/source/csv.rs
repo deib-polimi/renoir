@@ -126,8 +126,8 @@ impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::CsvSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::CsvSource;
     /// # use serde::{Deserialize, Serialize};
     /// # let mut env = StreamContext::new_local();
     /// #[derive(Clone, Deserialize, Serialize)]

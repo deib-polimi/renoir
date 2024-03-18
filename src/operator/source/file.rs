@@ -46,8 +46,8 @@ impl FileSource {
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::FileSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::FileSource;
     /// # let mut env = StreamContext::new_local();
     /// let source = FileSource::new("/datasets/huge.txt");
     /// let s = env.stream(source);

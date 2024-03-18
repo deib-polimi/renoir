@@ -1,4 +1,4 @@
-use noir_compute::prelude::*;
+use renoir::prelude::*;
 
 fn main() {
     let (config, _args) = RuntimeConfig::from_args();

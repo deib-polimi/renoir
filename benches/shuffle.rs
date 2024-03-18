@@ -3,9 +3,9 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
-use noir_compute::operator::source::IteratorSource;
-use noir_compute::BatchMode;
-use noir_compute::StreamContext;
+use renoir::operator::source::IteratorSource;
+use renoir::BatchMode;
+use renoir::StreamContext;
 
 fn shuffle(dataset: &'static [u32]) {
     let env = StreamContext::new_local();

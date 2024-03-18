@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 
-use noir_compute::operator::source::IteratorSource;
-use noir_compute::Replication;
+use renoir::operator::source::IteratorSource;
+use renoir::Replication;
 use utils::{TestHelper, WatermarkChecker};
 
 mod utils;

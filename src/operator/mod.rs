@@ -1,7 +1,7 @@
 //! Operators that can be applied to a stream.
 //!
-//! The actual operator list can be found from the implemented methods of [`Stream`](crate::Stream),
-//! [`KeyedStream`](crate::KeyedStream), [`WindowedStream`](crate::WindowedStream)
+//! The actual operator list can be found from the implemented methods of [`Stream`],
+//! [`KeyedStream`], [`crate::WindowedStream`]
 
 use std::fmt::Display;
 use std::hash::Hash;
@@ -306,9 +306,9 @@ where
     /// will be inserted.
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
-    /// use noir_compute::operator::Timestamp;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
+    /// use renoir::operator::Timestamp;
     /// # let mut env = StreamContext::new_local();
     ///
     /// let s = env.stream_iter(0..10);
@@ -342,9 +342,9 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
-    /// use noir_compute::BatchMode;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
+    /// use renoir::BatchMode;
     /// # let mut env = StreamContext::new_local();
     ///
     /// let s = env.stream_iter(0..10);
@@ -363,8 +363,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10);
     /// let res = s.filter_map(|n| if n % 2 == 0 { Some(n * 3) } else { None }).collect_vec();
@@ -388,8 +388,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10);
     /// let res = s.filter(|&n| n % 2 == 0).collect_vec();
@@ -430,8 +430,8 @@ where
     /// This will emit only the _positive prefix-sums_.
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter((std::array::IntoIter::new([1, 2, -5, 3, 1])));
     /// let res = s.rich_filter_map({
@@ -476,8 +476,8 @@ where
     /// there are more replicas.
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(1..=5);
     /// let res = s.rich_map({
@@ -497,8 +497,8 @@ where
     /// the `enumerate` function in Python.
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(1..=5);
     /// let res = s.rich_map({
@@ -530,8 +530,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s.map(|n| n * 10).collect_vec();
@@ -558,8 +558,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # tokio::runtime::Runtime::new()
     /// #    .unwrap()
     /// #    .block_on(base());
@@ -623,8 +623,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # tokio::runtime::Runtime::new()
     /// #    .unwrap()
     /// #    .block_on(base());
@@ -656,8 +656,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(5..15);
     /// let res = s.map_memo_by(|n| (n * n) % 7, |n| n % 7, 5).collect_vec();
@@ -704,8 +704,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s.fold(0, |acc, value| *acc += value).collect_vec();
@@ -750,8 +750,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s.fold_assoc(0, |acc, value| *acc += value, |acc, value| *acc += value).collect_vec();
@@ -797,8 +797,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s
@@ -888,8 +888,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s.key_by(|&n| n % 2).collect_vec();
@@ -913,8 +913,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// s.inspect(|n| println!("Item: {}", n)).for_each(std::mem::drop);
@@ -945,8 +945,8 @@ where
     /// This will emit only the _positive prefix-sums_.
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..=3);
     /// let res = s.rich_flat_map({
@@ -980,7 +980,7 @@ where
     /// This version of `rich_flat_map` is a lower level primitive that gives full control over the
     /// inner types used in streams. It can be used to define custom unary operators.
     ///
-    /// The closure must follow these rules to ensure the correct behaviour of noir:
+    /// The closure must follow these rules to ensure the correct behaviour of renoir:
     /// + `Watermark` messages must be sent when no more items with lower timestamp will ever be produced
     /// + `FlushBatch` messages must be forwarded if received
     /// + For each `FlushAndRestart` and `Terminate` message received, the operator must generate
@@ -1009,8 +1009,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3);
     /// let res = s.flat_map(|n| vec![n, n]).collect_vec();
@@ -1034,8 +1034,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// s.for_each(|n| println!("Item: {}", n));
@@ -1057,8 +1057,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter((vec![
     ///     vec![1, 2, 3],
@@ -1096,8 +1096,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10);
     /// s.broadcast();
@@ -1122,8 +1122,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let keyed = s.group_by(|&n| n % 2); // partition even and odd elements
@@ -1155,8 +1155,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s
@@ -1204,8 +1204,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s
@@ -1268,8 +1268,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s
@@ -1331,8 +1331,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s
@@ -1373,8 +1373,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s
@@ -1430,8 +1430,8 @@ where
     ///
     /// ## Example
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s
@@ -1571,8 +1571,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s.reduce(|a, b| a + b).collect::<Vec<_>>();
@@ -1616,8 +1616,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s.reduce_assoc(|a, b| a + b).collect_vec();
@@ -1657,7 +1657,7 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::prelude::*;
+    /// # use renoir::prelude::*;
     /// # let mut env = StreamContext::new_local();
     /// # let s = env.stream_iter(0..10);
     /// let mut routes = s.route()
@@ -1687,8 +1687,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s.shuffle();
@@ -1706,8 +1706,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let mut splits = s.split(3);
@@ -1742,8 +1742,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s1 = env.stream_iter((vec!['A', 'B', 'C', 'D'].into_iter()));
     /// let s2 = env.stream_iter((vec![1, 2, 3].into_iter()));
@@ -1781,8 +1781,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10u32);
     /// let rx = s.collect_channel();
@@ -1812,8 +1812,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10u32);
     /// let rx = s.collect_channel();
@@ -1844,8 +1844,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
@@ -1875,8 +1875,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
@@ -1905,8 +1905,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
@@ -1935,8 +1935,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
@@ -1964,8 +1964,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10);
     /// let res = s.collect_vec();
@@ -1997,8 +1997,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # tokio::runtime::Runtime::new()
     /// #    .unwrap()
     /// #    .block_on(base());
@@ -2038,8 +2038,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter((0..4).cycle().take(10));
     /// let res = s.map_memo(|n| n * n, 5).collect_vec();
@@ -2084,9 +2084,9 @@ where
     /// will be inserted.
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
-    /// use noir_compute::operator::Timestamp;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
+    /// use renoir::operator::Timestamp;
     /// # let mut env = StreamContext::new_local();
     ///
     /// let s = env.stream_iter(0..10);
@@ -2123,9 +2123,9 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
-    /// use noir_compute::BatchMode;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
+    /// use renoir::BatchMode;
     /// # let mut env = StreamContext::new_local();
     ///
     /// let s = env.stream_iter(0..10).group_by(|&n| n % 2);
@@ -2144,8 +2144,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10).group_by(|&n| n % 2);
     /// let res = s.filter_map(|(_key, n)| if n % 3 == 0 { Some(n * 4) } else { None }).collect_vec();
@@ -2173,8 +2173,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10).group_by(|&n| n % 2);
     /// let res = s.filter(|&(_key, n)| n % 3 == 0).collect_vec();
@@ -2200,8 +2200,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.flat_map(|(_key, n)| vec![n, n]).collect_vec();
@@ -2228,8 +2228,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// s.inspect(|(key, n)| println!("Item: {} has key {}", n, key)).for_each(std::mem::drop);
@@ -2266,8 +2266,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// let res = s
@@ -2311,8 +2311,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// let res = s
@@ -2344,8 +2344,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// let res = s.map(|(_key, n)| 10 * n).collect_vec();
@@ -2435,8 +2435,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let stream = env.stream_iter(0..4).group_by(|&n| n % 2);
     /// let res = stream.unkey().collect_vec();
@@ -2457,8 +2457,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let stream = env.stream_iter(0..4).group_by(|&n| n % 2);
     /// let res = stream.drop_key().collect_vec();
@@ -2478,8 +2478,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5).group_by(|&n| n % 2);
     /// s.for_each(|(key, n)| println!("Item: {} has key {}", n, key));
@@ -2538,8 +2538,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s1 = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let s2 = env.stream_iter(3..5).group_by(|&n| n % 2);
@@ -2583,8 +2583,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s.shuffle();
@@ -2606,8 +2606,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10u32);
     /// let rx = s.collect_channel();
@@ -2633,8 +2633,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..10u32);
     /// let rx = s.collect_channel();
@@ -2664,8 +2664,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.collect_vec();
@@ -2694,8 +2694,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.collect_vec_all();
@@ -2723,8 +2723,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.collect_vec();
@@ -2751,8 +2751,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3).group_by(|&n| n % 2);
     /// let res = s.collect_vec();
@@ -2784,8 +2784,8 @@ where
     /// ## Example
     ///
     /// ```
-    /// # use noir_compute::{StreamContext, RuntimeConfig};
-    /// # use noir_compute::operator::source::IteratorSource;
+    /// # use renoir::{StreamContext, RuntimeConfig};
+    /// # use renoir::operator::source::IteratorSource;
     /// # let mut env = StreamContext::new_local();
     /// let s = env
     ///     .stream_iter((vec![
