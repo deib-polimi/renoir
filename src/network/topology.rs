@@ -578,7 +578,7 @@ mod tests {
 
     #[test]
     fn test_local_topology() {
-        let config = RuntimeConfig::local(4);
+        let config = RuntimeConfig::local(4).unwrap();
         let mut topology = NetworkTopology::new(config);
 
         // s1 [b0, h0] -> r1 [b2, h0] (endpoint 1) type=i32
@@ -636,7 +636,9 @@ mod tests {
     #[cfg(not(feature = "tokio"))]
     #[test]
     fn test_remote_topology() {
-        let mut config = tempfile::NamedTempFile::new().unwrap();
+        use crate::config::ConfigBuilder;
+
+        let mut toml_path = tempfile::NamedTempFile::new().unwrap();
         let config_toml = r#"[[host]]
 address = "127.0.0.1"
 base_port = 21841
@@ -646,8 +648,7 @@ address = "127.0.0.1"
 base_port = 31258
 num_cores = 1
 "#;
-        std::io::Write::write_all(&mut config, config_toml.as_bytes()).unwrap();
-        let config = RuntimeConfig::remote(config.path()).unwrap();
+        std::io::Write::write_all(&mut toml_path, config_toml.as_bytes()).unwrap();
 
         // s1 [b0, h0, r0] -> r1 [b2, h1, r0] (endpoint 1) type=i32
         // s2 [b0, h1, r0] -> r1 [b2, h1, r0] (endpoint 1) type=i32
@@ -656,11 +657,8 @@ num_cores = 1
         // s3 [b1, h0, r0] -> r2 [b2, h1, r1] (endpoint 3) type=u64
         // s4 [b1, h0, r1] -> r2 [b2, h1, r1] (endpoint 3) type=u64
 
-        let run = |mut config: RuntimeConfig, host: HostId| {
-            if let RuntimeConfig::Remote(remote) = &mut config {
-                remote.host_id = Some(host);
-            }
-
+        let run = |config: RuntimeConfig| {
+            let host = config.host_id().unwrap();
             let mut topology = NetworkTopology::new(config);
 
             let s1 = Coord::new(0, 0, 0);
@@ -760,14 +758,27 @@ num_cores = 1
             topology.stop_and_wait();
         };
 
-        let config0 = config.clone();
+        let config0 = ConfigBuilder::new_remote()
+            .parse_file(toml_path.path())
+            .unwrap()
+            .host_id(0)
+            .build()
+            .unwrap();
+
+        let config1 = ConfigBuilder::new_remote()
+            .parse_file(toml_path.path())
+            .unwrap()
+            .host_id(1)
+            .build()
+            .unwrap();
+
         let join0 = std::thread::Builder::new()
             .name("host0".into())
-            .spawn(move || run(config0, 0))
+            .spawn(move || run(config0))
             .unwrap();
         let join1 = std::thread::Builder::new()
             .name("host1".into())
-            .spawn(move || run(config, 1))
+            .spawn(move || run(config1))
             .unwrap();
 
         join0.join().unwrap();
@@ -791,7 +802,7 @@ num_cores = 1
 
     #[test]
     fn test_multiple_output_types() {
-        let config = RuntimeConfig::local(4);
+        let config = RuntimeConfig::local(4).unwrap();
         let mut topology = NetworkTopology::new(config);
 
         // s1 [b0, h0] -> r1 [b1, h0] (endpoint 1) type=i32

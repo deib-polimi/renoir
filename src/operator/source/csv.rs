@@ -129,7 +129,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> CsvSource<Out> {
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::CsvSource;
     /// # use serde::{Deserialize, Serialize};
-    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
+    /// # let mut env = StreamContext::new_local();
     /// #[derive(Clone, Deserialize, Serialize)]
     /// struct Thing {
     ///     what: String,
@@ -456,7 +456,7 @@ mod tests {
                     write!(file.as_file(), "{},{}{}", i, i + 1, terminator).unwrap();
                 }
 
-                let env = StreamContext::new(RuntimeConfig::local(4));
+                let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
                 let source = CsvSource::<(i32, i32)>::new(file.path()).has_headers(false);
                 let res = env.stream(source).shuffle().collect_vec();
                 env.execute_blocking();
@@ -484,7 +484,7 @@ mod tests {
                     write!(file.as_file(), "{},{}{}", i, i + 1, terminator).unwrap();
                 }
 
-                let env = StreamContext::new(RuntimeConfig::local(4));
+                let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
                 let source = CsvSource::<T>::new(file.path());
                 let res = env.stream(source).shuffle().collect_vec();
                 env.execute_blocking();

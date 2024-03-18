@@ -104,7 +104,7 @@ mod qtests {
 
     #[test]
     fn collect_vec() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).collect::<Vec<_>>();
         env.execute_blocking();
@@ -113,7 +113,7 @@ mod qtests {
 
     #[test]
     fn collect_set() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).collect::<HashSet<_>>();
         env.execute_blocking();

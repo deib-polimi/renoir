@@ -48,7 +48,7 @@ impl FileSource {
     /// ```
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::FileSource;
-    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
+    /// # let mut env = StreamContext::new_local();
     /// let source = FileSource::new("/datasets/huge.txt");
     /// let s = env.stream(source);
     /// ```

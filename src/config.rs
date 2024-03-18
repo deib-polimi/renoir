@@ -2,6 +2,7 @@
 //!
 //! See the documentation of [`RuntimeConfig`] for more details.
 
+use std::env;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 use std::path::PathBuf;
@@ -36,7 +37,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 ///
 /// ```
 /// # use noir_compute::{StreamContext, RuntimeConfig};
-/// let config = RuntimeConfig::local(1);
+/// let config = RuntimeConfig::local(2).unwrap();
 /// let env = StreamContext::new(config);
 /// ```
 ///
@@ -82,6 +83,15 @@ pub enum RuntimeConfig {
     Remote(RemoteConfig),
 }
 
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        let parallelism = std::thread::available_parallelism()
+            .map(|q| q.get())
+            .unwrap_or(4);
+        RuntimeConfig::local(parallelism as u64).unwrap()
+    }
+}
+
 // #[derive(Debug, Clone, Eq, PartialEq)]
 // pub struct RuntimeConfig {
 //     /// Which runtime to use for the environment.
@@ -97,7 +107,7 @@ pub struct LocalConfig {
     /// The number of CPU cores of this host.
     ///
     /// A thread will be spawned for each core, for each block in the job graph.
-    pub num_cores: CoordUInt,
+    pub parallelism: CoordUInt,
 }
 
 /// This environment uses local threads and remote hosts.
@@ -105,7 +115,7 @@ pub struct LocalConfig {
 pub struct RemoteConfig {
     /// The identifier for this host.
     #[serde(skip)]
-    pub host_id: Option<HostId>,
+    host_id: Option<HostId>, // TODO: remove option
     /// The set of remote hosts to use.
     #[serde(rename = "host")]
     pub hosts: Vec<HostConfig>,
@@ -161,16 +171,24 @@ pub struct SSHConfig {
 
 impl std::fmt::Debug for SSHConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RemoteHostSSHConfig")
-            .field("ssh_port", &self.ssh_port)
-            .field("username", &self.username)
-            .field("password", &self.password.as_ref().map(|_| "REDACTED"))
-            .field("key_file", &self.key_file)
-            .field(
-                "key_passphrase",
-                &self.key_passphrase.as_ref().map(|_| "REDACTED"),
-            )
-            .finish()
+        let mut d = f.debug_struct("Ssh");
+        if self.ssh_port != 22 {
+            d.field("port", &self.ssh_port);
+        }
+        if let Some(username) = &self.username {
+            d.field("username", &username);
+        }
+        if let Some(key_file) = &self.key_file {
+            d.field("key_file", &key_file);
+        }
+        if self.password.is_some() {
+            d.field("password", &"REDACTED");
+        }
+        if self.key_passphrase.is_some() {
+            d.field("key_passphrase", &"REDACTED");
+        }
+
+        d.finish()
     }
 }
 
@@ -206,20 +224,20 @@ impl RuntimeConfig {
         opt.validate();
 
         let mut args = opt.args;
-        args.insert(0, std::env::args().next().unwrap());
+        args.insert(0, env::args().next().unwrap());
 
-        if let Some(num_cores) = opt.local {
-            (Self::local(num_cores), args)
+        if let Some(parallelism) = opt.local {
+            (Self::local(parallelism).expect("Configuration error"), args)
         } else if let Some(remote) = opt.remote {
-            (Self::remote(remote).unwrap(), args)
+            (Self::remote(remote).expect("Configuration error"), args)
         } else {
             unreachable!("Invalid configuration")
         }
     }
 
     /// Local environment that avoid using the network and runs concurrently using only threads.
-    pub fn local(num_cores: CoordUInt) -> RuntimeConfig {
-        RuntimeConfig::Local(LocalConfig { num_cores })
+    pub fn local(parallelism: CoordUInt) -> Result<RuntimeConfig, ConfigError> {
+        ConfigBuilder::new_local(parallelism)
     }
 
     /// Remote environment based on the provided configuration file.
@@ -229,58 +247,17 @@ impl RuntimeConfig {
     /// If it's the runner, the configuration file is read. If it's a worker, the configuration is
     /// read directly from the environment variable and not from the file (remote hosts may not have
     /// the configuration file).
-    pub fn remote<P: AsRef<Path>>(config: P) -> Result<RuntimeConfig, ConfigError> {
-        let mut config = if let Some(config) = RuntimeConfig::config_from_env() {
-            config
+    pub fn remote<P: AsRef<Path>>(toml_path: P) -> Result<RuntimeConfig, ConfigError> {
+        let mut builder = ConfigBuilder::new_remote();
+
+        if env::var(CONFIG_ENV_VAR).is_ok() {
+            builder.parse_env()?;
+            builder.host_id_from_env()?;
         } else {
-            log::info!("reading config from: {}", config.as_ref().display());
-            let content = std::fs::read_to_string(config)?;
-            toml::from_str(&content)?
-        };
-
-        // validate the configuration
-        for (host_id, host) in config.hosts.iter().enumerate() {
-            if host.ssh.password.is_some() && host.ssh.key_file.is_some() {
-                return Err(ConfigError::Invalid(format!("Malformed configuration: cannot specify both password and key file on host {}: {}", host_id, host.address)));
-            }
+            builder.parse_file(toml_path)?;
         }
 
-        config.host_id = RuntimeConfig::host_id_from_env(config.hosts.len().try_into().unwrap());
-        log::debug!("runtime configuration: {config:#?}");
-        Ok(RuntimeConfig::Remote(config))
-    }
-
-    /// Extract the host id from the environment variable, if present.
-    fn host_id_from_env(num_hosts: CoordUInt) -> Option<HostId> {
-        let host_id = match std::env::var(HOST_ID_ENV_VAR) {
-            Ok(host_id) => host_id,
-            Err(_) => return None,
-        };
-        let host_id = match HostId::from_str(&host_id) {
-            Ok(host_id) => host_id,
-            Err(e) => panic!("Invalid value for environment {HOST_ID_ENV_VAR}: {e:?}"),
-        };
-        if host_id >= num_hosts {
-            panic!(
-                "Invalid value for environment {}: value too large, max possible is {}",
-                HOST_ID_ENV_VAR,
-                num_hosts - 1
-            );
-        }
-        Some(host_id)
-    }
-
-    /// Extract the configuration from the environment, if it's present.
-    fn config_from_env() -> Option<RemoteConfig> {
-        match std::env::var(CONFIG_ENV_VAR) {
-            Ok(config) => {
-                info!("reading remote config from env {}", CONFIG_ENV_VAR);
-                let config: RemoteConfig =
-                    toml::from_str(&config).expect("Invalid configuration from environment");
-                Some(config)
-            }
-            Err(_) => None,
-        }
+        builder.build()
     }
 
     /// Spawn the remote workers via SSH and exit if this is the process that should spawn. If this
@@ -320,11 +297,114 @@ impl CommandLineOptions {
         if !(self.remote.is_some() ^ self.local.is_some()) {
             panic!("Use one of --remote or --local");
         }
-        if let Some(threads) = self.local {
-            if threads == 0 {
-                panic!("The number of cores should be positive");
-            }
+    }
+}
+#[derive(Debug, Clone)]
+pub struct ConfigBuilder {
+    host_id: Option<HostId>,
+    hosts: Vec<HostConfig>,
+    tracing_dir: Option<PathBuf>,
+    cleanup_executable: bool,
+}
+
+impl ConfigBuilder {
+    pub fn new_local(parallelism: CoordUInt) -> Result<RuntimeConfig, ConfigError> {
+        if parallelism == 0 {
+            Err(ConfigError::Invalid(
+                "The number of cores should be positive".into(),
+            ))
+        } else {
+            Ok(RuntimeConfig::Local(LocalConfig { parallelism }))
         }
+    }
+
+    pub fn new_remote() -> Self {
+        Self {
+            host_id: None,
+            hosts: Vec::new(),
+            tracing_dir: None,
+            cleanup_executable: false,
+        }
+    }
+    /// Parse toml and integrate it in the builder.
+    /// Hosts are appended to the list, the rest of the parameters set only if they were not present.
+    /// host_id is ignored. Configure it directly
+    pub fn parse_toml_str(&mut self, config_str: &str) -> Result<&mut Self, ConfigError> {
+        let RemoteConfig {
+            host_id: _, // Ignore serialized host_id
+            hosts,
+            tracing_dir,
+            cleanup_executable,
+        } = toml::from_str(config_str)?;
+
+        // validate the configuration
+        for host in hosts.into_iter() {
+            if host.ssh.password.is_some() && host.ssh.key_file.is_some() {
+                return Err(ConfigError::Invalid(format!(
+                    "Malformed configuration: cannot specify both password and key file on host {}",
+                    host.address
+                )));
+            }
+            self.hosts.push(host);
+        }
+        self.tracing_dir = self.tracing_dir.take().or(tracing_dir);
+        self.cleanup_executable |= cleanup_executable;
+
+        Ok(self)
+    }
+
+    /// Read toml file and integrate it in the builder.
+    /// Hosts are appended to the list, the rest of the parameters set only if they were not present.
+    pub fn parse_file(&mut self, toml_path: impl AsRef<Path>) -> Result<&mut Self, ConfigError> {
+        let content = std::fs::read_to_string(toml_path)?;
+        self.parse_toml_str(&content)
+    }
+
+    pub fn add_hosts(&mut self, hosts: &[HostConfig]) -> &mut Self {
+        self.hosts.extend_from_slice(hosts);
+        self
+    }
+
+    /// Read toml from env variable [CONFIG_ENV_VAR] and integrate it in the builder.
+    /// Hosts are appended to the list, the rest of the parameters set only if they were not present.
+    pub fn parse_env(&mut self) -> Result<&mut Self, ConfigError> {
+        let config_str = env::var(CONFIG_ENV_VAR)
+            .map_err(|e| ConfigError::Environment(CONFIG_ENV_VAR.to_string(), e))?;
+        self.parse_toml_str(&config_str)
+    }
+
+    pub fn host_id(&mut self, host_id: HostId) -> &mut Self {
+        self.host_id = Some(host_id);
+        self
+    }
+
+    /// Extract the host id from the environment variable [HOST_ID_ENV_VAR].
+    pub fn host_id_from_env(&mut self) -> Result<&mut Self, ConfigError> {
+        let host_id = env::var(HOST_ID_ENV_VAR)
+            .map_err(|e| ConfigError::Environment(HOST_ID_ENV_VAR.to_string(), e))?;
+        let host_id = HostId::from_str(&host_id)
+            .map_err(|_| ConfigError::Invalid("host_id must be an integer".into()))?;
+        self.host_id = Some(host_id);
+        Ok(self)
+    }
+
+    pub fn build(&mut self) -> Result<RuntimeConfig, ConfigError> {
+        if let Some(host_id) = self.host_id {
+            let num_hosts = self.hosts.len() as u64;
+            if host_id >= num_hosts {
+                return Err(ConfigError::Invalid(format!(
+                    "invalid host_id, must be between 0 and the number of hosts - 1: (0..{num_hosts})",
+                )));
+            }
+        };
+
+        let conf = RuntimeConfig::Remote(RemoteConfig {
+            host_id: self.host_id,
+            hosts: self.hosts.clone(),
+            tracing_dir: self.tracing_dir.clone(),
+            cleanup_executable: self.cleanup_executable,
+        });
+        Ok(conf)
     }
 }
 
@@ -343,4 +423,7 @@ pub enum ConfigError {
 
     #[error("Invalid configuration: {0}")]
     Invalid(String),
+
+    #[error("Missing environment variable {0}: {1}")]
+    Environment(String, env::VarError),
 }

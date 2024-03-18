@@ -1,7 +1,6 @@
 use parking_lot::Mutex;
 use std::any::TypeId;
 use std::sync::Arc;
-use std::thread::available_parallelism;
 
 use crate::block::{Block, Scheduling};
 use crate::config::RuntimeConfig;
@@ -45,14 +44,6 @@ pub struct StreamContext {
     inner: Arc<Mutex<StreamContextInner>>,
 }
 
-impl Default for StreamContext {
-    fn default() -> Self {
-        Self::new(RuntimeConfig::local(
-            available_parallelism().map(|q| q.get()).unwrap_or(1) as u64,
-        ))
-    }
-}
-
 impl StreamContext {
     /// Construct a new environment from the config.
     pub fn new(config: RuntimeConfig) -> Self {
@@ -62,15 +53,21 @@ impl StreamContext {
         }
     }
 
+    pub fn new_local() -> Self {
+        let parallelism = std::thread::available_parallelism()
+            .map(|q| q.get())
+            .unwrap_or(4);
+        let conf = RuntimeConfig::local(parallelism as u64).unwrap();
+        Self::new(conf)
+    }
+
     /// Construct a new stream bound to this environment starting with the specified source.
     pub fn stream<S>(&self, source: S) -> Stream<S>
     where
         S: Source + Send + 'static,
     {
         let mut inner = self.inner.lock();
-        if let RuntimeConfig::Remote(remote) = &inner.config {
-            assert!(remote.host_id.is_some(), "remote config must be started using RuntimeConfig::spawn_remote_workers(). (Or initialize `host_id` correctly)");
-        }
+        assert!(inner.config.host_id().is_some(), "remote config must be started using RuntimeConfig::spawn_remote_workers(). (Or initialize `host_id` correctly)");
 
         let block = inner.new_block(source, Default::default(), Default::default());
         Stream::new(self.inner.clone(), block)
@@ -103,7 +100,7 @@ impl StreamContext {
     /// Get the total number of processing cores in the cluster.
     pub fn parallelism(&self) -> CoordUInt {
         match &self.inner.lock().config {
-            RuntimeConfig::Local(local) => local.num_cores,
+            RuntimeConfig::Local(local) => local.parallelism,
             RuntimeConfig::Remote(remote) => remote.hosts.iter().map(|h| h.num_cores).sum(),
         }
     }

@@ -8,7 +8,7 @@ use noir_compute::BatchMode;
 use noir_compute::StreamContext;
 
 fn shuffle(dataset: &'static [u32]) {
-    let env = StreamContext::default();
+    let env = StreamContext::new_local();
 
     let source = IteratorSource::new(dataset.iter().cloned());
     let stream = env

@@ -147,7 +147,7 @@ fn remote_worker(
     if host.ssh.username.is_none() {
         host.ssh.username = Some(whoami::username());
     }
-    info!("starting remote worker for host {}: {:#?}", host_id, host);
+    info!("starting remote worker for host {}: {:?}", host_id, host);
 
     // connect to the ssh server
     let address = (host.address.as_str(), host.ssh.ssh_port);

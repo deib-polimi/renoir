@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn collect_vec() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = source::IteratorSource::new(0..10u8);
         let res = env.stream(source).collect_vec();
         env.execute_blocking();

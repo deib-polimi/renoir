@@ -48,7 +48,7 @@ where
     /// ```
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
-    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
+    /// # let mut env = StreamContext::new_local();
     /// let source = IteratorSource::new((0..5));
     /// let s = env.stream(source);
     /// ```

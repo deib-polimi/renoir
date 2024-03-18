@@ -238,7 +238,7 @@ where
     /// ```
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
-    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
+    /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3).shuffle();
     /// let state = s.replay(
     ///     3, // at most 3 iterations

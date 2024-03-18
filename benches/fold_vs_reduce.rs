@@ -8,7 +8,7 @@ use noir_compute::RuntimeConfig;
 use noir_compute::StreamContext;
 
 fn fold(dataset: &'static [u32]) {
-    let config = RuntimeConfig::local(4);
+    let config = RuntimeConfig::default();
     let env = StreamContext::new(config);
 
     let source = IteratorSource::new(dataset.iter().cloned());
@@ -21,7 +21,7 @@ fn fold(dataset: &'static [u32]) {
 }
 
 fn reduce(dataset: &'static [u32]) {
-    let config = RuntimeConfig::local(4);
+    let config = RuntimeConfig::default();
     let env = StreamContext::new(config);
 
     let source = IteratorSource::new(dataset.iter().cloned());
@@ -34,7 +34,7 @@ fn reduce(dataset: &'static [u32]) {
 }
 
 fn fold_assoc(dataset: &'static [u32]) {
-    let config = RuntimeConfig::local(4);
+    let config = RuntimeConfig::default();
     let env = StreamContext::new(config);
 
     let source = IteratorSource::new(dataset.iter().cloned());
@@ -51,7 +51,7 @@ fn fold_assoc(dataset: &'static [u32]) {
 }
 
 fn reduce_assoc(dataset: &'static [u32]) {
-    let config = RuntimeConfig::local(4);
+    let config = RuntimeConfig::default();
     let env = StreamContext::new(config);
 
     let source = IteratorSource::new(dataset.iter().cloned());

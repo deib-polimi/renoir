@@ -207,7 +207,7 @@ impl crate::StreamContext {
     /// ```
     /// use noir_compute::prelude::*;
     ///
-    /// let env = StreamContext::default();
+    /// let env = StreamContext::new_local();
     ///
     /// env.stream_par_iter(0..10)
     ///     .for_each(|q| println!("a: {q}"));
@@ -257,7 +257,7 @@ where
     /// ```
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::ParallelIteratorSource;
-    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
+    /// # let mut env = StreamContext::new_local();
     /// // generate the numbers from 0 to 99 using multiple replicas
     /// let n = 100;
     /// let source = ParallelIteratorSource::new(move |id, instances| {

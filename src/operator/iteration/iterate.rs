@@ -341,7 +341,7 @@ where
     /// ```
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
-    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
+    /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..3).shuffle();
     /// let (state, items) = s.iterate(
     ///     3, // at most 3 iterations
@@ -356,7 +356,9 @@ where
     /// env.execute_blocking();
     ///
     /// assert_eq!(state.get().unwrap(), vec![10 + 11 + 12 + 20 + 21 + 22 + 30 + 31 + 32]);
-    /// assert_eq!(items.get().unwrap(), vec![30, 31, 32]);
+    /// let mut sorted = items.get().unwrap();
+    /// sorted.sort();
+    /// assert_eq!(sorted, vec![30, 31, 32]);
     /// ```
     pub fn iterate<
         Body,

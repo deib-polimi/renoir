@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use itertools::{process_results, Itertools};
 
-use noir_compute::config::{HostConfig, RemoteConfig, RuntimeConfig};
+use noir_compute::config::{ConfigBuilder, HostConfig, RuntimeConfig};
 use noir_compute::operator::{Data, Operator, StreamElement, Timestamp};
 use noir_compute::structure::BlockStructure;
 use noir_compute::CoordUInt;
@@ -136,7 +136,7 @@ impl TestHelper {
     /// Run the test body under a local environment.
     pub fn local_env(body: Arc<dyn Fn(StreamContext) + Send + Sync>, num_cores: CoordUInt) {
         Self::setup();
-        let config = RuntimeConfig::local(num_cores);
+        let config = RuntimeConfig::local(num_cores).unwrap();
         log::debug!("Running test with env: {:?}", config);
         Self::env_with_config(config, body)
     }
@@ -165,12 +165,11 @@ impl TestHelper {
 
         let mut join_handles = vec![];
         for host_id in 0..num_hosts {
-            let config = RuntimeConfig::Remote(RemoteConfig {
-                host_id: Some(host_id),
-                hosts: hosts.clone(),
-                tracing_dir: None,
-                cleanup_executable: true,
-            });
+            let config = ConfigBuilder::new_remote()
+                .add_hosts(&hosts)
+                .host_id(host_id)
+                .build()
+                .unwrap();
             let body = body.clone();
             join_handles.push(
                 std::thread::Builder::new()

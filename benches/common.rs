@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use criterion::{black_box, Bencher};
-use noir_compute::config::{HostConfig, RemoteConfig, RuntimeConfig};
+use noir_compute::config::{ConfigBuilder, HostConfig, RemoteConfig, RuntimeConfig};
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
@@ -36,12 +36,11 @@ pub fn remote_loopback_deploy(
     let mut join_handles = vec![];
     let body = Arc::new(body);
     for host_id in 0..num_hosts {
-        let config = RuntimeConfig::Remote(RemoteConfig {
-            host_id: Some(host_id),
-            hosts: hosts.clone(),
-            tracing_dir: None,
-            cleanup_executable: false,
-        });
+        let config = ConfigBuilder::new_remote()
+            .add_hosts(&hosts)
+            .host_id(host_id)
+            .build()
+            .unwrap();
 
         let body = body.clone();
         join_handles.push(
@@ -100,6 +99,6 @@ where
 }
 
 pub fn noir_bench_default(b: &mut Bencher, logic: impl Fn(&StreamContext)) {
-    let builder = NoirBenchBuilder::new(StreamContext::default, logic);
+    let builder = NoirBenchBuilder::new(StreamContext::new_local, logic);
     b.iter_custom(|n| builder.bench(n));
 }

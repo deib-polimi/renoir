@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn for_each() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = source::IteratorSource::new(0..10u8);
         let sum = Arc::new(AtomicU8::new(0));
         let sum2 = sum.clone();
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn for_each_keyed() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = source::IteratorSource::new(0..10u8);
         let sum = Arc::new(AtomicU8::new(0));
         let sum2 = sum.clone();

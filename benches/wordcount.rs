@@ -58,7 +58,7 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let env = StreamContext::default();
+                    let env = StreamContext::new_local();
                     wc_fold(&env, path);
                     env.execute_blocking();
                 })
@@ -70,7 +70,7 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let env = StreamContext::default();
+                    let env = StreamContext::new_local();
                     wc_fold_assoc(&env, path);
                     env.execute_blocking();
                 })
@@ -82,7 +82,7 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let env = StreamContext::default();
+                    let env = StreamContext::new_local();
                     wc_count_assoc(&env, path);
                     env.execute_blocking();
                 })
@@ -94,7 +94,7 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let env = StreamContext::default();
+                    let env = StreamContext::new_local();
                     wc_reduce(&env, path);
                     env.execute_blocking();
                 })
@@ -106,7 +106,7 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let env = StreamContext::default();
+                    let env = StreamContext::new_local();
                     wc_reduce_assoc(&env, path);
                     env.execute_blocking();
                 })
@@ -118,7 +118,7 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let env = StreamContext::default();
+                    let env = StreamContext::new_local();
                     wc_fast(&env, path);
                     env.execute_blocking();
                 })
@@ -130,7 +130,7 @@ fn wordcount_bench(c: &mut Criterion) {
             file.path(),
             |b, path| {
                 b.iter(move || {
-                    let env = StreamContext::default();
+                    let env = StreamContext::new_local();
                     wc_fast_kstring(&env, path);
                     env.execute_blocking();
                 })

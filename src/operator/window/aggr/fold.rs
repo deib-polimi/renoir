@@ -109,7 +109,7 @@ where
     /// # use noir_compute::{StreamContext, RuntimeConfig};
     /// # use noir_compute::operator::source::IteratorSource;
     /// # use noir_compute::operator::window::CountWindow;
-    /// # let mut env = StreamContext::new(RuntimeConfig::local(1));
+    /// # let mut env = StreamContext::new_local();
     /// let s = env.stream_iter(0..5);
     /// let res = s
     ///     .group_by(|&n| n % 2)

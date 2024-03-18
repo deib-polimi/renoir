@@ -10,7 +10,7 @@ use noir_compute::RuntimeConfig;
 use noir_compute::StreamContext;
 
 fn batch_mode(batch_mode: BatchMode, dataset: &'static [u32]) {
-    let config = RuntimeConfig::local(4);
+    let config = RuntimeConfig::local(4).unwrap();
     let env = StreamContext::new(config);
 
     let source = IteratorSource::new(dataset.iter().cloned());

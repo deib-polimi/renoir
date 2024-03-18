@@ -16,7 +16,7 @@ fn bench_main(c: &mut Criterion) {
         g.throughput(Throughput::Elements(size));
         g.bench_with_input(BenchmarkId::new("collatz", size), &size, |b, n| {
             b.iter(|| {
-                let env = StreamContext::default();
+                let env = StreamContext::new_local();
                 env.stream_par_iter(0..*n)
                     .batch_mode(BatchMode::fixed(1024))
                     .map(move |n| {

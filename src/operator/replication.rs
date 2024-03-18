@@ -7,7 +7,7 @@ mod tests {
 
     #[test]
     fn test_replication() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let operator = FakeOperator::<u8>::empty();
         let stream = env.stream(operator);
         let old_block_id = stream.block.id;
@@ -20,3 +20,4 @@ mod tests {
         assert_ne!(old_block_id, new_block_id);
     }
 }
+// TODO: Actual meaningful tests

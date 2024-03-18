@@ -365,7 +365,7 @@ fn bench_main(c: &mut Criterion) {
         ($q:expr, $n:expr) => {{
             g.bench_with_input(BenchmarkId::new($q, $n), &$n, |b, size| {
                 b.iter(|| {
-                    let env = StreamContext::default();
+                    let env = StreamContext::new_local();
                     run_query(&env, $q, *size);
                     env.execute_blocking();
                 })

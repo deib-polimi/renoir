@@ -1,0 +1,10 @@
+
+[[host]]
+address = "host1"
+base_port = 9500
+num_cores = 16
+
+[[host]]
+address = "host2"
+base_port = 9500
+num_cores = 24

@@ -351,7 +351,7 @@ impl Scheduler {
         OperatorChain: Operator,
     {
         let replication = block.scheduling.replication;
-        let instances = replication.clamp(local.num_cores);
+        let instances = replication.clamp(local.parallelism);
         log::debug!(
             "local (b{:02}): {{ replicas: {:2}, replication: {:?}, only_one: {} }}",
             block.id,
@@ -459,7 +459,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Some streams do not have a sink attached")]
     fn test_scheduler_panic_on_missing_sink() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = IteratorSource::new(vec![1, 2, 3].into_iter());
         let _stream = env.stream(source);
         env.execute_blocking();
@@ -468,7 +468,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Some streams do not have a sink attached")]
     fn test_scheduler_panic_on_missing_sink_shuffle() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = IteratorSource::new(vec![1, 2, 3].into_iter());
         let _stream = env.stream(source).shuffle();
         env.execute_blocking();

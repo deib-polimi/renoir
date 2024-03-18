@@ -305,7 +305,7 @@ mod tests {
     #[test]
     #[allow(clippy::identity_op)]
     fn test_route() {
-        let env = StreamContext::new(RuntimeConfig::local(1));
+        let env = StreamContext::new(RuntimeConfig::local(2).unwrap());
         let s = env.stream_iter(0..10);
 
         let mut routes = s
@@ -317,17 +317,14 @@ mod tests {
         assert_eq!(routes.len(), 2);
 
         // 0 1 2 3 4
-        routes
-            .next()
-            .unwrap()
-            .for_each(|i| eprintln!("route1: {i}"));
+        let r1 = routes.next().unwrap().collect_vec();
         // 6 8
-        routes
-            .next()
-            .unwrap()
-            .for_each(|i| eprintln!("route2: {i}"));
+        let r2 = routes.next().unwrap().collect_vec();
         // 5 7 9 ignored
 
         env.execute_blocking();
+
+        assert_eq!(&[0, 1, 2, 3, 4], r1.get().unwrap().as_slice());
+        assert_eq!(&[6, 8], r2.get().unwrap().as_slice());
     }
 }

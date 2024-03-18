@@ -9,7 +9,7 @@ mod tests {
 
     #[test]
     fn batch_mode_fixed() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = FakeOperator::<u8>::empty();
         let batch_mode = BatchMode::fixed(42);
         let stream = env.stream(source).batch_mode(batch_mode);
@@ -18,7 +18,7 @@ mod tests {
 
     #[test]
     fn batch_mode_adaptive() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = FakeOperator::<u8>::empty();
         let batch_mode = BatchMode::adaptive(42, Duration::from_secs(42));
         let stream = env.stream(source).batch_mode(batch_mode);
@@ -27,7 +27,7 @@ mod tests {
 
     #[test]
     fn batch_inherit_from_previous() {
-        let env = StreamContext::new(RuntimeConfig::local(4));
+        let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = FakeOperator::<u8>::empty();
         let batch_mode = BatchMode::adaptive(42, Duration::from_secs(42));
         let stream = env.stream(source).batch_mode(batch_mode).group_by(|_| 0);
