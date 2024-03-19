@@ -26,7 +26,9 @@ jobs:
             ~/.cargo/git/db/
             target/
       - name: Cargo Doc
-        run: cargo doc --color=always --no-deps --all
+        run: |
+          cargo doc --color=always --no-deps --all
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=renoir\">" > target/doc/index.html
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Fix file permissions

@@ -1,6 +1,6 @@
 [package]
 name = "renoir"
-description = "Network of Operators In Rust"
+description = "Reactive Network of Operators In Rust"
 version = "0.2.0"
 edition = "2021"
 authors = [
