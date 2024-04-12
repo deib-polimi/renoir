@@ -194,6 +194,52 @@ mod tests {
     }
 
     #[test]
+    fn exact_window() {
+        let window = CountWindow::new(4, 1, true);
+
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let mut manager = window.build(fold);
+
+        let mut res = Vec::new();
+        for i in 1..6 {
+            res.extend(
+                manager
+                    .process(StreamElement::Item(i))
+                    .map(WindowResult::unwrap_item),
+            );
+        }
+        manager.process(StreamElement::Terminate);
+
+        eprintln!("{res:?}");
+        assert_eq!(vec![vec![1, 2, 3, 4], vec![2, 3, 4, 5],], res)
+    }
+
+    #[test]
+    fn nonexact_window() {
+        let window = CountWindow::new(4, 1, false);
+
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let mut manager = window.build(fold);
+
+        let mut res = Vec::new();
+        for i in 1..6 {
+            res.extend(
+                manager
+                    .process(StreamElement::Item(i))
+                    .map(WindowResult::unwrap_item),
+            );
+        }
+        res.extend(
+            manager
+                .process(StreamElement::Terminate)
+                .map(WindowResult::unwrap_item),
+        );
+
+        eprintln!("{res:?}");
+        assert_eq!(vec![vec![1, 2, 3, 4], vec![2, 3, 4, 5], vec![3, 4, 5]], res)
+    }
+
+    #[test]
     #[cfg(feature = "timestamp")]
     fn count_window_timestamped() {
         let size = 3;

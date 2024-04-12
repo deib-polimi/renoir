@@ -10,7 +10,7 @@ thread_local! {
     /// Coordinates of the replica the current worker thread is working on.
     ///
     /// Access to this by calling `replica_coord()`.
-    static COORD: RefCell<Option<Coord>> = RefCell::new(None);
+    static COORD: RefCell<Option<Coord>> = const { RefCell::new(None) };
 }
 
 /// Get the coord of the replica the current thread is working on.

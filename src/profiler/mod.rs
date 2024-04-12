@@ -30,20 +30,21 @@ pub trait Profiler {
 /// The implementation of the profiler when the `profiler` feature is enabled.
 #[cfg(feature = "profiler")]
 mod with_profiler {
+    use once_cell::sync::Lazy;
     use std::cell::UnsafeCell;
     use std::sync::Mutex;
     use std::time::Instant;
 
-    use crate::channel::{UnboundedReceiver, UnboundedSender};
     use crate::profiler::backend::ProfilerBackend;
     use crate::profiler::metrics::ProfilerResult;
+    use flume::{Receiver, Sender};
 
     /// The sender and receiver pair of the current profilers.
     ///
     /// These are options since they can be consumed.
     static CHANNEL: Lazy<Mutex<(Option<ProfilerSender>, Option<ProfilerReceiver>)>> =
         Lazy::new(|| {
-            let (sender, receiver) = ProfilerReceiver::new();
+            let (sender, receiver) = flume::unbounded();
             Mutex::new((Some(sender), Some(receiver)))
         });
 
@@ -58,9 +59,9 @@ mod with_profiler {
     }
 
     /// The type of the channel sender with the `ProfilerResult`s.
-    type ProfilerSender = UnboundedChannelSender<ProfilerResult>;
+    type ProfilerSender = Sender<ProfilerResult>;
     /// The type of the channel receiver with the `ProfilerResult`s.
-    type ProfilerReceiver = UnboundedChannelReceiver<ProfilerResult>;
+    type ProfilerReceiver = Receiver<ProfilerResult>;
 
     /// Get the sender for sending the profiler results.
     pub(crate) fn get_sender() -> ProfilerSender {
@@ -87,7 +88,7 @@ mod with_profiler {
             results.push(profiler_res);
         }
 
-        let (sender, receiver) = ProfilerReceiver::new();
+        let (sender, receiver) = flume::unbounded();
         channels.0 = Some(sender);
         channels.1 = Some(receiver);
 
@@ -98,11 +99,13 @@ mod with_profiler {
 /// The implementation of the profiler when the `profiler` feature is disabled.
 #[cfg(not(feature = "profiler"))]
 mod without_profiler {
+    use std::cell::UnsafeCell;
+
     use crate::network::Coord;
     use crate::profiler::*;
 
     /// The fake profiler for when the `profiler` feature is disabled.
-    static mut PROFILER: NoOpProfiler = NoOpProfiler;
+    // static PROFILER: UnsafeCell<NoOpProfiler> = UnsafeCell::new(NoOpProfiler);
 
     /// Fake profiler. This is used when the `profiler` feature is not enabled.
     ///
@@ -110,6 +113,10 @@ mod without_profiler {
     /// from a static reference.
     #[derive(Debug, Clone, Copy, Default)]
     pub struct NoOpProfiler;
+
+    thread_local! {
+        static PROFILER: UnsafeCell<NoOpProfiler> = const { UnsafeCell::new(NoOpProfiler) };
+    }
 
     impl Profiler for NoOpProfiler {
         #[inline(always)]
@@ -126,9 +133,7 @@ mod without_profiler {
 
     /// Get a fake profiler that does nothing.
     pub fn get_profiler() -> &'static mut NoOpProfiler {
-        // SAFETY: the profiler does nothing, so, even though this is a mutable borrow, no data is
-        //         shared.
-        unsafe { &mut PROFILER }
+        PROFILER.with(|t| unsafe { &mut *t.get() })
     }
 
     /// Do nothing, since there is nothing to wait for.
