@@ -12,10 +12,10 @@ fn main() {
     tracing_subscriber::fmt::init();
 
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 1 {
+    if args.len() != 2 {
         panic!("Pass the dataset path as an argument");
     }
-    let path = &args[0];
+    let path = &args[1];
 
     config.spawn_remote_workers();
     let env = StreamContext::new(config);
@@ -51,10 +51,10 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 1 {
+    if args.len() != 2 {
         panic!("Pass the dataset path as an argument");
     }
-    let path = &args[0];
+    let path = &args[1];
 
     config.spawn_remote_workers();
     let env = StreamContext::new(config);

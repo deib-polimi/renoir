@@ -845,6 +845,96 @@ where
         KeyedStream(new_stream)
     }
 
+    pub fn fold_scan<O, SL, SG, L, G, F>(
+        self,
+        local_fold: L,
+        global_fold: G,
+        global_init: SG,
+        map: F,
+    ) -> Stream<impl Operator<Out = O>>
+    where
+        Op::Out: ExchangeData,
+        L: Fn(&mut SL, Op::Out) + Send + Clone + 'static,
+        G: Fn(&mut SG, SL) + Send + Clone + 'static,
+        F: Fn(Op::Out, &SG) -> O + Send + Clone + 'static,
+        SL: ExchangeData + Default,
+        SG: ExchangeData + Sync,
+        O: ExchangeData,
+    {
+        #[derive(Serialize, Deserialize, Clone)]
+        enum TwoPass<I, O> {
+            First(I),
+            Second(I),
+            Output(O),
+        }
+
+        let (state, s) = self.map(|el| TwoPass::First(el)).iterate(
+            2,
+            None,
+            |s, state| {
+                s.map(move |el| match el {
+                    TwoPass::First(el) => TwoPass::Second(el),
+                    TwoPass::Second(el) => {
+                        TwoPass::Output((map)(el, state.get().as_ref().unwrap()))
+                    }
+                    TwoPass::Output(_) => unreachable!(),
+                })
+            },
+            move |local: &mut SL, el| match el {
+                TwoPass::First(_) => {}
+                TwoPass::Second(el) => local_fold(local, el),
+                TwoPass::Output(_) => {}
+            },
+            move |global: &mut Option<SG>, local| {
+                global_fold(global.get_or_insert(global_init.clone()), local)
+            },
+            |_| true,
+        );
+
+        state.for_each(std::mem::drop);
+        s.map(|t| match t {
+            TwoPass::First(_) | TwoPass::Second(_) => unreachable!(),
+            TwoPass::Output(o) => o,
+        })
+    }
+
+    pub fn reduce_scan<O, S, F1, F2, R>(
+        self,
+        first_map: F1,
+        reduce: R,
+        second_map: F2,
+    ) -> Stream<impl Operator<Out = O>>
+    where
+        Op::Out: ExchangeData,
+        F1: Fn(Op::Out) -> S + Send + Clone + 'static,
+        F2: Fn(Op::Out, &S) -> O + Send + Clone + 'static,
+        R: Fn(S, S) -> S + Send + Clone + 'static,
+        S: ExchangeData + Sync,
+        O: ExchangeData,
+    {
+        let reduce2 = reduce.clone();
+        self.fold_scan(
+            move |acc: &mut Option<S>, x| {
+                let map = (first_map)(x);
+                let cur = acc.take();
+                *acc = Some(match cur {
+                    Some(cur) => (reduce)(cur, map),
+                    None => map,
+                });
+            },
+            move |global, local| {
+                let cur = global.take();
+                *global = match (cur, local) {
+                    (Some(cur), Some(local)) => Some((reduce2)(cur, local)),
+                    (Some(a), None) | (None, Some(a)) => Some(a),
+                    (None, None) => None,
+                };
+            },
+            None,
+            move |x, state| (second_map)(x, state.as_ref().unwrap()),
+        )
+    }
+
     /// Deduplicate elements. The resulting stream will contain exactly one occurrence
     /// for each unique element in the input stream
     ///

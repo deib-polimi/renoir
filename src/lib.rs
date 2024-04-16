@@ -115,11 +115,7 @@ Refer to the [examples](examples/) directory for an extended set of working exam
 #[macro_use]
 extern crate derivative;
 #[macro_use]
-extern crate log;
-
-use std::ops::{Add, AddAssign};
-
-use serde::{Deserialize, Serialize};
+extern crate tracing;
 
 pub use block::structure;
 pub use block::BatchMode;
@@ -130,10 +126,6 @@ pub use environment::StreamContext;
 pub use operator::iteration::IterationStateHandle;
 pub use scheduler::ExecutionMetadata;
 pub use stream::{KeyedStream, Stream, WindowedStream};
-
-use crate::block::BlockStructure;
-use crate::network::Coord;
-use crate::profiler::ProfilerResult;
 
 pub(crate) mod block;
 pub(crate) mod channel;
@@ -160,27 +152,4 @@ pub mod prelude {
     #[cfg(feature = "timestamp")]
     pub use super::operator::window::{EventTimeWindow, TransactionWindow};
     pub use super::{BatchMode, RuntimeConfig, StreamContext};
-}
-
-/// Tracing information of the current execution.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct TracingData {
-    structures: Vec<(Coord, BlockStructure)>,
-    profilers: Vec<ProfilerResult>,
-}
-
-impl Add for TracingData {
-    type Output = TracingData;
-
-    fn add(mut self, rhs: Self) -> Self::Output {
-        self += rhs;
-        self
-    }
-}
-
-impl AddAssign for TracingData {
-    fn add_assign(&mut self, mut rhs: Self) {
-        self.structures.append(&mut rhs.structures);
-        self.profilers.append(&mut rhs.profilers);
-    }
 }

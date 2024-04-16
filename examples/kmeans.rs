@@ -108,12 +108,12 @@ impl State {
 
 fn main() {
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 3 {
+    if args.len() != 4 {
         panic!("Pass the number of centroid, the number of iterations and the dataset path as arguments");
     }
-    let num_centroids: usize = args[0].parse().expect("Invalid number of centroids");
-    let num_iters: usize = args[1].parse().expect("Invalid number of iterations");
-    let path = &args[2];
+    let num_centroids: usize = args[1].parse().expect("Invalid number of centroids");
+    let num_iters: usize = args[2].parse().expect("Invalid number of iterations");
+    let path = &args[3];
 
     config.spawn_remote_workers();
     let env = StreamContext::new(config);

@@ -14,8 +14,8 @@ fn main() {
     let (config, args) = RuntimeConfig::from_args();
 
     // command-line args: numbers of nodes and edges in the random graph.
-    let nodes: u64 = args[0].parse().unwrap();
-    let edges: u64 = args[1].parse().unwrap();
+    let nodes: u64 = args[1].parse().unwrap();
+    let edges: u64 = args[2].parse().unwrap();
     let max_iter: usize = 10000;
 
     config.spawn_remote_workers();

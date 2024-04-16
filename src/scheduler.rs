@@ -7,10 +7,9 @@ use crate::block::{BatchMode, Block, BlockStructure, JobGraphGenerator, Replicat
 use crate::config::{LocalConfig, RemoteConfig, RuntimeConfig};
 use crate::network::{Coord, NetworkTopology};
 use crate::operator::Operator;
-use crate::profiler::{wait_profiler, ProfilerResult};
+use crate::profiler::{log_trace, wait_profiler};
 use crate::worker::spawn_worker;
 use crate::CoordUInt;
-use crate::TracingData;
 
 /// Identifier of a block in the job graph.
 pub type BlockId = CoordUInt;
@@ -210,7 +209,7 @@ impl Scheduler {
 
         join_result.expect("Could not join worker threads");
 
-        Self::log_tracing_data(block_structures, wait_profiler());
+        log_trace(block_structures, wait_profiler());
     }
 
     /// Start the computation returning the list of handles used to join the workers.
@@ -248,7 +247,7 @@ impl Scheduler {
                         })
                     );
                     join_result.expect("Could not join worker threads");
-                    Self::log_tracing_data(block_structures, wait_profiler());
+                    log_trace(block_structures, wait_profiler());
                 });
         }
         #[cfg(not(feature = "tokio"))]
@@ -261,7 +260,7 @@ impl Scheduler {
 
             self.network.stop_and_wait();
             let profiler_results = wait_profiler();
-            Self::log_tracing_data(block_structures, profiler_results);
+            log_trace(block_structures, profiler_results);
         }
     }
 
@@ -296,17 +295,6 @@ impl Scheduler {
                 }
             }
         }
-    }
-
-    fn log_tracing_data(structures: Vec<(Coord, BlockStructure)>, profilers: Vec<ProfilerResult>) {
-        let data = TracingData {
-            structures,
-            profilers,
-        };
-        log::trace!(
-            "__renoir_TRACING_DATA__ {}",
-            serde_json::to_string(&data).unwrap()
-        );
     }
 
     fn log_topology(&self) {

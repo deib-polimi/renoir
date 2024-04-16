@@ -7,11 +7,11 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 2 {
+    if args.len() != 3 {
         panic!("Pass the number of iterations and the edges dataset as arguments");
     }
-    let num_iterations: usize = args[0].parse().expect("Invalid number of iterations");
-    let path_edges = &args[1];
+    let num_iterations: usize = args[1].parse().expect("Invalid number of iterations");
+    let path_edges = &args[2];
 
     config.spawn_remote_workers();
     let env = StreamContext::new(config);

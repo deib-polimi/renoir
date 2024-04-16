@@ -17,8 +17,9 @@ use ssh2::Session;
 use crate::config::CONFIG_ENV_VAR;
 use crate::config::HOST_ID_ENV_VAR;
 use crate::config::{HostConfig, RemoteConfig};
+use crate::profiler::try_parse_trace;
+use crate::profiler::TracingData;
 use crate::scheduler::HostId;
-use crate::TracingData;
 
 /// Size of the buffer usedahash to send the executable file via SCP.
 pub(crate) const SCP_BUFFER_SIZE: usize = 512 * 1024;
@@ -96,8 +97,9 @@ pub(crate) fn spawn_remote_workers(config: RemoteConfig) {
         max_execution_time = max_execution_time.max(result.execution_time);
         max_sync_time = max_sync_time.max(result.sync_time);
         exit_code_or |= result.exit_code;
-        if let Some(data) = result.tracing {
-            tracing_data += data;
+        if let Some(mut data) = result.tracing {
+            tracing_data.structures.append(&mut data.structures);
+            tracing_data.profilers.append(&mut data.profilers);
         }
     }
     if let Some(path) = config.tracing_dir {
@@ -232,33 +234,18 @@ fn remote_worker(
 
     let mut tracing_data = None;
 
-    std::thread::scope(|s| {
-        s.spawn(|| {
-            for l in stdout_reader.lines() {
-                println!(
-                    "{}|{}",
-                    host_id,
-                    l.unwrap_or_else(|e| format!("ERROR: {e}"))
-                );
-            }
-        });
-        s.spawn(|| {
-            // copy to stderr the output of the remote process
-            for line in stderr_reader.lines().map_while(Result::ok) {
-                if let Some(pos) = line.find("__renoir_TRACING_DATA__") {
-                    let json_data = &line[(pos + "__renoir_TRACING_DATA__ ".len())..];
-                    match serde_json::from_str(json_data) {
-                        Ok(data) => tracing_data = Some(data),
-                        Err(err) => {
-                            error!("Corrupted tracing data from host {}: {:?}", host_id, err);
-                        }
-                    }
-                } else {
-                    eprintln!("{host_id}|{line}");
-                }
-            }
-        });
-    });
+    for line in stdout_reader.lines().map_while(Result::ok) {
+        println!("{host_id}|{line}");
+    }
+
+    // copy to stderr the output of the remote process
+    for line in stderr_reader.lines().map_while(Result::ok) {
+        if let Some(trace) = try_parse_trace(&line) {
+            tracing_data = Some(trace);
+        } else {
+            eprintln!("{host_id}|{line}");
+        }
+    }
 
     channel.wait_close().unwrap();
     let exit_code = channel.exit_status().unwrap();

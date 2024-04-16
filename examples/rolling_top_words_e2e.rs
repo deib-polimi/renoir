@@ -111,7 +111,7 @@ fn main() {
     let k = 4;
 
     let (config, args) = RuntimeConfig::from_args();
-    let limit: u64 = args[0].parse().expect("Invalid number of events");
+    let limit: u64 = args[1].parse().expect("Invalid number of events");
 
     config.spawn_remote_workers();
     let env = StreamContext::new(config);

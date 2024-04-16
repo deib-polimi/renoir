@@ -29,13 +29,13 @@ impl State {
 
 fn main() {
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 4 {
+    if args.len() != 5 {
         panic!("Pass the number of iterations, number of vertices, vertex dataset and edges dataset as arguments");
     }
-    let num_iterations: usize = args[0].parse().expect("Invalid number of iterations");
-    let num_vertices: usize = args[1].parse().expect("Invalid number of vertices");
-    let path_vertices = &args[2];
-    let path_edges = &args[3];
+    let num_iterations: usize = args[1].parse().expect("Invalid number of iterations");
+    let num_vertices: usize = args[2].parse().expect("Invalid number of vertices");
+    let path_vertices = &args[3];
+    let path_edges = &args[4];
 
     config.spawn_remote_workers();
     let env = StreamContext::new(config);

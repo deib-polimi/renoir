@@ -10,13 +10,13 @@ const DAMPENING: f64 = 0.85;
 
 fn main() {
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 4 {
+    if args.len() != 5 {
         panic!("Pass the number of iterations, number of pages, pages dataset and links dataset as arguments");
     }
-    let num_iterations: usize = args[0].parse().expect("Invalid number of iterations");
-    let num_pages: usize = args[1].parse().expect("Invalid number of pages");
-    let path_pages = &args[2];
-    let path_links = &args[3];
+    let num_iterations: usize = args[1].parse().expect("Invalid number of iterations");
+    let num_pages: usize = args[2].parse().expect("Invalid number of pages");
+    let path_pages = &args[3];
+    let path_links = &args[4];
 
     config.spawn_remote_workers();
     let env = StreamContext::new(config);

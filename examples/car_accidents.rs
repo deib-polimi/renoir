@@ -292,14 +292,14 @@ fn print_query3(
 
 fn main() {
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 2 {
+    if args.len() != 3 {
         panic!(
             "Usage: {} dataset share_source",
             std::env::args().next().unwrap()
         );
     }
-    let path = &args[0];
-    let share_source = &args[1];
+    let path = &args[1];
+    let share_source = &args[2];
     let share_source = match share_source.as_str() {
         "true" => true,
         "false" => false,

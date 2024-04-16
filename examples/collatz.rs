@@ -6,10 +6,10 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
     let (config, args) = RuntimeConfig::from_args();
-    if args.len() != 1 {
+    if args.len() != 2 {
         panic!("Pass the number of integers to check");
     }
-    let limit: u64 = args[0].parse().unwrap();
+    let limit: u64 = args[1].parse().unwrap();
     let num_iter = 1000;
 
     config.spawn_remote_workers();

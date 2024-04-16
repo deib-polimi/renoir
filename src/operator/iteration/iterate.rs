@@ -360,19 +360,14 @@ where
     /// sorted.sort();
     /// assert_eq!(sorted, vec![30, 31, 32]);
     /// ```
-    pub fn iterate<
-        Body,
-        StateUpdate: ExchangeData + Default,
-        State: ExchangeData + Sync,
-        OperatorChain2,
-    >(
+    pub fn iterate<Body, StateUpdate, State, L, G, C, OperatorChain2>(
         self,
         num_iterations: usize,
         initial_state: State,
         body: Body,
-        local_fold: impl Fn(&mut StateUpdate, Out) + Send + Clone + 'static,
-        global_fold: impl Fn(&mut State, StateUpdate) + Send + Clone + 'static,
-        loop_condition: impl Fn(&mut State) -> bool + Send + Clone + 'static,
+        local_fold: L,
+        global_fold: G,
+        loop_condition: C,
     ) -> (
         Stream<impl Operator<Out = State>>,
         Stream<impl Operator<Out = Out>>,
@@ -383,6 +378,11 @@ where
             IterationStateHandle<State>,
         ) -> Stream<OperatorChain2>,
         OperatorChain2: Operator<Out = Out> + 'static,
+        L: Fn(&mut StateUpdate, Out) + Send + Clone + 'static,
+        G: Fn(&mut State, StateUpdate) + Send + Clone + 'static,
+        C: Fn(&mut State) -> bool + Send + Clone + 'static,
+        StateUpdate: ExchangeData + Default,
+        State: ExchangeData + Sync,
     {
         // this is required because if the iteration block is not present on all the hosts, the ones
         // without it won't receive the state updates.

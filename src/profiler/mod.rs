@@ -1,14 +1,15 @@
-pub use metrics::*;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "profiler")]
 pub use with_profiler::*;
 #[cfg(not(feature = "profiler"))]
 pub use without_profiler::*;
 
-use crate::{network::Coord, scheduler::BlockId};
+use crate::{block::BlockStructure, network::Coord, scheduler::BlockId};
 
 #[cfg(feature = "profiler")]
-mod backend;
-mod metrics;
+mod bucket_profiler;
+
+pub const TRACING_PREFIX: &str = "__renoir_TRACING_DATA__";
 
 /// The available profiling metrics.
 ///
@@ -27,72 +28,61 @@ pub trait Profiler {
     fn iteration_boundary(&mut self, leader_block_id: BlockId);
 }
 
-/// The implementation of the profiler when the `profiler` feature is enabled.
-#[cfg(feature = "profiler")]
-mod with_profiler {
-    use once_cell::sync::Lazy;
-    use std::cell::UnsafeCell;
-    use std::sync::Mutex;
-    use std::time::Instant;
+/// Tracing information of the current execution.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub(crate) struct TracingData {
+    pub structures: Vec<(Coord, BlockStructure)>,
+    pub profilers: Vec<ProfilerResult>,
+}
 
-    use crate::profiler::backend::ProfilerBackend;
-    use crate::profiler::metrics::ProfilerResult;
-    use flume::{Receiver, Sender};
+// impl Add for TracingData {
+//     type Output = TracingData;
 
-    /// The sender and receiver pair of the current profilers.
-    ///
-    /// These are options since they can be consumed.
-    static CHANNEL: Lazy<Mutex<(Option<ProfilerSender>, Option<ProfilerReceiver>)>> =
-        Lazy::new(|| {
-            let (sender, receiver) = flume::unbounded();
-            Mutex::new((Some(sender), Some(receiver)))
-        });
+//     fn add(mut self, rhs: Self) -> Self::Output {
+//         self += rhs;
+//         self
+//     }
+// }
 
-    /// The sender and receiver pair of the current profilers.
-    ///
-    /// These are options since they can be consumed.
-    static START_TIME: Lazy<Instant> = Lazy::new(|| Instant::now());
+// impl AddAssign for TracingData {
+//     fn add_assign(&mut self, mut rhs: Self) {
+//         self.structures.append(&mut rhs.structures);
+//         self.profilers.append(&mut rhs.profilers);
+//     }
+// }
 
-    thread_local! {
-        /// The actual profiler for the current thread, if the `profiler` feature is enabled.
-        static PROFILER: UnsafeCell<ProfilerBackend> = UnsafeCell::new(ProfilerBackend::new(*START_TIME));
+pub fn log_trace(structures: Vec<(Coord, BlockStructure)>, profilers: Vec<ProfilerResult>) {
+    if !cfg!(feature = "profiler") {
+        return;
     }
 
-    /// The type of the channel sender with the `ProfilerResult`s.
-    type ProfilerSender = Sender<ProfilerResult>;
-    /// The type of the channel receiver with the `ProfilerResult`s.
-    type ProfilerReceiver = Receiver<ProfilerResult>;
+    use std::io::Write as _;
+    let data = TracingData {
+        structures,
+        profilers,
+    };
 
-    /// Get the sender for sending the profiler results.
-    pub(crate) fn get_sender() -> ProfilerSender {
-        let channels = CHANNEL.lock().unwrap();
-        channels.0.clone().expect("Profiler sender already dropped")
-    }
+    let mut stderr = std::io::stderr().lock();
+    writeln!(
+        stderr,
+        "__renoir_TRACING_DATA__{}",
+        serde_json::to_string(&data).unwrap()
+    )
+    .unwrap();
+}
 
-    /// Get the current profiler.
-    pub fn get_profiler() -> &'static mut ProfilerBackend {
-        PROFILER.with(|t| unsafe { &mut *t.get() })
-    }
-
-    /// Wait for all the threads that used the profiler to exit, collect all their data and reset
-    /// the profiler.
-    pub fn wait_profiler() -> Vec<ProfilerResult> {
-        let mut channels = CHANNEL.lock().unwrap();
-        let profiler_receiver = channels.1.take().expect("Profiler receiver already taken");
-
-        // allow the following loop to exit when all the senders are dropped
-        channels.0.take().expect("Profiler sender already dropped");
-
-        let mut results = vec![];
-        while let Ok(profiler_res) = profiler_receiver.recv() {
-            results.push(profiler_res);
+#[inline]
+pub fn try_parse_trace(s: &str) -> Option<TracingData> {
+    if let Some(s) = s.strip_prefix(TRACING_PREFIX) {
+        match serde_json::from_str::<TracingData>(s) {
+            Ok(trace) => Some(trace),
+            Err(e) => {
+                tracing::error!("Corrupted tracing data ({e}) `{s}`");
+                None
+            }
         }
-
-        let (sender, receiver) = flume::unbounded();
-        channels.0 = Some(sender);
-        channels.1 = Some(receiver);
-
-        results
+    } else {
+        None
     }
 }
 
@@ -113,6 +103,9 @@ mod without_profiler {
     /// from a static reference.
     #[derive(Debug, Clone, Copy, Default)]
     pub struct NoOpProfiler;
+
+    #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+    pub struct ProfilerResult;
 
     thread_local! {
         static PROFILER: UnsafeCell<NoOpProfiler> = const { UnsafeCell::new(NoOpProfiler) };
@@ -139,5 +132,54 @@ mod without_profiler {
     /// Do nothing, since there is nothing to wait for.
     pub fn wait_profiler() -> Vec<ProfilerResult> {
         Default::default()
+    }
+}
+
+/// The implementation of the profiler when the `profiler` feature is enabled.
+#[cfg(feature = "profiler")]
+mod with_profiler {
+    use once_cell::sync::Lazy;
+    use std::cell::UnsafeCell;
+    use std::time::Instant;
+
+    use super::bucket_profiler::BucketProfiler;
+    use flume::{Receiver, Sender};
+
+    pub use super::bucket_profiler::ProfilerResult;
+
+    /// The sender and receiver pair of the current profilers.
+    ///
+    /// These are options since they can be consumed.
+    static CHANNEL: Lazy<(ProfilerSender, ProfilerReceiver)> = Lazy::new(|| flume::unbounded());
+
+    /// The sender and receiver pair of the current profilers.
+    ///
+    /// These are options since they can be consumed.
+    static START_TIME: Lazy<Instant> = Lazy::new(|| Instant::now());
+
+    thread_local! {
+        /// The actual profiler for the current thread, if the `profiler` feature is enabled.
+        static PROFILER: UnsafeCell<BucketProfiler> = UnsafeCell::new(BucketProfiler::new(*START_TIME));
+    }
+
+    /// The type of the channel sender with the `ProfilerResult`s.
+    type ProfilerSender = Sender<ProfilerResult>;
+    /// The type of the channel receiver with the `ProfilerResult`s.
+    type ProfilerReceiver = Receiver<ProfilerResult>;
+
+    /// Get the sender for sending the profiler results.
+    pub(crate) fn get_sender() -> ProfilerSender {
+        CHANNEL.0.clone()
+    }
+
+    /// Get the current profiler.
+    pub fn get_profiler() -> &'static mut BucketProfiler {
+        PROFILER.with(|t| unsafe { &mut *t.get() })
+    }
+
+    /// Wait for all the threads that used the profiler to exit, collect all their data and reset
+    /// the profiler.
+    pub fn wait_profiler() -> Vec<ProfilerResult> {
+        CHANNEL.1.drain().collect()
     }
 }
