@@ -78,6 +78,8 @@ indexmap = "2.2.6"
 tracing = { version = "0.1.40", features = ["log"] }
 quick_cache = "0.5.1"
 dashmap = "5.5.3"
+apache-avro = { version = "0.16.0", features = ["derive"] }
+dyn-clone = "1.0.17"
 
 [dev-dependencies]
 # for the tests
