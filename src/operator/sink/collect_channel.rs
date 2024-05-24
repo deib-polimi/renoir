@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::operator::sink::Sink;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
@@ -65,11 +64,6 @@ where
         operator.kind = OperatorKind::Sink;
         self.prev.structure().add_operator(operator)
     }
-}
-
-impl<Out: ExchangeData, PreviousOperators> Sink for CollectChannelSink<Out, PreviousOperators> where
-    PreviousOperators: Operator<Out = Out>
-{
 }
 
 #[cfg(test)]

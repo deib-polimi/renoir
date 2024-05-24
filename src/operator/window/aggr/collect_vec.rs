@@ -52,4 +52,13 @@ where
         };
         self.add_window_operator("WindowMap", acc)
     }
+
+    pub fn to_vec(self) -> KeyedStream<impl Operator<Out = (Key, Vec<Out>)>> {
+        let acc = CollectVec::<Out, Vec<Out>, _> {
+            vec: Default::default(),
+            f: |v| v,
+            _o: PhantomData,
+        };
+        self.add_window_operator("WindowMap", acc)
+    }
 }

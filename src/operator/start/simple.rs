@@ -51,10 +51,6 @@ impl<Out: ExchangeData> StartReceiver for SimpleStartReceiver<Out> {
         self.previous_replicas.clone()
     }
 
-    fn cached_replicas(&self) -> usize {
-        0
-    }
-
     fn recv_timeout(&mut self, timeout: Duration) -> Result<NetworkMessage<Out>, RecvTimeoutError> {
         let receiver = self.receiver.as_mut().unwrap();
         receiver.recv_timeout(timeout)

@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::operator::sink::{Sink, StreamOutputRef};
+use crate::operator::sink::StreamOutputRef;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
@@ -75,13 +75,6 @@ where
         operator.kind = OperatorKind::Sink;
         self.prev.structure().add_operator(operator)
     }
-}
-
-impl<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators> Sink
-    for Collect<Out, C, PreviousOperators>
-where
-    PreviousOperators: Operator<Out = Out>,
-{
 }
 
 impl<Out: ExchangeData, C: FromIterator<Out> + Send, PreviousOperators> Clone

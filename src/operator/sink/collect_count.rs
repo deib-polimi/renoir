@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 
-use crate::operator::sink::{Sink, StreamOutputRef};
+use crate::operator::sink::StreamOutputRef;
 use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
@@ -69,11 +69,6 @@ where
         operator.kind = OperatorKind::Sink;
         self.prev.structure().add_operator(operator)
     }
-}
-
-impl<PreviousOperators> Sink for CollectCountSink<PreviousOperators> where
-    PreviousOperators: Operator<Out = usize>
-{
 }
 
 impl<PreviousOperators> Clone for CollectCountSink<PreviousOperators>

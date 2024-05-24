@@ -31,9 +31,9 @@ pub(crate) trait StartReceiver: Clone {
     /// This list should contain all the replicas this receiver will receive data from.
     fn prev_replicas(&self) -> Vec<Coord>;
 
-    /// The number of those replicas which are behind a cache, and therefore never will emit a
-    /// `StreamElement::Terminate` message.
-    fn cached_replicas(&self) -> usize;
+    // /// The number of those replicas which are behind a cache, and therefore never will emit a
+    // /// `StreamElement::Terminate` message.
+    // fn cached_replicas(&self) -> usize;
 
     /// Try to receive a batch from the previous blocks, or fail with an error if the timeout
     /// expires.

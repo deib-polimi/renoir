@@ -324,16 +324,16 @@ impl<OutL: ExchangeData, OutR: ExchangeData> StartReceiver for BinaryStartReceiv
         previous
     }
 
-    fn cached_replicas(&self) -> usize {
-        let mut cached = 0;
-        if self.left.cached {
-            cached += self.left.instances
-        }
-        if self.right.cached {
-            cached += self.right.instances
-        }
-        cached
-    }
+    // fn cached_replicas(&self) -> usize {
+    //     let mut cached = 0;
+    //     if self.left.cached {
+    //         cached += self.left.instances
+    //     }
+    //     if self.right.cached {
+    //         cached += self.right.instances
+    //     }
+    //     cached
+    // }
 
     fn recv_timeout(
         &mut self,

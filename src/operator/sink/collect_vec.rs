@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::operator::sink::{Sink, StreamOutputRef};
+use crate::operator::sink::StreamOutputRef;
 use crate::operator::{ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
@@ -73,11 +73,6 @@ where
         operator.kind = OperatorKind::Sink;
         self.prev.structure().add_operator(operator)
     }
-}
-
-impl<Out: ExchangeData, PreviousOperators> Sink for CollectVecSink<Out, PreviousOperators> where
-    PreviousOperators: Operator<Out = Out>
-{
 }
 
 impl<Out: ExchangeData, PreviousOperators> Clone for CollectVecSink<Out, PreviousOperators>
