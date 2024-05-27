@@ -140,7 +140,7 @@ impl<R: MakeReader + Clone> Clone for AvroSource<R> {
         Self {
             reader: None,
             terminated: false,
-            replication: self.replication.clone(),
+            replication: self.replication,
             make_reader: self.make_reader.clone(),
         }
     }
@@ -174,7 +174,9 @@ impl<Op> Stream<Op>
 where
     Op: Operator<Out = Value> + 'static,
 {
-    pub fn from_avro_value<T: for<'de> Deserialize<'de> + Send>(self) -> Stream<impl Operator<Out = T>> {
+    pub fn from_avro_value<T: for<'de> Deserialize<'de> + Send>(
+        self,
+    ) -> Stream<impl Operator<Out = T>> {
         self.map(|v| {
             let de = from_value(&v);
             de.expect("failed to deserialize")
