@@ -152,4 +152,5 @@ pub mod prelude {
     #[cfg(feature = "timestamp")]
     pub use super::operator::window::{EventTimeWindow, TransactionWindow};
     pub use super::{BatchMode, RuntimeConfig, StreamContext};
+    pub use super::Replication;
 }

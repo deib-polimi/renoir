@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use apache_avro::AvroSchema;
 use clap::Parser;
-use renoir::prelude::*;
+use renoir::{prelude::*, Replication};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Parser)]
@@ -28,7 +28,9 @@ fn main() {
     let ctx = StreamContext::new(conf.clone());
 
     let source = if let Some(input) = opts.input {
-        ctx.stream_avro(input).into_boxed()
+        ctx.stream_avro_file(Replication::One, input)
+            .from_avro_value::<InputType>()
+            .into_boxed()
     } else {
         ctx.stream_iter((0..100).map(|i| InputType {
             s: format!("{i:o}"),
