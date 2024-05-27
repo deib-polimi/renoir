@@ -6,7 +6,6 @@
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::{AddAssign, Div};
-use std::path::PathBuf;
 
 use flume::{unbounded, Receiver};
 #[cfg(feature = "tokio")]
@@ -26,7 +25,6 @@ use crate::{BatchMode, KeyedStream, Stream};
 #[cfg(feature = "tokio")]
 use self::map_async::MapAsync;
 use self::map_memo::MapMemo;
-use self::sink::avro::AvroSink;
 use self::sink::collect::Collect;
 use self::sink::collect_channel::CollectChannelSink;
 use self::sink::collect_count::CollectCountSink;
@@ -60,6 +58,7 @@ use self::{
 #[cfg(feature = "timestamp")]
 mod add_timestamps;
 mod batch_mode;
+mod boxed;
 pub(crate) mod end;
 mod filter;
 mod filter_map;
@@ -88,7 +87,6 @@ pub mod source;
 mod start;
 pub mod window;
 mod zip;
-mod boxed;
 
 /// Marker trait that all the types inside a stream should implement.
 pub trait Data: Clone + Send + 'static {}

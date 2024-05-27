@@ -3,12 +3,10 @@ use serde::Serialize;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufWriter;
-use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
-use crate::operator::sink::StreamOutputRef;
-use crate::operator::{ExchangeData, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::Stream;
 
@@ -67,6 +65,7 @@ where
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&self.path)
             .unwrap_or_else(|err| {
                 panic!(
@@ -74,7 +73,6 @@ where
                     self.path, err
                 )
             });
-
 
         let buf_writer = BufWriter::new(file);
         self.writer = Some(buf_writer);
@@ -113,11 +111,11 @@ where
     }
 }
 
-impl<Op: Operator> Stream<Op> where
+impl<Op: Operator> Stream<Op>
+where
     Op: 'static,
-    Op::Out: AvroSchema + Serialize
+    Op::Out: AvroSchema + Serialize,
 {
-    
     /// Apply the given function to all the elements of the stream, consuming the stream.
     ///
     /// ## Example
@@ -131,8 +129,7 @@ impl<Op: Operator> Stream<Op> where
     ///
     /// env.execute_blocking();
     /// ```
-    pub fn write_avro<P: Into<PathBuf>>(self, path: P)
-    {
+    pub fn write_avro<P: Into<PathBuf>>(self, path: P) {
         self.add_operator(|prev| AvroSink::new(prev, path))
             .finalize_block();
     }

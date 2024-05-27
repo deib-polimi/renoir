@@ -48,7 +48,7 @@ where
 }
 
 pub struct BoxedOperator<O> {
-    pub(crate) op: Box<dyn DynOperator<Out=O> + 'static + Send>,
+    pub(crate) op: Box<dyn DynOperator<Out = O> + 'static + Send>,
 }
 
 impl<T> Clone for BoxedOperator<T> {
@@ -66,10 +66,8 @@ impl<T> Display for BoxedOperator<T> {
 }
 
 impl<O: Data> BoxedOperator<O> {
-    pub fn new<Op: Operator<Out=O> + 'static>(op: Op) -> Self {
-        Self {
-            op: Box::new(op),
-        }
+    pub fn new<Op: Operator<Out = O> + 'static>(op: Op) -> Self {
+        Self { op: Box::new(op) }
     }
 }
 
@@ -95,7 +93,7 @@ where
     Op::Out: Clone + Send + 'static,
 {
     /// Erase operator type using dynamic dispatching.
-    /// 
+    ///
     /// Use only when strictly necessary as it is decrimental for performance.
     pub fn into_boxed(self) -> Stream<BoxedOperator<Op::Out>> {
         self.add_operator(|prev| BoxedOperator::new(prev))

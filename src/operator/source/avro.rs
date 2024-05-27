@@ -1,7 +1,6 @@
 use std::fmt::Display;
 use std::fs::File;
-use std::io;
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::io::BufReader;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
@@ -85,7 +84,7 @@ impl<Out: Data + for<'a> Deserialize<'a>> Source for AvroSource<Out> {
 impl<Out: Data + for<'a> Deserialize<'a>> Operator for AvroSource<Out> {
     type Out = Out;
 
-    fn setup(&mut self, metadata: &mut ExecutionMetadata) {
+    fn setup(&mut self, _metadata: &mut ExecutionMetadata) {
         // let global_id = metadata.global_id;
         // let instances = metadata.replicas.len();
 
@@ -118,7 +117,10 @@ impl<Out: Data + for<'a> Deserialize<'a>> Operator for AvroSource<Out> {
         match reader.next() {
             Some(Ok(el)) => {
                 tracing::trace!("avro Value: {el:?}");
-                StreamElement::Item(apache_avro::from_value(&el).expect("could not deserialize from avro Value to specified type"))
+                StreamElement::Item(
+                    apache_avro::from_value(&el)
+                        .expect("could not deserialize from avro Value to specified type"),
+                )
             }
             Some(Err(e)) => panic!("Error while reading Aveo file: {:?}", e),
             None => {
@@ -163,14 +165,14 @@ impl crate::StreamContext {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
+    // use std::io::Write;
 
-    use itertools::Itertools;
-    use serde::{Deserialize, Serialize};
-    use tempfile::NamedTempFile;
+    // use itertools::Itertools;
+    // use serde::{Deserialize, Serialize};
+    // use tempfile::NamedTempFile;
 
-    use crate::config::RuntimeConfig;
-    use crate::environment::StreamContext;
+    // use crate::config::RuntimeConfig;
+    // use crate::environment::StreamContext;
     // use crate::operator::source::AvroSource;
 
     // #[test]
