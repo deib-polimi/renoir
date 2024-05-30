@@ -5,6 +5,7 @@
 
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "avro")]
 pub(super) mod avro;
 pub(super) mod collect;
 pub(super) mod collect_channel;

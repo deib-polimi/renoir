@@ -3,6 +3,7 @@
 pub use self::csv::*;
 #[cfg(feature = "tokio")]
 pub use async_stream::*;
+#[cfg(feature = "avro")]
 pub use avro::*;
 pub use channel::*;
 pub use file::*;
@@ -13,6 +14,7 @@ use crate::{block::Replication, operator::Operator};
 
 #[cfg(feature = "tokio")]
 mod async_stream;
+#[cfg(feature = "avro")]
 mod avro;
 mod channel;
 mod csv;

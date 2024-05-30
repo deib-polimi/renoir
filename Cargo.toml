@@ -14,10 +14,11 @@ homepage = "https://github.com/deib-polimi/renoir"
 readme = "README.md"
 
 [features]
-default = ["clap", "ssh", "timestamp",]
+default = ["clap", "ssh", "timestamp", "avro"]
 timestamp = []
 ssh = ["ssh2", "whoami", "shell-escape", "sha2", "base64"]
 tokio = ["dep:tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
+avro = ["dep:apache-avro"]
 profiler = []
 
 [dependencies]
@@ -78,7 +79,7 @@ indexmap = "2.2.6"
 tracing = { version = "0.1.40", features = ["log"] }
 quick_cache = "0.5.1"
 dashmap = "5.5.3"
-apache-avro = { version = "0.16.0", features = ["derive"] }
+apache-avro = { version = "0.16.0", features = ["derive"], optional = true }
 dyn-clone = "1.0.17"
 
 [dev-dependencies]
@@ -103,6 +104,10 @@ nexmark = { version = "0.2.0", features = ["serde"] }
 [[example]]
 name = "nexmark"
 required-features = ["timestamp"]
+
+[[example]]
+name = "avro_rw"
+required-features = ["avro"]
 
 [[example]]
 name = "rolling_top_words"
