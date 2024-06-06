@@ -3,6 +3,7 @@
 //! The actual operator list can be found from the implemented methods of [`Stream`],
 //! [`KeyedStream`], [`crate::WindowedStream`]
 
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::{AddAssign, Div};
@@ -2683,6 +2684,92 @@ where
 
     pub fn shuffle(self) -> Stream<impl Operator<Out = Op::Out>> {
         self.0.split_block(End::new, NextStrategy::random())
+    }
+
+    pub fn fold_scan<O, S, L, F>(
+        self,
+        init: S,
+        fold: L,
+        map: F,
+    ) -> KeyedStream<impl Operator<Out = (K, O)>>
+    where
+        Op::Out: ExchangeData,
+        I: Send,
+        K: ExchangeDataKey + Sync,
+        L: Fn(&K, &mut S, I) + Send + Clone + 'static,
+        F: Fn(&K, &S, I) -> O + Send + Clone + 'static,
+        S: ExchangeData + Sync,
+        O: ExchangeData,
+    {
+        #[derive(Serialize, Deserialize, Clone)]
+        enum TwoPass<I, O> {
+            First(I),
+            Second(I),
+            Output(O),
+        }
+
+        let (state, s) = self.map(|el| TwoPass::First(el.1)).unkey().iterate(
+            2,
+            HashMap::<K, S>::default(),
+            |s, state| {
+                s.to_keyed()
+                    .map(move |(k, el)| match el {
+                        TwoPass::First(el) => TwoPass::Second(el),
+                        TwoPass::Second(el) => {
+                            TwoPass::Output((map)(k, state.get().get(k).unwrap(), el))
+                        }
+                        TwoPass::Output(_) => unreachable!(),
+                    })
+                    .unkey()
+            },
+            move |local: &mut HashMap<K, S>, (k, el)| match el {
+                TwoPass::First(_) => {}
+                TwoPass::Second(el) => fold(
+                    &k,
+                    local.entry(k.clone()).or_insert_with(|| init.clone()),
+                    el,
+                ),
+                TwoPass::Output(_) => {}
+            },
+            move |global: &mut HashMap<K, S>, mut local| {
+                global.extend(local.drain());
+            },
+            |_| true,
+        );
+
+        state.for_each(std::mem::drop);
+        s.to_keyed().map(|(_, t)| match t {
+            TwoPass::First(_) | TwoPass::Second(_) => unreachable!(),
+            TwoPass::Output(o) => o,
+        })
+    }
+
+    pub fn reduce_scan<O, S, F1, F2, R>(
+        self,
+        first_map: F1,
+        reduce: R,
+        second_map: F2,
+    ) -> KeyedStream<impl Operator<Out = (K, O)>>
+    where
+        Op::Out: ExchangeData,
+        F1: Fn(&K, I) -> S + Send + Clone + 'static,
+        F2: Fn(&K, &S, I) -> O + Send + Clone + 'static,
+        R: Fn(&K, S, S) -> S + Send + Clone + 'static,
+        K: Sync,
+        S: ExchangeData + Sync,
+        O: ExchangeData,
+    {
+        self.fold_scan(
+            None,
+            move |k, acc: &mut Option<S>, x| {
+                let map = (first_map)(k, x);
+                *acc = Some(match acc.take() {
+                    Some(v) => (reduce)(k, v, map),
+                    None => map,
+                });
+            },
+            move |k, state, x| (second_map)(k, state.as_ref().unwrap(), x),
+        )
     }
 
     /// Close the stream and send resulting items to a channel on a single host.

@@ -297,7 +297,7 @@ impl<Out: ExchangeData, State: ExchangeData + Sync> Operator for Iterate<Out, St
     }
 }
 
-impl<Out: ExchangeData, State: ExchangeData + Sync> Display for Iterate<Out, State> {
+impl<Out: ExchangeData, State: ExchangeData> Display for Iterate<Out, State> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Iterate<{}>", std::any::type_name::<Out>())
     }

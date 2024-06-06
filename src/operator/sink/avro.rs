@@ -134,30 +134,3 @@ where
             .finalize_block();
     }
 }
-
-// #[cfg(test)]
-// mod qtests {
-//     use std::AvroSinkions::HashSet;
-
-//     use crate::config::RuntimeConfig;
-//     use crate::environment::StreamContext;
-//     use crate::operator::source;
-
-//     #[test]
-//     fn AvroSink_vec() {
-//         let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
-//         let source = source::IteratorSource::new(0..10u8);
-//         let res = env.stream(source).AvroSink::<Vec<_>>();
-//         env.execute_blocking();
-//         assert_eq!(res.get().unwrap(), (0..10).AvroSink::<Vec<_>>());
-//     }
-
-//     #[test]
-//     fn AvroSink_set() {
-//         let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
-//         let source = source::IteratorSource::new(0..10u8);
-//         let res = env.stream(source).AvroSink::<HashSet<_>>();
-//         env.execute_blocking();
-//         assert_eq!(res.get().unwrap(), (0..10).AvroSink::<HashSet<_>>());
-//     }
-// }
