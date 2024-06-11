@@ -187,11 +187,11 @@ impl<
                 }
                 StreamElement::Item(BinaryElement::LeftEnd) => {
                     self.left_ended = true;
-                    self.left.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
+                    glidesort::sort_by(&mut self.left, |(k1, _), (k2, _)| k1.cmp(k2));
                 }
                 StreamElement::Item(BinaryElement::RightEnd) => {
                     self.right_ended = true;
-                    self.right.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
+                    glidesort::sort_by(&mut self.right, |(k1, _), (k2, _)| k1.cmp(k2));
                 }
                 StreamElement::Timestamped(_, _) | StreamElement::Watermark(_) => {
                     panic!("Cannot join timestamp streams")
