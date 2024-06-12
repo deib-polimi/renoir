@@ -184,7 +184,7 @@ where
 
     fn next(&mut self) -> StreamElement<()> {
         let message = self.prev.next();
-        let to_return = message.take();
+        let to_return = message.variant();
         match &message {
             // Broadcast messages
             StreamElement::Watermark(_)

@@ -178,7 +178,7 @@ pub trait Operator: Clone + Send + Display {
 impl<Out> StreamElement<Out> {
     /// Create a new `StreamElement` with an `Item(())` if `self` contains an item, otherwise it
     /// returns the same variant of `self`.
-    pub fn take(&self) -> StreamElement<()> {
+    pub fn variant(&self) -> StreamElement<()> {
         match self {
             StreamElement::Item(_) => StreamElement::Item(()),
             StreamElement::Timestamped(_, _) => StreamElement::Item(()),
@@ -219,7 +219,7 @@ impl<Out> StreamElement<Out> {
     }
 
     /// A string representation of the variant of this `StreamElement`.
-    pub fn variant(&self) -> &'static str {
+    pub fn variant_str(&self) -> &'static str {
         match self {
             StreamElement::Item(_) => "Item",
             StreamElement::Timestamped(_, _) => "Timestamped",

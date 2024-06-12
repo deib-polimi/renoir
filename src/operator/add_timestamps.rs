@@ -84,7 +84,10 @@ where
             StreamElement::FlushAndRestart
             | StreamElement::FlushBatch
             | StreamElement::Terminate => elem,
-            _ => panic!("AddTimestamp received invalid variant: {}", elem.variant()),
+            _ => panic!(
+                "AddTimestamp received invalid variant: {}",
+                elem.variant_str()
+            ),
         }
     }
 

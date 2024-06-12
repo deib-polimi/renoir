@@ -136,7 +136,7 @@ where
                 StreamElement::FlushAndRestart => {}
                 m => unreachable!(
                     "Iterate received invalid message from IterationLeader: {}",
-                    m.variant()
+                    m.variant_str()
                 ),
             }
         }

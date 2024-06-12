@@ -205,7 +205,7 @@ mod tests {
             let item = keyed_fold.next();
             match item {
                 StreamElement::Item(x) => res.push(x),
-                other => panic!("Expecting StreamElement::Item, got {}", other.variant()),
+                other => panic!("Expecting StreamElement::Item, got {}", other.variant_str()),
             }
         }
 
@@ -235,7 +235,7 @@ mod tests {
                 StreamElement::Timestamped(x, ts) => res.push((x, ts)),
                 other => panic!(
                     "Expecting StreamElement::Timestamped, got {}",
-                    other.variant()
+                    other.variant_str()
                 ),
             }
         }

@@ -11,7 +11,9 @@ pub(super) mod collect;
 pub(super) mod collect_channel;
 pub(super) mod collect_count;
 pub(super) mod collect_vec;
+pub(super) mod csv;
 pub(super) mod for_each;
+pub(super) mod writer;
 
 pub(crate) type StreamOutputRef<Out> = Arc<Mutex<Option<Out>>>;
 

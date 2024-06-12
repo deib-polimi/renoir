@@ -104,7 +104,7 @@ mod tests {
                     assert_eq!(a, i);
                     assert_eq!(b, i);
                 }
-                item => panic!("Expected StreamElement::Item, got {}", item.variant()),
+                item => panic!("Expected StreamElement::Item, got {}", item.variant_str()),
             }
         }
         assert_eq!(key_by.next(), StreamElement::Terminate);

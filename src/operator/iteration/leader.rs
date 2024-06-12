@@ -137,7 +137,7 @@ where
                 StreamElement::FlushAndRestart | StreamElement::FlushBatch => {}
                 update => unreachable!(
                     "IterationLeader received an invalid message: {}",
-                    update.variant()
+                    update.variant_str()
                 ),
             }
         }
