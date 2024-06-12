@@ -251,7 +251,7 @@ fn print_query3(
     let groups = res
         .iter()
         .sorted_by_key(|(b, yw, _, _)| (b, yw))
-        .group_by(|(b, _, _, _)| b);
+        .chunk_by(|(b, _, _, _)| b);
     for (borough, data) in groups.into_iter() {
         print!("\n\x1b[1m{borough:<max_len$}\t");
         let data = data.into_iter().collect_vec();
