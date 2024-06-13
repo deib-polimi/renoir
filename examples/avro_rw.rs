@@ -41,11 +41,12 @@ fn main() {
 
     source
         .inspect(|e| eprintln!("{e:?}"))
+        .repartition_by(Replication::Unlimited, |x| (x.num % 5).into())
         .map(|mut e| {
             e.num *= 2;
             e
         })
-        .write_avro(opts.output);
+        .write_avro_seq(opts.output);
 
     ctx.execute_blocking();
 }

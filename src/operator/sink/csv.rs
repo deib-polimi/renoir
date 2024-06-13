@@ -9,27 +9,24 @@ use crate::operator::{ExchangeData, Operator};
 use crate::scheduler::ExecutionMetadata;
 use crate::{CoordUInt, Replication, Stream};
 
-use super::writer::{WriteOperator, WriterOperator};
+use super::writer::{sequential_path, WriteOperator, WriterOperator};
 
 // #[derive(Debug)]
-pub struct CsvWriteOp<T, N> {
+pub struct CsvWriteOp<T> {
     _t: PhantomData<T>,
-    make_path: Option<N>,
     append: bool,
     path: Option<PathBuf>,
     /// Reader used to parse the CSV file.
     writer: Option<csv::Writer<BufWriter<File>>>,
 }
 
-impl<T, N> CsvWriteOp<T, N>
+impl<T> CsvWriteOp<T>
 where
     T: Serialize + Send,
-    N: FnOnce(CoordUInt) -> PathBuf + Clone + Send + 'static,
 {
-    pub fn new(make_path: N, append: bool) -> Self {
+    pub fn new(append: bool) -> Self {
         Self {
             _t: PhantomData,
-            make_path: Some(make_path),
             append,
             path: None,
             writer: None,
@@ -37,14 +34,14 @@ where
     }
 }
 
-impl<T, N> WriteOperator<T> for CsvWriteOp<T, N>
+impl<T> WriteOperator<T> for CsvWriteOp<T>
 where
     T: Serialize + Send,
-    N: FnOnce(CoordUInt) -> PathBuf + Clone + Send + 'static,
 {
-    fn setup(&mut self, metadata: &ExecutionMetadata) {
-        let id = metadata.global_id;
-        self.path = Some(self.make_path.take().unwrap()(id));
+    type Destination = PathBuf;
+
+    fn setup(&mut self, destination: PathBuf) {
+        self.path = Some(destination);
 
         tracing::debug!("Write csv to path {:?}", self.path.as_ref().unwrap());
         let file = File::options()
@@ -70,8 +67,10 @@ where
         self.writer = Some(csv_writer);
     }
 
-    fn write(&mut self, item: T) {
-        self.writer.as_mut().unwrap().serialize(item).unwrap();
+    fn write(&mut self, items: &mut impl Iterator<Item = T>) {
+        for item in items {
+            self.writer.as_mut().unwrap().serialize(item).unwrap();
+        }
     }
 
     fn flush(&mut self) {
@@ -83,14 +82,10 @@ where
     }
 }
 
-impl<T, N> Clone for CsvWriteOp<T, N>
-where
-    N: Clone,
-{
+impl<T> Clone for CsvWriteOp<T> {
     fn clone(&self) -> Self {
         Self {
             _t: PhantomData,
-            make_path: self.make_path.clone(),
             append: self.append,
             path: None,
             writer: None,
@@ -101,26 +96,53 @@ where
 impl<Op: Operator> Stream<Op>
 where
     Op: 'static,
-    Op::Out: Serialize + ExchangeData,
+    Op::Out: Serialize,
 {
     pub fn write_csv<F: FnOnce(CoordUInt) -> PathBuf + Clone + Send + 'static>(
         self,
         make_path: F,
         append: bool,
     ) {
+        let make_destination = |metadata: &ExecutionMetadata| (make_path)(metadata.global_id);
+
         self.add_operator(|prev| {
-            let writer = CsvWriteOp::new(make_path, append);
-            WriterOperator { prev, writer }
+            let writer = CsvWriteOp::new(append);
+            WriterOperator::new(prev, writer, make_destination)
         })
         .finalize_block();
     }
 
+    /// Write output to CSV files. A CSV is created for each replica of the current block.
+    /// A file with a numerical suffix is created according to the path passed as parameter.
+    ///
+    /// + If the input is a directory numbered files will be created as output.
+    /// + If the input is a file name the basename will be kept as prefix and numbers will
+    ///   be added as suffix while keeping the same extension for the output.
+    ///
+    /// ## Example
+    ///
+    /// + `template_path`: `/data/renoir/output.csv` -> `/data/renoir/output0000.csv`, /data/renoir/output0001.csv` ...
+    /// + `template_path`: `/data/renoir/` -> `/data/renoir/0000.csv`, /data/renoir/0001.csv` ...
+    pub fn write_csv_seq(self, template_path: PathBuf, append: bool) {
+        self.add_operator(|prev| {
+            let writer = CsvWriteOp::new(append);
+            WriterOperator::new(prev, writer, |m| sequential_path(template_path, m))
+        })
+        .finalize_block();
+    }
+}
+
+impl<Op: Operator> Stream<Op>
+where
+    Op: 'static,
+    Op::Out: ExchangeData,
+{
     pub fn write_csv_one<P: Into<PathBuf>>(self, path: P, append: bool) {
         let path = path.into();
         self.repartition(Replication::One, NextStrategy::only_one())
             .add_operator(|prev| {
-                let writer = CsvWriteOp::new(move |_| path, append);
-                WriterOperator { prev, writer }
+                let writer = CsvWriteOp::new(append);
+                WriterOperator::new(prev, writer, move |_| path)
             })
             .finalize_block();
     }
