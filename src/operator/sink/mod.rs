@@ -14,6 +14,7 @@ pub(super) mod collect_vec;
 pub(super) mod csv;
 pub(super) mod for_each;
 pub(super) mod writer;
+pub(super) mod parquet;
 
 pub(crate) type StreamOutputRef<Out> = Arc<Mutex<Option<Out>>>;
 
