@@ -1,20 +1,20 @@
 use std::path::PathBuf;
 
-use arrow_schema::{Field, Schema, DataType};
+use arrow::{array::UInt32Array, datatypes::{DataType, Field, Float64Type, Int32Type, Schema, UInt32Type}};
 use renoir::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Output {
-    pub text: String,
     pub value: u32,
+    pub root: f64,
 }
 
 impl Output {
     pub fn schema() -> Schema {
         Schema::new(vec![
-            Field::new("text", DataType::Utf8, false),
             Field::new("value", DataType::UInt32, false),
+            Field::new("root", DataType::Float64, false),
         ])
     }
 }
@@ -38,7 +38,7 @@ fn main() {
     // Write to multiple files in parallel
     let path = dir_path.clone();
     ctx.stream_par_iter(0..100u32)
-        .map(|i| Output { value: i, text: format!("{i:08x}")})
+        .map(|i| Output { value: i, root: (i as f64).sqrt()})
         .write_parquet_seq(path, Output::schema());
 
     ctx.execute_blocking();
@@ -48,7 +48,7 @@ fn main() {
     let mut path = dir_path.clone();
     path.push("one.parquet");
     ctx.stream_par_iter(0..100u32)
-        .map(|i| Output { value: i, text: format!("{i:08x}")})
+        .map(|i| Output { value: i, root: (i as f64).sqrt()})
         .write_parquet_one(path, Output::schema());
 
     ctx.execute_blocking();
@@ -56,11 +56,12 @@ fn main() {
 
     eprintln!("Reading from parquet is not supported yet.");
 
-    // let ctx = StreamContext::new(conf);
-    // let mut path = dir_path;
-    // path.push("0001.csv");
-    // ctx.stream_csv::<(i32, String)>(path)
-    //     .for_each(|t| println!("{t:?}"));
+    let ctx = StreamContext::new(conf);
+    let mut path = dir_path;
+    path.push("one.parquet");
+    ctx.stream_parquet_one(path)
+        .to_rows::<(UInt32Type, Float64Type)>()
+        .for_each(|t| println!("{t:?}"));
 
-    // ctx.execute_blocking();
+    ctx.execute_blocking();
 }

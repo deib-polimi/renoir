@@ -19,8 +19,9 @@ timestamp = []
 ssh = ["ssh2", "whoami", "shell-escape", "sha2", "base64"]
 tokio = ["dep:tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 avro = ["dep:apache-avro"]
-parquet = ["dep:parquet", "dep:arrow-array", "dep:arrow-schema", "dep:arrow-buffer", "dep:arrow-json"]
 profiler = []
+parquet = ["dep:parquet", "dep:arrow"]
+# parquet = ["dep:parquet", "dep:arrow"]
 
 [dependencies]
 # for logging to the console
@@ -84,10 +85,9 @@ dyn-clone = "1.0.17"
 
 apache-avro = { version = "0.16.0", features = ["derive"], optional = true }
 parquet = { version = "52.0.0", optional = true }
-arrow-array = { version = "52.0.0", optional = true }
-arrow-schema = { version = "52.0.0", optional = true }
-arrow-buffer = { version = "52.0.0", optional = true }
-arrow-json = { version = "52.0.0", optional = true }
+arrow = { version = "52.0.0", optional = true }
+
+
 
 [dev-dependencies]
 # for the tests

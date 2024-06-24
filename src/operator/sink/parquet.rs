@@ -1,8 +1,6 @@
-use arrow_array::types::ArrowPrimitiveType;
-use arrow_array::RecordBatch;
-use arrow_json::reader::Decoder;
-use arrow_json::ReaderBuilder;
-use arrow_schema::{Field, Schema};
+use arrow::datatypes::Schema;
+use arrow::json::reader::Decoder;
+use arrow::json::ReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -124,13 +122,13 @@ where
 
         if matches!(self.block.scheduling.replication, Replication::One) {
             self.add_operator(|prev| {
-                WriterOperator::new(prev, writer, |meta| sequential_path(path, meta))
+                WriterOperator::new(prev, writer, |_| path)
             })
             .finalize_block();
         } else {
             self.repartition(Replication::One, NextStrategy::only_one())
                 .add_operator(|prev| {
-                    WriterOperator::new(prev, writer, |meta| sequential_path(path, meta))
+                    WriterOperator::new(prev, writer, |_| path)
                 })
                 .finalize_block();
         }
