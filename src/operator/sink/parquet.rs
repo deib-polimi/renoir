@@ -121,15 +121,11 @@ where
         let path = path.into();
 
         if matches!(self.block.scheduling.replication, Replication::One) {
-            self.add_operator(|prev| {
-                WriterOperator::new(prev, writer, |_| path)
-            })
-            .finalize_block();
+            self.add_operator(|prev| WriterOperator::new(prev, writer, |_| path))
+                .finalize_block();
         } else {
             self.repartition(Replication::One, NextStrategy::only_one())
-                .add_operator(|prev| {
-                    WriterOperator::new(prev, writer, |_| path)
-                })
+                .add_operator(|prev| WriterOperator::new(prev, writer, |_| path))
                 .finalize_block();
         }
     }

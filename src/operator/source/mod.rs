@@ -9,6 +9,7 @@ pub use channel::*;
 pub use file::*;
 pub use iterator::*;
 pub use parallel_iterator::*;
+#[cfg(feature = "parquet")]
 pub use parquet::*;
 
 use crate::{block::Replication, operator::Operator};
@@ -22,6 +23,7 @@ mod csv;
 mod file;
 mod iterator;
 mod parallel_iterator;
+#[cfg(feature = "parquet")]
 mod parquet;
 
 /// This trait marks all the operators that can be used as sinks.
