@@ -123,35 +123,28 @@ impl<I: Data + Send> StreamCache<I> {
         }
     }
 
+    /// Returns a copy of the [RuntimeConfig] of the [StreamContext] this
+    /// cache was created in.
     pub fn config(&self) -> Arc<RuntimeConfig> {
         self.config.clone()
     }
 
+    /// Returns the data cached on this node by cloning the inner cache.
     pub fn inner_cloned(&self) -> HashMap<CoordUInt, Vec<I>> {
         let cache = self.data.lock();
         assert!(cache.is_complete(), "Reading cache before it was complete. execution from a cached stream must start after the previous StreamContext has completed!");
         cache.data.clone()
     }
 
-    // // for debuggin purposes
-    // pub fn read(&self) -> Vec<I> {
-    //     let cache_lock = self.cache_reference.lock();
-    //     assert!(
-    //         cache_lock.is_some(),
-    //         "Can't read the cache before the execution"
-    //     );
-    //     cache_lock
-    //         .clone()
-    //         .unwrap()
-    //         .into_iter()
-    //         .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
-    //         .flat_map(|(_, values)| values.into_iter())
-    //         .fold(Vec::new(), |mut acc, values| {
-    //             acc.push(values);
-    //             acc
-    //         })
-    // }
-
+    /// Consume the cache creating a new [Stream] in a [StreamContext].
+    /// 
+    /// The [StreamCache] will behave as a source with the same parallelism (and distribution of data)
+    /// as the original [Stream] it was cached from.
+    /// 
+    /// + **ATTENTION** ⚠️: The new [StreamContext] must have the same [RuntimeConfig] as the
+    /// one in which the cache was created.
+    /// + **ATTENTION** ⚠️: The cache can be resumed **only after** the execution of its origin
+    /// `StreamContext` has terminated.
     pub fn stream_in(self, ctx: &StreamContext) -> Stream<CacheSource<I>> {
         assert_eq!(
             self.config,

@@ -2077,14 +2077,14 @@ where
         StreamOutput::from(output)
     }
 
-    /// Closes the stream, preserving all resulting items in a [`StreamCache`]. This enables the
-    /// stream to be resumed from the last processed element.
+    /// Collect the output of the stream to a [StreamCache] that can later be resumed to
+    /// create a [Stream] with its content. Returns the cache and consumes the stream.
     ///
-    /// **Note**: To resume the stream later, ensure that the stream is executed using
-    /// [`StreamEnvironment::interactive_execute_blocking`]. Failing to do so will consume the environment.
-    ///
-    /// **Note**: Calling [`StreamCache::read`] on the returned cache before the execution of the stream
-    /// will result in a panic.
+    /// To resume the cache, create a new [StreamContext](crate::StreamContext) with the **same**
+    /// [RuntimeConfig](crate::RuntimeConfig) and call the [StreamCache::stream_in] method.
+    /// 
+    /// **Warning**: [StreamCache] methods must only be called **after** the original `StreamContext`
+    /// has finished executing. Calling `stream_in` or `inner_cloned` on an incomplete cache will panic!
     ///
     /// ## Example
     ///
@@ -2117,12 +2117,15 @@ where
         StreamCache::new(config, replication, output)
     }
 
-    /// Create a checkpoint in a stream by caching all the elements in a [`StreamCache`].
-    /// The function returns a tuple containing the cache and the stream on which operations
-    /// following the checkpoint can be applied.
+    /// Collect the output of the stream to a [StreamCache] that can later be resumed to
+    /// create a [Stream] with its content. Returns the cache and a copy of the current stream.
     ///
-    /// **Note**: This operator will split the current block.
-    ///
+    /// To resume the cache, create a new [StreamContext](crate::StreamContext) with the **same**
+    /// [RuntimeConfig](crate::RuntimeConfig) and call the [StreamCache::stream_in] method.
+    /// 
+    /// **Warning**: [StreamCache] methods must only be called **after** the original `StreamContext`
+    /// has finished executing. Calling `stream_in` or `inner_cloned` on an incomplete cache will panic!
+
     /// ## Example
     /// ```
     /// # use renoir::prelude::*;
