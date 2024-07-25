@@ -213,7 +213,7 @@ where
             }
 
             let el = self.prev.next();
-            let kind = el.take();
+            let kind = el.variant();
 
             if let Some(b) = self.batcher.enqueue(el) {
                 self.schedule_batch(b);

@@ -5,7 +5,6 @@ use tokio::net::{TcpListener, TcpStream};
 #[cfg(feature = "tokio")]
 use tokio::task::JoinHandle;
 
-use anyhow::anyhow;
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 
@@ -82,12 +81,12 @@ async fn bind_remotes<In: ExchangeData>(
     let listener = TcpListener::bind(&*address)
         .await
         .map_err(|e| {
-            anyhow!(
+            panic!(
                 "Failed to bind socket for {} at {:?}: {:?}",
                 coord,
                 address,
                 e
-            )
+            ) // TODO
         })
         .unwrap();
     let address = listener
