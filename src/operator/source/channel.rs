@@ -4,7 +4,7 @@ use flume::{bounded, Receiver, RecvError, Sender, TryRecvError};
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::operator::source::Source;
-use crate::operator::{replication, Operator, StreamElement};
+use crate::operator::{Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 
 const MAX_RETRY: u8 = 16;

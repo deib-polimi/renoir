@@ -8,6 +8,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::{AddAssign, Div};
 
+use cache::{CacheRegistry, CacheSink, CachedStream, Cacher};
 use flume::{unbounded, Receiver};
 #[cfg(feature = "tokio")]
 use futures::Future;
@@ -23,7 +24,6 @@ use crate::scheduler::ExecutionMetadata;
 use crate::stream::KeyedItem;
 use crate::{BatchMode, KeyedStream, Stream};
 
-use self::cache::{CacheInnerRef, CacheSink, StreamCache};
 #[cfg(feature = "tokio")]
 use self::map_async::MapAsync;
 use self::map_memo::MapMemo;
@@ -61,7 +61,7 @@ use self::{
 mod add_timestamps;
 mod batch_mode;
 mod boxed;
-pub mod cache;
+mod cache;
 pub(crate) mod end;
 mod filter;
 mod filter_map;
@@ -2082,7 +2082,7 @@ where
     ///
     /// To resume the cache, create a new [StreamContext](crate::StreamContext) with the **same**
     /// [RuntimeConfig](crate::RuntimeConfig) and call the [StreamCache::stream_in] method.
-    /// 
+    ///
     /// **Warning**: [StreamCache] methods must only be called **after** the original `StreamContext`
     /// has finished executing. Calling `stream_in` or `inner_cloned` on an incomplete cache will panic!
     ///
@@ -2108,13 +2108,15 @@ where
     /// let expected = (0..10).filter(|x| x % 3 == 0 && x % 2 == 0).collect::<Vec<_>>();
     /// assert_eq!(expected, res.get().unwrap());
     /// ```
-    pub fn collect_cache(self) -> StreamCache<I> {
-        let config = self.ctx.lock().config.clone();
+    pub fn collect_cache<C: Cacher<I> + 'static>(self, config: C::Config) -> CachedStream<I, C> {
+        let rt_config = self.ctx.lock().config.clone();
         let replication = self.block.scheduling.replication;
-        let output = CacheInnerRef::default();
-        self.add_operator(|prev| CacheSink::new(prev, config.clone(), output.clone()))
-            .finalize_block();
-        StreamCache::new(config, replication, output)
+        let output = CacheRegistry::<I, C::Handle>::new();
+        self.add_operator(|prev| {
+            CacheSink::<I, C, _>::new(prev, rt_config.clone(), config, output.clone())
+        })
+        .finalize_block();
+        CachedStream::new(rt_config, replication, output)
     }
 
     /// Collect the output of the stream to a [StreamCache] that can later be resumed to
@@ -2122,7 +2124,7 @@ where
     ///
     /// To resume the cache, create a new [StreamContext](crate::StreamContext) with the **same**
     /// [RuntimeConfig](crate::RuntimeConfig) and call the [StreamCache::stream_in] method.
-    /// 
+    ///
     /// **Warning**: [StreamCache] methods must only be called **after** the original `StreamContext`
     /// has finished executing. Calling `stream_in` or `inner_cloned` on an incomplete cache will panic!
 
@@ -2154,9 +2156,15 @@ where
     /// let expected = (0..10).filter(|x| x % 3 == 0 && x % 2 == 0).collect::<Vec<_>>();
     /// assert_eq!(expected, res.get().unwrap());
     /// ```
-    pub fn cache(self) -> (StreamCache<I>, Stream<impl Operator<Out = Op::Out>>) {
+    pub fn cache<C: Cacher<I> + 'static>(
+        self,
+        config: C::Config,
+    ) -> (CachedStream<I, C>, Stream<impl Operator<Out = Op::Out>>) {
         let mut splits = self.split(2);
-        (splits.pop().unwrap().collect_cache(), splits.pop().unwrap())
+        (
+            splits.pop().unwrap().collect_cache(config),
+            splits.pop().unwrap(),
+        )
     }
 }
 

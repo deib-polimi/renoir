@@ -14,7 +14,7 @@ homepage = "https://github.com/deib-polimi/renoir"
 readme = "README.md"
 
 [features]
-default = ["clap", "ssh", "timestamp", "parquet"]
+default = ["clap", "ssh", "timestamp"]
 timestamp = []
 ssh = ["ssh2", "whoami", "shell-escape", "sha2", "base64"]
 tokio = ["dep:tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
