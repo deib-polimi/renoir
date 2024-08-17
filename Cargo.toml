@@ -152,6 +152,9 @@ harness = false
 [[bench]]
 name = "nexmark"
 harness = false
+[[bench]]
+name = "caching"
+harness = false
 
 [profile.release]
 lto = true

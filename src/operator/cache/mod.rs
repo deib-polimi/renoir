@@ -17,6 +17,8 @@ pub mod bincode;
 mod stream_cache;
 pub mod vec;
 pub use stream_cache::*;
+pub use vec::VecCacher;
+pub use bincode::{BincodeCacher, BincodeCacheConfig};
 
 pub trait Cacher<T>: Send {
     type Config: Send + Sync;

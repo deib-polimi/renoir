@@ -61,7 +61,7 @@ use self::{
 mod add_timestamps;
 mod batch_mode;
 mod boxed;
-mod cache;
+pub mod cache;
 pub(crate) mod end;
 mod filter;
 mod filter_map;

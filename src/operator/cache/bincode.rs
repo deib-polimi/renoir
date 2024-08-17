@@ -8,11 +8,13 @@ use serde::{Deserialize, Serialize};
 
 use super::{CacheReplayer, Cacher};
 
-static BINCODE_CONFIG: Lazy<bincode::DefaultOptions> = Lazy::new(bincode::DefaultOptions::new);
+static BINCODE_CONFIG: Lazy<
+    bincode::config::WithOtherIntEncoding<bincode::DefaultOptions, bincode::config::VarintEncoding>,
+> = Lazy::new(|| bincode::DefaultOptions::new().with_varint_encoding());
 
 pub struct BincodeCacheConfig {
-    batch_size: usize,
-    path: PathBuf,
+    pub batch_size: usize,
+    pub path: PathBuf,
 }
 
 pub struct BincodeCacher<T> {
