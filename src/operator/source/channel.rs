@@ -41,10 +41,11 @@ impl<Out: Send + 'static> ChannelSource<Out> {
     /// ## Example
     ///
     /// ```
+    /// # use renoir::prelude::*;
     /// # use renoir::{StreamContext, RuntimeConfig};
     /// # use renoir::operator::source::ChannelSource;
     /// # let mut env = StreamContext::new_local();
-    /// let (tx_channel, source) = ChannelSource::new(4);
+    /// let (tx_channel, source) = ChannelSource::new(4, Replication::One);
     /// let R = env.stream(source);
     /// tx_channel.send(1);
     /// tx_channel.send(2);

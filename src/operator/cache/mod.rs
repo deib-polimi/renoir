@@ -16,9 +16,9 @@ use crate::operator::{source::Source, Data, Operator, StreamElement};
 pub mod bincode;
 mod stream_cache;
 pub mod vec;
+pub use bincode::{BincodeCacheConfig, BincodeCacher};
 pub use stream_cache::*;
 pub use vec::VecCacher;
-pub use bincode::{BincodeCacher, BincodeCacheConfig};
 
 pub trait Cacher<T>: Send {
     type Config: Send + Sync;

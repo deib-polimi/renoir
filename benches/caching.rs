@@ -111,8 +111,7 @@ fn nexmark_caching(c: &mut Criterion) {
     });
 
     let ctx = StreamContext::new_local();
-    let cached = events(&ctx)
-        .collect_cache::<VecCacher<_>>(());
+    let cached = events(&ctx).collect_cache::<VecCacher<_>>(());
     ctx.execute_blocking();
 
     group.bench_function("vec", move |b| {
@@ -126,11 +125,10 @@ fn nexmark_caching(c: &mut Criterion) {
 
     let ctx = StreamContext::new_local();
     let dir = tempdir().unwrap();
-    let cached = events(&ctx)
-        .collect_cache::<BincodeCacher<_>>(BincodeCacheConfig {
-            batch_size: 1024,
-            path: dir.into_path().to_owned(),
-        });
+    let cached = events(&ctx).collect_cache::<BincodeCacher<_>>(BincodeCacheConfig {
+        batch_size: 1024,
+        path: dir.into_path().to_owned(),
+    });
     ctx.execute_blocking();
 
     group.bench_function("bincode", move |b| {
@@ -146,11 +144,10 @@ fn nexmark_caching(c: &mut Criterion) {
         b.iter(|| {
             let dir = tempdir().unwrap();
             let ctx = StreamContext::new_local();
-            let cached = events(&ctx)
-                .collect_cache::<BincodeCacher<_>>(BincodeCacheConfig {
-                    batch_size: 8192,
-                    path: dir.path().to_owned(),
-                });
+            let cached = events(&ctx).collect_cache::<BincodeCacher<_>>(BincodeCacheConfig {
+                batch_size: 8192,
+                path: dir.path().to_owned(),
+            });
             ctx.execute_blocking();
             let (ctx, stream) = cached.clone().stream();
             stream.for_each(|x| {

@@ -59,9 +59,9 @@ impl<T: Data, C: Cacher<T>> CachedStream<T, C> {
     /// as the original [Stream] it was cached from.
     ///
     /// + **ATTENTION** ⚠️: The new [StreamContext] must have the same [RuntimeConfig] as the
-    /// one in which the cache was created.
+    ///   one in which the cache was created.
     /// + **ATTENTION** ⚠️: The cache can be resumed **only after** the execution of its origin
-    /// `StreamContext` has terminated.
+    ///   `StreamContext` has terminated.
     pub fn stream_in(self, ctx: &StreamContext) -> Stream<CacheSource<T, C::Replayer>> {
         assert_eq!(
             self.config,
@@ -81,7 +81,7 @@ impl<T: Data, C: Cacher<T>> CachedStream<T, C> {
     /// **Returns**: a tuple containing the new [StreamContext] and the [Stream] with the [CacheSource].
     ///
     /// + **ATTENTION** ⚠️: The cache can be resumed **only after** the execution of its origin
-    /// `StreamContext` has terminated.
+    ///   `StreamContext` has terminated.
     pub fn stream(self) -> (StreamContext, Stream<CacheSource<T, C::Replayer>>) {
         let ctx = StreamContext::new(self.config.clone());
         let stream = self.stream_in(&ctx);
