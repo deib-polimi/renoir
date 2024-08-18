@@ -83,9 +83,7 @@ async fn bind_remotes<In: ExchangeData>(
         .map_err(|e| {
             panic!(
                 "Failed to bind socket for {} at {:?}: {:?}",
-                coord,
-                address,
-                e
+                coord, address, e
             ) // TODO
         })
         .unwrap();
