@@ -29,7 +29,7 @@ fn main() {
 
     let result = env
         // Open and read file line by line in parallel
-        .stream_file(&args[0])
+        .stream_file(&args[1])
         // Split into words
         .flat_map(|line| tokenize(&line))
         // Partition
@@ -66,7 +66,7 @@ fn main() {
     let env = StreamContext::new(config);
 
     let result = env
-        .stream_file(&args[0])
+        .stream_file(&args[1])
         // Adaptive batching(default) has predictable latency
         // Fixed size batching often leads to shorter execution times
         // If data is immediately available and latency is not critical
@@ -82,7 +82,7 @@ fn main() {
     env.execute_blocking(); // Start execution (blocking)
     if let Some(result) = result.get() {
         // Print word counts
-        result.into_iter().for_each(|(word, count)| println!("{word}: {count}"));
+        result.into_iter().for_each(|(_, (word, count))| println!("{word}: {count}"));
     }
 }
 
