@@ -2090,9 +2090,10 @@ where
     ///
     /// ```
     /// # use renoir::prelude::*;
+    /// use renoir::operator::cache::VecCacher;
     /// let mut ctx = StreamContext::new_local();    ///
     /// // Create a cached stream by applying filters and caching the results
-    /// let cache = ctx.stream_iter(0..10).filter(|x| x % 3 == 0).collect_cache();
+    /// let cache = ctx.stream_iter(0..10).filter(|x| x % 3 == 0).collect_cache::<VecCacher<_>>(());
     ///
     /// // Execute the stream interactively to capture and store the results in the cache
     /// ctx.execute_blocking();
@@ -2131,10 +2132,11 @@ where
     /// ## Example
     /// ```
     /// # use renoir::prelude::*;
+    /// use renoir::operator::cache::VecCacher;
     /// let ctx = StreamContext::new_local();
     ///
     /// // Create a cached stream by applying filters and caching the results
-    /// let (cache, stream) = ctx.stream_iter(0..10).filter(|x| x % 3 == 0).cache();
+    /// let (cache, stream) = ctx.stream_iter(0..10).filter(|x| x % 3 == 0).cache::<VecCacher<_>>(());
     ///
     /// // Further process the cached stream, applying additional filters and collecting the results
     /// let result = stream.filter(|x| x % 2 == 0).collect_vec();

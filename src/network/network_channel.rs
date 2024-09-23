@@ -64,13 +64,12 @@ impl<In: Send + 'static> NetworkReceiver<In> {
         &self,
         message: Result<NetworkMessage<In>, E>,
     ) -> Result<NetworkMessage<In>, E> {
-        message.map(|message| {
+        message.inspect(|message| {
             get_profiler().items_in(
                 message.sender,
                 self.receiver_endpoint.coord,
                 message.num_items(),
             );
-            message
         })
     }
 
