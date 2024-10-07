@@ -8,7 +8,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::ops::{AddAssign, Div};
 
-use cache::{CacheRegistry, CacheSink, CachedStream, Cacher};
+use cache::{CacheRegistry, CacheSink, CachedStream, Cacher, VecCacher};
 use flume::{unbounded, Receiver};
 #[cfg(feature = "tokio")]
 use futures::Future;
@@ -2121,6 +2121,14 @@ where
     }
 
     /// Collect the output of the stream to a [StreamCache] that can later be resumed to
+    /// create a [Stream] with its content. Returns the cache and consumes the stream.
+    ///
+    /// **See [Stream::collect_cache]**
+    pub fn collect_cache_vec(self) -> CachedStream<I, VecCacher<I>> {
+        self.collect_cache(())
+    }
+
+    /// Collect the output of the stream to a [StreamCache] that can later be resumed to
     /// create a [Stream] with its content. Returns the cache and a copy of the current stream.
     ///
     /// To resume the cache, create a new [StreamContext](crate::StreamContext) with the **same**
@@ -2167,6 +2175,19 @@ where
             splits.pop().unwrap().collect_cache(config),
             splits.pop().unwrap(),
         )
+    }
+
+    /// Collect the output of the stream to a [StreamCache] that can later be resumed to
+    /// create a [Stream] with its content. Returns the cache and a copy of the current stream.
+    ///
+    /// **See [Stream::cache]**
+    pub fn cache_vec(
+        self,
+    ) -> (
+        CachedStream<I, VecCacher<I>>,
+        Stream<impl Operator<Out = Op::Out>>,
+    ) {
+        self.cache(())
     }
 }
 
