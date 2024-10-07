@@ -373,9 +373,6 @@ mod tests {
 
     #[test]
     fn one_to_one() {
-        tracing_subscriber::fmt::SubscriberBuilder::default()
-            .with_max_level(tracing::Level::DEBUG)
-            .init();
         let ctx = StreamContext::new_local();
         let n = 20;
         let source = IteratorSource::new(0..n);
@@ -407,9 +404,6 @@ mod tests {
 
     #[test]
     fn many_to_many() {
-        // tracing_subscriber::fmt::SubscriberBuilder::default()
-        //     .with_max_level(tracing::Level::DEBUG)
-        //     .init();
         let ctx = StreamContext::new_local();
         let n = 128;
         let cache = ctx

@@ -25,7 +25,7 @@ parquet = ["dep:parquet", "dep:arrow"]
 
 [dependencies]
 # for logging to the console
-log = { version = "0.4.21", features = ["release_max_level_info"] }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
 
 # used by the network for storing type-generic structures
 typemap_rev = "0.3.0"
@@ -37,23 +37,23 @@ nanorand = "0.7.0"
 derivative = "2.2.0"
 
 # serialization
-serde = { version = "1.0.203", features = ["derive"] }
-serde_json = "1.0.117"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
 bincode = "1.3.3"
-toml = "0.8.14"
+toml = "0.8.19"
 
-thiserror = "1.0.61"
+thiserror = "1.0.64"
 
 # handy iterators functions
 
 # for storing non-mutable static variables with non-trivial initialization
-once_cell = "1.19.0"
+once_cell = "1.20.2"
 
 # used for spawning the remote workers
 ssh2 = { version = "0.9.4", optional = true }
-whoami = { version = "1.5.1", optional = true }
+whoami = { version = "1.5.2", optional = true }
 shell-escape = { version = "0.1.5", optional = true }
-clap = { version = "4.5.7", features = ["derive"], optional = true }
+clap = { version = "4.5.19", features = ["derive"], optional = true }
 sha2 = { version = "0.10.8", optional = true }
 base64 = { version = "0.22.1", optional = true }
 
@@ -69,43 +69,43 @@ lazy-init = "0.5.1"
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
 coarsetime = "0.1.34"
 
-tokio = { version = "1.38.0", features = ["rt"], default-features = false, optional = true }
-futures = { version = "0.3.30", optional = true }
+tokio = { version = "1.40.0", features = ["rt"], default-features = false, optional = true }
+futures = { version = "0.3.31", optional = true }
 
 parking_lot = "0.12.3"
 
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 glidesort = "0.1.2"
-indexmap = "2.2.6"
+indexmap = "2.6.0"
 tracing = { version = "0.1.40", features = ["log"] }
-quick_cache = "0.5.1"
-dashmap = "5.5.3"
+quick_cache = "0.6.9"
+dashmap = "6.1.0"
 dyn-clone = "1.0.17" 
 
-apache-avro = { version = "0.16.0", features = ["derive"], optional = true }
-parquet = { version = "52.0.0", optional = true }
-arrow = { version = "52.0.0", optional = true }
+apache-avro = { version = "0.17.0", features = ["derive"], optional = true }
+parquet = { version = "53.1.0", optional = true }
+arrow = { version = "53.1.0", optional = true }
 
 
 
 [dev-dependencies]
 # for the tests
-env_logger = "0.11.3"
+env_logger = "0.11.5"
 rand = { version = "0.8.5", features = ["small_rng"] }
-tempfile = "3.10.1"
+tempfile = "3.13.0"
 criterion = { version = "0.5.1", features = ["html_reports"] }
-fake = "2.9.2"
-mimalloc = { version = "0.1.42", default-features = false }
+fake = "2.10.0"
+mimalloc = { version = "0.1.43", default-features = false }
 tracing-subscriber = "0.3.18"
 itertools = "0.13.0"
 
 micrometer = { version = "0.2.7", features = ["enable"]}
 
 # for the examples
-regex = "1.10.5"
+regex = "1.11.0"
 
-kstring = { version = "2.0.0", features = ["serde"] }
+kstring = { version = "2.0.2", features = ["serde"] }
 nexmark = { version = "0.2.0", features = ["serde"] }
 
 [[example]]
