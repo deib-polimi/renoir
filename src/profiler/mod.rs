@@ -9,6 +9,7 @@ use crate::{block::BlockStructure, network::Coord, scheduler::BlockId};
 #[cfg(feature = "profiler")]
 mod bucket_profiler;
 
+#[cfg(feature = "ssh")]
 pub const TRACING_PREFIX: &str = "__renoir_TRACING_DATA__";
 
 /// The available profiling metrics.
@@ -71,6 +72,7 @@ pub fn log_trace(structures: Vec<(Coord, BlockStructure)>, profilers: Vec<Profil
     .unwrap();
 }
 
+#[cfg(feature = "ssh")]
 #[inline]
 pub fn try_parse_trace(s: &str) -> Option<TracingData> {
     if let Some(s) = s.strip_prefix(TRACING_PREFIX) {

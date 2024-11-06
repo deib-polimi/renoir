@@ -7,7 +7,6 @@ use crate::config::RuntimeConfig;
 use crate::operator::iteration::IterationStateLock;
 use crate::operator::source::Source;
 use crate::operator::{Data, Operator};
-#[cfg(feature = "ssh")]
 use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
 use crate::{BatchMode, CoordUInt};

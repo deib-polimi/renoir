@@ -158,7 +158,9 @@ harness = false
 
 [profile.release]
 lto = true
-# strip = "symbols"
+
+[profile.bench]
+inherits = "release"
 debug = 1
 
 [profile.release-fast]

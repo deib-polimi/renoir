@@ -12,7 +12,6 @@ use std::str::FromStr;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::runner::spawn_remote_workers;
 use crate::scheduler::HostId;
 use crate::CoordUInt;
 
@@ -267,7 +266,7 @@ impl RuntimeConfig {
             RuntimeConfig::Local(_) => {}
             #[cfg(feature = "ssh")]
             RuntimeConfig::Remote(remote) => {
-                spawn_remote_workers(remote.clone());
+                crate::runner::spawn_remote_workers(remote.clone());
             }
             #[cfg(not(feature = "ssh"))]
             RuntimeConfig::Remote(_) => {
