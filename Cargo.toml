@@ -14,13 +14,14 @@ homepage = "https://github.com/deib-polimi/renoir"
 readme = "README.md"
 
 [features]
-default = ["clap", "ssh", "timestamp"]
+default = ["clap", "ssh", "timestamp", "rdkafka"]
 timestamp = []
 ssh = ["ssh2", "whoami", "shell-escape", "sha2", "base64"]
 tokio = ["dep:tokio", "futures", "tokio/net", "tokio/io-util", "tokio/time", "tokio/rt-multi-thread", "tokio/macros"]
 avro = ["dep:apache-avro"]
 profiler = []
 parquet = ["dep:parquet", "dep:arrow"]
+rdkafka = ["tokio", "dep:rdkafka"]
 # parquet = ["dep:parquet", "dep:arrow"]
 
 [dependencies]
@@ -37,12 +38,12 @@ nanorand = "0.7.0"
 derivative = "2.2.0"
 
 # serialization
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.128"
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
 bincode = "1.3.3"
 toml = "0.8.19"
 
-thiserror = "1.0.64"
+thiserror = "1.0.69"
 
 # handy iterators functions
 
@@ -53,15 +54,15 @@ once_cell = "1.20.2"
 ssh2 = { version = "0.9.4", optional = true }
 whoami = { version = "1.5.2", optional = true }
 shell-escape = { version = "0.1.5", optional = true }
-clap = { version = "4.5.19", features = ["derive"], optional = true }
+clap = { version = "4.5.21", features = ["derive"], optional = true }
 sha2 = { version = "0.10.8", optional = true }
 base64 = { version = "0.22.1", optional = true }
 
 # channel implementation
-flume = "0.11.0"
+flume = "0.11.1"
 
 # used for csv file source
-csv = "1.3.0"
+csv = "1.3.1"
 
 # Lazy with support for delayed and synchronized initialization
 lazy-init = "0.5.1"
@@ -69,7 +70,7 @@ lazy-init = "0.5.1"
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
 coarsetime = "0.1.34"
 
-tokio = { version = "1.40.0", features = ["rt"], default-features = false, optional = true }
+tokio = { version = "1.41.1", features = ["rt"], default-features = false, optional = true }
 futures = { version = "0.3.31", optional = true }
 
 parking_lot = "0.12.3"
@@ -84,16 +85,16 @@ dashmap = "6.1.0"
 dyn-clone = "1.0.17" 
 
 apache-avro = { version = "0.17.0", features = ["derive"], optional = true }
-parquet = { version = "53.1.0", optional = true }
-arrow = { version = "53.1.0", optional = true }
-
+parquet = { version = "53.3.0", optional = true }
+arrow = { version = "53.3.0", optional = true }
+rdkafka = { version = "0.36.2", optional = true }
 
 
 [dev-dependencies]
 # for the tests
 env_logger = "0.11.5"
 rand = { version = "0.8.5", features = ["small_rng"] }
-tempfile = "3.13.0"
+tempfile = "3.14.0"
 criterion = { version = "0.5.1", features = ["html_reports"] }
 fake = "2.10.0"
 mimalloc = { version = "0.1.43", default-features = false }
@@ -103,7 +104,7 @@ itertools = "0.13.0"
 micrometer = { version = "0.2.7", features = ["enable"]}
 
 # for the examples
-regex = "1.11.0"
+regex = "1.11.1"
 
 kstring = { version = "2.0.2", features = ["serde"] }
 nexmark = { version = "0.2.0", features = ["serde"] }

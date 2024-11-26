@@ -12,6 +12,7 @@ pub(super) mod collect_channel;
 pub(super) mod collect_count;
 pub(super) mod collect_vec;
 pub(super) mod csv;
+pub(super) mod kafka;
 pub(super) mod for_each;
 #[cfg(feature = "parquet")]
 pub(super) mod parquet;
