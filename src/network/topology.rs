@@ -569,7 +569,6 @@ impl NetworkTopology {
 mod tests {
     use crate::network::NetworkMessage;
     use crate::operator::StreamElement;
-    use itertools::Itertools;
 
     use super::*;
 
@@ -795,13 +794,16 @@ num_cores = 1
         receiver: NetworkReceiver<T>,
         expected: Vec<T>,
     ) {
-        let res = (0..expected.len())
+        let mut res = (0..expected.len())
             .flat_map(|_| receiver.recv().unwrap().into_iter())
-            .sorted()
-            .collect_vec();
+            .collect::<Vec<_>>();
+        res.sort_unstable();
         assert_eq!(
             res,
-            expected.into_iter().map(StreamElement::Item).collect_vec()
+            expected
+                .into_iter()
+                .map(StreamElement::Item)
+                .collect::<Vec<_>>()
         );
     }
 

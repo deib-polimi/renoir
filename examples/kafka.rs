@@ -1,10 +1,5 @@
 use clap::Parser;
-use rdkafka::{
-    config::RDKafkaLogLevel,
-    consumer::{Consumer, StreamConsumer},
-    producer::FutureProducer,
-    ClientConfig,
-};
+use rdkafka::{config::RDKafkaLogLevel, ClientConfig, Message};
 use renoir::prelude::*;
 
 #[derive(Parser)]
@@ -24,26 +19,28 @@ async fn main() {
 
     // Kafka Configuration
     // Consuming:
-    let consumer = ClientConfig::new()
+    let mut consumer_config = ClientConfig::new();
+    consumer_config
         .set("group.id", "asd")
         .set("bootstrap.servers", &opt.brokers)
         .set("enable.partition.eof", "false")
         .set("session.timeout.ms", "6000")
         .set("enable.auto.commit", "true")
-        .set_log_level(RDKafkaLogLevel::Info)
-        .create::<StreamConsumer>()
-        .expect("Consumer creation failed");
+        .set_log_level(RDKafkaLogLevel::Info);
 
-    consumer.subscribe(&["test1"]).expect("kafka fail");
-
-    ctx.stream_kafka(consumer).for_each(|x| println!("{x:?}"));
+    ctx.stream_kafka(consumer_config, &["test1"], Replication::Unlimited)
+        .map(|m| {
+            m.payload()
+                .map(|p| String::from_utf8_lossy(p).to_string())
+                .unwrap_or_default()
+        })
+        .for_each(|x| println!("{x:?}"));
 
     // Producing:
-    let producer = ClientConfig::new()
+    let mut producer = ClientConfig::new();
+    producer
         .set("bootstrap.servers", &opt.brokers)
-        .set("message.timeout.ms", "5000")
-        .create::<FutureProducer>()
-        .expect("Producer creation error");
+        .set("message.timeout.ms", "5000");
 
     ctx.stream_par_iter(0..200)
         .map(|x| format!("{x:08X}"))

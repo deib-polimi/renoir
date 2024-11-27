@@ -1,8 +1,10 @@
 use std::fmt::Display;
+use std::sync::Arc;
+use std::time::Duration;
 
-use rdkafka::message::ToBytes;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::Timeout;
+use rdkafka::ClientConfig;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure};
 
@@ -19,7 +21,8 @@ where
     prev: Op,
     #[derivative(Debug = "ignore")]
     producer: FutureProducer,
-    topic: String,
+    topic: Arc<String>,
+    rt: tokio::runtime::Handle,
 }
 
 impl<Op> KafkaSink<Op>
@@ -30,7 +33,8 @@ where
         Self {
             prev,
             producer,
-            topic,
+            topic: Arc::new(topic),
+            rt: tokio::runtime::Handle::current(),
         }
     }
 }
@@ -47,7 +51,7 @@ where
 impl<Op> Operator for KafkaSink<Op>
 where
     Op: Operator,
-    Op::Out: ToBytes,
+    Op::Out: AsRef<[u8]> + 'static,
 {
     type Out = ();
 
@@ -59,17 +63,17 @@ where
         loop {
             match self.prev.next() {
                 StreamElement::Item(t) | StreamElement::Timestamped(t, _) => {
-                    let record = FutureRecord::to(&self.topic)
-                    .key(&[])
-                    .payload(&t)
-                    // .key(&t)
-                    ;
+                    let producer = self.producer.clone();
+                    let topic = self.topic.clone();
 
-                    futures::executor::block_on(
-                        self.producer
-                            .send(record, Timeout::After(std::time::Duration::from_secs(30))),
-                    )
-                    .expect("kafka fail");
+                    self.rt.spawn(async move {
+                        let record = FutureRecord::to(&topic).key(&[]).payload(t.as_ref());
+
+                        producer
+                            .send(record, Timeout::After(Duration::from_secs(10)))
+                            .await
+                            .expect("kafka producer fail");
+                    });
                 }
                 StreamElement::Watermark(w) => return StreamElement::Watermark(w),
                 StreamElement::Terminate => return StreamElement::Terminate,
@@ -88,9 +92,12 @@ where
 
 impl<Op> Stream<Op>
 where
-    Op: Operator<Out: ToBytes> + 'static,
+    Op: Operator<Out: AsRef<[u8]>> + 'static,
 {
-    pub fn write_kafka(self, producer: FutureProducer, topic: &str) {
+    pub fn write_kafka(self, producer_config: ClientConfig, topic: &str) {
+        let producer = producer_config
+            .create::<FutureProducer>()
+            .expect("failed to create kafka producer");
         self.add_operator(|prev| KafkaSink::new(prev, producer, topic.to_owned()))
             .finalize_block();
     }

@@ -8,11 +8,11 @@ pub use avro::*;
 pub use channel::*;
 pub use file::*;
 pub use iterator::*;
+#[cfg(feature = "rdkafka")]
+pub use kafka::*;
 pub use parallel_iterator::*;
 #[cfg(feature = "parquet")]
 pub use parquet::*;
-#[cfg(feature = "rdkafka")]
-pub use kafka::*;
 
 use crate::{block::Replication, operator::Operator};
 
@@ -24,11 +24,11 @@ mod channel;
 mod csv;
 mod file;
 mod iterator;
+#[cfg(feature = "rdkafka")]
+mod kafka;
 mod parallel_iterator;
 #[cfg(feature = "parquet")]
 mod parquet;
-#[cfg(feature = "rdkafka")]
-mod kafka;
 
 /// This trait marks all the operators that can be used as sinks.
 pub trait Source: Operator {
