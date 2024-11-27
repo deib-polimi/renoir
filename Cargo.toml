@@ -156,6 +156,10 @@ harness = false
 [[bench]]
 name = "caching"
 harness = false
+[[bench]]
+name = "kafka"
+harness = false
+
 
 [profile.release]
 lto = true

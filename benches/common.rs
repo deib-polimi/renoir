@@ -87,18 +87,41 @@ where
     pub fn bench(&self, n: u64) -> Duration {
         let mut time = Duration::default();
         for _ in 0..n {
-            let mut env = (self.make_env)();
-            let _result = (self.make_network)(&mut env);
+            let mut ctx = (self.make_env)();
+            let _result = (self.make_network)(&mut ctx);
             let start = Instant::now();
-            env.execute_blocking();
+            ctx.execute_blocking();
             time += start.elapsed();
             black_box(_result);
         }
         time
     }
+
+    #[cfg(feature = "tokio")]
+    pub fn bench_tokio(&self, n: u64) -> Duration {
+        tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(async move {
+            let mut time = Duration::default();
+            for _ in 0..n {
+                let mut ctx = (self.make_env)();
+                let _result = (self.make_network)(&mut ctx);
+                let start = Instant::now();
+                ctx.execute().await;
+                time += start.elapsed();
+                black_box(_result);
+            }
+            time
+        })
+    }
+
 }
 
 pub fn renoir_bench_default(b: &mut Bencher, logic: impl Fn(&StreamContext)) {
     let builder = BenchBuilder::new(StreamContext::new_local, logic);
     b.iter_custom(|n| builder.bench(n));
+}
+
+#[cfg(feature = "tokio")]
+pub fn renoir_bench_default_tokio(b: &mut Bencher, logic: impl Fn(&StreamContext)) {
+    let builder = BenchBuilder::new(StreamContext::new_local, logic);
+    b.iter_custom(|n| builder.bench_tokio(n));
 }

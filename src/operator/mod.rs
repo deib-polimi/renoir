@@ -683,6 +683,28 @@ where
         self.add_operator(|prev| MapMemo::new(prev, f, fk, capacity))
     }
 
+    pub fn limit(self, count: usize) -> Stream<impl Operator<Out = Op::Out>> {
+        let mut count = count;
+        let mut flushed = false;
+        self.rich_map_custom(move |mut gen| {
+            if count == 0 {
+                return if !flushed {
+                    flushed = true;
+                    StreamElement::FlushAndRestart
+                } else {
+                    StreamElement::Terminate
+                };
+            }
+            match gen.next() {
+                el @ StreamElement::Item(_) | el @ StreamElement::Timestamped(_, _) => {
+                    count = count.saturating_sub(1);
+                    el
+                }
+                el => el,
+            }
+        })
+    }
+
     /// Fold the stream into a stream that emits a single value.
     ///
     /// The folding operator consists in adding to the current accumulation value (initially the

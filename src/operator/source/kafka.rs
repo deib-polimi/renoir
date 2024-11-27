@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
+use flume::Receiver;
+use futures::{StreamExt, TryStreamExt};
 use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
+use rdkafka::message::OwnedMessage;
 use rdkafka::ClientConfig;
 
 use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
@@ -14,7 +17,7 @@ enum KafkaSourceInner {
         config: ClientConfig,
         topics: Vec<String>,
     },
-    Running(StreamConsumer),
+    Running(Receiver<OwnedMessage>),
     // Terminated,
 }
 
@@ -69,7 +72,17 @@ impl Operator for KafkaSource {
         consumer
             .subscribe(t.as_slice())
             .expect("failed to subscribe to kafka topics");
-        self.inner = KafkaSourceInner::Running(consumer);
+        tracing::debug!("kafka source subscribed to {topics:?}");
+
+        let (tx, rx) = flume::bounded(8);
+        tokio::spawn(async move {
+            let mut stream = consumer.stream();
+            while let Some(msg) = stream.next().await {
+                let msg = msg.expect("failed receiving from kafka").detach();
+                tx.send(msg).expect("channel fail from kafka source");
+            }
+        });
+        self.inner = KafkaSourceInner::Running(rx);
     }
 
     fn next(&mut self) -> StreamElement<Self::Out> {
@@ -78,18 +91,13 @@ impl Operator for KafkaSource {
                 unreachable!("KafkaSource executing before setup!")
             }
             // KafkaSourceInner::Terminated => return StreamElement::Terminate,
-            KafkaSourceInner::Running(consumer) => {
-                let r = futures::executor::block_on(consumer.recv()).expect("kafka failure");
+            KafkaSourceInner::Running(rx) => {
+                match rx.recv() {
+                    Ok(msg) => StreamElement::Item(msg),
+                    Err(_e) => todo!(),
+                    // StreamElement::Terminate,
+                }
 
-                let msg = r.detach();
-
-                // TODO: with adaptive batching this does not work since it never emits FlushBatch messages
-                let output = StreamElement::Item(msg);
-
-                consumer
-                    .commit_message(&r, CommitMode::Async)
-                    .expect("kafka failure");
-                output
             }
         }
     }
