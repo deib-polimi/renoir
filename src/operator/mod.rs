@@ -683,7 +683,10 @@ where
         self.add_operator(|prev| MapMemo::new(prev, f, fk, capacity))
     }
 
-    pub fn limit(self, count: usize) -> Stream<impl Operator<Out = Op::Out>> {
+    pub fn limit(self, count: usize) -> Stream<impl Operator<Out = Op::Out>>
+    where
+        Op: crate::operator::source::Source,
+    {
         let mut count = count;
         let mut flushed = false;
         self.rich_map_custom(move |mut gen| {

@@ -30,7 +30,7 @@ mod parallel_iterator;
 #[cfg(feature = "parquet")]
 mod parquet;
 
-/// This trait marks all the operators that can be used as sinks.
+/// This trait marks all the operators that can be used as source.
 pub trait Source: Operator {
     /// The maximum parallelism offered by this operator.
     fn replication(&self) -> Replication;

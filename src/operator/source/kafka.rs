@@ -1,8 +1,10 @@
 use std::fmt::Display;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use flume::Receiver;
 use futures::StreamExt;
-use rdkafka::consumer::{Consumer, StreamConsumer};
+use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
 use rdkafka::message::OwnedMessage;
 use rdkafka::ClientConfig;
 
@@ -17,8 +19,10 @@ enum KafkaSourceInner {
         config: ClientConfig,
         topics: Vec<String>,
     },
-    Running(Receiver<OwnedMessage>),
-    // Terminated,
+    Running {
+        rx: Receiver<OwnedMessage>,
+        cancel_token: Arc<AtomicBool>,
+    }, // Terminated,
 }
 
 impl Clone for KafkaSourceInner {
@@ -75,14 +79,29 @@ impl Operator for KafkaSource {
         tracing::debug!("kafka source subscribed to {topics:?}");
 
         let (tx, rx) = flume::bounded(8);
+        let cancel_token = Arc::new(AtomicBool::new(false));
+        let cancel = cancel_token.clone();
         tokio::spawn(async move {
             let mut stream = consumer.stream();
             while let Some(msg) = stream.next().await {
-                let msg = msg.expect("failed receiving from kafka").detach();
-                tx.send(msg).expect("channel fail from kafka source");
+                let msg = msg.expect("failed receiving from kafka");
+                if cancel.load(Ordering::SeqCst) {
+                    break;
+                }
+                let owned = msg.detach();
+                if let Err(e) = tx.send(owned) {
+                    if cancel.load(Ordering::SeqCst) {
+                        break;
+                    } else {
+                        panic!("channel send failed for kafka source {e}");
+                    }
+                }
+                consumer
+                    .commit_message(&msg, CommitMode::Async)
+                    .expect("kafka fail to commit");
             }
         });
-        self.inner = KafkaSourceInner::Running(rx);
+        self.inner = KafkaSourceInner::Running { rx, cancel_token };
     }
 
     fn next(&mut self) -> StreamElement<Self::Out> {
@@ -91,10 +110,10 @@ impl Operator for KafkaSource {
                 unreachable!("KafkaSource executing before setup!")
             }
             // KafkaSourceInner::Terminated => return StreamElement::Terminate,
-            KafkaSourceInner::Running(rx) => {
+            KafkaSourceInner::Running { rx, .. } => {
                 match rx.recv() {
                     Ok(msg) => StreamElement::Item(msg),
-                    Err(_e) => todo!(),
+                    Err(e) => panic!("kafka background task panicked: {e}"),
                     // StreamElement::Terminate,
                 }
             }
@@ -122,6 +141,17 @@ impl Clone for KafkaSource {
             inner: self.inner.clone(),
             replication: self.replication,
             terminated: false,
+        }
+    }
+}
+
+impl Drop for KafkaSource {
+    fn drop(&mut self) {
+        match &self.inner {
+            KafkaSourceInner::Init { .. } => {}
+            KafkaSourceInner::Running { cancel_token, .. } => {
+                cancel_token.store(true, Ordering::SeqCst);
+            }
         }
     }
 }

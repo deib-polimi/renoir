@@ -17,7 +17,6 @@ fn kafka_prod(ctx: &StreamContext, size: u64, topic: &str) {
     let mut producer = ClientConfig::new();
     producer
         .set("bootstrap.servers", BROKERS.as_str())
-        .set("enable.auto.commit", "true")
         .set("message.timeout.ms", "5000");
     ctx.stream_par_iter(0u64..size)
         .batch_mode(BatchMode::timed(1024, Duration::from_millis(100)))
@@ -34,17 +33,16 @@ fn kafka_consume(ctx: &StreamContext, size: u64, topic: &str) {
         .set("bootstrap.servers", BROKERS.as_str())
         // .set("enable.partition.eof", "false")
         .set("session.timeout.ms", "6000")
-        // .set("auto.offset.reset", "latest")
-        .set("enable.auto.commit", "true");
+        .set("auto.offset.reset", "earliest");
 
-    ctx.stream_kafka(consumer_config, &[topic], Replication::Unlimited)
+    ctx.stream_kafka(consumer_config, &[topic], Replication::One)
+        .limit(size as usize)
         .batch_mode(BatchMode::timed(1024, Duration::from_millis(100)))
-        .inspect(|x| eprintln!("dbg: {x:?}"))
+        // .inspect(|x| eprintln!("dbg: {x:?}"))
         .map(|msg| {
             std::hint::black_box(msg);
         })
         .repartition_by(Replication::One, |_| 0)
-        .limit(size as usize)
         .collect_count();
 }
 
