@@ -13,6 +13,7 @@ pub(super) mod collect_count;
 pub(super) mod collect_vec;
 pub(super) mod csv;
 pub(super) mod for_each;
+#[cfg(feature = "rdkafka")]
 pub(super) mod kafka;
 #[cfg(feature = "parquet")]
 pub(super) mod parquet;

@@ -3,7 +3,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 use crate::channel::{
-    self, Receiver, RecvError, RecvTimeoutError, SelectResult, Sender, TryRecvError,
+    self, Receiver, RecvError, RecvTimeoutError, SelectResult, Sender, TryRecvError, TrySendError,
 };
 
 use crate::network::{NetworkMessage, ReceiverEndpoint};
@@ -125,13 +125,21 @@ pub(crate) struct NetworkSender<Out: Send + 'static> {
     sender: SenderInner<Out>,
 }
 
-#[derive(Clone)]
 enum SenderInner<Out: Send + 'static> {
     Mux(Sender<(ReceiverEndpoint, NetworkMessage<Out>)>),
     Local(Sender<NetworkMessage<Out>>),
 }
 
-impl<Out: ExchangeData> NetworkSender<Out> {
+impl<Out: Send + 'static> Clone for SenderInner<Out> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Mux(arg0) => Self::Mux(arg0.clone()),
+            Self::Local(arg0) => Self::Local(arg0.clone()),
+        }
+    }
+}
+
+impl<Out: Send + 'static> NetworkSender<Out> {
     pub fn send(&self, message: NetworkMessage<Out>) -> Result<(), NetworkSendError> {
         get_profiler().items_out(
             message.sender,
@@ -149,6 +157,32 @@ impl<Out: ExchangeData> NetworkSender<Out> {
         }
     }
 
+    pub fn try_send(&self, message: NetworkMessage<Out>) -> Result<(), NetworkTrySendError<Out>> {
+        let sender = message.sender;
+        let size = message.num_items();
+        let res = match &self.sender {
+            SenderInner::Mux(tx) => {
+                tx.try_send((self.receiver_endpoint, message))
+                    .map_err(|e| match e {
+                        TrySendError::Full(item) => NetworkTrySendError::Full(item.1),
+                        TrySendError::Disconnected(_) => {
+                            NetworkTrySendError::Disconnected(self.receiver_endpoint)
+                        }
+                    })
+            }
+            SenderInner::Local(tx) => tx.try_send(message).map_err(|e| match e {
+                TrySendError::Full(item) => NetworkTrySendError::Full(item),
+                TrySendError::Disconnected(_) => {
+                    NetworkTrySendError::Disconnected(self.receiver_endpoint)
+                }
+            }),
+        };
+        if res.is_ok() {
+            get_profiler().items_out(sender, self.receiver_endpoint.coord, size);
+        }
+        res
+    }
+
     pub fn clone_inner(&self) -> Sender<NetworkMessage<Out>> {
         match &self.sender {
             SenderInner::Mux(_) => panic!("Trying to clone mux channel. Not supported"),
@@ -159,6 +193,14 @@ impl<Out: ExchangeData> NetworkSender<Out> {
 
 #[derive(Debug, Error)]
 pub enum NetworkSendError {
+    #[error("channel disconnected")]
+    Disconnected(ReceiverEndpoint),
+}
+
+#[derive(Debug, Error)]
+pub enum NetworkTrySendError<T> {
+    #[error("channel full")]
+    Full(NetworkMessage<T>),
     #[error("channel disconnected")]
     Disconnected(ReceiverEndpoint),
 }

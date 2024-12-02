@@ -112,6 +112,12 @@ impl<T> NetworkMessage<T> {
         }
     }
 
+    pub fn into_vec(self) -> Vec<StreamElement<T>> {
+        match self.data {
+            NetworkData::Batch(vec) => vec,
+        }
+    }
+
     /// The coordinates of the sending block.
     pub fn sender(&self) -> Coord {
         self.sender

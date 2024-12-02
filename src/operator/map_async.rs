@@ -32,7 +32,11 @@ impl<T> Batcher<T> {
     /// Put a message in the batch queue, it won't be sent immediately.
     pub(crate) fn enqueue(&mut self, message: StreamElement<T>) -> Option<Vec<StreamElement<T>>> {
         match self.mode {
-            BatchMode::Adaptive(n, max_delay) => {
+            BatchMode::Adaptive(n, max_delay)
+            | BatchMode::Timed {
+                max_size: n,
+                interval: max_delay,
+            } => {
                 self.buffer.push(message);
                 let timeout_elapsed = self.last_send.elapsed() > max_delay.into();
                 if self.buffer.len() >= n.get() || timeout_elapsed {

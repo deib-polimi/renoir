@@ -8,13 +8,11 @@ use std::time::Duration;
 use flume::{
     bounded as bounded_ext, unbounded as unbounded_ext, Receiver as ReceiverExt,
     RecvError as ExtRecvError, RecvTimeoutError as ExtRecvTimeoutError, SendError as SendErrorExt,
-    Sender as SenderExt, TryRecvError as ExtTryRecvError,
+    Sender as SenderExt, TryRecvError as ExtTryRecvError, TrySendError as TrySendErrorExt,
 };
 
-pub trait ChannelItem: Send + 'static {}
-impl<T: Send + 'static> ChannelItem for T {}
-
 pub type SendError<T> = SendErrorExt<T>;
+pub type TrySendError<T> = TrySendErrorExt<T>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RecvError {
@@ -101,21 +99,32 @@ mod select_impl {
 }
 
 /// A wrapper on a bounded channel sender.
-#[derive(Debug, Clone)]
-pub struct Sender<T: ChannelItem>(SenderExt<T>);
+#[derive(Debug)]
+pub struct Sender<T: Send + 'static>(SenderExt<T>);
+
+impl<T: Send + 'static> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 /// A wrapper on a bounded channel receiver.
 #[derive(Debug)]
-pub struct Receiver<T: ChannelItem>(ReceiverExt<T>);
+pub struct Receiver<T: Send + 'static>(ReceiverExt<T>);
 
-impl<T: ChannelItem> Sender<T> {
+impl<T: Send + 'static> Sender<T> {
     /// Send a message in the channel, blocking if it's full.
     #[inline]
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
         self.0.send(item)
     }
+
+    #[inline]
+    pub fn try_send(&self, item: T) -> Result<(), TrySendErrorExt<T>> {
+        self.0.try_send(item)
+    }
 }
 
-impl<T: ChannelItem> Receiver<T> {
+impl<T: Send + 'static> Receiver<T> {
     /// Block until a message is present in the channel and return it when ready.
     #[inline]
     pub fn recv(&self) -> Result<T, RecvError> {
@@ -148,13 +157,13 @@ impl<T: ChannelItem> Receiver<T> {
     /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
     /// fairness property.
     #[inline]
-    pub fn select<T2: ChannelItem>(&self, other: &Receiver<T2>) -> SelectResult<T, T2> {
+    pub fn select<T2: Send + 'static>(&self, other: &Receiver<T2>) -> SelectResult<T, T2> {
         select_impl!(self, other)
     }
 
     /// Same as `select`, with a timeout.
     #[inline]
-    pub fn select_timeout<T2: ChannelItem>(
+    pub fn select_timeout<T2: Send + 'static>(
         &self,
         other: &Receiver<T2>,
         timeout: Duration,
@@ -165,12 +174,12 @@ impl<T: ChannelItem> Receiver<T> {
 
 /// A wrapper on an unbounded channel sender.
 #[derive(Debug, Clone)]
-pub struct UnboundedSender<T: ChannelItem>(SenderExt<T>);
+pub struct UnboundedSender<T: Send + 'static>(SenderExt<T>);
 /// A wrapper on an unbounded channel receiver.
 #[derive(Debug)]
-pub struct UnboundedReceiver<T: ChannelItem>(pub(crate) ReceiverExt<T>);
+pub struct UnboundedReceiver<T: Send + 'static>(pub(crate) ReceiverExt<T>);
 
-impl<T: ChannelItem> UnboundedSender<T> {
+impl<T: Send + 'static> UnboundedSender<T> {
     /// Send a message in the channel.
     #[inline]
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
@@ -178,7 +187,7 @@ impl<T: ChannelItem> UnboundedSender<T> {
     }
 }
 
-impl<T: ChannelItem> UnboundedReceiver<T> {
+impl<T: Send + 'static> UnboundedReceiver<T> {
     /// Block until a message is present in the channel and return it when ready.
     #[inline]
     pub fn recv(&self) -> Result<T, RecvError> {
@@ -199,13 +208,13 @@ impl<T: ChannelItem> UnboundedReceiver<T> {
     /// randomly (with an unspecified probability). It's guaranteed this function has the eventual
     /// fairness property.
     #[inline]
-    pub fn select<T2: ChannelItem>(&self, other: &UnboundedReceiver<T2>) -> SelectResult<T, T2> {
+    pub fn select<T2: Send + 'static>(&self, other: &UnboundedReceiver<T2>) -> SelectResult<T, T2> {
         select_impl!(self, other)
     }
 
     /// Same as `select`, with a timeout.
     #[inline]
-    pub fn select_timeout<T2: ChannelItem>(
+    pub fn select_timeout<T2: Send + 'static>(
         &self,
         other: &UnboundedReceiver<T2>,
         timeout: Duration,

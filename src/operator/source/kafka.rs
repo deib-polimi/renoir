@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use flume::Receiver;
-use futures::{StreamExt, TryStreamExt};
-use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
+use futures::StreamExt;
+use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::OwnedMessage;
 use rdkafka::ClientConfig;
 
@@ -97,7 +97,6 @@ impl Operator for KafkaSource {
                     Err(_e) => todo!(),
                     // StreamElement::Terminate,
                 }
-
             }
         }
     }
