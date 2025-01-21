@@ -138,7 +138,6 @@ impl<T: Send + 'static> Receiver<T> {
     }
 
     #[inline]
-
     pub async fn recv_async(&self) -> Result<T, RecvError> {
         self.0.recv_async().await.map_err(RecvError::from)
     }

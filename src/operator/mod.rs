@@ -2161,7 +2161,6 @@ where
     ///
     /// **Warning**: [StreamCache] methods must only be called **after** the original `StreamContext`
     /// has finished executing. Calling `stream_in` or `inner_cloned` on an incomplete cache will panic!
-
     /// ## Example
     /// ```
     /// # use renoir::prelude::*;
@@ -2281,7 +2280,6 @@ where
     ///
     /// assert_eq!(res.get().unwrap(), vec![0, 1, 4, 9, 0, 1, 4, 9, 0, 1]);
     /// ```
-
     pub fn map_memo<O: Data + Sync, F>(
         self,
         f: F,

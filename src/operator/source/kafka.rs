@@ -22,6 +22,7 @@ enum KafkaSourceInner {
     Running {
         rx: Receiver<OwnedMessage>,
         cancel_token: Arc<AtomicBool>,
+        cooldown: bool,
     }, // Terminated,
 }
 
@@ -81,6 +82,7 @@ impl Operator for KafkaSource {
         let (tx, rx) = flume::bounded(8);
         let cancel_token = Arc::new(AtomicBool::new(false));
         let cancel = cancel_token.clone();
+        tracing::debug!("started kafka source with topics {:?}", topics);
         tokio::spawn(async move {
             let mut stream = consumer.stream();
             while let Some(msg) = stream.next().await {
@@ -101,19 +103,43 @@ impl Operator for KafkaSource {
                     .expect("kafka fail to commit");
             }
         });
-        self.inner = KafkaSourceInner::Running { rx, cancel_token };
+        self.inner = KafkaSourceInner::Running {
+            rx,
+            cancel_token,
+            cooldown: false,
+        };
     }
 
     fn next(&mut self) -> StreamElement<Self::Out> {
-        match &self.inner {
+        match &mut self.inner {
             KafkaSourceInner::Init { .. } => {
                 unreachable!("KafkaSource executing before setup!")
             }
             // KafkaSourceInner::Terminated => return StreamElement::Terminate,
-            KafkaSourceInner::Running { rx, .. } => {
-                match rx.recv() {
+            KafkaSourceInner::Running { rx, cooldown, .. } => {
+                if *cooldown {
+                    match rx.recv() {
+                        Ok(msg) => {
+                            *cooldown = false;
+                            return StreamElement::Item(msg);
+                        }
+                        Err(flume::RecvError::Disconnected) => {
+                            tracing::warn!("kafka background task disconnected.");
+                            return StreamElement::Terminate;
+                        }
+                    }
+                }
+
+                match rx.recv_timeout(std::time::Duration::from_millis(100)) {
                     Ok(msg) => StreamElement::Item(msg),
-                    Err(e) => panic!("kafka background task panicked: {e}"),
+                    Err(flume::RecvTimeoutError::Timeout) => {
+                        *cooldown = true;
+                        StreamElement::FlushBatch
+                    }
+                    Err(flume::RecvTimeoutError::Disconnected) => {
+                        tracing::warn!("kafka background task disconnected.");
+                        StreamElement::Terminate
+                    }
                     // StreamElement::Terminate,
                 }
             }
