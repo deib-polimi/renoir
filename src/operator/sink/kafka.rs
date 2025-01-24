@@ -94,6 +94,7 @@ impl<Op> Stream<Op>
 where
     Op: Operator<Out: AsRef<[u8]>> + 'static,
 {
+    /// # WARNING: KAFKA API IS EXPERIMENTAL
     pub fn write_kafka(self, producer_config: ClientConfig, topic: &str) {
         let producer = producer_config
             .create::<FutureProducer>()

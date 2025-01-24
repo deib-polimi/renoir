@@ -97,8 +97,8 @@ mod without_profiler {
     use crate::profiler::*;
 
     /// The fake profiler for when the `profiler` feature is disabled.
-    // static PROFILER: UnsafeCell<NoOpProfiler> = UnsafeCell::new(NoOpProfiler);
-
+    /// static PROFILER: UnsafeCell<NoOpProfiler> = UnsafeCell::new(NoOpProfiler);
+    ///
     /// Fake profiler. This is used when the `profiler` feature is not enabled.
     ///
     /// This struct MUST NOT contain any field and must do absolutely nothing since it is accessed

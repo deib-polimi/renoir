@@ -1,3 +1,5 @@
+// WARNING: KAFKA API IS EXPERIMENTAL
+
 use clap::Parser;
 use rdkafka::{config::RDKafkaLogLevel, ClientConfig, Message};
 use renoir::prelude::*;

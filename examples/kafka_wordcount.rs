@@ -1,3 +1,5 @@
+// WARNING: KAFKA API IS EXPERIMENTAL
+
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;

@@ -1,6 +1,9 @@
 mod count;
 pub use count::CountWindow;
 
+mod all;
+pub use all::AllWindow;
+
 #[cfg(feature = "timestamp")]
 mod event_time;
 #[cfg(feature = "timestamp")]

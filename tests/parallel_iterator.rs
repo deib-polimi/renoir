@@ -7,9 +7,9 @@ mod utils;
 #[test]
 fn parallel_iterator() {
     TestHelper::local_remote_env(|env| {
-        let n = 100;
+        let n = 100u64;
         let source = ParallelIteratorSource::new(move |id, instances| {
-            let chunk_size = (n + instances - 1) / instances;
+            let chunk_size = n.div_ceil(instances);
             let remaining = n - n.min(chunk_size * id);
             let range = remaining.min(chunk_size);
 

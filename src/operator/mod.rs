@@ -2820,7 +2820,6 @@ where
     /// let s = env.stream_iter(0..5);
     /// let res = s.shuffle();
     /// ```
-
     pub fn shuffle(self) -> Stream<impl Operator<Out = Op::Out>> {
         self.0.split_block(End::new, NextStrategy::random())
     }

@@ -63,7 +63,7 @@ where
         let ts = el.timestamp().cloned();
         match el {
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
-                while self.ws.len() < (self.size + self.slide - 1) / self.slide {
+                while self.ws.len() < self.size.div_ceil(self.slide) {
                     self.ws.push_back(Slot::new(self.init.clone()))
                 }
                 let k = self.ws.front().unwrap().count / self.slide + 1; // TODO: Check

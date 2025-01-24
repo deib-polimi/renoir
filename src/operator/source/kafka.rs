@@ -38,9 +38,14 @@ impl Clone for KafkaSourceInner {
     }
 }
 
-/// Source that consumes an iterator and emits all its elements into the stream.
+/// # WARNING: KAFKA API IS EXPERIMENTAL
 ///
-/// The iterator will be consumed **only from one replica**, therefore this source is not parallel.
+/// If replication is greater than `Replication::One` and timestamping logic
+/// is being used, ensure that the number of kafka partitions receiving events
+/// is greater than the number of replicas. Otherwise, watermarks may not be generated
+/// stalling the computation. To solve this, reduce the replication.
+///
+/// TODO: address this
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct KafkaSource {
@@ -139,8 +144,7 @@ impl Operator for KafkaSource {
                     Err(flume::RecvTimeoutError::Disconnected) => {
                         tracing::warn!("kafka background task disconnected.");
                         StreamElement::Terminate
-                    }
-                    // StreamElement::Terminate,
+                    } // StreamElement::Terminate,
                 }
             }
         }
@@ -186,6 +190,15 @@ impl crate::StreamContext {
     /// Convenience method, creates a `KafkaSource` and makes a stream using `StreamContext::stream`
     ///
     /// See Examples
+    ///
+    /// # WARNING: KAFKA API IS EXPERIMENTAL
+    ///
+    /// If replication is greater than `Replication::One` and timestamping logic
+    /// is being used, ensure that the number of kafka partitions receiving events
+    /// is greater than the number of replicas. Otherwise, watermarks may not be generated
+    /// stalling the computation. To solve this, reduce the replication.
+    ///
+    /// TODO: address this
     pub fn stream_kafka(
         &self,
         client_config: ClientConfig,
