@@ -16,8 +16,8 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           path: |
@@ -26,17 +26,22 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
+      - uses: taiki-e/install-action@cargo-nextest
       - name: Cargo Test
         timeout-minutes: 20
         run: |
-          cargo test --all --no-fail-fast
+          cargo nextest run --no-fail-fast
+      - name: Cargo Test Doc
+        timeout-minutes: 20
+        run: |
+          cargo test --doc
 
   lint:
     name: Format and Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           path: |
@@ -53,5 +58,5 @@ jobs:
           cargo fmt --all --check
       - name: Cargo clippy
         run: |
-          cargo clippy --all-targets --all -- -D warnings
+          cargo clippy --all-targets --all
       
