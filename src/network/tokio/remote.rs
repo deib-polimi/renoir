@@ -123,9 +123,9 @@ pub(crate) async fn remote_recv<T: ExchangeData, R: AsyncRead + Unpin>(
 
 #[cfg(test)]
 mod tests {
-    use bincode::enc::write::SizeWriter;
-    use crate::network::remote::HEADER_SIZE;
     use super::{MessageHeader, BINCODE_HEADER};
+    use crate::network::remote::HEADER_SIZE;
+    use bincode::enc::write::SizeWriter;
 
     #[test]
     fn header_size() {

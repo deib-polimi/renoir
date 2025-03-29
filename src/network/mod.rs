@@ -226,11 +226,10 @@ impl From<ReceiverEndpoint> for DemuxCoord {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use super::remote::{MessageHeader, BINCODE_HEADER, HEADER_SIZE};
     use bincode::enc::write::SizeWriter;
-    use super::remote::{HEADER_SIZE, MessageHeader, BINCODE_HEADER};
 
     #[test]
     fn header_size() {
