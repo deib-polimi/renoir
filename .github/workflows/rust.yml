@@ -31,10 +31,12 @@ jobs:
         timeout-minutes: 20
         run: |
           cargo nextest run --no-fail-fast
+          cargo nextest run --no-fail-fast --features tokio
       - name: Cargo Test Doc
         timeout-minutes: 20
         run: |
           cargo test --doc
+          cargo test --doc --features tokio
 
   lint:
     name: Format and Clippy
@@ -53,10 +55,13 @@ jobs:
       - name: Cargo Check
         run: |
           cargo check --all-targets
+          cargo check --all-targets --features tokio
       - name: Cargo Format
         run: |
           cargo fmt --all --check
+          cargo fmt --all --check --features tokio
       - name: Cargo clippy
         run: |
           cargo clippy --all-targets --all
+          cargo clippy --all-targets --all --features tokio
       
