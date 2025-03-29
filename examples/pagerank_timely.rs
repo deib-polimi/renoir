@@ -24,7 +24,8 @@ fn main() {
     let source = env
         .stream_par_iter(move |index, peers| {
             let mut rng1: SmallRng = SeedableRng::seed_from_u64(index);
-            (0..(edges / peers)).map(move |_| (rng1.gen_range(0..nodes), rng1.gen_range(0..nodes)))
+            (0..(edges / peers))
+                .map(move |_| (rng1.random_range(0..nodes), rng1.random_range(0..nodes)))
         })
         .batch_mode(BatchMode::fixed(1024));
 

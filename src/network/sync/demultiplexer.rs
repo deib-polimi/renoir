@@ -174,8 +174,9 @@ fn demux_thread<In: ExchangeData>(
 
     // let mut r = std::io::BufReader::new(&mut stream);
     let mut r = &mut stream;
+    let mut scratch = Vec::new();
 
-    while let Some((dest, message)) = remote_recv(coord, &mut r, &address) {
+    while let Some((dest, message)) = remote_recv(coord, &mut r, &mut scratch, &address) {
         if let Err(e) = senders[&dest].send(message) {
             warn!("demux failed to send message to {}: {:?}", dest, e);
         }

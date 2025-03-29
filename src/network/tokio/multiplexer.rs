@@ -150,9 +150,10 @@ async fn mux_thread<Out: ExchangeData>(
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
     log::debug!("{} connected to {:?}", coord, address);
+    let mut scratch = Vec::new();
 
     while let Ok((dest, message)) = rx.recv_async().await {
-        remote_send(message, dest, &mut stream, &address).await;
+        remote_send(message, dest, &mut stream, &mut scratch, &address).await;
     }
 
     stream.shutdown().await.unwrap();

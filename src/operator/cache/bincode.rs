@@ -2,15 +2,11 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, ErrorKind, Write};
 use std::path::PathBuf;
 
-use bincode::Options as _;
-use once_cell::sync::Lazy;
+use bincode::config;
+use bincode::error::DecodeError;
 use serde::{Deserialize, Serialize};
 
 use super::{CacheReplayer, Cacher};
-
-static BINCODE_CONFIG: Lazy<
-    bincode::config::WithOtherIntEncoding<bincode::DefaultOptions, bincode::config::VarintEncoding>,
-> = Lazy::new(|| bincode::DefaultOptions::new().with_varint_encoding());
 
 pub struct BincodeCacheConfig {
     pub batch_size: usize,
@@ -31,12 +27,12 @@ pub struct BincodeReplayer<T> {
 }
 
 impl<T: Serialize> BincodeCacher<T> {
-    fn write_buf(&mut self) {
+    fn flush_buf(&mut self) {
         // let len = BINCODE_CONFIG.serialized_size(&self.buf).unwrap();
         // self.file.write_all(&len.to_le_bytes()).unwrap();
-        BINCODE_CONFIG
-            .serialize_into(&mut self.file, &self.buf)
+        bincode::serde::encode_into_std_write(&self.buf, &mut self.file, config::standard())
             .unwrap();
+
         self.buf.truncate(0);
     }
 }
@@ -64,13 +60,13 @@ impl<T: Serialize + for<'de> Deserialize<'de> + Send + 'static> Cacher<T> for Bi
     fn append(&mut self, item: T) {
         self.buf.push(item);
         if self.buf.len() == self.batch_size {
-            self.write_buf();
+            self.flush_buf();
         }
     }
 
     fn finalize(mut self) -> Self::Handle {
         if !self.buf.is_empty() {
-            self.write_buf();
+            self.flush_buf();
         }
         self.file.flush().unwrap();
         self.path
@@ -95,23 +91,15 @@ impl<T: for<'de> Deserialize<'de> + Send> CacheReplayer<T> for BincodeReplayer<T
             return Some(el);
         }
 
-        // let mut size = [0u8; 8];
-
-        // if let Err(e) = self.file.read_exact(&mut size[..]) {
-        //     match e.kind() {
-        //         std::io::ErrorKind::UnexpectedEof => return None,
-        //         _ => panic!("{e}"),
-        //     }
-        // }
-
-        match BINCODE_CONFIG.deserialize_from::<_, Vec<T>>(&mut self.file) {
+        match bincode::serde::decode_from_std_read::<Vec<T>, _, _>(
+            &mut self.file,
+            config::standard(),
+        ) {
             Ok(data) => self.buf = data.into_iter(),
+            Err(DecodeError::Io { inner, .. }) if inner.kind() == ErrorKind::UnexpectedEof => {
+                return None
+            }
             Err(e) => {
-                if let bincode::ErrorKind::Io(e) = e.as_ref() {
-                    if e.kind() == ErrorKind::UnexpectedEof {
-                        return None;
-                    }
-                }
                 panic!("{e}");
             }
         }

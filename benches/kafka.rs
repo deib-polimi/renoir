@@ -1,7 +1,7 @@
 use criterion::BenchmarkId;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use once_cell::sync::Lazy;
-use rand::prelude::*;
+use rand::{prelude::*, rng};
 use rdkafka::ClientConfig;
 use renoir::prelude::*;
 use std::time::Duration;
@@ -27,7 +27,7 @@ fn kafka_prod(ctx: &StreamContext, size: u64, topic: &str) {
 fn kafka_consume(ctx: &StreamContext, size: u64, topic: &str) {
     let mut consumer_config = ClientConfig::new();
 
-    let g = format!("{:010x}", thread_rng().gen_range(0..100000));
+    let g = format!("{:010x}", rng().random_range(0..100000));
     consumer_config
         .set("group.id", g)
         .set("bootstrap.servers", BROKERS.as_str())

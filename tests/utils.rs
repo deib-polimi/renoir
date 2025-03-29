@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use itertools::{process_results, Itertools};
 
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use renoir::config::{ConfigBuilder, HostConfig, RuntimeConfig};
 use renoir::operator::{Data, Operator, StreamElement, Timestamp};
 use renoir::structure::BlockStructure;
@@ -150,7 +150,7 @@ impl TestHelper {
     ) {
         Self::setup();
         let mut hosts = vec![];
-        let test_id: u16 = thread_rng().gen(); //TEST_INDEX.fetch_add(1, Ordering::SeqCst) + 1;
+        let test_id: u16 = rng().random(); //TEST_INDEX.fetch_add(1, Ordering::SeqCst) + 1;
         for host_id in 0..num_hosts {
             let high_part = (test_id & 0xff00) >> 8;
             let low_part = test_id & 0xff;

@@ -115,7 +115,7 @@ fn bench_main(c: &mut Criterion) {
                 let source = env.stream_par_iter(move |id, peers| {
                     let mut rng: SmallRng = SeedableRng::seed_from_u64(id ^ 0xdeadbeef);
                     (0..edges / peers)
-                        .map(move |_| (rng.gen_range(0..nodes), rng.gen_range(0..nodes)))
+                        .map(move |_| (rng.random_range(0..nodes), rng.random_range(0..nodes)))
                 });
 
                 connected(source);
@@ -134,8 +134,9 @@ fn bench_main(c: &mut Criterion) {
 
                         let source = env.stream_par_iter(move |id, peers| {
                             let mut rng: SmallRng = SeedableRng::seed_from_u64(id ^ 0xdeadbeef);
-                            (0..edges / peers)
-                                .map(move |_| (rng.gen_range(0..nodes), rng.gen_range(0..nodes)))
+                            (0..edges / peers).map(move |_| {
+                                (rng.random_range(0..nodes), rng.random_range(0..nodes))
+                            })
                         });
 
                         connected(source);

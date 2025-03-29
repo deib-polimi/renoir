@@ -169,8 +169,9 @@ async fn demux_thread<In: ExchangeData>(
         .map(|a| a.to_string())
         .unwrap_or_else(|_| "unknown".to_string());
     log::debug!("{} started", coord);
+    let mut scratch = Vec::new();
 
-    while let Some((dest, message)) = remote_recv(coord, &mut stream, &address).await {
+    while let Some((dest, message)) = remote_recv(coord, &mut stream, &mut scratch, &address).await {
         if let Err(e) = senders[&dest].send(message) {
             warn!("demux failed to send message to {}: {:?}", dest, e);
         }

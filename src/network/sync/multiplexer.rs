@@ -133,9 +133,10 @@ fn mux_thread<Out: ExchangeData>(
 
     // let mut w = std::io::BufWriter::new(&mut stream);
     let mut w = &mut stream;
+    let mut scratch = Vec::new();
 
     while let Ok((dest, message)) = rx.recv() {
-        remote_send(message, dest, &mut w, &address);
+        remote_send(message, dest, &mut w, &mut scratch, &address);
     }
 
     w.flush().unwrap();

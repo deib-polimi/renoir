@@ -61,10 +61,10 @@ const TOPICS: [&str; 50] = [
 const PROB: f64 = 0.1;
 
 fn random_topic() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     for topic in TOPICS {
-        if rng.gen::<f64>() < PROB {
+        if rng.random::<f64>() < PROB {
             return topic.to_string();
         }
     }

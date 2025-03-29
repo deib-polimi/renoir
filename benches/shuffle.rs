@@ -33,7 +33,7 @@ fn shuffle_benchmark(c: &mut Criterion) {
     const DATASET_SIZE: usize = 100_000;
     let mut dataset: [u32; DATASET_SIZE] = [0; DATASET_SIZE];
     for item in dataset.iter_mut() {
-        *item = r.gen();
+        *item = r.random();
     }
 
     let dataset = Box::leak(Box::new(dataset)) as &_;

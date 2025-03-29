@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use utils::TestHelper;
 
 mod utils;
@@ -28,7 +28,7 @@ fn map_memo_by_stream() {
     TestHelper::local_remote_env(|env| {
         let res = env
             .stream_par_iter(0..1000u32)
-            .map(|v| v as f32 + thread_rng().gen::<f32>() * 0.4)
+            .map(|v| v as f32 + rng().random::<f32>() * 0.4)
             .map(|v| v.rem_euclid(30.))
             .map_memo_by(
                 |v| {
