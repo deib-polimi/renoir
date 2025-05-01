@@ -1,7 +1,7 @@
 [package]
 name = "renoir"
 description = "Reactive Network of Operators In Rust"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 authors = [
     "Luca De Martini <luca.demartini@polimi.it>",
@@ -41,7 +41,7 @@ derivative = "2.2.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 bincode = { version = "2.0.1", features = ["serde"] }
-toml = "0.8.20"
+toml = "0.8.22"
 
 thiserror = "2.0.12"
 
@@ -54,8 +54,8 @@ once_cell = "1.21.3"
 ssh2 = { version = "0.9.5", optional = true }
 whoami = { version = "1.6.0", optional = true }
 shell-escape = { version = "0.1.5", optional = true }
-clap = { version = "4.5.34", features = ["derive"], optional = true }
-sha2 = { version = "0.10.8", optional = true }
+clap = { version = "4.5.37", features = ["derive"], optional = true }
+sha2 = { version = "0.10.9", optional = true }
 base64 = { version = "0.22.1", optional = true }
 
 # channel implementation
@@ -70,7 +70,7 @@ lazy-init = "0.5.1"
 # Faster monotonic clock using libc's CLOCK_MONOTONIC_COARSE
 coarsetime = "0.1.36"
 
-tokio = { version = "1.44.1", features = ["rt"], default-features = false, optional = true }
+tokio = { version = "1.44.2", features = ["rt"], default-features = false, optional = true }
 futures = { version = "0.3.31", optional = true }
 
 parking_lot = "0.12.3"
@@ -78,26 +78,26 @@ parking_lot = "0.12.3"
 wyhash = "0.5.0"
 fxhash = "0.2.1"
 glidesort = "0.1.2"
-indexmap = "2.8.0"
+indexmap = "2.9.0"
 tracing = { version = "0.1.41", features = ["log"] }
-quick_cache = "0.6.12"
+quick_cache = "0.6.13"
 dashmap = "6.1.0"
 dyn-clone = "1.0.19" 
 
 apache-avro = { version = "0.17.0", features = ["derive"], optional = true }
-parquet = { version = "54.3.0", optional = true }
-arrow = { version = "54.3.0", optional = true }
+parquet = { version = "54.3.1", optional = true }
+arrow = { version = "54.3.1", optional = true }
 rdkafka = { version = "0.37.0", optional = true }
 serde_bytes = "0.11.17"
 
 [dev-dependencies]
 # for the tests
-env_logger = "0.11.7"
-rand = { version = "0.9.0", features = ["small_rng"] }
+env_logger = "0.11.8"
+rand = { version = "0.9.1", features = ["small_rng"] }
 tempfile = "3.19.1"
 criterion = { version = "0.5.1", features = ["html_reports"] }
-fake = "4.2.0"
-mimalloc = { version = "0.1.44", default-features = false }
+fake = "4.3.0"
+mimalloc = { version = "0.1.46", default-features = false }
 tracing-subscriber = "0.3.19"
 itertools = "0.14.0"
 

@@ -38,7 +38,7 @@ where
     WindowDescr: WindowDescription<Out>,
     OperatorChain: Operator<Out = (Key, Out)> + 'static,
     Key: DataKey,
-    Out: Data + Ord,
+    Out: Data,
 {
     /// Prefer other aggregators if possible as they don't save all elements
     pub fn map<NewOut: Data, F: Fn(Vec<Out>) -> NewOut + Send + Clone + 'static>(
