@@ -3,7 +3,6 @@ pub use count::CountWindow;
 mod last_k;
 pub use last_k::LastKWindow;
 
-
 mod all;
 pub use all::AllWindow;
 

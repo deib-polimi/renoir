@@ -45,7 +45,7 @@ impl<A: WindowAccumulator> CountWindowManager<A> {
             (Some(t), None) | (None, Some(t)) => Some(t),
             (None, None) => None,
         };
-        self.ws[idx].acc.process(&el);
+        self.ws[idx].acc.process(el);
     }
 }
 

@@ -44,7 +44,7 @@ impl<A: WindowAccumulator> LastKWindowManager<A> {
             (Some(t), None) | (None, Some(t)) => Some(t),
             (None, None) => None,
         };
-        self.ws[idx].acc.process(&el);
+        self.ws[idx].acc.process(el);
     }
 }
 
@@ -102,9 +102,7 @@ impl LastKWindow {
     /// Last K Window with slide = 1
     #[inline]
     pub fn new(size: usize) -> Self {
-        Self {
-            size,
-        }
+        Self { size }
     }
 }
 
@@ -145,6 +143,16 @@ mod tests {
         manager.process(StreamElement::Terminate);
 
         eprintln!("{res:?}");
-        assert_eq!(vec![vec![0], vec![0,1], vec![0,1,2], vec![1,2,3], vec![2,3,4], vec![3, 4, 5],], res)
+        assert_eq!(
+            vec![
+                vec![0],
+                vec![0, 1],
+                vec![0, 1, 2],
+                vec![1, 2, 3],
+                vec![2, 3, 4],
+                vec![3, 4, 5],
+            ],
+            res
+        )
     }
 }
