@@ -14,8 +14,8 @@ impl<L: Data, R: Data> WindowAccumulator for Join<L, R> {
     type Out = ProductIterator<L, R>; // TODO: may have more efficient formulations
 
     #[inline]
-    fn process(&mut self, el: Self::In) {
-        match el {
+    fn process(&mut self, el: &Self::In) {
+        match el.clone() {
             MergeElement::Left(l) => self.left.push(l),
             MergeElement::Right(r) => self.right.push(r),
         }

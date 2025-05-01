@@ -10,9 +10,9 @@ impl<T: Data> WindowAccumulator for First<T> {
     type Out = T;
 
     #[inline]
-    fn process(&mut self, el: Self::In) {
+    fn process(&mut self, el: &Self::In) {
         if self.0.is_none() {
-            self.0 = Some(el);
+            self.0 = Some(el.clone());
         }
     }
 
@@ -31,8 +31,8 @@ impl<T: Data> WindowAccumulator for Last<T> {
     type Out = T;
 
     #[inline]
-    fn process(&mut self, el: Self::In) {
-        self.0 = Some(el);
+    fn process(&mut self, el: &Self::In) {
+        self.0 = Some(el.clone());
     }
 
     #[inline]

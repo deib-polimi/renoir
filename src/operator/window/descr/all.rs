@@ -32,7 +32,7 @@ where
             StreamElement::Item(item) | StreamElement::Timestamped(item, _) => {
                 self.accumulator
                     .get_or_insert_with(|| self.init.clone())
-                    .process(item);
+                    .process(&item);
                 None
             }
             StreamElement::FlushAndRestart => Some(WindowResult::new(
@@ -97,7 +97,7 @@ mod tests {
     fn all_window() {
         let window = AllWindow::new();
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         for i in 1..100 {

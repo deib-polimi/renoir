@@ -38,7 +38,7 @@ pub trait WindowAccumulator: Clone + Send + 'static {
     type Out: Data;
 
     /// Process a single input element updating the state of the accumulator
-    fn process(&mut self, el: Self::In);
+    fn process(&mut self, el: &Self::In);
     /// Finalize the accumulator and produce a result
     fn output(self) -> Self::Out;
 }

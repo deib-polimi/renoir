@@ -8,7 +8,7 @@ use super::super::*;
 #[derive(Clone)]
 pub(crate) struct Fold<I, S, F>
 where
-    F: FnMut(&mut S, I),
+    F: FnMut(&mut S, &I),
 {
     state: S,
     f: F,
@@ -17,7 +17,7 @@ where
 
 impl<I, S, F> Fold<I, S, F>
 where
-    F: FnMut(&mut S, I),
+    F: FnMut(&mut S, &I),
 {
     pub(crate) fn new(state: S, f: F) -> Self {
         Self {
@@ -32,13 +32,13 @@ impl<I, S, F> WindowAccumulator for Fold<I, S, F>
 where
     I: Clone + Send + 'static,
     S: Clone + Send + 'static,
-    F: FnMut(&mut S, I) + Clone + Send + 'static,
+    F: FnMut(&mut S, &I) + Clone + Send + 'static,
 {
     type In = I;
 
     type Out = S;
 
-    fn process(&mut self, el: Self::In) {
+    fn process(&mut self, el: &Self::In) {
         (self.f)(&mut self.state, el);
     }
 
@@ -50,7 +50,7 @@ where
 #[derive(Clone)]
 pub(crate) struct FoldFirst<I, F>
 where
-    F: FnMut(&mut I, I),
+    F: FnMut(&mut I, &I),
 {
     state: Option<I>,
     f: F,
@@ -58,7 +58,7 @@ where
 
 impl<I, F> FoldFirst<I, F>
 where
-    F: FnMut(&mut I, I),
+    F: FnMut(&mut I, &I),
 {
     pub(crate) fn new(f: F) -> Self {
         Self { state: None, f }
@@ -68,15 +68,15 @@ where
 impl<I, F> WindowAccumulator for FoldFirst<I, F>
 where
     I: Clone + Send + 'static,
-    F: FnMut(&mut I, I) + Clone + Send + 'static,
+    F: FnMut(&mut I, &I) + Clone + Send + 'static,
 {
     type In = I;
     type Out = I;
 
     #[inline]
-    fn process(&mut self, el: Self::In) {
+    fn process(&mut self, el: &Self::In) {
         match self.state.as_mut() {
-            None => self.state = Some(el),
+            None => self.state = Some(el.clone()),
             Some(s) => (self.f)(s, el),
         }
     }
@@ -129,7 +129,7 @@ where
         fold: F,
     ) -> KeyedStream<impl Operator<Out = (Key, NewOut)>>
     where
-        F: FnMut(&mut NewOut, Out) + Clone + Send + 'static,
+        F: FnMut(&mut NewOut, &Out) + Clone + Send + 'static,
     {
         let acc = Fold::new(init, fold);
         self.add_window_operator("WindowFold", acc)
@@ -141,7 +141,7 @@ where
     ///
     pub fn fold_first<F>(self, fold: F) -> KeyedStream<impl Operator<Out = (Key, Out)>>
     where
-        F: FnMut(&mut Out, Out) + Clone + Send + 'static,
+        F: FnMut(&mut Out, &Out) + Clone + Send + 'static,
     {
         let acc = FoldFirst::new(fold);
         self.add_window_operator("WindowFoldFirst", acc)

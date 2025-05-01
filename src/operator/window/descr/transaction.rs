@@ -62,7 +62,7 @@ where
                 let slot = self.w.get_or_insert_with(|| Slot::new(self.init.clone()));
 
                 let command = (self.f)(&item);
-                slot.acc.process(item);
+                slot.acc.process(&item);
 
                 match command {
                     TransactionOp::Commit => return_current!(),

@@ -13,8 +13,8 @@ where
 {
     pub fn max(self) -> KeyedStream<impl Operator<Out = (Key, Out)>> {
         let acc = FoldFirst::<Out, _>::new(|max, x| {
-            if x > *max {
-                *max = x
+            if *x > *max {
+                *max = x.clone()
             }
         });
         self.add_window_operator("WindowMax", acc)
@@ -33,8 +33,8 @@ where
         get_key: F,
     ) -> KeyedStream<impl Operator<Out = (Key, Out)>> {
         let acc = FoldFirst::<Out, _>::new(move |max, x| {
-            if (get_key)(&x) > (get_key)(max) {
-                *max = x
+            if (get_key)(x) > (get_key)(max) {
+                *max = x.clone()
             }
         });
         self.add_window_operator("WindowMax", acc)
@@ -45,8 +45,8 @@ where
         compare: F,
     ) -> KeyedStream<impl Operator<Out = (Key, Out)>> {
         let acc = FoldFirst::<Out, _>::new(move |max, x| {
-            if (compare)(&x, max).is_gt() {
-                *max = x
+            if (compare)(x, max).is_gt() {
+                *max = x.clone()
             }
         });
         self.add_window_operator("WindowMax", acc)

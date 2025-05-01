@@ -63,7 +63,7 @@ where
                     .skip_while(|w| w.end <= now)
                     .take_while(|w| w.start <= now)
                     .for_each(|w| {
-                        w.acc.process(item.clone());
+                        w.acc.process(&item);
                         w.active = true;
                     });
             }
@@ -149,7 +149,7 @@ mod tests {
         let size = Duration::from_micros(100);
         let window = ProcessingTimeWindow::tumbling(size);
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         let start = Instant::now();

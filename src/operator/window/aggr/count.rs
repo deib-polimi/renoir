@@ -10,7 +10,7 @@ impl<T: Data> WindowAccumulator for Count<T> {
     type Out = usize;
 
     #[inline]
-    fn process(&mut self, _: Self::In) {
+    fn process(&mut self, _: &Self::In) {
         self.0 += 1;
     }
 

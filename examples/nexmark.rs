@@ -53,7 +53,7 @@ fn winning_bids(
         // find the bid with the maximum price
         .fold(
             (None, Vec::new()),
-            |(auction, bids): &mut (Option<Auction>, Vec<Bid>), e| match e {
+            |(auction, bids): &mut (Option<Auction>, Vec<Bid>), e| match e.clone() {
                 Event::Auction(a) => {
                     let winner = bids
                         .drain(..)

@@ -14,7 +14,7 @@ where
     pub fn sum<NewOut: Data + Default + AddAssign<Out>>(
         self,
     ) -> KeyedStream<impl Operator<Out = (Key, NewOut)>> {
-        let acc = Fold::new(NewOut::default(), |sum, x| *sum += x);
+        let acc = Fold::new(NewOut::default(), |sum, x: &Out| *sum += x.clone());
         self.add_window_operator("WindowSum", acc)
     }
 }

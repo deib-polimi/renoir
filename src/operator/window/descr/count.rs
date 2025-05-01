@@ -38,14 +38,14 @@ impl<A> Slot<A> {
 
 impl<A: WindowAccumulator> CountWindowManager<A> {
     #[inline]
-    fn update_slot(&mut self, idx: usize, el: A::In, ts: Option<Timestamp>) {
+    fn update_slot(&mut self, idx: usize, el: &A::In, ts: Option<Timestamp>) {
         self.ws[idx].count += 1;
         self.ws[idx].ts = match (self.ws[idx].ts, ts) {
             (Some(a), Some(b)) => Some(a.max(b)),
             (Some(t), None) | (None, Some(t)) => Some(t),
             (None, None) => None,
         };
-        self.ws[idx].acc.process(el);
+        self.ws[idx].acc.process(&el);
     }
 }
 
@@ -68,7 +68,7 @@ where
                 }
                 let k = self.ws.front().unwrap().count / self.slide + 1; // TODO: Check
                 for i in 0..k {
-                    self.update_slot(i, item.clone(), ts);
+                    self.update_slot(i, &item, ts);
                 }
                 if self.ws[0].count == self.size {
                     let r = self.ws.pop_front().unwrap();
@@ -178,7 +178,7 @@ mod tests {
         let slide = 2;
         let window = CountWindow::sliding(3, 2);
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         for i in 1..100 {
@@ -197,7 +197,7 @@ mod tests {
     fn exact_window() {
         let window = CountWindow::new(4, 1, true);
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         let mut res = Vec::new();
@@ -218,7 +218,7 @@ mod tests {
     fn nonexact_window() {
         let window = CountWindow::new(4, 1, false);
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         let mut res = Vec::new();
@@ -246,7 +246,7 @@ mod tests {
         let slide = 2;
         let window = CountWindow::sliding(3, 2);
 
-        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold: Fold<isize, Vec<isize>, _> = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         for i in 1..100 {

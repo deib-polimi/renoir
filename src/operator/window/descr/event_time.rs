@@ -74,7 +74,7 @@ where
                     .skip_while(|w| w.end <= ts)
                     .take_while(|w| w.start <= ts)
                     .for_each(|w| {
-                        w.acc.process(item.clone());
+                        w.acc.process(&item);
                         w.active = true;
                     });
 
@@ -160,7 +160,7 @@ mod tests {
     fn event_time_window() {
         let window = EventTimeWindow::sliding(5, 4);
 
-        let fold = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         let mut received = Vec::new();
@@ -187,7 +187,7 @@ mod tests {
     fn event_time_window_spars() {
         let window = EventTimeWindow::sliding(5, 4);
 
-        let fold = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         let mut received = Vec::new();

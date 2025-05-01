@@ -13,8 +13,8 @@ where
 {
     pub fn min(self) -> KeyedStream<impl Operator<Out = (Key, Out)>> {
         let acc = FoldFirst::<Out, _>::new(|min, x| {
-            if x < *min {
-                *min = x
+            if *x < *min {
+                *min = x.clone()
             }
         });
         self.add_window_operator("WindowMin", acc)
@@ -33,8 +33,8 @@ where
         get_key: F,
     ) -> KeyedStream<impl Operator<Out = (Key, Out)>> {
         let acc = FoldFirst::<Out, _>::new(move |min, x| {
-            if (get_key)(&x) < (get_key)(min) {
-                *min = x
+            if (get_key)(x) < (get_key)(min) {
+                *min = x.clone()
             }
         });
         self.add_window_operator("WindowMin", acc)
@@ -45,8 +45,8 @@ where
         compare: F,
     ) -> KeyedStream<impl Operator<Out = (Key, Out)>> {
         let acc = FoldFirst::<Out, _>::new(move |min, x| {
-            if (compare)(&x, min).is_lt() {
-                *min = x
+            if (compare)(x, min).is_lt() {
+                *min = x.clone()
             }
         });
         self.add_window_operator("WindowMin", acc)

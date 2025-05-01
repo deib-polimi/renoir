@@ -113,14 +113,14 @@ fn query5(events: Stream<impl Operator<Out = (SystemTime, Event)> + 'static>) {
         .group_by(|(_, a)| *a)
         .map(|(_, (t, _))| t)
         .window(window_descr.clone())
-        .fold((UNIX_EPOCH, 0), |(t, count), t1| {
+        .fold((UNIX_EPOCH, 0), |(t, count), &t1| {
             *t = t1.max(*t);
             *count += 1;
         })
         .unkey();
     counts
         .window_all(window_descr)
-        .fold_first(|(max, (t, max_count)), (id, (t1, count))| {
+        .fold_first(|(max, (t, max_count)), &(id, (t1, count))| {
             *t = t1.max(*t);
             if count > *max_count {
                 *max = id;

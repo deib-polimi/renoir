@@ -52,7 +52,7 @@ where
                 let slot = self
                     .w
                     .get_or_insert_with(|| Slot::new(self.init.clone(), ts));
-                slot.acc.process(item);
+                slot.acc.process(&item);
                 slot.last = ts;
                 ret
             }
@@ -109,7 +109,7 @@ mod tests {
     fn event_time_window() {
         let window = SessionWindow::new(Duration::from_millis(10));
 
-        let fold = Fold::new(Vec::new(), |v, el| v.push(el));
+        let fold = Fold::new(Vec::new(), |v, &el| v.push(el));
         let mut manager = window.build(fold);
 
         let mut received = Vec::new();

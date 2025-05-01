@@ -23,8 +23,8 @@ where
     type Out = O;
 
     #[inline]
-    fn process(&mut self, el: Self::In) {
-        self.vec.push(el);
+    fn process(&mut self, el: &Self::In) {
+        self.vec.push(el.clone());
     }
 
     #[inline]
