@@ -13,7 +13,7 @@ use itertools::{process_results, Itertools};
 use rand::{rng, Rng};
 use renoir::config::{ConfigBuilder, HostConfig, RuntimeConfig};
 use renoir::operator::{Data, Operator, StreamElement, Timestamp};
-use renoir::structure::BlockStructure;
+use renoir::block::structure::BlockStructure;
 use renoir::CoordUInt;
 use renoir::ExecutionMetadata;
 use renoir::StreamContext;

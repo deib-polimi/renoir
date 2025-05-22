@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use crate::{CoordUInt, RuntimeConfig, StreamContext};
-use crate::{Replication, Stream};
-
+use crate::block::Replication;
 use crate::operator::Data;
+use crate::Stream;
+use crate::{CoordUInt, RuntimeConfig, StreamContext};
 
 use super::{CacheRegistryRef, CacheSource, Cacher};
 

@@ -1,9 +1,10 @@
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use coarsetime::Instant;
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
 use crate::network::{Coord, NetworkMessage, NetworkSender, NetworkTrySendError};
@@ -18,21 +19,23 @@ use crate::operator::StreamElement;
 /// it has at least 1024 messages, or no message has been received in the last 50ms.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum BatchMode {
-    /// A batch is flushed only when the specified number of messages is present.
+    /// A batch is flushed only when the specified number of messages is
+    /// present.
     Fixed(NonZeroUsize),
-    /// A batch is flushed only when the specified number of messages is present or a timeout
-    /// expires. NOTE: The timer is checked only when a new message arrives, for background
-    /// timers use BatchMode::Timed
+    /// A batch is flushed only when the specified number of messages is
+    /// present or a timeout expires. NOTE: The timer is checked only when a
+    /// new message arrives, for background timers with a small execution
+    /// overhead use BatchMode::Timed
     Adaptive(NonZeroUsize, Duration),
-    /// A batch is flushed only when the specified number of messages is present or a timeout
-    /// expires. The timer is checked in the background. the `tokio` feature is recommended for
-    /// best performance when using this mode.
+    /// A batch is flushed only when the specified number of messages is
+    /// present or a timeout expires. The timer is checked in the background.
+    /// Using background timers may incud in a very small perfomance overhead
+    /// when compared to Fixed or Adaptive batching
     Timed {
         max_size: NonZeroUsize,
         interval: Duration,
     },
-
-    /// Send each message infdividually
+    /// Send a size 1 batch for each element
     Single,
 }
 
@@ -198,17 +201,16 @@ impl<T: Clone + Send + 'static> Batcher<T> {
                         batcher.lock().try_flush();
                     }
                 });
-                // TODO: This currently spawns A LOT of threads, we should switch to a time wheel version
                 #[cfg(not(feature = "tokio"))]
-                std::thread::spawn(move || {
-                    loop {
-                        std::thread::sleep(interval); // TODO: exact interval with time diff
-                        if cancel.load(Ordering::Acquire) {
-                            break;
-                        }
-                        batcher.lock().try_flush();
-                    }
-                });
+                {
+                    static CLOCK: Lazy<BatchScheduler> = Lazy::new(BatchScheduler::new);
+
+                    CLOCK.register(
+                        Box::new(move |_| _ = batcher.lock().try_flush()),
+                        interval,
+                        cancel,
+                    );
+                }
                 Self::Sync {
                     inner,
                     cancel_token,
@@ -236,9 +238,9 @@ impl<T: Clone + Send + 'static> Batcher<T> {
             Batcher::Sync { inner, .. } => inner.lock().flush(),
         }
     }
-    pub(crate) fn end(self) {
-        match self {
-            Batcher::Unsync(mut inner) => inner.end(),
+    pub(crate) fn end(mut self) {
+        match &mut self {
+            Batcher::Unsync(inner) => inner.end(),
             Batcher::Sync {
                 inner,
                 cancel_token,
@@ -246,6 +248,17 @@ impl<T: Clone + Send + 'static> Batcher<T> {
                 cancel_token.store(true, Ordering::Release);
                 inner.lock().end()
             }
+        }
+    }
+}
+
+impl<T: Send + 'static> Drop for Batcher<T> {
+    fn drop(&mut self) {
+        match self {
+            Batcher::Sync { cancel_token, .. } => {
+                cancel_token.store(true, Ordering::Release);
+            }
+            _ => {}
         }
     }
 }
@@ -290,6 +303,67 @@ impl BatchMode {
 
 impl Default for BatchMode {
     fn default() -> Self {
-        BatchMode::adaptive(1024, Duration::from_millis(50))
+        BatchMode::timed(1024, Duration::from_millis(100))
+    }
+}
+
+struct CancellableTask(Box<dyn FnMut(Instant) + Send + Sync>, Arc<AtomicBool>);
+
+struct BatchScheduler {
+    tasks: Arc<DashMap<Duration, Vec<CancellableTask>>>,
+}
+
+impl BatchScheduler {
+    pub fn new() -> Self {
+        Self {
+            tasks: Arc::new(DashMap::new()),
+        }
+    }
+
+    pub fn register(
+        &self,
+        op: Box<dyn FnMut(Instant) + Send + Sync>,
+        period: Duration,
+        cancel_token: Arc<AtomicBool>,
+    ) {
+        match self.tasks.entry(period) {
+            dashmap::Entry::Occupied(mut e) => {
+                e.get_mut().push(CancellableTask(op, cancel_token));
+            }
+            dashmap::Entry::Vacant(e) => {
+                e.insert(vec![CancellableTask(op, cancel_token)]);
+                let tasks = self.tasks.clone();
+                std::thread::Builder::new()
+                    .name(format!("timer-{:?}", period))
+                    .spawn(move || {
+                        loop {
+                            std::thread::sleep(period);
+                            let mut is_empty = false;
+                            if let Some(mut tasks_ref) = tasks.get_mut(&period) {
+                                let now = Instant::now();
+                                // Retain only tasks that are not cancelled
+                                tasks_ref.retain_mut(|CancellableTask(task, cancel_token)| {
+                                    if cancel_token.load(Ordering::Acquire) {
+                                        false
+                                    } else {
+                                        (task)(now);
+                                        true
+                                    }
+                                });
+                                if tasks_ref.is_empty() {
+                                    is_empty = true;
+                                }
+                            }
+                            if is_empty {
+                                tasks.remove_if(&period, |_, v| v.is_empty());
+                                if !tasks.contains_key(&period) {
+                                    break;
+                                }
+                            }
+                        }
+                    })
+                    .unwrap();
+            }
+        }
     }
 }

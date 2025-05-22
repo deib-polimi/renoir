@@ -4,13 +4,14 @@ use std::fmt::Display;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::block::BatchMode;
 use crate::block::{BlockStructure, OperatorStructure, Replication};
 use crate::network::{Coord, NetworkSender, NetworkTopology, ReceiverEndpoint};
 use crate::operator::source::Source;
 use crate::operator::{Data, ExchangeData, Operator, StreamElement};
 use crate::scheduler::ExecutionMetadata;
 use crate::CoordUInt;
-use crate::{BatchMode, RuntimeConfig};
+use crate::RuntimeConfig;
 
 /// A fake operator that can be used to unit-test the operators.
 #[derive(Debug, Clone)]

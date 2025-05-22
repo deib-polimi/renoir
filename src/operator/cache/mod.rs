@@ -4,11 +4,8 @@ use std::{fmt::Display, sync::Arc};
 
 use parking_lot::Mutex;
 
+use crate::block::{BlockStructure, OperatorKind, OperatorStructure, Replication};
 use crate::network::Coord;
-use crate::{
-    block::{BlockStructure, OperatorKind, OperatorStructure},
-    Replication,
-};
 use crate::{CoordUInt, RuntimeConfig};
 
 use crate::operator::{source::Source, Data, Operator, StreamElement};

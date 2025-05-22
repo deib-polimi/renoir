@@ -71,6 +71,7 @@ lazy-init = "0.5.1"
 coarsetime = "0.1.36"
 
 tokio = { version = "1.44.2", features = ["rt"], default-features = false, optional = true }
+smol = { version = "2.0.2", default-features = false}
 futures = { version = "0.3.31", optional = true }
 
 parking_lot = "0.12.3"

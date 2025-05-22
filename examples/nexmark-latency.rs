@@ -3,7 +3,7 @@ use nexmark::config::NexmarkConfig;
 use renoir::operator::Operator;
 use renoir::operator::Timestamp;
 use renoir::prelude::*;
-use renoir::Replication;
+use renoir::block::Replication;
 use renoir::Stream;
 use std::time::Instant;
 use std::time::SystemTime;

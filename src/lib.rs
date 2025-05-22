@@ -117,17 +117,14 @@ extern crate derivative;
 #[macro_use]
 extern crate tracing;
 
-pub use block::structure;
-pub use block::BatchMode;
-pub use block::Replication;
-pub use block::{group_by_hash, GroupHasherBuilder};
 pub use config::RuntimeConfig;
 pub use environment::StreamContext;
 pub use operator::iteration::IterationStateHandle;
 pub use scheduler::ExecutionMetadata;
 pub use stream::{KeyedStream, Stream, WindowedStream};
+pub use block::{BatchMode, Replication};
 
-pub(crate) mod block;
+pub mod block;
 pub(crate) mod channel;
 pub mod config;
 pub(crate) mod environment;
@@ -146,11 +143,12 @@ pub type CoordUInt = u64;
 
 /// Re-export of commonly used structs and traits
 pub mod prelude {
-    pub use super::operator::sink::StreamOutput;
-    pub use super::operator::source::*;
-    pub use super::operator::window::{CountWindow, ProcessingTimeWindow, SessionWindow};
+    pub use crate::block::{BatchMode, Replication};
+    pub use crate::config::RuntimeConfig;
+    pub use crate::operator::sink::StreamOutput;
+    pub use crate::operator::source::*;
+    pub use crate::operator::window::{CountWindow, ProcessingTimeWindow, SessionWindow};
     #[cfg(feature = "timestamp")]
-    pub use super::operator::window::{EventTimeWindow, TransactionWindow};
-    pub use super::Replication;
-    pub use super::{BatchMode, RuntimeConfig, StreamContext};
+    pub use crate::operator::window::{EventTimeWindow, TransactionWindow};
+    pub use crate::StreamContext;
 }

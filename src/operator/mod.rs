@@ -23,8 +23,9 @@ pub use rich_map_custom::ElementGenerator;
 use crate::block::{group_by_hash, BlockStructure, GroupHasherBuilder, NextStrategy, Replication};
 use crate::scheduler::ExecutionMetadata;
 
+use crate::block::BatchMode;
 use crate::stream::KeyedItem;
-use crate::{BatchMode, KeyedStream, Stream};
+use crate::{KeyedStream, Stream};
 
 #[cfg(feature = "tokio")]
 use self::map_async::MapAsync;
@@ -1119,7 +1120,7 @@ where
     /// + `Watermark` messages must be sent when no more items with lower timestamp will ever be produced
     /// + `FlushBatch` messages must be forwarded if received
     /// + For each `FlushAndRestart` and `Terminate` message received, the operator must generate
-    ///     one and only one message of the same kind. No other messages of this kind should be created
+    ///   one and only one message of the same kind. No other messages of this kind should be created
     ///
     /// The mapping function is _cloned_ inside each replica, and they will not share state between
     /// each other. If you want that only a single replica handles all the items you may want to

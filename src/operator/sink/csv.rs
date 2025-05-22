@@ -5,9 +5,10 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use crate::block::NextStrategy;
+use crate::block::Replication;
 use crate::operator::{ExchangeData, Operator};
 use crate::scheduler::ExecutionMetadata;
-use crate::{CoordUInt, Replication, Stream};
+use crate::{CoordUInt, Stream};
 
 use super::writer::{sequential_path, WriteOperator, WriterOperator};
 

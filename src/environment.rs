@@ -9,7 +9,8 @@ use crate::operator::source::Source;
 use crate::operator::{Data, Operator};
 use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
-use crate::{BatchMode, CoordUInt};
+use crate::CoordUInt;
+use crate::block::BatchMode;
 
 // static LAST_REMOTE_CONFIG: Lazy<Mutex<Option<RemoteConfig>>> = Lazy::new(|| Mutex::new(None));
 
