@@ -2,8 +2,8 @@ use serde::Serialize;
 use std::{ffi::OsString, fmt::Display, path::PathBuf};
 
 use crate::{
-    operator::{Operator, StreamElement},
     block::structure::{OperatorKind, OperatorStructure},
+    operator::{Operator, StreamElement},
     ExecutionMetadata,
 };
 

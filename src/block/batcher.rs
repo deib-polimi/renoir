@@ -294,7 +294,8 @@ impl BatchMode {
         match &self {
             BatchMode::Adaptive(_, max_delay) => Some(*max_delay),
             BatchMode::Timed { interval, .. } => Some(*interval),
-            BatchMode::Fixed(_) | BatchMode::Single => None,
+            BatchMode::Single => Some(Duration::from_secs(5)), // Avoid starvation on locked nodes
+            BatchMode::Fixed(_) => None,
         }
     }
 }

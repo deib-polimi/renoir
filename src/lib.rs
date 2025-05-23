@@ -117,12 +117,12 @@ extern crate derivative;
 #[macro_use]
 extern crate tracing;
 
+pub use block::{BatchMode, Replication};
 pub use config::RuntimeConfig;
 pub use environment::StreamContext;
 pub use operator::iteration::IterationStateHandle;
 pub use scheduler::ExecutionMetadata;
 pub use stream::{KeyedStream, Stream, WindowedStream};
-pub use block::{BatchMode, Replication};
 
 pub mod block;
 pub(crate) mod channel;

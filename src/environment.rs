@@ -2,6 +2,7 @@ use parking_lot::Mutex;
 use std::any::TypeId;
 use std::sync::Arc;
 
+use crate::block::BatchMode;
 use crate::block::{Block, Scheduling};
 use crate::config::RuntimeConfig;
 use crate::operator::iteration::IterationStateLock;
@@ -10,7 +11,6 @@ use crate::operator::{Data, Operator};
 use crate::scheduler::{BlockId, Scheduler};
 use crate::stream::Stream;
 use crate::CoordUInt;
-use crate::block::BatchMode;
 
 // static LAST_REMOTE_CONFIG: Lazy<Mutex<Option<RemoteConfig>>> = Lazy::new(|| Mutex::new(None));
 
