@@ -1,10 +1,9 @@
 use std::fmt::Display;
-use std::sync::Arc;
 use std::vec::IntoIter as VecIter;
 
 use coarsetime::Instant;
-use flume::{Receiver, Sender};
 use futures::{Future, StreamExt};
+use tokio::runtime::Handle;
 
 use crate::block::{BlockStructure, OperatorStructure};
 use crate::operator::{Data, Operator, StreamElement};
@@ -78,36 +77,34 @@ impl<T> Batcher<T> {
 
 pub struct MapAsync<O: Send + 'static, F, Fut, Op>
 where
-    F: Fn(Op::Out) -> Fut + Send + Sync + 'static,
+    F: Fn(Op::Out) -> Fut + Send,
     Fut: Future<Output = O> + Send,
     Op: Operator,
 {
     prev: Op,
     batcher: Batcher<Op::Out>,
     buffer: Option<VecIter<StreamElement<O>>>,
-    flushing: bool,
-    pending: usize,
+    buffering: usize,
+    rt: Handle,
     f: F,
-    i_tx: Sender<Vec<StreamElement<Op::Out>>>,
-    o_rx: Receiver<Vec<StreamElement<O>>>,
 }
 
 impl<O: Send + 'static, F, Fut, Op> Clone for MapAsync<O, F, Fut, Op>
 where
-    F: Fn(Op::Out) -> Fut + Send + Sync + 'static,
+    F: Fn(Op::Out) -> Fut + Send,
     Fut: Future<Output = O> + Send,
     Op: Operator,
     Op::Out: 'static,
     F: Clone,
 {
     fn clone(&self) -> Self {
-        Self::new(self.prev.clone(), self.f.clone(), 4)
+        Self::new(self.prev.clone(), self.f.clone(), self.buffering)
     }
 }
 
 impl<O: Data, F, Fut, Op> Display for MapAsync<O, F, Fut, Op>
 where
-    F: Fn(Op::Out) -> Fut + Send + Sync + 'static,
+    F: Fn(Op::Out) -> Fut + Send,
     Fut: Future<Output = O> + Send,
     Op: Operator,
 {
@@ -124,70 +121,37 @@ where
 
 impl<O: Send + 'static, F, Fut, Op> MapAsync<O, F, Fut, Op>
 where
-    F: Fn(Op::Out) -> Fut + Send + Sync + 'static + Clone,
+    F: Fn(Op::Out) -> Fut + Send + Clone,
     Fut: Future<Output = O> + Send,
     Op: Operator,
     Op::Out: 'static,
 {
     pub(super) fn new(prev: Op, f: F, buffer: usize) -> Self {
-        const CH: usize = 2;
-        let (i_tx, i_rx) = flume::bounded::<Vec<StreamElement<Op::Out>>>(CH);
-        let (o_tx, o_rx) = flume::bounded::<Vec<StreamElement<O>>>(CH);
-
-        let ff = Arc::new(f.clone());
-        tokio::spawn(async move {
-            while let Ok(b) = i_rx.recv_async().await {
-                let v: Vec<_> = futures::stream::iter(b.into_iter())
-                    .map(|el| {
-                        let ff = ff.clone();
-                        tokio::spawn(async move { el.map_async(ff.as_ref()).await })
-                    })
-                    .buffered(buffer)
-                    .map(Result::unwrap)
-                    .collect()
-                    .await;
-
-                o_tx.send_async(v).await.unwrap();
-            }
-        });
-
         Self {
             prev,
             batcher: Default::default(),
-            f,
-            flushing: false,
-            pending: 0,
+            rt: Handle::current(),
+            f: f,
             buffer: Default::default(),
-            i_tx,
-            o_rx,
+            buffering: buffer,
         }
     }
 
-    fn schedule_batch(&mut self, b: Vec<StreamElement<Op::Out>>) {
-        match self.i_tx.try_send(b) {
-            Ok(()) => self.pending += 1,
-            Err(flume::TrySendError::Full(b)) => {
-                self.recv_output_batch();
-                self.i_tx.send(b).unwrap();
-                self.pending += 1
-            }
-            Err(e) => panic!("{e}"),
-        }
-    }
-
-    fn recv_output_batch(&mut self) {
-        assert!(
-            self.pending > 0,
-            "map_async trier receiving batches, but pending is equal to 0"
+    fn run_batch(&mut self, b: Vec<StreamElement<Op::Out>>) {
+        let result = self.rt.block_on(
+            futures::stream::iter(b.into_iter())
+                .map(|el| el.map_async(&self.f))
+                .buffered(self.buffering)
+                .collect::<Vec<_>>(),
         );
-        self.buffer = Some(self.o_rx.recv().unwrap().into_iter());
-        self.pending -= 1;
+
+        self.buffer = Some(result.into_iter());
     }
 }
 
 impl<O: Data, F, Fut, Op> Operator for MapAsync<O, F, Fut, Op>
 where
-    F: Fn(Op::Out) -> Fut + Send + Sync + 'static + Clone,
+    F: Fn(Op::Out) -> Fut + Send + Clone,
     Fut: Future<Output = O> + Send,
     Op: Operator,
     Op::Out: 'static,
@@ -201,6 +165,11 @@ where
 
     #[inline]
     fn next(&mut self) -> StreamElement<O> {
+        if matches!(self.batcher.mode, BatchMode::Single) {
+            let el = self.prev.next();
+            return el.map(|item| self.rt.block_on((self.f)(item)));
+        }
+
         loop {
             if let Some(el) = self.buffer.as_mut().and_then(Iterator::next) {
                 return el;
@@ -208,19 +177,11 @@ where
                 self.buffer = None;
             }
 
-            if self.flushing && self.pending > 0 {
-                self.recv_output_batch();
-                continue;
-            }
-            if self.flushing && self.pending == 0 {
-                self.flushing = false;
-            }
-
             let el = self.prev.next();
             let kind = el.variant();
 
             if let Some(b) = self.batcher.enqueue(el) {
-                self.schedule_batch(b);
+                self.run_batch(b);
             }
 
             if matches!(
@@ -230,14 +191,8 @@ where
                     | StreamElement::Terminate
             ) {
                 if let Some(b) = self.batcher.flush() {
-                    self.schedule_batch(b);
+                    self.run_batch(b);
                 }
-            }
-            if matches!(
-                kind,
-                StreamElement::FlushAndRestart | StreamElement::Terminate
-            ) {
-                self.flushing = true;
             }
         }
     }
@@ -249,36 +204,160 @@ where
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use std::str::FromStr;
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
 
-//     use crate::operator::map::Map;
-//     use crate::operator::{Operator, StreamElement};
-//     use crate::test::FakeOperator;
+    use crate::operator::map_async::MapAsync;
+    use crate::operator::{Operator, StreamElement};
+    use crate::test::{FakeNetworkTopology, FakeOperator};
+    use crate::BatchMode;
 
-//     #[test]
-//     #[cfg(feature = "timestamp")]
-//     fn map_stream() {
-//         let mut fake_operator = FakeOperator::new(0..10u8);
-//         for i in 0..10 {
-//             fake_operator.push(StreamElement::Timestamped(i, i as i64));
-//         }
-//         fake_operator.push(StreamElement::Watermark(100));
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn async_map_timed_batch() {
+        let mut fake_operator = FakeOperator::new(0..20u8);
+        fake_operator.push(StreamElement::FlushAndRestart);
+        fake_operator.push(StreamElement::Terminate);
 
-//         let map = Map::new(fake_operator, |x| x.to_string());
-//         let map = Map::new(map, |x| x + "000");
-//         let mut map = Map::new(map, |x| u32::from_str(&x).unwrap());
+        let mut net = FakeNetworkTopology::<u32>::new(0, 0);
+        let mut metadata = net.metadata();
+        metadata.batch_mode = BatchMode::timed(5, Duration::from_millis(100));
 
-//         for i in 0..10 {
-//             let elem = map.next();
-//             assert_eq!(elem, StreamElement::Item(i * 1000));
-//         }
-//         for i in 0..10 {
-//             let elem = map.next();
-//             assert_eq!(elem, StreamElement::Timestamped(i * 1000, i as i64));
-//         }
-//         assert_eq!(map.next(), StreamElement::Watermark(100));
-//         assert_eq!(map.next(), StreamElement::Terminate);
-//     }
-// }
+        let mut map = MapAsync::new(
+            fake_operator,
+            |x| async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                x * 2
+            },
+            4,
+        );
+
+        map.setup(&mut metadata);
+
+        eprintln!("starting new thread ");
+        std::thread::scope(|s| {
+            s.spawn(move || {
+                for i in 0..20 {
+                    eprintln!("waiting element {i}");
+                    let elem = map.next();
+                    eprintln!("received element {i}");
+                    assert_eq!(elem, StreamElement::Item(i * 2));
+                }
+                eprintln!("waiting termination stuff");
+                assert_eq!(map.next(), StreamElement::FlushAndRestart);
+                assert_eq!(map.next(), StreamElement::Terminate);
+            });
+        });
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn async_map_adaptive_batch() {
+        let mut fake_operator = FakeOperator::new(0..20u8);
+        fake_operator.push(StreamElement::FlushAndRestart);
+        fake_operator.push(StreamElement::Terminate);
+
+        let mut net = FakeNetworkTopology::<u32>::new(0, 0);
+        let mut metadata = net.metadata();
+        metadata.batch_mode = BatchMode::adaptive(8, Duration::from_millis(100));
+
+        let mut map = MapAsync::new(
+            fake_operator,
+            |x| async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                x * 2
+            },
+            4,
+        );
+
+        map.setup(&mut metadata);
+
+        eprintln!("starting new thread ");
+        std::thread::scope(|s| {
+            s.spawn(move || {
+                for i in 0..20 {
+                    eprintln!("waiting element {i}");
+                    let elem = map.next();
+                    eprintln!("received element {i}");
+                    assert_eq!(elem, StreamElement::Item(i * 2));
+                }
+                eprintln!("waiting termination stuff");
+                assert_eq!(map.next(), StreamElement::FlushAndRestart);
+                assert_eq!(map.next(), StreamElement::Terminate);
+            });
+        });
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn async_map_no_batch() {
+        let mut fake_operator = FakeOperator::new(0..20u8);
+        fake_operator.push(StreamElement::FlushAndRestart);
+        fake_operator.push(StreamElement::Terminate);
+
+        let mut net = FakeNetworkTopology::<u32>::new(0, 0);
+        let mut metadata = net.metadata();
+        metadata.batch_mode = BatchMode::single();
+
+        let mut map = MapAsync::new(
+            fake_operator,
+            |x| async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                x * 2
+            },
+            4,
+        );
+
+        map.setup(&mut metadata);
+
+        eprintln!("starting new thread ");
+        std::thread::scope(|s| {
+            s.spawn(move || {
+                for i in 0..20 {
+                    eprintln!("waiting element {i}");
+                    let elem = map.next();
+                    eprintln!("received element {i}");
+                    assert_eq!(elem, StreamElement::Item(i * 2));
+                }
+                eprintln!("waiting termination stuff");
+                assert_eq!(map.next(), StreamElement::FlushAndRestart);
+                assert_eq!(map.next(), StreamElement::Terminate);
+            });
+        });
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn async_map_fixed_batch() {
+        let mut fake_operator = FakeOperator::new(0..20u8);
+        fake_operator.push(StreamElement::FlushAndRestart);
+        fake_operator.push(StreamElement::Terminate);
+
+        let mut net = FakeNetworkTopology::<u32>::new(0, 0);
+        let mut metadata = net.metadata();
+        metadata.batch_mode = BatchMode::fixed(8);
+
+        let mut map = MapAsync::new(
+            fake_operator,
+            |x| async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                x * 2
+            },
+            4,
+        );
+
+        map.setup(&mut metadata);
+
+        eprintln!("starting new thread ");
+        std::thread::scope(|s| {
+            s.spawn(move || {
+                for i in 0..20 {
+                    eprintln!("waiting element {i}");
+                    let elem = map.next();
+                    eprintln!("received element {i}");
+                    assert_eq!(elem, StreamElement::Item(i * 2));
+                }
+                eprintln!("waiting termination stuff");
+                assert_eq!(map.next(), StreamElement::FlushAndRestart);
+                assert_eq!(map.next(), StreamElement::Terminate);
+            });
+        });
+    }
+}

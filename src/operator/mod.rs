@@ -211,7 +211,7 @@ impl<Out> StreamElement<Out> {
     #[cfg(feature = "tokio")]
     pub async fn map_async<NewOut, F, Fut>(self, f: F) -> StreamElement<NewOut>
     where
-        F: FnOnce(Out) -> Fut,
+        F: Fn(Out) -> Fut,
         Fut: Future<Output = NewOut>,
     {
         match self {

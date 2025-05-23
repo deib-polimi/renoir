@@ -279,8 +279,6 @@ impl BatchMode {
 
     /// Construct a new `BatchMode::Adaptive` with the given positive batch size and maximum delay.
     pub fn timed(size: usize, interval: Duration) -> BatchMode {
-        #[cfg(not(feature = "tokio"))]
-        tracing::warn!("Currently, using timed batches without the tokio feature may spawn a large number of threads!");
         BatchMode::Timed {
             max_size: NonZeroUsize::new(size).expect("The batch size must be positive"),
             interval,
@@ -307,12 +305,15 @@ impl Default for BatchMode {
     }
 }
 
+#[cfg(not(feature = "tokio"))]
 struct CancellableTask(Box<dyn FnMut(Instant) + Send + Sync>, Arc<AtomicBool>);
 
+#[cfg(not(feature = "tokio"))]
 struct BatchScheduler {
     tasks: Arc<DashMap<Duration, Vec<CancellableTask>>>,
 }
 
+#[cfg(not(feature = "tokio"))]
 impl BatchScheduler {
     pub fn new() -> Self {
         Self {

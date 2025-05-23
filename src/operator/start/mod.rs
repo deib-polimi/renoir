@@ -86,6 +86,9 @@ pub(crate) struct Start<Receiver: StartReceiver + Send> {
     /// `missing_flush_and_restart`.
     num_previous_replicas: usize,
 
+    /// If previous message was a FlushBatch, avoid multiplying them
+    flushed_batch: bool,
+
     /// Whether the previous blocks timed out and the last batch has been flushed.
     ///
     /// The next time `next()` is called it will not wait the timeout asked by the batch mode.
@@ -110,6 +113,7 @@ impl<Receiver: StartReceiver + Send> Clone for Start<Receiver> {
             batch_iter: Default::default(),
             missing_terminate: self.missing_terminate,
             missing_flush_and_restart: self.missing_flush_and_restart,
+            flushed_batch: false,
             num_previous_replicas: self.num_previous_replicas,
             already_timed_out: self.already_timed_out,
             watermark_frontier: self.watermark_frontier.clone(),
@@ -169,6 +173,7 @@ impl<Receiver: StartReceiver + Send> Start<Receiver> {
             missing_terminate: Default::default(),
             missing_flush_and_restart: Default::default(),
             num_previous_replicas: 0,
+            flushed_batch: false,
 
             already_timed_out: Default::default(),
 
@@ -239,6 +244,10 @@ where
                     }
                     Some(item) => {
                         match item {
+                            StreamElement::FlushBatch if self.flushed_batch => {
+                                // Ignore duplicates
+                                continue;
+                            }
                             StreamElement::Watermark(ts) => {
                                 // update the frontier and return a watermark if necessary
                                 match self.watermark_frontier.update(sender, ts) {
@@ -277,6 +286,8 @@ where
                     }
                     self.wait_for_state = false;
                 }
+
+                self.flushed_batch = matches!(msg, StreamElement::FlushBatch);
                 return msg;
             }
 
