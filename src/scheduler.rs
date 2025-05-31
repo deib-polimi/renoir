@@ -187,6 +187,7 @@ impl Scheduler {
     /// Start the computation returning the list of handles used to join the workers.
     pub(crate) async fn start(mut self, block_count: CoordUInt) {
         debug!("start scheduler: {:?}", self.config);
+        info!("starting execution with tokio net ({} blocks)", block_count);
         self.log_topology();
 
         assert_eq!(
@@ -217,42 +218,44 @@ impl Scheduler {
     ///
     /// NOTE: If running with the `tokio` feature enable, this will create a new
     /// tokio runtime.
-    pub(crate) fn start_blocking(mut self, num_blocks: CoordUInt) {
+    pub(crate) fn start_blocking(mut self, block_count: CoordUInt) {
         debug!("start scheduler: {:?}", self.config);
         self.log_topology();
 
         assert_eq!(
             self.block_info.len(),
-            num_blocks as usize,
+            block_count as usize,
             "Some streams do not have a sink attached: {} streams created, but only {} registered",
-            num_blocks as usize,
+            block_count as usize,
             self.block_info.len(),
         );
 
         #[cfg(feature = "tokio")]
         {
+            let _ = &mut self;
+
+            if let Ok(rt) = tokio::runtime::Handle::try_current() {
+                tracing::error!("Attempting to block from a tokio worker thread!");
+                rt.block_on(async move { panic!("Attempting to block from a tokio worker thread!") });
+            }
+
+            tracing::warn!("starting a new tokio runtime for Renoir");
             tokio::runtime::Builder::new_multi_thread()
                 .enable_io()
                 .enable_time()
                 .build()
                 .unwrap()
                 .block_on(async move {
-                    let (join, block_structures) = self.build_all();
-
-                    let (_, join_result) = tokio::join!(
-                        self.network.stop_and_wait(),
-                        tokio::task::spawn_blocking(move || {
-                            for handle in join {
-                                handle.join().unwrap();
-                            }
-                        })
-                    );
-                    join_result.expect("Could not join worker threads");
-                    log_trace(block_structures, wait_profiler());
+                    tokio::task::spawn(async move {
+                        self.start(block_count).await;
+                    })
+                    .await
+                    .unwrap()
                 });
         }
         #[cfg(not(feature = "tokio"))]
         {
+            info!("starting execution ({} blocks)", block_count);
             let (join, block_structures) = self.build_all();
 
             for handle in join {

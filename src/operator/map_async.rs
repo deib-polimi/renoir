@@ -131,7 +131,7 @@ where
             prev,
             batcher: Default::default(),
             rt: Handle::current(),
-            f: f,
+            f,
             buffer: Default::default(),
             buffering: buffer,
         }
@@ -139,7 +139,7 @@ where
 
     fn run_batch(&mut self, b: Vec<StreamElement<Op::Out>>) {
         let result = self.rt.block_on(
-            futures::stream::iter(b.into_iter())
+            futures::stream::iter(b)
                 .map(|el| el.map_async(&self.f))
                 .buffered(self.buffering)
                 .collect::<Vec<_>>(),

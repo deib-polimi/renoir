@@ -7,8 +7,6 @@ use std::sync::Arc;
 #[cfg(not(feature = "tokio"))]
 use std::thread::JoinHandle;
 
-#[cfg(feature = "tokio")]
-use futures::StreamExt;
 use indexmap::IndexSet;
 use typemap_rev::{TypeMap, TypeMapKey};
 
@@ -165,14 +163,13 @@ impl NetworkTopology {
     /// Knowing that the computation ended, tear down the topology wait for all of its thread to
     /// exit.
     pub(crate) async fn stop_and_wait(&mut self) {
-        self.async_join_handles
-            .drain(..)
-            .collect::<futures::stream::FuturesUnordered<_>>()
-            .for_each(|h| {
-                h.unwrap();
-                futures::future::ready(())
-            })
-            .await;
+        use tokio::task::JoinSet;
+
+        let mut join = self.async_join_handles.drain(..).collect::<JoinSet<_>>();
+
+        while let Some(r) = join.join_next().await {
+            r.unwrap().unwrap();
+        }
     }
 
     #[cfg(not(feature = "tokio"))]

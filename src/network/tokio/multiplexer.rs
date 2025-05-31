@@ -68,7 +68,6 @@ impl<Out: ExchangeData> MultiplexingSender<Out> {
     // ) -> Result<(), SendError<(ReceiverEndpoint, NetworkMessage<Out>)>> {
     //     self.sender.send((destination, message))
     // }
-
     pub(crate) fn get_sender(&mut self, receiver_endpoint: ReceiverEndpoint) -> NetworkSender<Out> {
         use crate::network::mux_sender;
         mux_sender(receiver_endpoint, self.tx.as_ref().unwrap().clone())

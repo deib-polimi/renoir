@@ -80,12 +80,12 @@ impl StreamContext {
     /// Start the computation. Await on the returned future to actually start the computation.
     #[cfg(feature = "tokio")]
     pub async fn execute(self) {
-        let mut ctx = self.inner.lock();
-        info!("starting execution ({} blocks)", ctx.block_count);
+        let ctx = Arc::into_inner(self.inner)
+            .expect("Every stream that has been created must end with a sink. All references to the StreamContext (including Streams) must be dropped before execution");
+        let mut ctx = ctx.into_inner();
         let scheduler = ctx.scheduler.take().unwrap();
         let block_count = ctx.block_count;
-        drop(ctx);
-        scheduler.start(block_count).await;
+        tokio::spawn(scheduler.start(block_count)).await.unwrap();
         info!("finished execution");
     }
 
@@ -95,7 +95,6 @@ impl StreamContext {
     /// for non-blocking alternatives
     pub fn execute_blocking(self) {
         let mut env = self.inner.lock();
-        info!("starting execution ({} blocks)", env.block_count);
         let scheduler = env.scheduler.take().unwrap();
         scheduler.start_blocking(env.block_count);
         info!("finished execution");

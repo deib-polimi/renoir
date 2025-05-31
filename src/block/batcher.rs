@@ -3,8 +3,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use dashmap::DashMap;
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 
 use crate::network::{Coord, NetworkMessage, NetworkSender, NetworkTrySendError};
@@ -82,7 +80,7 @@ impl<Out: Send + 'static> BatcherInner<Out> {
         match self.mode {
             BatchMode::Adaptive(n, max_delay) => {
                 self.buffer.push(message);
-                let timeout_elapsed = self.last_send.elapsed() > max_delay.into();
+                let timeout_elapsed = self.last_send.elapsed() > max_delay;
                 if self.buffer.len() >= n.get() || timeout_elapsed {
                     self.flush()
                 }
@@ -203,6 +201,7 @@ impl<T: Clone + Send + 'static> Batcher<T> {
                 });
                 #[cfg(not(feature = "tokio"))]
                 {
+                    use once_cell::sync::Lazy;
                     static CLOCK: Lazy<BatchScheduler> = Lazy::new(BatchScheduler::new);
 
                     CLOCK.register(
@@ -254,11 +253,8 @@ impl<T: Clone + Send + 'static> Batcher<T> {
 
 impl<T: Send + 'static> Drop for Batcher<T> {
     fn drop(&mut self) {
-        match self {
-            Batcher::Sync { cancel_token, .. } => {
-                cancel_token.store(true, Ordering::Release);
-            }
-            _ => {}
+        if let Batcher::Sync { cancel_token, .. } = self {
+            cancel_token.store(true, Ordering::Release);
         }
     }
 }
@@ -311,14 +307,14 @@ struct CancellableTask(Box<dyn FnMut(Instant) + Send + Sync>, Arc<AtomicBool>);
 
 #[cfg(not(feature = "tokio"))]
 struct BatchScheduler {
-    tasks: Arc<DashMap<Duration, Vec<CancellableTask>>>,
+    tasks: Arc<dashmap::DashMap<Duration, Vec<CancellableTask>>>,
 }
 
 #[cfg(not(feature = "tokio"))]
 impl BatchScheduler {
     pub fn new() -> Self {
         Self {
-            tasks: Arc::new(DashMap::new()),
+            tasks: Arc::new(dashmap::DashMap::new()),
         }
     }
 
