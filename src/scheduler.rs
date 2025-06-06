@@ -193,7 +193,7 @@ impl Scheduler {
         assert_eq!(
             self.block_info.len(),
             block_count as usize,
-            "Some streams do not have a sink attached: {} streams created, but only {} registered",
+            "Every stream must end with a sink. Complete all streams before starting execution: {} streams created, but only {} registered",
             block_count as usize,
             self.block_info.len(),
         );
@@ -225,7 +225,7 @@ impl Scheduler {
         assert_eq!(
             self.block_info.len(),
             block_count as usize,
-            "Some streams do not have a sink attached: {} streams created, but only {} registered",
+            "Every stream must end with a sink. Complete all streams before starting execution: {} streams created, but only {} registered",
             block_count as usize,
             self.block_info.len(),
         );
@@ -236,7 +236,9 @@ impl Scheduler {
 
             if let Ok(rt) = tokio::runtime::Handle::try_current() {
                 tracing::error!("Attempting to block from a tokio worker thread!");
-                rt.block_on(async move { panic!("Attempting to block from a tokio worker thread!") });
+                rt.block_on(
+                    async move { panic!("Attempting to block from a tokio worker thread!") },
+                );
             }
 
             tracing::warn!("starting a new tokio runtime for Renoir");
@@ -449,7 +451,7 @@ mod tests {
     use crate::operator::source::IteratorSource;
 
     #[test]
-    #[should_panic(expected = "Some streams do not have a sink attached")]
+    #[should_panic(expected = "Every stream must end with a sink")]
     fn test_scheduler_panic_on_missing_sink() {
         let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = IteratorSource::new(vec![1, 2, 3].into_iter());
@@ -458,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Some streams do not have a sink attached")]
+    #[should_panic(expected = "Every stream must end with a sink")]
     fn test_scheduler_panic_on_missing_sink_shuffle() {
         let env = StreamContext::new(RuntimeConfig::local(4).unwrap());
         let source = IteratorSource::new(vec![1, 2, 3].into_iter());

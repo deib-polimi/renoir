@@ -55,7 +55,7 @@ where
         loop {
             match self.prev.next() {
                 StreamElement::Item(ref item) | StreamElement::Timestamped(ref item, _)
-                    if !(self.predicate)(item) => {}
+                    if !(self.predicate)(item) => {} // Skip
                 element => return element,
             }
         }

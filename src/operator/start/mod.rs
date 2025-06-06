@@ -234,61 +234,57 @@ where
                 self.state_generation += 2;
                 return StreamElement::FlushAndRestart;
             }
+            // the previous iteration has ended, this message refers to the new iteration: we need to be
+            // sure the state is set before we let this message pass
+            if self.wait_for_state {
+                if let Some(lock) = self.state_lock.as_ref() {
+                    lock.wait_for_update(self.state_generation);
+                }
+                self.wait_for_state = false;
+            }
 
             if let Some((sender, ref mut inner)) = self.batch_iter {
-                let msg = match inner.next() {
-                    None => {
-                        // Current batch is finished
-                        self.batch_iter = None;
-                        continue;
-                    }
-                    Some(item) => {
-                        match item {
-                            StreamElement::FlushBatch if self.flushed_batch => {
-                                // Ignore duplicates
-                                continue;
-                            }
-                            StreamElement::Watermark(ts) => {
-                                // update the frontier and return a watermark if necessary
-                                match self.watermark_frontier.update(sender, ts) {
-                                    Some(ts) => StreamElement::Watermark(ts), // ts is safe
-                                    None => continue,
-                                }
-                            }
-                            StreamElement::FlushAndRestart => {
-                                // mark this replica as ended and let the frontier ignore it from now on
-                                #[cfg(feature = "timestamp")]
-                                {
-                                    self.watermark_frontier.update(sender, Timestamp::MAX);
-                                }
-                                self.missing_flush_and_restart -= 1;
-                                continue;
-                            }
-                            StreamElement::Terminate => {
-                                self.missing_terminate -= 1;
-                                log::trace!(
-                                    "{} received terminate, {} left",
-                                    coord,
-                                    self.missing_terminate
-                                );
-                                continue;
-                            }
-                            _ => item,
-                        }
-                    }
+                let Some(item) = inner.next() else {
+                    // Current batch is finished
+                    self.batch_iter = None;
+                    continue;
                 };
 
-                // the previous iteration has ended, this message refers to the new iteration: we need to be
-                // sure the state is set before we let this message pass
-                if self.wait_for_state {
-                    if let Some(lock) = self.state_lock.as_ref() {
-                        lock.wait_for_update(self.state_generation);
+                let item = match item {
+                    StreamElement::Watermark(ts) => {
+                        // update the frontier and return a watermark if necessary
+                        match self.watermark_frontier.update(sender, ts) {
+                            Some(ts) => return StreamElement::Watermark(ts), // ts is safe
+                            None => continue,
+                        }
                     }
-                    self.wait_for_state = false;
-                }
+                    StreamElement::FlushAndRestart => {
+                        // mark this replica as ended and let the frontier ignore it from now on
+                        #[cfg(feature = "timestamp")]
+                        {
+                            self.watermark_frontier.update(sender, Timestamp::MAX);
+                        }
+                        self.missing_flush_and_restart -= 1;
+                        continue;
+                    }
+                    StreamElement::Terminate => {
+                        self.missing_terminate -= 1;
+                        log::trace!(
+                            "{} received terminate, {} left",
+                            coord,
+                            self.missing_terminate
+                        );
+                        continue;
+                    }
+                    StreamElement::FlushBatch if self.flushed_batch => {
+                        // Ignore duplicates
+                        continue;
+                    }
+                    _ => item,
+                };
 
-                self.flushed_batch = matches!(msg, StreamElement::FlushBatch);
-                return msg;
+                self.flushed_batch = matches!(item, StreamElement::FlushBatch);
+                return item;
             }
 
             // Receive next batch
@@ -406,7 +402,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(StreamElement::Timestamped(42, ts(10)), start_block.next());
-        assert_eq!(StreamElement::FlushBatch, start_block.next());
 
         sender2
             .send(NetworkMessage::new_batch(
@@ -416,7 +411,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(StreamElement::Watermark(ts(20)), start_block.next());
-        assert_eq!(StreamElement::FlushBatch, start_block.next());
 
         sender1
             .send(NetworkMessage::new_batch(

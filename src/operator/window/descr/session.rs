@@ -106,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    fn event_time_window() {
+    fn session_time_window() {
         let window = SessionWindow::new(Duration::from_millis(10));
 
         let fold = Fold::new(Vec::new(), |v, &el| v.push(el));

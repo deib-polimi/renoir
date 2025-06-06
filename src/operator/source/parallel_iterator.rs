@@ -29,7 +29,7 @@ impl IntoParallelSource for Range<u64> {
 
     fn generate_iterator(self, index: CoordUInt, peers: CoordUInt) -> Self::Iter {
         let n = self.end - self.start;
-        let chunk_size = (n.saturating_add(peers - 1)) / peers;
+        let chunk_size = n.div_ceil(peers);
         let start = self.start.saturating_add(index * chunk_size);
         let end = (start.saturating_add(chunk_size))
             .min(self.end)
@@ -93,9 +93,9 @@ impl<Source: IntoParallelSource> IteratorGenerator<Source> {
     ///
     /// This method can be called only once.
     fn generate(&mut self, global_id: CoordUInt, instances: CoordUInt) {
-        let gen = std::mem::replace(self, IteratorGenerator::Generating);
-        let iter = match gen {
-            IteratorGenerator::Generator(gen) => gen.generate_iterator(global_id, instances),
+        let g = std::mem::replace(self, IteratorGenerator::Generating);
+        let iter = match g {
+            IteratorGenerator::Generator(g) => g.generate_iterator(global_id, instances),
             _ => unreachable!("generate on non-Generator variant"),
         };
         *self = IteratorGenerator::Iterator(iter);
@@ -113,7 +113,7 @@ impl<Source: IntoParallelSource> IteratorGenerator<Source> {
 impl<Source: IntoParallelSource> Clone for IteratorGenerator<Source> {
     fn clone(&self) -> Self {
         match self {
-            Self::Generator(gen) => Self::Generator(gen.clone()),
+            Self::Generator(g) => Self::Generator(g.clone()),
             _ => panic!("Can clone only before generating the iterator"),
         }
     }
