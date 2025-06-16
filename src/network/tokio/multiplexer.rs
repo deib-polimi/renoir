@@ -99,6 +99,7 @@ async fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream 
         for address in socket_addrs.iter() {
             match TcpStream::connect(address).await {
                 Ok(stream) => {
+                    stream.set_nodelay(true).unwrap();
                     return stream;
                 }
                 Err(err) => match err.kind() {

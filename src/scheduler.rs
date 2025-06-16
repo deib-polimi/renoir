@@ -204,7 +204,7 @@ impl Scheduler {
             self.network.stop_and_wait(),
             tokio::task::spawn_blocking(move || {
                 for handle in join {
-                    handle.join().unwrap();
+                    handle.join().expect("renoir worker thread failed");
                 }
             })
         );

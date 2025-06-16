@@ -99,7 +99,10 @@ fn bind_remotes<In: ExchangeData>(
     while connected_clients < num_clients {
         let stream = incoming.next().unwrap();
         let stream = match stream {
-            Ok(stream) => stream,
+            Ok(stream) => {
+                stream.set_nodelay(true).unwrap();
+                stream
+            }
             Err(e) => {
                 warn!("{} to accept incoming connection: {:?}", coord, e);
                 continue;

@@ -110,6 +110,7 @@ async fn bind_remotes<In: ExchangeData>(
                 continue;
             }
         };
+        stream.set_nodelay(true).unwrap();
         connected_clients += 1;
         info!(
             "Remote receiver at {} accepted a new connection from {} ({} / {})",
@@ -173,9 +174,10 @@ async fn demux_thread<In: ExchangeData>(
 
     while let Some((dest, message)) = remote_recv(coord, &mut stream, &mut scratch, &address).await
     {
-        if let Err(e) = senders[&dest].send(message) {
-            warn!("demux failed to send message to {}: {:?}", dest, e);
+        if let Err(e) = senders[&dest].send_async(message).await {
+            panic!("demux failed to send message to {}: {:?}", dest, e);
         }
+        // stream.flush().await.unwrap();
     }
 
     stream.shutdown().await.unwrap();

@@ -84,6 +84,7 @@ fn connect_remote(coord: DemuxCoord, address: (String, u16)) -> TcpStream {
         for address in socket_addrs.iter() {
             match TcpStream::connect_timeout(address, CONNECT_TIMEOUT) {
                 Ok(stream) => {
+                    stream.set_nodelay(true).unwrap();
                     return stream;
                 }
                 Err(err) => match err.kind() {

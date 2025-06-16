@@ -117,6 +117,11 @@ impl<T: Send + 'static> Sender<T> {
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
         self.0.send(item)
     }
+    /// Send a message in the channel, blocking if it's full.
+    #[inline]
+    pub async fn send_async(&self, item: T) -> Result<(), SendError<T>> {
+        self.0.send_async(item).await
+    }
 
     #[inline]
     pub fn try_send(&self, item: T) -> Result<(), TrySendErrorExt<T>> {
