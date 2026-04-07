@@ -152,7 +152,6 @@ impl<
         }
     }
 
-        
     fn flush_outer(&mut self) {
         if self.variant.left_outer() {
             for (key, left) in self.left.data.drain() {

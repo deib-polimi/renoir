@@ -35,7 +35,7 @@ pub(super) fn remote_worker(
     executable_uid: String,
 ) -> HostExecutionResult {
     if host.ssh.username.is_none() {
-        host.ssh.username = Some(whoami::username());
+        host.ssh.username = Some(whoami::username().expect("failed to get username"));
     }
     info!("starting remote worker for host {}: {:?}", host_id, host);
 

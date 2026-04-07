@@ -1,11 +1,13 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use rand::prelude::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use renoir::operator::source::IteratorSource;
 use renoir::BatchMode;
 use renoir::RuntimeConfig;
 use renoir::StreamContext;
+
+use std::hint::black_box;
 
 fn fold(dataset: &'static [u32]) {
     let config = RuntimeConfig::default();

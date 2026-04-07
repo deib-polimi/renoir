@@ -1,13 +1,15 @@
 mod common;
 
 use common::renoir_bench_default;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use mimalloc::MiMalloc;
 
 use renoir::operator::cache::{BincodeCacheConfig, BincodeCacher, VecCacher};
 use renoir::operator::Operator;
 use renoir::{BatchMode, Stream, StreamContext};
 use tempfile::tempdir;
+
+use std::hint::black_box;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;

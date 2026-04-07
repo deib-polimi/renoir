@@ -355,7 +355,7 @@ fn left_join_proptest() {
 
                 let mut expected: Vec<(u32, (u32, Option<u32>))> = Vec::new();
                 for &l in left_data.iter() {
-                    let key = l as u32 % m;
+                    let key = l % m;
                     match right_map.get(&key) {
                         Some(matches) => {
                             for &r in matches {

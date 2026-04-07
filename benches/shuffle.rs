@@ -1,11 +1,13 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use renoir::operator::source::IteratorSource;
 use renoir::BatchMode;
 use renoir::StreamContext;
+
+use std::hint::black_box;
 
 fn shuffle(dataset: &'static [u32]) {
     let env = StreamContext::new_local();

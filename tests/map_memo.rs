@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use rand::{rng, Rng};
+use rand::{rng, RngExt};
 use utils::TestHelper;
 
 mod utils;

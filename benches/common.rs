@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use criterion::{black_box, Bencher};
+use criterion::Bencher;
 use renoir::config::{ConfigBuilder, HostConfig, RemoteConfig, RuntimeConfig};
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU16, Ordering};
@@ -8,6 +8,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use renoir::*;
+
+use std::hint::black_box;
 
 pub const SAMPLES: usize = 50;
 

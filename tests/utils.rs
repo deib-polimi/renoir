@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use itertools::{process_results, Itertools};
 
-use rand::{rng, Rng};
+use rand::{rng, RngExt};
 use renoir::block::structure::BlockStructure;
 use renoir::config::{ConfigBuilder, HostConfig, RuntimeConfig};
 use renoir::operator::{Data, Operator, StreamElement, Timestamp};
