@@ -152,34 +152,30 @@ impl<
         }
     }
 
-    /// Mark the left side as ended, generating all the remaining tuples if the join is outer.
-    ///
-    /// This can be used to mark also the right side by swapping the parameters.
-    fn side_ended<OutL, OutR>(
-        right_outer: bool,
-        left: &mut SideHashMap<Key, OutL>,
-        right: &mut SideHashMap<Key, OutR>,
-        buffer: &mut VecDeque<(Key, OuterJoinTuple<Out1, Out2>)>,
-        make_pair: impl Fn(Option<OutL>, Option<OutR>) -> OuterJoinTuple<Out1, Out2>,
-    ) {
-        if right_outer {
-            // left ended and this is a right-outer, so we need to generate (None, Some)
-            // tuples. For each value on the right side, before dropping the right hashmap,
-            // search if there was already a match.
-            for (key, right) in right.data.drain() {
-                if !left.keys.contains(&key) {
-                    for rhs in right {
-                        buffer.push_back((key.clone(), make_pair(None, Some(rhs))));
+        
+    fn flush_outer(&mut self) {
+        if self.variant.left_outer() {
+            for (key, left) in self.left.data.drain() {
+                if !self.right.keys.contains(&key) {
+                    for lhs in left {
+                        self.buffer.push_back((key.clone(), (Some(lhs), None)));
                     }
                 }
             }
-        } else {
-            // in any case, we won't need the right hashmap anymore.
-            right.data.clear();
         }
-        // we will never look at it, and nothing will be inserted, drop it freeing some memory.
-        left.keys.clear();
-        left.ended = true;
+        if self.variant.right_outer() {
+            for (key, right) in self.right.data.drain() {
+                if !self.left.keys.contains(&key) {
+                    for rhs in right {
+                        self.buffer.push_back((key.clone(), (None, Some(rhs))));
+                    }
+                }
+            }
+        }
+        self.left.keys.clear();
+        self.right.keys.clear();
+        self.left.data.clear();
+        self.right.data.clear();
     }
 }
 
@@ -227,13 +223,11 @@ impl<
                         self.left.count,
                         self.right.count
                     );
-                    Self::side_ended(
-                        self.variant.right_outer(),
-                        &mut self.left,
-                        &mut self.right,
-                        &mut self.buffer,
-                        |x, y| (x, y),
-                    )
+                    self.left.ended = true;
+
+                    if self.left.ended && self.right.ended {
+                        self.flush_outer()
+                    }
                 }
                 StreamElement::Item(BinaryElement::RightEnd) => {
                     log::debug!(
@@ -242,13 +236,11 @@ impl<
                         self.left.count,
                         self.right.count
                     );
-                    Self::side_ended(
-                        self.variant.left_outer(),
-                        &mut self.right,
-                        &mut self.left,
-                        &mut self.buffer,
-                        |x, y| (y, x),
-                    )
+                    self.right.ended = true;
+
+                    if self.left.ended && self.right.ended {
+                        self.flush_outer()
+                    }
                 }
                 StreamElement::FlushAndRestart => {
                     assert!(self.left.ended);

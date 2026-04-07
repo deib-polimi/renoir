@@ -110,6 +110,7 @@ regex = "1.12.2"
 
 kstring = { version = "2.0.2", features = ["serde"] }
 nexmark = { version = "0.2.0", features = ["serde"] }
+proptest = "1.11.0"
 
 [[example]]
 name = "nexmark"

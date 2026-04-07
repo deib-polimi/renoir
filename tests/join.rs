@@ -310,3 +310,74 @@ fn join_in_loop() {
         }
     });
 }
+
+#[test]
+fn left_join_proptest() {
+    use proptest::collection::vec;
+    use proptest::prelude::*;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    proptest!(|(
+        left in vec(0u32..200, 0..10usize),
+        right in vec(0u32..200, 0..10usize),
+        m in 1u32..10u32,
+        n in 1u32..20u32,
+    )| {
+        let left_data = Arc::new(left);
+        let right_data = Arc::new(right);
+
+        TestHelper::local_remote_env(move |env| {
+            let s1 = env.stream_iter((*left_data).clone().into_iter());
+            let s2 = env.stream_iter((*right_data).clone().into_iter());
+            let res = s1
+                .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)))
+                .left_join(s2, move |x| *x % m, move |x| *x % n)
+                .unkey()
+                .collect_vec();
+            env.execute_blocking();
+            if let Some(mut res) = res.get() {
+                res.sort_unstable();
+
+                // Build expected via HashMap: group right values by key, then for
+                // each left item emit one pair per matching right, or (l, None) if
+                // there is no matching right element.
+
+                let mut left_map: HashMap<u32, Vec<u32>> = HashMap::new();
+                for &r in left_data.iter() {
+                    left_map.entry(r % m).or_default().push(r);
+                }
+
+                let mut right_map: HashMap<u32, Vec<u32>> = HashMap::new();
+                for &r in right_data.iter() {
+                    right_map.entry(r % n).or_default().push(r);
+                }
+
+                let mut expected: Vec<(u32, (u32, Option<u32>))> = Vec::new();
+                for &l in left_data.iter() {
+                    let key = l as u32 % m;
+                    match right_map.get(&key) {
+                        Some(matches) => {
+                            for &r in matches {
+                                expected.push((key, (l, Some(r))));
+                            }
+                        }
+                        None => {
+                            expected.push((key, (l, None)));
+                        }
+                    }
+                }
+                expected.sort_unstable();
+
+                eprintln!("=================================");
+                eprintln!("{left_data:?}");
+                eprintln!("{right_data:?}");
+                eprintln!("---------------------------------");
+
+                eprintln!("{expected:?}");
+                eprintln!("{res:?}");
+                assert_eq!(res, expected);
+            }
+        });
+    });
+}

@@ -74,7 +74,7 @@ pub const CONFIG_ENV_VAR: &str = "NOIR_CONFIG";
 /// let (config, args) = RuntimeConfig::from_args();
 /// let env = StreamContext::new(config);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub enum RuntimeConfig {
     /// Use only local threads.
     Local(LocalConfig),
@@ -101,7 +101,7 @@ impl Default for RuntimeConfig {
 // }
 
 /// This environment uses only local threads.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LocalConfig {
     /// The number of CPU cores of this host.
     ///
@@ -113,7 +113,7 @@ pub struct LocalConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct RemoteConfig {
     /// The identifier for this host.
-    #[serde(skip)]
+    #[serde(default)]
     host_id: Option<HostId>, // TODO: remove option
     /// The set of remote hosts to use.
     #[serde(rename = "host")]
@@ -362,6 +362,10 @@ impl ConfigBuilder {
     pub fn add_hosts(&mut self, hosts: &[HostConfig]) -> &mut Self {
         self.hosts.extend_from_slice(hosts);
         self
+    }
+
+    pub fn hosts(&self) -> &[HostConfig] {
+        &self.hosts
     }
 
     /// Read toml from env variable [CONFIG_ENV_VAR] and integrate it in the builder.

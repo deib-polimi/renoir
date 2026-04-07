@@ -1759,10 +1759,15 @@ where
     ///
     /// **Note**: this operator is pretty advanced, some operators may need to be fully replicated
     /// and will fail otherwise.
-    #[deprecated]
     pub fn replication(self, replication: Replication) -> Stream<impl Operator<Out = Op::Out>> {
         let mut new_stream = self.split_block(End::new, NextStrategy::only_one());
         // TODO: Cannot scale up
+        new_stream.block.scheduling.replication(replication);
+        new_stream
+    }
+
+    pub fn shuffle_to(self, replication: Replication) -> Stream<impl Operator<Out = Op::Out>> {
+        let mut new_stream = self.split_block(End::new, NextStrategy::random());
         new_stream.block.scheduling.replication(replication);
         new_stream
     }
@@ -1771,7 +1776,7 @@ where
     ///
     /// **Note**: this operator is advanced and is only intended to add functionality
     /// that is not achievable with other operators. Use with care
-    pub fn repartition<Fk: KeyerFn<u64, Op::Out>>(
+    pub(crate) fn repartition<Fk: KeyerFn<u64, Op::Out>>(
         self,
         replication: Replication,
         next_strategy: NextStrategy<Op::Out, Fk>,
