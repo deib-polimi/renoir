@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use std::collections::HashSet;
+use std::hash::Hash;
 use std::time::Duration;
 
 use itertools::Itertools;
@@ -95,6 +96,89 @@ fn build_expected_outer(n1: u16, n2: u32, m: u8) -> Vec<(u8, (Option<u16>, Optio
     }
     expected.sort_unstable();
     expected
+}
+
+fn reference_full_join<K: Eq + Hash + Clone + Ord, T1: Clone + Ord, T2: Clone + Ord>(
+    left: impl IntoIterator<Item = (K, T1)>,
+    left_is_outer: bool,
+    right: impl IntoIterator<Item = (K, T2)>,
+    right_is_outer: bool,
+) -> Vec<(K, (Option<T1>, Option<T2>))> {
+    use std::collections::HashMap;
+    let mut expected = Vec::new();
+
+    let mut left_map: HashMap<K, Vec<T1>> = HashMap::new();
+    for (k, v) in left.into_iter() {
+        left_map.entry(k).or_default().push(v);
+    }
+
+    let mut right_map: HashMap<K, Vec<T2>> = HashMap::new();
+    for (k, v) in right.into_iter() {
+        right_map.entry(k).or_default().push(v);
+    }
+
+    for (key, v1) in left_map.iter() {
+        match right_map.get(key) {
+            Some(matches) => {
+                // Inner
+                for lhs in v1 {
+                    for rhs in matches {
+                        expected.push((key.clone(), (Some(lhs.clone()), Some(rhs.clone()))));
+                    }
+                }
+            }
+            None if left_is_outer => {
+                // Outer Left
+                for lhs in v1 {
+                    expected.push((key.clone(), (Some(lhs.clone()), None)));
+                }
+            }
+            None => {
+                // Inner Left
+            }
+        }
+    }
+
+    for (key, v2) in right_map.iter() {
+        match left_map.get(key) {
+            None if right_is_outer => {
+                for rhs in v2 {
+                    expected.push((key.clone(), (None, Some(rhs.clone()))));
+                }
+            }
+            Some(_) | None => {} // Already covered before
+        }
+    }
+
+    expected.sort_unstable();
+    expected
+}
+
+fn reference_left<K: Eq + Hash + Clone + Ord, T1: Clone + Ord, T2: Clone + Ord>(
+    left: impl IntoIterator<Item = (K, T1)>,
+    right: impl IntoIterator<Item = (K, T2)>,
+) -> Vec<(K, (T1, Option<T2>))> {
+    let r = reference_full_join(left, true, right, false);
+    r.into_iter()
+        .map(|(k, (a, b))| (k, (a.unwrap(), b)))
+        .collect()
+}
+
+fn reference_inner<K: Eq + Hash + Clone + Ord, T1: Clone + Ord, T2: Clone + Ord>(
+    left: impl IntoIterator<Item = (K, T1)>,
+    right: impl IntoIterator<Item = (K, T2)>,
+) -> Vec<(K, (T1, T2))> {
+    let r = reference_full_join(left, false, right, false);
+    r.into_iter()
+        .map(|(k, (a, b))| (k, (a.unwrap(), b.unwrap())))
+        .collect()
+}
+
+fn reference_outer<K: Eq + Hash + Clone + Ord, T1: Clone + Ord, T2: Clone + Ord>(
+    left: impl IntoIterator<Item = (K, T1)>,
+    right: impl IntoIterator<Item = (K, T2)>,
+) -> Vec<(K, (Option<T1>, Option<T2>))> {
+    reference_full_join(left, true, right, true)
 }
 
 fn build_expected_inner(n1: u16, n2: u32, m: u8) -> Vec<(u8, (u16, u32))> {
@@ -311,27 +395,32 @@ fn join_in_loop() {
     });
 }
 
+fn batch_mode_strategy() -> impl proptest::strategy::Strategy<Value = BatchMode> {
+    use proptest::prelude::*;
+    proptest::prop_oneof![
+        Just(BatchMode::Single),
+        Just(BatchMode::fixed(4)),
+        Just(BatchMode::adaptive(16, Duration::from_millis(20))),
+        Just(BatchMode::timed(16, Duration::from_millis(20))),
+    ]
+}
+
 #[test]
 fn left_join_proptest() {
     use proptest::collection::vec;
     use proptest::prelude::*;
-    use std::collections::HashMap;
-    use std::sync::Arc;
 
     proptest!(|(
-        left in vec(0u32..200, 0..10usize),
-        right in vec(0u32..200, 0..10usize),
-        m in 1u32..10u32,
-        n in 1u32..20u32,
-    )| {
-        let left_data = Arc::new(left);
-        let right_data = Arc::new(right);
-
-        TestHelper::local_remote_env(move |env| {
-            let s1 = env.stream_iter((*left_data).clone().into_iter());
-            let s2 = env.stream_iter((*right_data).clone().into_iter());
+        left in vec(0u32..256, 0..100usize),
+        right in vec(0u32..256, 0..100usize),
+        m in 1u32..8u32,
+        n in 1u32..8u32,
+        bm in batch_mode_strategy(),
+    )| {        TestHelper::local_remote_env(move |env| {
+            let s1 = env.stream_iter(left.clone().into_iter());
+            let s2 = env.stream_iter(right.clone().into_iter());
             let res = s1
-                .batch_mode(BatchMode::adaptive(100, Duration::from_millis(100)))
+                .batch_mode(bm)
                 .left_join(s2, move |x| *x % m, move |x| *x % n)
                 .unkey()
                 .collect_vec();
@@ -339,45 +428,116 @@ fn left_join_proptest() {
             if let Some(mut res) = res.get() {
                 res.sort_unstable();
 
-                // Build expected via HashMap: group right values by key, then for
-                // each left item emit one pair per matching right, or (l, None) if
-                // there is no matching right element.
+                let left = left.clone().into_iter().map(|l| (l % m, l));
+                let right = right.clone().into_iter().map(|r| (r % n, r));
+                let expected = reference_left(left, right);
 
-                let mut left_map: HashMap<u32, Vec<u32>> = HashMap::new();
-                for &r in left_data.iter() {
-                    left_map.entry(r % m).or_default().push(r);
-                }
-
-                let mut right_map: HashMap<u32, Vec<u32>> = HashMap::new();
-                for &r in right_data.iter() {
-                    right_map.entry(r % n).or_default().push(r);
-                }
-
-                let mut expected: Vec<(u32, (u32, Option<u32>))> = Vec::new();
-                for &l in left_data.iter() {
-                    let key = l % m;
-                    match right_map.get(&key) {
-                        Some(matches) => {
-                            for &r in matches {
-                                expected.push((key, (l, Some(r))));
-                            }
-                        }
-                        None => {
-                            expected.push((key, (l, None)));
-                        }
-                    }
-                }
-                expected.sort_unstable();
-
-                eprintln!("=================================");
-                eprintln!("{left_data:?}");
-                eprintln!("{right_data:?}");
-                eprintln!("---------------------------------");
-
-                eprintln!("{expected:?}");
-                eprintln!("{res:?}");
                 assert_eq!(res, expected);
             }
         });
+    });
+}
+
+#[test]
+fn inner_join_proptest() {
+    use proptest::collection::vec;
+    use proptest::prelude::*;
+
+    proptest!(|(
+        left in vec(0u32..256, 0..100usize),
+        right in vec(0u32..256, 0..100usize),
+        m in 1u32..8u32,
+        n in 1u32..8u32,
+        bm in batch_mode_strategy(),
+    )| {        TestHelper::local_remote_env(move |env| {
+            let s1 = env.stream_iter(left.clone().into_iter());
+            let s2 = env.stream_iter(right.clone().into_iter());
+            let res = s1
+                .batch_mode(bm)
+                .join(s2, move |x| *x % m, move |x| *x % n)
+                .unkey()
+                .collect_vec();
+            env.execute_blocking();
+            if let Some(mut res) = res.get() {
+                res.sort_unstable();
+
+                let left = left.clone().into_iter().map(|l| (l % m, l));
+                let right = right.clone().into_iter().map(|r| (r % n, r));
+                let expected = reference_inner(left, right);
+
+                assert_eq!(res, expected);
+            }
+        });
+    });
+}
+
+#[test]
+fn outer_join_proptest() {
+    use proptest::collection::vec;
+    use proptest::prelude::*;
+
+    proptest!(|(
+        left in vec(0u32..256, 0..100usize),
+        right in vec(0u32..256, 0..100usize),
+        m in 1u32..8u32,
+        n in 1u32..8u32,
+        bm in batch_mode_strategy(),
+    )| {        TestHelper::local_remote_env(move |env| {
+            let s1 = env.stream_iter(left.clone().into_iter());
+            let s2 = env.stream_iter(right.clone().into_iter());
+            let res = s1
+                .batch_mode(bm)
+                .outer_join(s2, move |x| *x % m, move |x| *x % n)
+                .unkey()
+                .collect_vec();
+            env.execute_blocking();
+            if let Some(mut res) = res.get() {
+                res.sort_unstable();
+
+                let left = left.clone().into_iter().map(|l| (l % m, l));
+                let right = right.clone().into_iter().map(|r| (r % n, r));
+                let expected = reference_outer(left, right);
+
+                assert_eq!(res, expected);
+            }
+        });
+    });
+}
+
+#[test]
+fn left_join_specific() {
+    use std::sync::Arc;
+
+    let left = vec![(1, 2), (1, 1), (2, 5), (2, 6), (3, 7)];
+    let right = vec![(1, 3), (1, 4)];
+
+    let left_data = Arc::new(left);
+    let right_data = Arc::new(right);
+
+    TestHelper::local_remote_env(move |env| {
+        let s1 = env.stream_iter((*left_data).clone().into_iter());
+        let s2 = env.stream_iter((*right_data).clone().into_iter());
+        let res = s1
+            .batch_mode(BatchMode::fixed(1))
+            .left_join(s2, move |x| x.0, move |x| x.0)
+            .drop_key()
+            .map(|(a, b)| (a.1, b.map(|b| b.1)))
+            .collect_vec();
+        env.execute_blocking();
+        if let Some(mut res) = res.get() {
+            let mut expected: Vec<(u32, Option<u32>)> = vec![
+                (2, Some(3)),
+                (2, Some(4)),
+                (1, Some(3)),
+                (1, Some(4)),
+                (5, None),
+                (6, None),
+                (7, None),
+            ];
+
+            expected.sort_unstable();
+            res.sort_unstable();
+            assert_eq!(res, expected);
+        }
     });
 }

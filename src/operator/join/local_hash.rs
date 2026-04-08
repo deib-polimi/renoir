@@ -23,19 +23,22 @@ struct SideHashMap<Key: DataKey, Out> {
     /// The set of all the keys seen.
     ///
     /// Note that when this side ends this set is emptied since it won't be used again.
-    keys: HashSet<Key>,
+    keys: HashSet<Key, crate::block::GroupHasherBuilder>,
     /// Whether this side has ended.
     ended: bool,
+    /// Whether this side is an outer join.
+    is_outer: bool,
     /// The number of items received.
     count: usize,
 }
 
-impl<Key: DataKey, Out> Default for SideHashMap<Key, Out> {
-    fn default() -> Self {
+impl<Key: DataKey, Out> SideHashMap<Key, Out> {
+    fn new(outer: bool) -> Self {
         Self {
             data: Default::default(),
             keys: Default::default(),
             ended: false,
+            is_outer: outer,
             count: 0,
         }
     }
@@ -65,11 +68,6 @@ struct JoinLocalHash<
     keyer1: Keyer1,
     keyer2: Keyer2,
 
-    /// The variant of join to build.
-    ///
-    /// This is used for optimizing the behaviour in case of inner and left joins, avoiding to
-    /// generate useless tuples.
-    variant: JoinVariant,
     /// The already generated tuples, but not yet returned.
     buffer: VecDeque<(Key, OuterJoinTuple<Out1, Out2>)>,
 }
@@ -103,14 +101,16 @@ impl<
     > JoinLocalHash<Key, Out1, Out2, Keyer1, Keyer2, OperatorChain>
 {
     fn new(prev: OperatorChain, variant: JoinVariant, keyer1: Keyer1, keyer2: Keyer2) -> Self {
+        let left = SideHashMap::new(variant.left_outer());
+        let right = SideHashMap::new(variant.right_outer());
+
         Self {
             prev,
             coord: Default::default(),
-            left: Default::default(),
-            right: Default::default(),
+            left,
+            right,
             keyer1,
             keyer2,
-            variant,
             buffer: Default::default(),
         }
     }
@@ -120,61 +120,60 @@ impl<
     /// This can be used to add _right_ tuples by swapping left and right parameters.
     fn add_item<OutL: ExchangeData, OutR: ExchangeData>(
         (key, item): (Key, OutL),
-        left: &mut SideHashMap<Key, OutL>,
-        right: &mut SideHashMap<Key, OutR>,
-        left_outer: bool,
-        right_outer: bool,
+        side: &mut SideHashMap<Key, OutL>,
+        opposite: &mut SideHashMap<Key, OutR>,
         buffer: &mut VecDeque<(Key, OuterJoinTuple<Out1, Out2>)>,
         make_pair: impl Fn(Option<OutL>, Option<OutR>) -> OuterJoinTuple<Out1, Out2>,
     ) {
-        left.count += 1;
-        if let Some(right) = right.data.get(&key) {
+        side.count += 1;
+        if let Some(matching) = opposite.data.get(&key) {
             // the left item has at least one right matching element
-            for rhs in right {
-                buffer.push_back((
-                    key.clone(),
-                    make_pair(Some(item.clone()), Some(rhs.clone())),
-                ));
+            for el in matching {
+                buffer.push_back((key.clone(), make_pair(Some(item.clone()), Some(el.clone()))));
             }
-        } else if right.ended && left_outer {
-            // if the left item has no right correspondent, but the right has already ended
-            // we might need to generate the outer tuple.
+        } else if opposite.ended && side.is_outer {
+            // if the left item has no opposite correspondent, but the opposite has already ended
+            // we need to generate the outer tuple.
             buffer.push_back((key.clone(), make_pair(Some(item.clone()), None)));
         } else {
             // either the rhs is not ended (so we cannot generate anything for now), or
             // it's left inner, so we cannot generate left-outer tuples.
         }
-        if right_outer {
-            left.keys.insert(key.clone());
+
+        if opposite.is_outer {
+            side.keys.insert(key.clone());
         }
-        if !right.ended {
-            left.data.entry(key).or_default().push(item);
+        if !opposite.ended {
+            side.data.entry(key).or_default().push(item);
         }
     }
-
-    fn flush_outer(&mut self) {
-        if self.variant.left_outer() {
-            for (key, left) in self.left.data.drain() {
-                if !self.right.keys.contains(&key) {
-                    for lhs in left {
-                        self.buffer.push_back((key.clone(), (Some(lhs), None)));
-                    }
-                }
-            }
-        }
-        if self.variant.right_outer() {
-            for (key, right) in self.right.data.drain() {
-                if !self.left.keys.contains(&key) {
+    /// Mark the left side as ended, generating all the remaining tuples if the join is outer.
+    ///
+    /// This can be used to mark also the right side by swapping the parameters.
+    fn side_ended<OutA, OutB>(
+        side: &mut SideHashMap<Key, OutA>,
+        opposite: &mut SideHashMap<Key, OutB>,
+        buffer: &mut VecDeque<(Key, OuterJoinTuple<Out1, Out2>)>,
+        make_pair: impl Fn(Option<OutA>, Option<OutB>) -> OuterJoinTuple<Out1, Out2>,
+    ) {
+        if opposite.is_outer {
+            // left ended and this is a right-outer, so we need to generate (None, Some)
+            // tuples. For each value on the right side, before dropping the right hashmap,
+            // search if there was already a match.
+            for (key, right) in opposite.data.drain() {
+                if !side.keys.contains(&key) {
                     for rhs in right {
-                        self.buffer.push_back((key.clone(), (None, Some(rhs))));
+                        buffer.push_back((key.clone(), make_pair(None, Some(rhs))));
                     }
                 }
             }
+        } else {
+            // in any case, we won't need the right hashmap anymore.
+            opposite.data.clear();
         }
-        self.left.keys.clear();
-        self.right.keys.clear();
-        self.left.data.clear();
-        self.right.data.clear();
+        // we will never look at it, and nothing will be inserted, drop it freeing some memory.
+        side.keys.clear();
+        side.ended = true;
     }
 }
 
@@ -201,8 +200,6 @@ impl<
                     ((self.keyer1)(&item), item),
                     &mut self.left,
                     &mut self.right,
-                    self.variant.left_outer(),
-                    self.variant.right_outer(),
                     &mut self.buffer,
                     |x, y| (x, y),
                 ),
@@ -210,8 +207,6 @@ impl<
                     ((self.keyer2)(&item), item),
                     &mut self.right,
                     &mut self.left,
-                    self.variant.right_outer(),
-                    self.variant.left_outer(),
                     &mut self.buffer,
                     |x, y| (y, x),
                 ),
@@ -222,11 +217,9 @@ impl<
                         self.left.count,
                         self.right.count
                     );
-                    self.left.ended = true;
-
-                    if self.left.ended && self.right.ended {
-                        self.flush_outer()
-                    }
+                    Self::side_ended(&mut self.left, &mut self.right, &mut self.buffer, |x, y| {
+                        (x, y)
+                    })
                 }
                 StreamElement::Item(BinaryElement::RightEnd) => {
                     log::debug!(
@@ -235,19 +228,15 @@ impl<
                         self.left.count,
                         self.right.count
                     );
-                    self.right.ended = true;
-
-                    if self.left.ended && self.right.ended {
-                        self.flush_outer()
-                    }
+                    Self::side_ended(&mut self.right, &mut self.left, &mut self.buffer, |x, y| {
+                        (y, x)
+                    })
                 }
                 StreamElement::FlushAndRestart => {
                     assert!(self.left.ended);
                     assert!(self.right.ended);
                     assert!(self.left.data.is_empty());
                     assert!(self.right.data.is_empty());
-                    assert!(self.left.keys.is_empty());
-                    assert!(self.right.keys.is_empty());
                     self.left.ended = false;
                     self.left.count = 0;
                     self.right.ended = false;
