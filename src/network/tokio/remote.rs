@@ -44,8 +44,15 @@ pub(crate) async fn remote_send<T: ExchangeData, W: AsyncWrite + Unpin>(
 ) {
     scratch.resize(HEADER_SIZE, 0);
 
-    let serialized_len = bincode::serde::encode_into_std_write(&msg, scratch, BINCODE_MESSAGE)
+    #[cfg(feature = "bitcode")]
+    bitcode::serialize_in(scratch, &msg)
         .unwrap_or_else(|e| panic!("Failed to serialize message to {dest} at {address}: {e:?}",));
+
+    #[cfg(not(feature = "bitcode"))]
+    bincode::serde::encode_into_std_write(&msg, scratch, BINCODE_MESSAGE)
+        .unwrap_or_else(|e| panic!("Failed to serialize message to {dest} at {address}: {e:?}",));
+
+    let serialized_len = scratch.len() - HEADER_SIZE;
 
     let header = MessageHeader {
         size: serialized_len.try_into().unwrap(),
@@ -109,9 +116,12 @@ pub(crate) async fn remote_recv<T: ExchangeData, R: AsyncRead + Unpin>(
             )
         });
 
-    let (msg, msg_len): (NetworkMessage<T>, _) =
+    #[cfg(feature = "bitcode")]
+    let msg: NetworkMessage<T> = bitcode::deserialize(scratch).expect("Malformed message");
+    // debug_assert_eq!(header.size as usize, msg_len);
+    #[cfg(not(feature = "bitcode"))]
+    let (msg, _msg_len): (NetworkMessage<T>, _) =
         bincode::serde::decode_from_slice(scratch, BINCODE_MESSAGE).expect("Malformed message");
-    debug_assert_eq!(header.size as usize, msg_len);
 
     let dest = ReceiverEndpoint::new(
         Coord::new(coord.coord.block_id, coord.coord.host_id, header.replica_id),

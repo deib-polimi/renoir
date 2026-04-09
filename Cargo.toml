@@ -22,6 +22,7 @@ avro = ["dep:apache-avro"]
 profiler = []
 parquet = ["dep:parquet", "dep:arrow"]
 rdkafka = ["dep:rdkafka", "tokio"]
+bitcode = ["dep:bitcode"]
 # parquet = ["dep:parquet", "dep:arrow"]
 
 [dependencies]
@@ -41,6 +42,7 @@ derivative = "2.2.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 bincode = { version = "2.0.1", features = ["serde"] }
+bitcode = { version = "0.6.9", git = "https://github.com/imDema/bitcode", features = ["serde"], optional = true }
 toml = "1.1.2"
 
 thiserror = "2.0.18"
