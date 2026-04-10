@@ -165,6 +165,9 @@ harness = false
 name = "nexmark"
 harness = false
 [[bench]]
+name = "serde"
+harness = false
+[[bench]]
 name = "caching"
 harness = false
 [[bench]]
