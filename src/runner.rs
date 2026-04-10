@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Write as FmtWrite;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
@@ -131,7 +131,7 @@ fn build_remote_command(
     host_id: HostId,
     config: &RemoteConfig,
     binary_path: &Path,
-    perf_path: &Option<PathBuf>,
+    perf_cmd: &Option<String>,
 ) -> String {
     let config_toml = toml::to_string(config).unwrap();
     let config_str = shell_escape::escape(config_toml.into());
@@ -140,14 +140,11 @@ fn build_remote_command(
         .map(|arg| shell_escape::escape(arg.into()))
         .collect::<Vec<_>>()
         .join(" ");
-    let perf_cmd = if let Some(path) = perf_path.as_ref() {
-        warn!("Running remote process on host {} with perf enabled. This may cause performance regressions.", host_id);
-        format!(
-            "perf record --call-graph dwarf -o {} -- ",
-            shell_escape::escape(path.to_str().expect("non UTF-8 perf path").into())
-        )
+    let perf_cmd = if let Some(cmd) = perf_cmd.as_ref() {
+        warn!("Running remote process on host {host_id} with perf enabled. This may cause performance regressions. Command: {cmd}");
+        cmd.to_owned()
     } else {
-        "".to_string()
+        "".into()
     };
     format!(
         "export {host_id_env}={host_id};
@@ -155,7 +152,7 @@ export {config_env}={config};
 export RUST_LOG={rust_log};
 export RUST_BACKTRACE={rust_backtrace};
 export RUST_LOG_STYLE=always;
-{perf_cmd}{binary_path} {args}",
+{perf_cmd} {binary_path} {args}",
         host_id_env = HOST_ID_ENV_VAR,
         host_id = host_id,
         config_env = CONFIG_ENV_VAR,

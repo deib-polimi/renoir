@@ -160,7 +160,7 @@ impl TestHelper {
                 base_port: TEST_BASE_PORT,
                 num_cores: cores_per_host,
                 ssh: Default::default(),
-                perf_path: None,
+                perf_cmd: None,
             });
         }
 

@@ -1,10 +1,15 @@
 
 [[host]]
-address = "host1"
+address = "localhost"
 base_port = 9500
-num_cores = 16
+num_cores = 8
+ssh = { username = "user", key_file = "/home/user/.ssh/id_ed25519" }
+# perf_cmd = "samply record --reuse-threads --per-cpu-threads -s -o /tmp/profile1.json.gz"
 
 [[host]]
-address = "host2"
-base_port = 9500
-num_cores = 24
+address = "localhost"
+base_port = 9600
+num_cores = 16
+# perf_cmd = "perf record --call-graph dwarf -o /tmp/data1.perf"
+# perf_cmd = "samply record --reuse-threads --per-cpu-threads -s -o /tmp/profile2.json.gz"
+ssh = { username = "user", key_file = "/home/user/.ssh/id_ed25519" }

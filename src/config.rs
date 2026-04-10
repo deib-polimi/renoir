@@ -144,9 +144,12 @@ pub struct HostConfig {
     /// The configuration to use to connect via SSH to the remote host.
     #[serde(default)]
     pub ssh: SSHConfig,
-    /// If specified the remote worker will be spawned under `perf`, and its output will be stored
-    /// at this location.
-    pub perf_path: Option<PathBuf>,
+    /// If specified, command to prefix to the worker execution. Used for profiling.
+    /// 
+    /// Examples:
+    /// perf record --call-graph dwarf -o /tmp/data-1.perf --
+    /// samply record --reuse-threads --per-cpu-threads -s -o /tmp/profile-1.json.gz
+    pub perf_cmd: Option<String>,
 }
 
 /// The information used to connect to a remote host via SSH.

@@ -110,7 +110,7 @@ pub(super) fn remote_worker(
     let sync_time = sync_start.elapsed();
 
     // build the remote command
-    let command = build_remote_command(host_id, &config, &remote_path, &host.perf_path);
+    let command = build_remote_command(host_id, &config, &remote_path, &host.perf_cmd);
     log::debug!("executing on host {}:\n{}", host_id, command);
 
     let execution_start = Instant::now();
