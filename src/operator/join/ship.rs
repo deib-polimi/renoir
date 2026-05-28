@@ -73,8 +73,8 @@ where
     {
         let keyer1 = prev.keyer1;
         let keyer2 = prev.keyer2;
-        let next_strategy1 = NextStrategy::group_by(keyer1.clone());
-        let next_strategy2 = NextStrategy::group_by(keyer2.clone());
+        let next_strategy1 = NextStrategy::group_by_hash(keyer1.clone());
+        let next_strategy2 = NextStrategy::group_by_hash(keyer2.clone());
         let inner =
             prev.lhs
                 .binary_connection(prev.rhs, Start::multiple, next_strategy1, next_strategy2);

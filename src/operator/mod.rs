@@ -1380,7 +1380,7 @@ where
         Fk: Fn(&Op::Out) -> K + Send + Clone + 'static,
         K: DataKey,
     {
-        let next_strategy = NextStrategy::group_by(keyer.clone());
+        let next_strategy = NextStrategy::group_by_hash(keyer.clone());
         let new_stream = self
             .split_block(End::new, next_strategy)
             .add_operator(|prev| KeyBy::new(prev, keyer));
@@ -1790,11 +1790,14 @@ where
     ///
     /// **Note**: this operator is advanced and is only intended to add functionality
     /// that is not achievable with other operators. Use with care
-    pub fn repartition_by<Fk: KeyerFn<u64, Op::Out>>(
+    pub fn repartition_by<Fk>(
         self,
         replication: Replication,
         partition_fn: Fk,
-    ) -> Stream<impl Operator<Out = Op::Out>> {
+    ) -> Stream<impl Operator<Out = Op::Out>>
+    where
+        Fk: Fn(&Op::Out) -> u64 + Clone + Send + 'static,
+    {
         let mut new_stream = self.split_block(End::new, NextStrategy::group_by(partition_fn));
         new_stream.block.scheduling.replication(replication);
         new_stream

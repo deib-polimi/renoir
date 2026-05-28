@@ -60,7 +60,7 @@ where
 
 impl<Out: ExchangeData> NextStrategy<Out> {
     /// Build a `NextStrategy` from a keyer function.
-    pub(crate) fn group_by<Key: Hash, Keyer>(
+    pub(crate) fn group_by_hash<Key: Hash, Keyer>(
         keyer: Keyer,
     ) -> NextStrategy<Out, impl KeyerFn<u64, Out>>
     where
@@ -70,6 +70,14 @@ impl<Out: ExchangeData> NextStrategy<Out> {
             move |item: &Out| group_by_hash(&keyer(item)),
             Default::default(),
         )
+    }
+
+    /// Build a `NextStrategy` from a keyer function.
+    pub(crate) fn group_by<Keyer>(keyer: Keyer) -> NextStrategy<Out, impl KeyerFn<u64, Out>>
+    where
+        Keyer: Fn(&Out) -> u64 + Send + Clone + 'static,
+    {
+        NextStrategy::GroupBy(keyer, Default::default())
     }
 
     /// Returns `NextStrategy::All` with default `IndexFn`.
